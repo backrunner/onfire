@@ -1,0 +1,20 @@
+{
+  "name": "@onfire/sdk",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json --outDir dist",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "echo \"(sdk) no tests yet\""
+  },
+  "dependencies": {
+    "@onfire/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
+

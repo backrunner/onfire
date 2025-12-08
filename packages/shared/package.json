@@ -1,0 +1,27 @@
+{
+  "name": "@onfire/shared",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./rbac": "./src/rbac.ts",
+    "./schema": "./src/schema.ts",
+    "./drizzle/schema": "./src/drizzle/schema.ts",
+    "./drizzle/client": "./src/drizzle/client.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --outDir dist",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "echo \"(shared) no tests yet\""
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
+

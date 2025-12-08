@@ -1,0 +1,30 @@
+{
+  "name": "onfire",
+  "private": true,
+  "version": "0.0.1",
+  "packageManager": "bun@1.3.5",
+  "workspaces": [
+    "apps/*",
+    "workers/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "format": "turbo format",
+    "test": "turbo test",
+    "init": "bash scripts/init.sh",
+    "db:generate": "drizzle-kit generate:sqlite --schema=packages/shared/src/drizzle/schema.ts --out=drizzle/migrations",
+    "db:migrate:toc": "WRANGLER_CONFIG=workers/toc-worker/wrangler.toml bunx wrangler d1 migrations apply DB --local",
+    "db:migrate:tob": "WRANGLER_CONFIG=workers/tob-worker/wrangler.toml bunx wrangler d1 migrations apply DB --local",
+    "db:migrate:all": "npm run db:migrate:toc && npm run db:migrate:tob"
+  },
+  "devDependencies": {
+    "turbo": "^2.6.3",
+    "typescript": "^5.9.3",
+    "drizzle-kit": "^0.31.8",
+    "wrangler": "^4.53.0"
+  }
+}
+

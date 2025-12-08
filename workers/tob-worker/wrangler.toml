@@ -1,0 +1,15 @@
+name = "onfire-tob-worker"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+node_compat = true
+[unsafe]
+bindings = []
+
+[vars]
+APP_PREFIX = "/api/tob"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "onfire-d1"
+database_id = "local"
+
