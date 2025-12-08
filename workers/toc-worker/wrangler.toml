@@ -1,7 +1,7 @@
 name = "onfire-toc-worker"
 main = "src/index.ts"
 compatibility_date = "2025-06-01"
-node_compat = true
+compatibility_flags = ["nodejs_compat"]
 
 [vars]
 APP_PREFIX = "/api/toc"
