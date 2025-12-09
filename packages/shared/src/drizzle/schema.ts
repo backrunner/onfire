@@ -19,6 +19,16 @@ export const products = sqliteTable('products', {
   slaLowReply: integer('sla_low_reply')
 });
 
+export const productKeys = sqliteTable('product_keys', {
+  id: text('id').primaryKey(),
+  productId: text('product_id').notNull(),
+  name: text('name'),
+  secret: text('secret').notNull(),
+  createdAt: text('created_at').notNull(),
+  lastUsedAt: text('last_used_at'),
+  revoked: integer('revoked', { mode: 'boolean' }).default(false)
+});
+
 export const teams = sqliteTable('teams', {
   id: text('id').primaryKey(),
   tenantId: text('tenant_id').notNull(),
@@ -102,4 +112,5 @@ export const history = sqliteTable('history', {
 export type TicketRow = typeof tickets.$inferSelect;
 export type ReplyRow = typeof replies.$inferSelect;
 export type TemplateRow = typeof templates.$inferSelect;
+export type ProductKeyRow = typeof productKeys.$inferSelect;
 

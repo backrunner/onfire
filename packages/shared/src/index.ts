@@ -44,6 +44,15 @@ export interface Product {
   sla?: PriorityPolicy;
 }
 
+export interface ProductApiKey {
+  id: string;
+  productId: ProductID;
+  name?: string | null;
+  createdAt: string;
+  lastUsedAt?: string | null;
+  revoked?: boolean;
+}
+
 export interface Team {
   id: TeamID;
   tenantId: TenantID;

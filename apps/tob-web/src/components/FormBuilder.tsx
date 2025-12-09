@@ -34,9 +34,24 @@ export function FormBuilder({ value, onChange }: FormBuilderProps) {
     setFields(value ?? []);
   }, [value]);
 
+  const ensureDetail = (list: FormField[]) => {
+    if (list.some((f) => f.type === 'textarea')) return list;
+    return [
+      {
+        label: '问题详情',
+        key: 'content',
+        type: 'textarea',
+        required: true,
+        placeholder: '请详细描述问题、步骤、期望'
+      },
+      ...list
+    ];
+  };
+
   const emit = (next: FormField[]) => {
-    setFields(next);
-    onChange(next, JSON.stringify(next, null, 2));
+    const ensured = ensureDetail(next);
+    setFields(ensured);
+    onChange(ensured, JSON.stringify(ensured, null, 2));
   };
 
   const resetDraft = () => {

@@ -50,12 +50,21 @@ export const createTicketRoutes = (env: Bindings) =>
       const body = (await request.json()) as Record<string, any>;
       const token = request.headers.get('authorization')?.replace('Bearer ', '');
       if (!token) return new Response('missing token', { status: 401 });
-      const identity = await verifyJwt(token, store.env);
+      const identity = await verifyJwt(token, store.env, store.db);
       await verifyTurnstile(body.turnstileToken as string | undefined, store.env.TURNSTILE_SECRET);
-      const priority = (body.priority as TicketPriority) ?? derivePriority(body.customer?.level);
+      const customerEmail = identity.email ?? (body.customer?.email as string | undefined) ?? '';
+      const customerLevel = identity.level ?? (body.customer?.level as number | undefined) ?? undefined;
+      const priority = (body.priority as TicketPriority) ?? derivePriority(customerLevel);
       const now = new Date();
       // 读取产品 SLA 配置（分钟），若无配置则回落默认
-      const productRow = await store.db.query.products.findFirst({ where: eq(products.id, (body.productId as string) ?? identity.productId ?? 'demo-product') });
+      const resolvedProductId = (identity.productId as string | undefined) ?? (body.productId as string | undefined) ?? 'demo-product';
+      const productRow = await store.db.query.products.findFirst({ where: eq(products.id, resolvedProductId) });
+      const metadataPayload = {
+        ...(body.metadata ?? {}),
+        category: (body.metadata?.category as string | undefined) ?? (body.category as string | undefined),
+        form: (body.metadata?.form as Record<string, unknown> | undefined) ?? (body.form as Record<string, unknown> | undefined),
+        customer: { externalId: identity.externalId, meta: identity.meta }
+      };
       const policy: PriorityPolicy = {
         high: {
           acceptWithinMinutes: productRow?.slaHighAccept ?? defaultPolicy.high.acceptWithinMinutes,
@@ -73,7 +82,7 @@ export const createTicketRoutes = (env: Bindings) =>
       const sla = calcSla(priority, now, policy);
       const id = crypto.randomUUID();
       const tenantId = identity.tenantId ?? 'demo-tenant';
-      const productId = (body.productId as string) ?? identity.productId ?? 'demo-product';
+      const productId = resolvedProductId;
       const prodTeam = await store.db.select({ teamId: productTeams.teamId }).from(productTeams).where(eq(productTeams.productId, productId)).limit(1);
       const tenantDefault = await store.db.select({ teamId: tenants.defaultTeamId }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
       const teamId = prodTeam[0]?.teamId ?? tenantDefault[0]?.teamId ?? 'team-default';
@@ -90,10 +99,10 @@ export const createTicketRoutes = (env: Bindings) =>
           priority,
           subject: String(body.subject ?? '未命名工单'),
           content: String(body.content ?? ''),
-          customerEmail: String(body.customer?.email ?? ''),
-          customerLevel: body.customer?.level ?? null,
+          customerEmail: String(customerEmail),
+          customerLevel: customerLevel ?? null,
           templateId: body.templateId ?? null,
-          metadata: body.metadata ? JSON.stringify(body.metadata) : null,
+          metadata: JSON.stringify(metadataPayload),
           slaAcceptDeadline: sla.acceptDeadline,
           slaReplyDeadline: sla.replyDeadline,
           createdAt: now.toISOString(),
@@ -130,7 +139,7 @@ export const createTicketRoutes = (env: Bindings) =>
     .get('/tickets', async ({ query, request, store }) => {
       const token = request.headers.get('authorization')?.replace('Bearer ', '');
       if (!token) return new Response('missing token', { status: 401 });
-      const identity = await verifyJwt(token, env);
+      const identity = await verifyJwt(token, env, store.db);
       const productId = query['productId'] as string | undefined;
       const status = query['status'] as TicketStatus | undefined;
       const where = [eq(tickets.tenantId, identity.tenantId ?? 'demo-tenant')];
@@ -148,7 +157,7 @@ export const createTicketRoutes = (env: Bindings) =>
     .get('/tickets/:id', async ({ params, request, store }) => {
       const token = request.headers.get('authorization')?.replace('Bearer ', '');
       if (!token) return new Response('missing token', { status: 401 });
-      const identity = await verifyJwt(token, env);
+      const identity = await verifyJwt(token, env, store.db);
       const ticket = await store.db.query.tickets.findFirst({ where: eq(tickets.id, params.id) });
       if (!ticket) return new Response('not found', { status: 404 });
       if (ticket.tenantId !== (identity.tenantId ?? 'demo-tenant')) return new Response('forbidden', { status: 403 });
@@ -160,7 +169,7 @@ export const createTicketRoutes = (env: Bindings) =>
       const body = (await request.json()) as { content: string; turnstileToken?: string };
       const token = request.headers.get('authorization')?.replace('Bearer ', '');
       if (!token) return new Response('missing token', { status: 401 });
-      const identity = await verifyJwt(token, store.env);
+      const identity = await verifyJwt(token, store.env, store.db);
       await verifyTurnstile(body.turnstileToken, store.env.TURNSTILE_SECRET);
       const ticket = await store.db.query.tickets.findFirst({ where: eq(tickets.id, params.id) });
       if (!ticket) return new Response('not found', { status: 404 });

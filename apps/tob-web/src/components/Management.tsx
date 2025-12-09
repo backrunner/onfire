@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Panel, Button, Input } from '@onfire/ui';
-import { ShieldCheck, Users, Building2, LayoutList, Bot, RefreshCw, Pencil, Trash2 } from 'lucide-react';
+import { ShieldCheck, Users, Building2, LayoutList, Bot, RefreshCw, Pencil, Trash2, KeyRound, Copy } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import {
   adminTenants,
@@ -9,8 +9,12 @@ import {
   adminTemplates,
   adminUsers,
   adminCustomers,
+  adminProductKeys,
   createTenant,
   createProduct,
+  createProductKey,
+  rotateProductKey,
+  revokeProductKey,
   createTeam,
   createTemplate,
   updateTenant,
@@ -56,6 +60,10 @@ export function Management({
   const [templates, setTemplates] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
+  const [productKeys, setProductKeys] = useState<any[]>([]);
+  const [apiKeyProductId, setApiKeyProductId] = useState('');
+  const [apiKeyName, setApiKeyName] = useState('');
+  const [issuedApiKey, setIssuedApiKey] = useState<string | null>(null);
   const [tenantName, setTenantName] = useState('');
   const [editingTenant, setEditingTenant] = useState<any | null>(null);
   const [productName, setProductName] = useState('');
@@ -108,6 +116,7 @@ export function Management({
     try {
       if (canManageTenant) setTenants((await adminTenants()).data ?? []);
       if (canManageProduct) setProducts((await adminProducts()).data ?? []);
+      if (canManageProduct) setProductKeys((await adminProductKeys()).data ?? []);
       if (canManageTeam) setTeams((await adminTeams()).data ?? []);
       if (canManageTemplate) setTemplates((await adminTemplates()).data ?? []);
       if (canManageUser) setUsers((await adminUsers()).data ?? []);
@@ -129,6 +138,14 @@ export function Management({
 
   const setError = (key: string, msg?: string) => {
     setErrors((prev) => ({ ...prev, [key]: msg ?? '' }));
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard?.writeText(text);
+    } catch {
+      /* ignore */
+    }
   };
 
   return (
@@ -458,6 +475,106 @@ export function Management({
                   </div>
                 </div>
               )}
+              <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-zinc-800">
+                    <KeyRound className="h-4 w-4 text-zinc-500" />
+                    Product API Key
+                  </div>
+                  <Button size="sm" variant="outline" onClick={async () => setProductKeys((await adminProductKeys()).data ?? [])}>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    刷新
+                  </Button>
+                </div>
+                <div className="grid gap-2 md:grid-cols-3">
+                  <Input placeholder="产品ID" value={apiKeyProductId} onChange={(e) => setApiKeyProductId(e.target.value)} />
+                  <Input placeholder="备注名称(可选)" value={apiKeyName} onChange={(e) => setApiKeyName(e.target.value)} />
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      if (!apiKeyProductId) {
+                        setError('productKey', '请输入产品ID');
+                        return;
+                      }
+                      setError('productKey', '');
+                      setLoading(true);
+                      try {
+                        const res = await createProductKey({ productId: apiKeyProductId, name: apiKeyName || undefined });
+                        setIssuedApiKey(res.apiKey);
+                        setProductKeys((await adminProductKeys()).data ?? []);
+                        setApiKeyName('');
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                  >
+                    生成 API Key
+                  </Button>
+                </div>
+                <ErrorText text={errors['productKey']} />
+                {issuedApiKey && (
+                  <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                    <div className="flex items-center justify-between">
+                      <div className="font-semibold">新 API Key（仅此处可见）</div>
+                      <Button size="sm" variant="outline" onClick={() => copyToClipboard(issuedApiKey)}>
+                        <Copy className="mr-1 h-3 w-3" />
+                        复制
+                      </Button>
+                    </div>
+                    <div className="mt-1 break-all font-mono text-[11px]">{issuedApiKey}</div>
+                  </div>
+                )}
+                <div className="mt-3 space-y-2 text-xs text-zinc-700">
+                  {productKeys.length === 0 ? (
+                    <NoAccess reason="暂无 Key" />
+                  ) : (
+                    productKeys.map((k) => (
+                      <div key={k.id} className="flex items-center justify-between rounded border border-zinc-100 px-2 py-2">
+                        <div>
+                          <div className="font-semibold text-zinc-800">{k.name ?? k.id}</div>
+                          <div className="text-[11px] text-zinc-500">
+                            product {k.productId} · 创建 {k.createdAt ?? '-'} · 最近 {k.lastUsedAt ?? '未使用'}
+                          </div>
+                          {k.revoked && <div className="text-[11px] text-amber-600">已吊销</div>}
+                        </div>
+                        <div className="space-x-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              setLoading(true);
+                              try {
+                                const res = await rotateProductKey(k.id);
+                                if (res.apiKey) setIssuedApiKey(res.apiKey);
+                                setProductKeys((await adminProductKeys()).data ?? []);
+                              } finally {
+                                setLoading(false);
+                              }
+                            }}
+                          >
+                            重置
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              setLoading(true);
+                              try {
+                                await revokeProductKey(k.id, !k.revoked);
+                                setProductKeys((await adminProductKeys()).data ?? []);
+                              } finally {
+                                setLoading(false);
+                              }
+                            }}
+                          >
+                            {k.revoked ? '启用' : '吊销'}
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           ) : (
             <NoAccess reason="无产品管理权限" />

@@ -106,10 +106,28 @@ export const adminTeams = () => fetch(`${baseUrl}/admin/teams`, { headers: authH
 export const adminTemplates = () => fetch(`${baseUrl}/admin/templates`, { headers: authHeaders() }).then(json) as Promise<{ data: any[] }>;
 export const adminUsers = () => fetch(`${baseUrl}/admin/users`, { headers: authHeaders() }).then(json) as Promise<{ data: any[] }>;
 export const adminCustomers = () => fetch(`${baseUrl}/admin/customers`, { headers: authHeaders() }).then(json) as Promise<{ data: any[] }>;
+export const adminProductKeys = (productId?: string) =>
+  fetch(`${baseUrl}/admin/product-keys${productId ? `?productId=${encodeURIComponent(productId)}` : ''}`, { headers: authHeaders() }).then(json) as Promise<{
+    data: any[];
+  }>;
 export const createTenant = (body: { name: string }) =>
   fetch(`${baseUrl}/admin/tenants`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(body) }).then(json);
 export const createProduct = (body: { name: string; tenantId?: string; sla?: { highAccept?: number; highReply?: number; mediumAccept?: number; mediumReply?: number; lowAccept?: number; lowReply?: number } }) =>
   fetch(`${baseUrl}/admin/products`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(body) }).then(json);
+export const createProductKey = (body: { productId: string; name?: string }) =>
+  fetch(`${baseUrl}/admin/product-keys`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body)
+  }).then(json);
+export const rotateProductKey = (id: string) =>
+  fetch(`${baseUrl}/admin/product-keys/${id}/rotate`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() } }).then(json);
+export const revokeProductKey = (id: string, revoked = true) =>
+  fetch(`${baseUrl}/admin/product-keys/${id}/revoke`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ revoked })
+  }).then(json);
 export const createTeam = (body: { name: string; allowReassign?: boolean; tenantId?: string }) =>
   fetch(`${baseUrl}/admin/teams`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(body) }).then(json);
 export const createTemplate = (body: { productId: string; title: string; categories?: string; formSchema?: string }) =>

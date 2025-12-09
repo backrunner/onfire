@@ -8,6 +8,7 @@ import { createSystemRoutes } from './routes/system';
 import { createTemplateRoutes } from './routes/templates';
 import { createTicketRoutes } from './routes/tickets';
 import { createTaskRoutes } from './routes/tasks';
+import { createTokenRoutes } from './routes/tokens';
 
 const createApp = (env: Bindings) =>
   new Elysia({ adapter: CloudflareAdapter, prefix: env.APP_PREFIX ?? '/api/toc' })
@@ -17,6 +18,7 @@ const createApp = (env: Bindings) =>
     .use(createSystemRoutes(env))
     .use(createTemplateRoutes(env))
     .use(createTicketRoutes(env))
+    .use(createTokenRoutes(env))
     .use(createTaskRoutes())
     .compile();
 

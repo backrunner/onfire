@@ -49,6 +49,14 @@ export interface ReplyTicketInput {
   internal?: boolean;
 }
 
+export interface IssueCustomerJwtInput {
+  apiKey: string;
+  email?: string;
+  externalId?: string;
+  level?: number;
+  meta?: Record<string, unknown>;
+}
+
 export interface ReassignInput {
   assigneeId: string;
 }
@@ -178,6 +186,21 @@ export class OnfireClient {
     return res.json();
   }
 
+  async issueCustomerJwt(input: IssueCustomerJwtInput): Promise<{ token: string; productId: string; tenantId: string }> {
+    const res = await this.fetcher(`${this.baseUrl}/tokens/issue`, {
+      method: 'POST',
+      headers: { ...this.headers(), 'x-api-key': input.apiKey, Authorization: `Bearer ${input.apiKey}` },
+      body: JSON.stringify({
+        email: input.email,
+        externalId: input.externalId,
+        level: input.level,
+        meta: input.meta
+      })
+    });
+    await ensureOk(res, 'issueCustomerJwt');
+    return res.json();
+  }
+
   /**
    * 生成 ToC 前端跳转 URL（需外部准备好 JWT）
    */
@@ -188,6 +211,15 @@ export class OnfireClient {
       if (v !== undefined && v !== null) query.set(k, String(v));
     });
     return `${base}/?${query.toString()}`;
+  }
+
+  /**
+   * 使用 API Key 签发 JWT 并生成 ToC URL
+   */
+  async buildTocUrlWithSigning(productId: ProductID, input: Omit<IssueCustomerJwtInput, 'apiKey'> & { apiKey: string }, extraQuery?: Record<string, string | number | undefined>) {
+    const issued = await this.issueCustomerJwt({ ...input, apiKey: input.apiKey, email: input.email, externalId: input.externalId, level: input.level, meta: input.meta });
+    const targetProductId = issued.productId ?? productId;
+    return this.buildTocUrl(targetProductId, issued.token, extraQuery);
   }
 }
 

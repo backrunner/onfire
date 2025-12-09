@@ -1,11 +1,13 @@
-import { schema, seedSql } from '@onfire/shared/schema';
 import type { D1Database } from '@cloudflare/workers-types';
+import { migrate } from 'drizzle-orm/d1/migrator';
+import { createDb } from '@onfire/shared/drizzle/client';
 
 export const prepare = async (db: D1Database) => {
-  for (const key of Object.keys(schema)) {
-    // biome-ignore lint/style/noNonNullAssertion: dynamic access
-    const sql = (schema as any)[key] as string;
-    await db.exec(sql);
+  const client = createDb(db);
+  try {
+    const migrationsPath = new URL('../../../../drizzle/migrations', import.meta.url).pathname;
+    await migrate(client, { migrationsFolder: migrationsPath });
+  } catch (err) {
+    console.warn('drizzle migration skipped or failed', err);
   }
-  await db.exec(seedSql);
 };

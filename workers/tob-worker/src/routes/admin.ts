@@ -1,6 +1,6 @@
 import { Role } from '@onfire/shared';
 import { assertPermission } from '@onfire/shared/rbac';
-import { tenants, products, teams, templates, users, productTeams } from '@onfire/shared/drizzle/schema';
+import { tenants, products, teams, templates, users, productTeams, productKeys } from '@onfire/shared/drizzle/schema';
 import { Elysia } from 'elysia';
 import { and, eq, inArray } from 'drizzle-orm';
 import { resolveContext } from '../core/context';
@@ -43,6 +43,19 @@ const syncProductTeams = async (store: any, productId: string, teamIds: string[]
     .run();
 };
 
+const createApiKeyValue = () => {
+  const id = crypto.randomUUID();
+  const secret = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+  return { id, secret, apiKey: `${id}.${secret}` };
+};
+
+const assertProductAccessible = async (store: any, ctx: any, productId: string) => {
+  const existing = await store.db.query.products.findFirst({ where: eq(products.id, productId) });
+  if (!existing) throw new Response('not found', { status: 404 });
+  if (ctx.user.role !== Role.SuperAdmin && !ctx.tenantIds.includes(existing.tenantId as any)) throw new Response('forbidden', { status: 403 });
+  return existing;
+};
+
 export const createAdminRoutes = (env: Bindings) =>
   new Elysia({ prefix: '/admin' })
     .get('/tenants', async ({ user, store }) => {
@@ -71,6 +84,56 @@ export const createAdminRoutes = (env: Bindings) =>
       });
       const merged = rows.map((p) => ({ ...p, teamIds: teamMap.get(p.id) ?? [] }));
       return { data: merged };
+    })
+    .get('/product-keys', async ({ user, store, query }) => {
+      const ctx = await resolveContext(env, user);
+      assertPermission(ctx, 'product.manage');
+      const productId = query['productId'] as string | undefined;
+      const targetIds = productId ? [productId] : ctx.productIds;
+      if (!targetIds.length) return { data: [] };
+      const rows =
+        ctx.user.role === Role.SuperAdmin
+          ? await store.db.select().from(productKeys).where(inArray(productKeys.productId, targetIds))
+          : await store.db
+              .select()
+              .from(productKeys)
+              .where(inArray(productKeys.productId, targetIds));
+      return { data: rows.map((r: any) => ({ ...r, secret: undefined })) };
+    })
+    .post('/product-keys', async ({ user, store, request }) => {
+      const ctx = await resolveContext(env, user);
+      assertPermission(ctx, 'product.manage');
+      const body = (await request.json()) as { productId: string; name?: string };
+      if (!body.productId) return new Response('productId required', { status: 400 });
+      const product = await assertProductAccessible(store, ctx, body.productId);
+      const { id, secret, apiKey } = createApiKeyValue();
+      const now = new Date().toISOString();
+      await store.db
+        .insert(productKeys)
+        .values({ id, productId: product.id, name: body.name ?? null, secret, createdAt: now, revoked: false })
+        .run();
+      return { ok: true, id, productId: product.id, apiKey };
+    })
+    .post('/product-keys/:id/rotate', async ({ user, store, params }) => {
+      const ctx = await resolveContext(env, user);
+      assertPermission(ctx, 'product.manage');
+      const existing = await store.db.query.productKeys.findFirst({ where: eq(productKeys.id, params.id) });
+      if (!existing) return new Response('not found', { status: 404 });
+      await assertProductAccessible(store, ctx, existing.productId);
+      const { secret, apiKey } = createApiKeyValue();
+      const now = new Date().toISOString();
+      await store.db.update(productKeys).set({ secret, createdAt: now, lastUsedAt: null, revoked: false }).where(eq(productKeys.id, params.id)).run();
+      return { ok: true, id: existing.id, apiKey };
+    })
+    .patch('/product-keys/:id/revoke', async ({ user, store, params, request }) => {
+      const ctx = await resolveContext(env, user);
+      assertPermission(ctx, 'product.manage');
+      const body = (await request.json().catch(() => ({}))) as { revoked?: boolean };
+      const existing = await store.db.query.productKeys.findFirst({ where: eq(productKeys.id, params.id) });
+      if (!existing) return new Response('not found', { status: 404 });
+      await assertProductAccessible(store, ctx, existing.productId);
+      await store.db.update(productKeys).set({ revoked: body.revoked ?? true }).where(eq(productKeys.id, params.id)).run();
+      return { ok: true };
     })
     .get('/teams', async ({ user, store }) => {
       const ctx = await resolveContext(env, user);
@@ -248,8 +311,40 @@ export const createAdminRoutes = (env: Bindings) =>
       const body = (await request.json()) as { productId: string; title: string; categories: string; formSchema: string };
       if (!body.productId || !body.title) return new Response('productId and title required', { status: 400 });
       if (!ctx.productIds.includes(body.productId)) return new Response('forbidden', { status: 403 });
+      let parsedSchema: any = null;
+      try {
+        parsedSchema = JSON.parse(body.formSchema ?? '{}');
+      } catch {
+        return new Response('invalid formSchema json', { status: 400 });
+      }
+      const fields: any[] = Array.isArray(parsedSchema) ? parsedSchema : parsedSchema.fields;
+      const hasTextarea = Array.isArray(fields) && fields.some((f) => f.type === 'textarea' || f.type === 'longtext');
+      const ensuredSchema = hasTextarea
+        ? parsedSchema
+        : {
+            ...(Array.isArray(parsedSchema) ? { fields: parsedSchema } : parsedSchema),
+            fields: [
+              {
+                label: '问题详情',
+                key: 'content',
+                type: 'textarea',
+                required: true,
+                placeholder: '请详细描述问题、步骤、期望'
+              },
+              ...(Array.isArray(fields) ? fields : [])
+            ]
+          };
       const id = crypto.randomUUID();
-      await store.db.insert(templates).values({ id, productId: body.productId, title: body.title, categories: body.categories ?? '[]', formSchema: body.formSchema ?? '{}' }).run();
+      await store.db
+        .insert(templates)
+        .values({
+          id,
+          productId: body.productId,
+          title: body.title,
+          categories: body.categories ?? '[]',
+          formSchema: JSON.stringify(ensuredSchema)
+        })
+        .run();
       return { ok: true, id };
     })
     .patch('/templates/:id', async ({ user, store, request, params }) => {
@@ -259,12 +354,43 @@ export const createAdminRoutes = (env: Bindings) =>
       if (!existing) return new Response('not found', { status: 404 });
       if (ctx.user.role !== Role.SuperAdmin && !ctx.productIds.includes(existing.productId as any)) return new Response('forbidden', { status: 403 });
       const body = (await request.json()) as { title?: string; categories?: string; formSchema?: string };
+      let parsedSchema: any = null;
+      if (body.formSchema) {
+        try {
+          parsedSchema = JSON.parse(body.formSchema);
+        } catch {
+          return new Response('invalid formSchema json', { status: 400 });
+        }
+      }
+      const fields: any[] =
+        parsedSchema !== null ? (Array.isArray(parsedSchema) ? parsedSchema : parsedSchema.fields) : (() => {
+            try { return JSON.parse(existing.formSchema).fields; } catch { return []; }
+          })();
+      const hasTextarea = Array.isArray(fields) && fields.some((f) => f.type === 'textarea' || f.type === 'longtext');
+      const ensuredSchema =
+        parsedSchema !== null
+          ? hasTextarea
+            ? parsedSchema
+            : {
+                ...(Array.isArray(parsedSchema) ? { fields: parsedSchema } : parsedSchema),
+                fields: [
+                  {
+                    label: '问题详情',
+                    key: 'content',
+                    type: 'textarea',
+                    required: true,
+                    placeholder: '请详细描述问题、步骤、期望'
+                  },
+                  ...(Array.isArray(fields) ? fields : [])
+                ]
+              }
+          : undefined;
       await store.db
         .update(templates)
         .set({
           ...(body.title ? { title: body.title } : {}),
           ...(body.categories ? { categories: body.categories } : {}),
-          ...(body.formSchema ? { formSchema: body.formSchema } : {})
+          ...(ensuredSchema ? { formSchema: JSON.stringify(ensuredSchema) } : {})
         })
         .where(eq(templates.id, params.id))
         .run();
