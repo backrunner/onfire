@@ -2,7 +2,7 @@ import { Elysia } from 'elysia';
 import { SignJWT } from 'jose';
 import { eq } from 'drizzle-orm';
 import { productKeys, products } from '@onfire/shared/drizzle/schema';
-import type { Bindings } from '../core/types';
+import type { Bindings, WorkerSingleton } from '../core/types';
 
 type IssueBody = {
   email?: string;
@@ -27,7 +27,7 @@ const generateToken = async (secret: string, kid: string, issuer: string | undef
 };
 
 export const createTokenRoutes = (env: Bindings) =>
-  new Elysia({ prefix: '/tokens' }).post('/issue', async ({ request, store }) => {
+  new Elysia<string, WorkerSingleton>({ prefix: '/tokens' }).post('/issue', async ({ request, store }) => {
     const body = (await request.json().catch(() => ({}))) as IssueBody & { apiKey?: string };
     const apiKey = parseApiKey(request.headers, body);
     if (!apiKey) return new Response('missing api key', { status: 401 });

@@ -2,9 +2,10 @@ import { TicketStatus } from '@onfire/shared';
 import { history, tickets } from '@onfire/shared/drizzle/schema';
 import { Elysia } from 'elysia';
 import { eq, ne } from 'drizzle-orm';
+import type { WorkerSingleton } from '../core/types';
 
 export const createTaskRoutes = () =>
-  new Elysia().post('/tasks/sla-scan', async ({ store }) => {
+  new Elysia<string, WorkerSingleton>().post('/tasks/sla-scan', async ({ store }) => {
     const now = new Date();
     const isoNow = now.toISOString();
     const rows = await store.db

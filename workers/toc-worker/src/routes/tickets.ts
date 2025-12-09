@@ -1,10 +1,10 @@
 import { TicketPriority, TicketStatus } from '@onfire/shared';
-import { history, productTeams, replies, tenants, tickets, products } from '@onfire/shared/drizzle/schema';
+import { history, productTeams, replies, tenants, tickets, products, categoryRoutes, customers } from '@onfire/shared/drizzle/schema';
 import { Elysia } from 'elysia';
 import { and, desc, eq } from 'drizzle-orm';
 import { bumpLoadCache, chooseEscalationAssignee, derivePriority, pickAssignee } from '../services/allocation';
 import { verifyJwt } from '../core/jwt';
-import type { Bindings } from '../core/types';
+import type { Bindings, WorkerSingleton } from '../core/types';
 
 type PriorityPolicy = Record<
   TicketPriority,
@@ -18,6 +18,37 @@ const defaultPolicy: PriorityPolicy = {
   high: { acceptWithinMinutes: 5, replyWithinMinutes: 20 },
   medium: { acceptWithinMinutes: 10, replyWithinMinutes: 60 },
   low: { acceptWithinMinutes: 30, replyWithinMinutes: 180 }
+};
+
+const parseJson = (val: any) => {
+  if (val === null || val === undefined) return undefined;
+  if (typeof val !== 'string') return val;
+  try {
+    return JSON.parse(val);
+  } catch {
+    return val;
+  }
+};
+
+const enrichTicket = (row: any) => {
+  if (!row) return row;
+  const acceptDeadline = row.slaAcceptDeadline ? Date.parse(row.slaAcceptDeadline) : undefined;
+  const replyDeadline = row.slaReplyDeadline ? Date.parse(row.slaReplyDeadline) : undefined;
+  const now = Date.now();
+  const sla =
+    row.slaAcceptDeadline || row.slaReplyDeadline
+      ? {
+          acceptDeadline: row.slaAcceptDeadline,
+          replyDeadline: row.slaReplyDeadline,
+          acceptBreached: acceptDeadline ? acceptDeadline < now : false,
+          replyBreached: replyDeadline ? replyDeadline < now : false
+        }
+      : undefined;
+  return {
+    ...row,
+    metadata: parseJson(row.metadata),
+    sla
+  };
 };
 
 const calcSla = (priority: TicketPriority, now = new Date(), policy: PriorityPolicy = defaultPolicy) => {
@@ -44,8 +75,61 @@ const verifyTurnstile = async (token: string | undefined, secret: string | undef
   return true;
 };
 
+const chooseTeamForCategory = async (db: any, productId: string, category?: string, subcategory?: string, fallback?: string) => {
+  if (!category) return fallback;
+  const rows = await db
+    .select()
+    .from(categoryRoutes)
+    .where(and(eq(categoryRoutes.productId, productId), eq(categoryRoutes.category, category)))
+    .limit(20);
+  if (!rows?.length) return fallback;
+  if (subcategory) {
+    const found = rows.find((r: any) => r.subcategory === subcategory);
+    if (found) return found.teamId;
+  }
+  return rows[0]?.teamId ?? fallback;
+};
+
+const upsertCustomer = async (db: any, payload: { tenantId: string; productId: string; email: string; externalId?: string; level?: number; meta?: any }) => {
+  const now = new Date().toISOString();
+  const existing = await db
+    .select()
+    .from(customers)
+    .where(and(eq(customers.email, payload.email), eq(customers.productId, payload.productId)))
+    .limit(1);
+  if (existing[0]) {
+    await db
+      .update(customers)
+      .set({
+        externalId: payload.externalId ?? existing[0].externalId,
+        level: payload.level ?? existing[0].level,
+        meta: payload.meta ? JSON.stringify(payload.meta) : existing[0].meta,
+        updatedAt: now
+      })
+      .where(eq(customers.id, existing[0].id))
+      .run();
+    return existing[0].id;
+  }
+  const id = crypto.randomUUID();
+  await db
+    .insert(customers)
+    .values({
+      id,
+      tenantId: payload.tenantId,
+      productId: payload.productId,
+      email: payload.email,
+      externalId: payload.externalId ?? null,
+      level: payload.level ?? null,
+      meta: payload.meta ? JSON.stringify(payload.meta) : null,
+      createdAt: now,
+      updatedAt: now
+    })
+    .run();
+  return id;
+};
+
 export const createTicketRoutes = (env: Bindings) =>
-  new Elysia()
+  new Elysia<string, WorkerSingleton>()
     .post('/tickets', async ({ request, store }) => {
       const body = (await request.json()) as Record<string, any>;
       const token = request.headers.get('authorization')?.replace('Bearer ', '');
@@ -62,6 +146,7 @@ export const createTicketRoutes = (env: Bindings) =>
       const metadataPayload = {
         ...(body.metadata ?? {}),
         category: (body.metadata?.category as string | undefined) ?? (body.category as string | undefined),
+        subcategory: (body.metadata?.subcategory as string | undefined) ?? (body.subcategory as string | undefined),
         form: (body.metadata?.form as Record<string, unknown> | undefined) ?? (body.form as Record<string, unknown> | undefined),
         customer: { externalId: identity.externalId, meta: identity.meta }
       };
@@ -85,8 +170,19 @@ export const createTicketRoutes = (env: Bindings) =>
       const productId = resolvedProductId;
       const prodTeam = await store.db.select({ teamId: productTeams.teamId }).from(productTeams).where(eq(productTeams.productId, productId)).limit(1);
       const tenantDefault = await store.db.select({ teamId: tenants.defaultTeamId }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
-      const teamId = prodTeam[0]?.teamId ?? tenantDefault[0]?.teamId ?? 'team-default';
+      const category = metadataPayload.category as string | undefined;
+      const subcategory = (body.subcategory as string | undefined) ?? (metadataPayload.form as any)?.subcategory;
+      const mappedTeam = await chooseTeamForCategory(store.db, productId, category, subcategory, prodTeam[0]?.teamId ?? tenantDefault[0]?.teamId ?? 'team-default');
+      const teamId = mappedTeam ?? prodTeam[0]?.teamId ?? tenantDefault[0]?.teamId ?? 'team-default';
       const assignee = await pickAssignee(store.db, teamId);
+      await upsertCustomer(store.db, {
+        tenantId,
+        productId,
+        email: customerEmail,
+        externalId: identity.externalId,
+        level: customerLevel,
+        meta: identity.meta
+      });
       await store.db
         .insert(tickets)
         .values({
@@ -152,7 +248,7 @@ export const createTicketRoutes = (env: Bindings) =>
         .where(and(...where))
         .orderBy(desc(tickets.createdAt))
         .limit(50);
-      return { data: rows, total: rows.length };
+      return { data: rows.map(enrichTicket), total: rows.length };
     })
     .get('/tickets/:id', async ({ params, request, store }) => {
       const token = request.headers.get('authorization')?.replace('Bearer ', '');
@@ -163,7 +259,7 @@ export const createTicketRoutes = (env: Bindings) =>
       if (ticket.tenantId !== (identity.tenantId ?? 'demo-tenant')) return new Response('forbidden', { status: 403 });
       const replyRows = await store.db.select().from(replies).where(eq(replies.ticketId, ticket.id)).orderBy(replies.createdAt);
       const historyRows = await store.db.select().from(history).where(eq(history.ticketId, ticket.id)).orderBy(history.createdAt);
-      return { ticket, replies: replyRows, history: historyRows };
+      return { ticket: enrichTicket(ticket), replies: replyRows, history: historyRows };
     })
     .post('/tickets/:id/reply', async ({ params, request, store }) => {
       const body = (await request.json()) as { content: string; turnstileToken?: string };
@@ -195,9 +291,14 @@ export const createTicketRoutes = (env: Bindings) =>
       const replyRows = await store.db.select().from(replies).where(eq(replies.ticketId, ticket.id)).orderBy(replies.createdAt);
       return { ok: true, replies: replyRows };
     })
-    .post('/tickets/:id/escalate', async ({ params, store }) => {
+    .post('/tickets/:id/escalate', async ({ params, request, store }) => {
+      // 需要客户 JWT，避免匿名越权升级
+      const token = request.headers.get('authorization')?.replace('Bearer ', '');
+      if (!token) return new Response('missing token', { status: 401 });
+      const identity = await verifyJwt(token, env, store.db);
       const ticket = await store.db.query.tickets.findFirst({ where: eq(tickets.id, params.id) });
       if (!ticket) return new Response('not found', { status: 404 });
+      if (ticket.tenantId !== (identity.tenantId ?? 'demo-tenant')) return new Response('forbidden', { status: 403 });
       const assignee = await chooseEscalationAssignee(store.db, ticket.teamId, ticket.assigneeId);
       if (!assignee) return new Response('no assignee available', { status: 409 });
       const now = new Date().toISOString();
@@ -211,7 +312,7 @@ export const createTicketRoutes = (env: Bindings) =>
         .values({
           id: crypto.randomUUID(),
           ticketId: ticket.id,
-          actorId: assignee.id,
+          actorId: identity.sub ?? identity.email ?? assignee.id,
           action: 'escalated',
           snapshot: JSON.stringify({ assigneeId: assignee.id }),
           createdAt: now

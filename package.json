@@ -21,6 +21,7 @@
     "db:migrate:all": "npm run db:migrate:toc && npm run db:migrate:tob"
   },
   "devDependencies": {
+    "@types/bun": "^1.1.12",
     "turbo": "^2.6.3",
     "typescript": "^5.9.3",
     "drizzle-kit": "^0.31.8",

@@ -77,6 +77,7 @@ export interface AgentProfile {
   email: string;
   teamIds: TeamID[];
   active: boolean;
+  avatarUrl?: string;
 }
 
 export interface TicketTemplate {
@@ -85,6 +86,26 @@ export interface TicketTemplate {
   title: string;
   categories: Category[];
   formSchema: Record<string, unknown>;
+}
+
+export interface Customer {
+  id: string;
+  tenantId: TenantID;
+  productId: ProductID;
+  email: string;
+  externalId?: string;
+  level?: number;
+  meta?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CategoryRoute {
+  id: string;
+  productId: ProductID;
+  category: string;
+  subcategory?: string;
+  teamId: TeamID;
 }
 
 export interface Ticket {
@@ -173,14 +194,78 @@ export type Permission =
   | 'team.manage'
   | 'product.manage'
   | 'tenant.manage'
-  | 'user.manage';
+  | 'user.manage'
+  | 'role.manage'
+  | 'customer.read'
+  | 'customer.write'
+  | 'category.map'
+  | 'agent.profile';
 
 export const rolePermissions: Record<Role, Permission[]> = {
-  [Role.SuperAdmin]: ['ticket.read', 'ticket.write', 'ticket.assign', 'ticket.escalate', 'ticket.close', 'ticket.reassign', 'template.read', 'template.write', 'team.manage', 'product.manage', 'tenant.manage', 'user.manage'],
-  [Role.TenantAdmin]: ['ticket.read', 'ticket.write', 'ticket.assign', 'ticket.escalate', 'ticket.close', 'ticket.reassign', 'template.read', 'template.write', 'team.manage', 'product.manage', 'user.manage'],
-  [Role.ProductAdmin]: ['ticket.read', 'ticket.write', 'ticket.assign', 'ticket.escalate', 'ticket.close', 'ticket.reassign', 'template.read', 'template.write', 'team.manage'],
-  [Role.TeamAdmin]: ['ticket.read', 'ticket.write', 'ticket.assign', 'ticket.escalate', 'ticket.close', 'ticket.reassign'],
-  [Role.Agent]: ['ticket.read', 'ticket.write', 'ticket.close']
+  [Role.SuperAdmin]: [
+    'ticket.read',
+    'ticket.write',
+    'ticket.assign',
+    'ticket.escalate',
+    'ticket.close',
+    'ticket.reassign',
+    'template.read',
+    'template.write',
+    'team.manage',
+    'product.manage',
+    'tenant.manage',
+    'user.manage',
+    'role.manage',
+    'customer.read',
+    'customer.write',
+    'category.map',
+    'agent.profile'
+  ],
+  [Role.TenantAdmin]: [
+    'ticket.read',
+    'ticket.write',
+    'ticket.assign',
+    'ticket.escalate',
+    'ticket.close',
+    'ticket.reassign',
+    'template.read',
+    'template.write',
+    'team.manage',
+    'product.manage',
+    'user.manage',
+    'role.manage',
+    'customer.read',
+    'customer.write',
+    'category.map',
+    'agent.profile'
+  ],
+  [Role.ProductAdmin]: [
+    'ticket.read',
+    'ticket.write',
+    'ticket.assign',
+    'ticket.escalate',
+    'ticket.close',
+    'ticket.reassign',
+    'template.read',
+    'template.write',
+    'team.manage',
+    'customer.read',
+    'customer.write',
+    'category.map',
+    'agent.profile'
+  ],
+  [Role.TeamAdmin]: [
+    'ticket.read',
+    'ticket.write',
+    'ticket.assign',
+    'ticket.escalate',
+    'ticket.close',
+    'ticket.reassign',
+    'customer.read',
+    'category.map',
+    'agent.profile'
+  ],
+  [Role.Agent]: ['ticket.read', 'ticket.write', 'ticket.close', 'agent.profile']
 };
 
 export const hasPermission = (role: Role, perm: Permission) => rolePermissions[role]?.includes(perm) ?? false;

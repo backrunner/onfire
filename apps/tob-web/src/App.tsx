@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import type { FormEvent, ChangeEvent } from 'react';
-import type { Ticket, TicketPriority, TicketStatus } from '@onfire/shared';
+import { TicketPriority, type Ticket, type TicketStatus } from '@onfire/shared';
 import {
   listTickets,
   getTicket,
@@ -15,8 +15,8 @@ import {
   listTeams,
   listProducts
 } from './api';
-import { AppShell, Button, Topbar, Input } from '@onfire/ui';
-import { Search, RefreshCw, ArrowUpRight } from 'lucide-react';
+import { AppShell, Button, Topbar, Input, Badge } from '@onfire/ui';
+import { Search, RefreshCw, ArrowUpRight, LayoutDashboard, ListChecks, Shield, KeyRound } from 'lucide-react';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { usePagination } from './hooks/usePagination';
 import { useAuth } from './hooks/useAuth';
@@ -26,6 +26,8 @@ import { BulkActions } from './components/BulkActions';
 import { LoginPage } from './components/LoginPage';
 import { Dashboard } from './components/Dashboard';
 import { Management } from './components/Management';
+import { InstallPage } from './components/InstallPage';
+import { Account } from './components/Account';
 
 export default function App() {
   return (
@@ -38,15 +40,26 @@ const AppRoutes = () => {
   const { authStatus, authUser, setAuthStatus, setAuthUser, ensureSession, signOut, hasPermission } = useAuth();
   const sidebar = useMemo(() => {
     const base = [
-      { key: 'dashboard', label: 'Dashboard', path: '/' },
-      { key: 'tickets', label: '工单列表', path: '/tickets' }
+      { key: 'dashboard', label: 'Dashboard', path: '/', icon: <LayoutDashboard className="h-4 w-4" /> },
+      { key: 'tickets', label: '工单列表', path: '/tickets', icon: <ListChecks className="h-4 w-4" /> },
+      { key: 'account', label: '账户', path: '/account', icon: <KeyRound className="h-4 w-4" /> }
     ];
     if (hasPermission('tenant.manage') || hasPermission('product.manage') || hasPermission('team.manage') || hasPermission('template.write') || hasPermission('user.manage')) {
-      base.push({ key: 'admin', label: '管理', path: '/admin' });
+      base.push({ key: 'admin', label: '管理', path: '/admin', icon: <Shield className="h-4 w-4" /> });
     }
     return base;
   }, [hasPermission]);
-  const [summary, setSummary] = useState({ tenants: 0, products: 0, pendingTickets: 0, escalated: 0 });
+  const [summary, setSummary] = useState({
+    tenants: 0,
+    products: 0,
+    pendingTickets: 0,
+    escalated: 0,
+    overdue: 0,
+    topPending: [] as Ticket[],
+    topOverdue: [] as Ticket[],
+    topEscalated: [] as Ticket[],
+    scope: ''
+  });
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selected, setSelected] = useState<any>(null);
   const [teamOptions, setTeamOptions] = useState<string[]>([]);
@@ -58,7 +71,7 @@ const AppRoutes = () => {
   const [closeReason, setCloseReason] = useState('');
   const [escalateReason, setEscalateReason] = useState('');
   const [priorityReason, setPriorityReason] = useState('');
-  const [priorityDraft, setPriorityDraft] = useState<TicketPriority>('medium');
+  const [priorityDraft, setPriorityDraft] = useState<TicketPriority>(TicketPriority.Medium);
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showAssignDialog, setShowAssignDialog] = useState(false);
@@ -250,6 +263,15 @@ const AppRoutes = () => {
     return <div className="flex h-screen items-center justify-center text-sm text-zinc-600">正在检查登录...</div>;
   }
 
+  if (authStatus === 'setup') {
+    return (
+      <Routes>
+        <Route path="/install" element={<InstallPage onFinished={ensureSession} />} />
+        <Route path="*" element={<Navigate to="/install" replace />} />
+      </Routes>
+    );
+  }
+
   if (authStatus === 'unauth') {
     return (
       <Routes>
@@ -280,6 +302,8 @@ const AppRoutes = () => {
                 <RefreshCw className="mr-2 h-4 w-4" />
                 刷新
               </Button>
+              <Badge variant="info">待处理 {summary.pendingTickets}</Badge>
+              <Badge variant="warning">超时 {summary.overdue ?? 0}</Badge>
               {authUser?.email && (
                 <span className="rounded-md bg-zinc-100 px-3 py-1 text-xs text-zinc-700">已登录 {authUser.email}</span>
               )}
@@ -346,6 +370,7 @@ const AppRoutes = () => {
             )
           }
         />
+        <Route path="/account" element={<Account />} />
         <Route path="/tickets/:id" element={<Navigate to="/tickets" replace />} />
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />

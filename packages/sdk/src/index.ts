@@ -47,6 +47,7 @@ export interface UpdateTicketStatusInput {
 export interface ReplyTicketInput {
   content: string;
   internal?: boolean;
+  turnstileToken?: string;
 }
 
 export interface IssueCustomerJwtInput {
@@ -70,6 +71,7 @@ export interface TicketDetail {
   ticket: Ticket;
   replies?: unknown[];
   history?: unknown[];
+  timeline?: Array<{ type: string; createdAt?: string; [key: string]: unknown }>;
 }
 
 const buildHeaders = (token?: string): HeadersInit => {
@@ -107,8 +109,42 @@ export class OnfireClient {
     return buildHeaders(this.token);
   }
 
+  private tocBase(): string {
+    return (this.tocBaseUrl ?? this.baseUrl).replace(/\/$/, '');
+  }
+
+  private normalizeTicket(raw: any): Ticket {
+    const metadata =
+      raw?.metadata && typeof raw.metadata === 'string'
+        ? (() => {
+            try {
+              return JSON.parse(raw.metadata);
+            } catch {
+              return raw.metadata;
+            }
+          })()
+        : raw?.metadata;
+    const acceptDeadline = raw?.slaAcceptDeadline ?? raw?.sla?.acceptDeadline;
+    const replyDeadline = raw?.slaReplyDeadline ?? raw?.sla?.replyDeadline;
+    const now = Date.now();
+    const sla =
+      acceptDeadline || replyDeadline
+        ? {
+            acceptDeadline,
+            replyDeadline,
+            acceptBreached: acceptDeadline ? Date.parse(acceptDeadline) < now : false,
+            replyBreached: replyDeadline ? Date.parse(replyDeadline) < now : false
+          }
+        : raw?.sla;
+    return {
+      ...raw,
+      metadata,
+      sla
+    };
+  }
+
   async listTemplates(productId: ProductID): Promise<TicketTemplate[]> {
-    const res = await this.fetcher(`${this.baseUrl}/templates?productId=${encodeURIComponent(productId)}`, {
+    const res = await this.fetcher(`${this.tocBase()}/templates?productId=${encodeURIComponent(productId)}`, {
       headers: this.headers()
     });
     await ensureOk(res, 'listTemplates');
@@ -116,13 +152,14 @@ export class OnfireClient {
   }
 
   async createTicket(input: CreateTicketInput): Promise<Ticket> {
-    const res = await this.fetcher(`${this.baseUrl}/tickets`, {
+    const res = await this.fetcher(`${this.tocBase()}/tickets`, {
       method: 'POST',
       headers: this.headers(),
       body: JSON.stringify(input)
     });
     await ensureOk(res, 'createTicket');
-    return res.json();
+    const data = await res.json();
+    return this.normalizeTicket(data);
   }
 
   async listTickets(params: ListTicketsParams = {}): Promise<{ data: Ticket[]; total: number }> {
@@ -131,63 +168,72 @@ export class OnfireClient {
       if (value !== undefined && value !== null) query.append(key, String(value));
     });
 
-    const res = await this.fetcher(`${this.baseUrl}/tickets?${query.toString()}`, {
+    const res = await this.fetcher(`${this.tocBase()}/tickets?${query.toString()}`, {
       headers: this.headers()
     });
     await ensureOk(res, 'listTickets');
-    return res.json();
+    const data = await res.json();
+    return { ...data, data: (data?.data ?? []).map((t: any) => this.normalizeTicket(t)) };
   }
 
   async getTicket(ticketId: TicketID): Promise<TicketDetail> {
-    const res = await this.fetcher(`${this.baseUrl}/tickets/${encodeURIComponent(ticketId)}`, {
+    const res = await this.fetcher(`${this.tocBase()}/tickets/${encodeURIComponent(ticketId)}`, {
       headers: this.headers()
     });
     await ensureOk(res, 'getTicket');
-    return res.json();
+    const detail = await res.json();
+    return {
+      ...detail,
+      ticket: this.normalizeTicket(detail.ticket)
+    };
   }
 
   async reply(ticketId: TicketID, input: ReplyTicketInput) {
-    const res = await this.fetcher(`${this.baseUrl}/tickets/${encodeURIComponent(ticketId)}/reply`, {
+    const res = await this.fetcher(`${this.tocBase()}/tickets/${encodeURIComponent(ticketId)}/reply`, {
       method: 'POST',
       headers: this.headers(),
       body: JSON.stringify(input)
     });
     await ensureOk(res, 'reply');
-    return res.json();
+    const data = await res.json();
+    return { ...data, ticket: data.ticket ? this.normalizeTicket(data.ticket) : undefined };
   }
 
   async updateStatus(ticketId: TicketID, input: UpdateTicketStatusInput) {
-    const res = await this.fetcher(`${this.baseUrl}/tickets/${encodeURIComponent(ticketId)}/status`, {
+    const res = await this.fetcher(`${this.tocBase()}/tickets/${encodeURIComponent(ticketId)}/status`, {
       method: 'POST',
       headers: this.headers(),
       body: JSON.stringify(input)
     });
     await ensureOk(res, 'updateStatus');
-    return res.json();
+    const data = await res.json();
+    return { ...data, ticket: data.ticket ? this.normalizeTicket(data.ticket) : undefined };
   }
 
   async reassign(ticketId: TicketID, input: ReassignInput) {
-    const res = await this.fetcher(`${this.baseUrl}/tickets/${encodeURIComponent(ticketId)}/assign`, {
+    const res = await this.fetcher(`${this.tocBase()}/tickets/${encodeURIComponent(ticketId)}/assign`, {
       method: 'POST',
       headers: this.headers(),
       body: JSON.stringify(input)
     });
     await ensureOk(res, 'reassign');
-    return res.json();
+    const data = await res.json();
+    return { ...data, ticket: data.ticket ? this.normalizeTicket(data.ticket) : undefined };
   }
 
   async escalate(ticketId: TicketID, input: EscalateInput) {
-    const res = await this.fetcher(`${this.baseUrl}/tickets/${encodeURIComponent(ticketId)}/escalate`, {
+    const res = await this.fetcher(`${this.tocBase()}/tickets/${encodeURIComponent(ticketId)}/escalate`, {
       method: 'POST',
       headers: this.headers(),
       body: JSON.stringify(input)
     });
     await ensureOk(res, 'escalate');
-    return res.json();
+    const data = await res.json();
+    return { ...data, ticket: data.ticket ? this.normalizeTicket(data.ticket) : undefined };
   }
 
   async issueCustomerJwt(input: IssueCustomerJwtInput): Promise<{ token: string; productId: string; tenantId: string }> {
-    const res = await this.fetcher(`${this.baseUrl}/tokens/issue`, {
+    const res = await this.fetcher(`${this.tocBase()}/tokens/issue`, {
       method: 'POST',
       headers: { ...this.headers(), 'x-api-key': input.apiKey, Authorization: `Bearer ${input.apiKey}` },
       body: JSON.stringify({

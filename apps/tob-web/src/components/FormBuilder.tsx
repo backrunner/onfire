@@ -34,16 +34,17 @@ export function FormBuilder({ value, onChange }: FormBuilderProps) {
     setFields(value ?? []);
   }, [value]);
 
-  const ensureDetail = (list: FormField[]) => {
+  const ensureDetail = (list: FormField[]): FormField[] => {
     if (list.some((f) => f.type === 'textarea')) return list;
+    const detailField: FormField = {
+      label: '问题详情',
+      key: 'content',
+      type: 'textarea',
+      required: true,
+      placeholder: '请详细描述问题、步骤、期望'
+    };
     return [
-      {
-        label: '问题详情',
-        key: 'content',
-        type: 'textarea',
-        required: true,
-        placeholder: '请详细描述问题、步骤、期望'
-      },
+      detailField,
       ...list
     ];
   };
@@ -141,7 +142,14 @@ export function FormBuilder({ value, onChange }: FormBuilderProps) {
                 {f.options && f.options.length ? `· 选项: ${f.options.join(', ')}` : ''}
               </div>
               <div className="flex items-center gap-1">
-                <Button size="sm" variant="outline" onClick={() => setDraft(f) || setEditingIndex(idx)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setDraft(f);
+                    setEditingIndex(idx);
+                  }}
+                >
                   <Pencil className="mr-1 h-3 w-3" />
                   编辑
                 </Button>

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getSession } from '../api';
+import { getInstallStatus, getSession } from '../api';
 
-export type AuthStatus = 'loading' | 'authed' | 'unauth';
+export type AuthStatus = 'loading' | 'authed' | 'unauth' | 'setup';
 
 export const useAuth = () => {
   const navigate = useNavigate();
@@ -17,15 +17,39 @@ export const useAuth = () => {
   }, [navigate]);
 
   const ensureSession = useCallback(() => {
-    getSession()
-      .then((res) => {
-        setAuthUser(res ? { id: res.user?.id, email: res.user?.email, role: res.role, permissions: res.permissions } : null);
-        setAuthStatus('authed');
+    getInstallStatus()
+      .then((state) => {
+        if (state.needsSetup) {
+          setAuthStatus('setup');
+          setAuthUser(null);
+          navigate('/install');
+          return;
+        }
+        return getSession()
+          .then((res) => {
+            setAuthUser(res ? { id: res.user?.id, email: res.user?.email, role: res.role, permissions: res.permissions } : null);
+            setAuthStatus('authed');
+          })
+          .catch((err: any) => {
+            if (err?.status === 428) {
+              setAuthStatus('setup');
+              setAuthUser(null);
+              navigate('/install');
+              return;
+            }
+            signOut();
+          });
       })
-      .catch(() => {
+      .catch((err: any) => {
+        if (err?.status === 428) {
+          setAuthStatus('setup');
+          setAuthUser(null);
+          navigate('/install');
+          return;
+        }
         signOut();
       });
-  }, [signOut]);
+  }, [navigate, signOut]);
 
   useEffect(() => {
     ensureSession();

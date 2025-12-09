@@ -125,16 +125,3 @@ CREATE TABLE IF NOT EXISTS history (
   FOREIGN KEY (ticket_id) REFERENCES tickets(id)
 );
 
--- Seed defaults
-INSERT OR IGNORE INTO tenants (id, name, default_team_id) VALUES ('demo-tenant', 'Demo Tenant', 'team-default');
-INSERT OR IGNORE INTO products (id, tenant_id, name) VALUES ('demo-product', 'demo-tenant', 'Demo Product');
-INSERT OR IGNORE INTO teams (id, tenant_id, name, allow_reassign) VALUES ('team-default', 'demo-tenant', 'Default Team', 1);
-INSERT OR IGNORE INTO product_teams (product_id, team_id) VALUES ('demo-product', 'team-default');
-INSERT OR IGNORE INTO users (id, email, display_name, tenant_id, role) VALUES
-  ('admin-1', 'admin@demo.dev', 'Demo Admin', 'demo-tenant', 'team_admin'),
-  ('agent-1', 'agent@demo.dev', 'Demo Agent', 'demo-tenant', 'agent');
-INSERT OR IGNORE INTO agents (user_id, level, active) VALUES ('agent-1', 1, 1);
-INSERT OR IGNORE INTO agent_teams (user_id, team_id) VALUES ('agent-1', 'team-default');
-INSERT OR IGNORE INTO templates (id, product_id, title, categories, form_schema) VALUES
-  ('tmpl-default', 'demo-product', '默认模版', '通用', '{"fields": []}');
-

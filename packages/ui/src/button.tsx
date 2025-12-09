@@ -1,24 +1,29 @@
+import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
-import { twMerge } from 'tailwind-merge';
-import type { ButtonHTMLAttributes, PropsWithChildren } from 'react';
+import type { ButtonHTMLAttributes } from 'react';
+import { cn } from './utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60',
+  'inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60 ring-offset-background',
   {
     variants: {
       variant: {
-        primary: 'bg-zinc-900 text-white hover:bg-zinc-800',
-        outline: 'border border-zinc-300 text-zinc-900 hover:bg-zinc-100',
-        ghost: 'text-zinc-700 hover:bg-zinc-100'
+        default: 'bg-primary text-primary-foreground shadow hover:bg-primary/90',
+        secondary: 'bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80',
+        outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+        ghost: 'hover:bg-accent hover:text-accent-foreground',
+        destructive: 'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90',
+        link: 'text-primary underline-offset-4 hover:underline'
       },
       size: {
-        sm: 'h-9 px-3 text-sm',
-        md: 'h-10 px-4 text-sm',
-        lg: 'h-11 px-5 text-base'
+        sm: 'h-9 px-3',
+        md: 'h-10 px-4',
+        lg: 'h-11 px-5 text-base',
+        icon: 'h-9 w-9'
       }
     },
     defaultVariants: {
-      variant: 'primary',
+      variant: 'default',
       size: 'md'
     }
   }
@@ -26,25 +31,18 @@ const buttonVariants = cva(
 
 export interface ButtonProps
   extends ButtonHTMLAttributes<HTMLButtonElement>,
-    PropsWithChildren,
     VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
   loading?: boolean;
 }
 
-export const Button = ({
-  variant = 'primary',
-  size = 'md',
-  className,
-  loading = false,
-  children,
-  disabled,
-  ...rest
-}: ButtonProps) => (
-  <button
-    className={twMerge(buttonVariants({ variant, size }), className)}
-    disabled={disabled || loading}
-    {...rest}
-  >
-    {loading ? '处理中…' : children}
-  </button>
-);
+export const Button = ({ className, variant, size, loading = false, asChild = false, children, disabled, ...props }: ButtonProps) => {
+  const Comp = asChild ? Slot : 'button';
+  return (
+    <Comp className={cn(buttonVariants({ variant, size }), className)} disabled={disabled || loading} {...props}>
+      {loading ? '处理中…' : children}
+    </Comp>
+  );
+};
+
+export { buttonVariants };

@@ -1,10 +1,10 @@
 import { Role } from '@onfire/shared';
 import { assertPermission } from '@onfire/shared/rbac';
-import { tenants, products, teams, templates, users, productTeams, productKeys } from '@onfire/shared/drizzle/schema';
+import { tenants, products, teams, templates, users, productTeams, productKeys, agents, agentTeams, customers, categoryRoutes, agentProfiles } from '@onfire/shared/drizzle/schema';
 import { Elysia } from 'elysia';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, gte, lte } from 'drizzle-orm';
 import { resolveContext } from '../core/context';
-import type { Bindings } from '../core/types';
+import type { Bindings, WorkerSingleton } from '../core/types';
 
 type ProductSlaInput = {
   highAccept?: number;
@@ -49,6 +49,94 @@ const createApiKeyValue = () => {
   return { id, secret, apiKey: `${id}.${secret}` };
 };
 
+const maskApiKey = (id: string) => `${id.slice(0, 6)}…${id.slice(-4)}`;
+
+const assertTeamIdsAccessible = async (store: any, teamIds: string[], allowedTenantIds: string[], isSuperAdmin: boolean) => {
+  if (!teamIds?.length) return;
+  if (isSuperAdmin) return;
+  const rows = await store.db.select().from(teams).where(inArray(teams.id, teamIds));
+  const invalid = rows.filter((t: any) => !allowedTenantIds.includes(t.tenantId));
+  if (invalid.length) throw new Response('forbidden', { status: 403 });
+};
+
+const loadAgents = async (store: any, tenantIds: string[], isSuperAdmin: boolean) => {
+  const baseSelect = {
+    userId: users.id,
+    email: users.email,
+    displayName: users.displayName,
+    tenantId: users.tenantId,
+    role: users.role,
+    level: agents.level,
+    active: agents.active,
+    profileName: agentProfiles.displayName,
+    profileEmail: agentProfiles.email,
+    avatarUrl: agentProfiles.avatarUrl
+  };
+  const joined =
+    isSuperAdmin
+      ? await store.db.select(baseSelect).from(agents).leftJoin(users, eq(users.id, agents.userId)).leftJoin(agentProfiles, eq(agentProfiles.userId, agents.userId))
+      : await store.db
+          .select(baseSelect)
+          .from(agents)
+          .leftJoin(users, eq(users.id, agents.userId))
+          .leftJoin(agentProfiles, eq(agentProfiles.userId, agents.userId))
+          .where(inArray(users.tenantId, tenantIds));
+
+  const ids = joined.map((a: any) => a.userId).filter(Boolean);
+  const teamRows = ids.length
+    ? await store.db.select({ userId: agentTeams.userId, teamId: agentTeams.teamId }).from(agentTeams).where(inArray(agentTeams.userId, ids))
+    : [];
+  const teamMap = new Map<string, string[]>();
+  teamRows.forEach((r: any) => teamMap.set(r.userId, [...(teamMap.get(r.userId) ?? []), r.teamId]));
+
+  return joined.map((a: any) => ({
+    userId: a.userId,
+    email: a.profileEmail ?? a.email,
+    displayName: a.profileName ?? a.displayName,
+    tenantId: a.tenantId,
+    role: a.role,
+    level: a.level ?? 1,
+    active: Boolean(a.active ?? true),
+    teamIds: teamMap.get(a.userId) ?? [],
+    avatarUrl: a.avatarUrl ?? undefined
+  }));
+};
+
+const upsertAgentProfile = async (store: any, userId: string, profile?: { displayName?: string; email?: string; avatarUrl?: string }) => {
+  if (!profile) return;
+  const baseUser = await store.db.query.users.findFirst({ where: eq(users.id, userId) });
+  const payload = {
+    userId,
+    ...(profile.displayName ? { displayName: profile.displayName } : {}),
+    ...(profile.email ? { email: profile.email } : {}),
+    ...(profile.avatarUrl !== undefined ? { avatarUrl: profile.avatarUrl } : {})
+  };
+  if (Object.keys(payload).length <= 1 && !profile.avatarUrl) return;
+  const displayName = payload.displayName ?? baseUser?.displayName ?? 'Agent';
+  const email = payload.email ?? baseUser?.email ?? 'unknown@agent';
+  await store.db
+    .insert(agentProfiles)
+    .values({ userId, displayName, email, avatarUrl: profile.avatarUrl ?? null })
+    .onConflictDoUpdate({
+      target: agentProfiles.userId,
+      set: {
+        ...(profile.displayName ? { displayName: profile.displayName } : {}),
+        ...(profile.email ? { email: profile.email } : {}),
+        ...(profile.avatarUrl !== undefined ? { avatarUrl: profile.avatarUrl } : {})
+      }
+    })
+    .run();
+};
+
+const parseJsonSafe = (val: string | null) => {
+  if (!val) return undefined;
+  try {
+    return JSON.parse(val);
+  } catch {
+    return undefined;
+  }
+};
+
 const assertProductAccessible = async (store: any, ctx: any, productId: string) => {
   const existing = await store.db.query.products.findFirst({ where: eq(products.id, productId) });
   if (!existing) throw new Response('not found', { status: 404 });
@@ -57,7 +145,7 @@ const assertProductAccessible = async (store: any, ctx: any, productId: string) 
 };
 
 export const createAdminRoutes = (env: Bindings) =>
-  new Elysia({ prefix: '/admin' })
+  new Elysia<string, WorkerSingleton>({ prefix: '/admin' })
     .get('/tenants', async ({ user, store }) => {
       const ctx = await resolveContext(env, user);
       assertPermission(ctx, 'tenant.manage');
@@ -98,7 +186,13 @@ export const createAdminRoutes = (env: Bindings) =>
               .select()
               .from(productKeys)
               .where(inArray(productKeys.productId, targetIds));
-      return { data: rows.map((r: any) => ({ ...r, secret: undefined })) };
+      return {
+        data: rows.map((r: any) => ({
+          ...r,
+          secret: undefined,
+          masked: maskApiKey(r.id)
+        }))
+      };
     })
     .post('/product-keys', async ({ user, store, request }) => {
       const ctx = await resolveContext(env, user);
@@ -135,6 +229,45 @@ export const createAdminRoutes = (env: Bindings) =>
       await store.db.update(productKeys).set({ revoked: body.revoked ?? true }).where(eq(productKeys.id, params.id)).run();
       return { ok: true };
     })
+    .get('/agents', async ({ user, store }) => {
+      const ctx = await resolveContext(env, user);
+      assertPermission(ctx, 'user.manage');
+      const data = await loadAgents(store, ctx.tenantIds, ctx.user.role === Role.SuperAdmin);
+      return { data };
+    })
+    .patch('/agents/:id', async ({ user, store, request, params }) => {
+      const ctx = await resolveContext(env, user);
+      assertPermission(ctx, 'agent.profile');
+      const body = (await request.json()) as { level?: number; active?: boolean; teamIds?: string[]; displayName?: string; email?: string; avatarUrl?: string };
+      const targetUser = await store.db.query.users.findFirst({ where: eq(users.id, params.id) });
+      if (!targetUser) return new Response('not found', { status: 404 });
+      if (ctx.user.role !== Role.SuperAdmin && !ctx.tenantIds.includes(targetUser.tenantId as any)) return new Response('forbidden', { status: 403 });
+      if (body.teamIds) {
+        await assertTeamIdsAccessible(store, body.teamIds, ctx.tenantIds, ctx.user.role === Role.SuperAdmin);
+        await store.db.delete(agentTeams).where(eq(agentTeams.userId, params.id)).run();
+        if (body.teamIds.length) {
+          await store.db.insert(agentTeams).values(body.teamIds.map((t) => ({ userId: params.id, teamId: t }))).run();
+        }
+      }
+      if (body.level !== undefined || body.active !== undefined) {
+        await store.db
+          .insert(agents)
+          .values({ userId: params.id, level: body.level ?? 1, active: body.active ?? true })
+          .onConflictDoUpdate({
+            target: agents.userId,
+            set: {
+              ...(body.level !== undefined ? { level: body.level } : {}),
+              ...(body.active !== undefined ? { active: body.active } : {})
+            }
+          })
+          .run();
+      }
+      if (body.displayName || body.email || body.avatarUrl !== undefined) {
+        await upsertAgentProfile(store, params.id, { displayName: body.displayName, email: body.email, avatarUrl: body.avatarUrl });
+      }
+      const refreshed = await loadAgents(store, ctx.tenantIds, ctx.user.role === Role.SuperAdmin);
+      return { ok: true, data: refreshed };
+    })
     .get('/teams', async ({ user, store }) => {
       const ctx = await resolveContext(env, user);
       assertPermission(ctx, 'team.manage');
@@ -153,6 +286,59 @@ export const createAdminRoutes = (env: Bindings) =>
           : await store.db.select().from(templates).where(inArray(templates.productId, ctx.productIds));
       return { data: rows };
     })
+    .get('/category-routes', async ({ user, store, query }) => {
+      const ctx = await resolveContext(env, user);
+      assertPermission(ctx, 'category.map');
+      const productId = (query['productId'] as string | undefined) ?? undefined;
+      const targetProductIds = productId ? [productId] : ctx.productIds;
+      if (!targetProductIds.length) return { data: [] };
+      const rows =
+        ctx.user.role === Role.SuperAdmin
+          ? await store.db.select().from(categoryRoutes).where(inArray(categoryRoutes.productId, targetProductIds))
+          : await store.db.select().from(categoryRoutes).where(inArray(categoryRoutes.productId, targetProductIds));
+      return { data: rows };
+    })
+    .post('/category-routes', async ({ user, store, request }) => {
+      const ctx = await resolveContext(env, user);
+      assertPermission(ctx, 'category.map');
+      const body = (await request.json()) as { productId: string; category: string; subcategory?: string; teamId: string };
+      if (!body.productId || !body.category || !body.teamId) return new Response('productId, category, teamId required', { status: 400 });
+      await assertProductAccessible(store, ctx, body.productId);
+      const id = crypto.randomUUID();
+      await store.db
+        .insert(categoryRoutes)
+        .values({ id, productId: body.productId, category: body.category, subcategory: body.subcategory ?? null, teamId: body.teamId })
+        .run();
+      return { ok: true, id };
+    })
+    .patch('/category-routes/:id', async ({ user, store, request, params }) => {
+      const ctx = await resolveContext(env, user);
+      assertPermission(ctx, 'category.map');
+      const body = (await request.json()) as { category?: string; subcategory?: string | null; teamId?: string };
+      const existing = await store.db.query.categoryRoutes.findFirst({ where: eq(categoryRoutes.id, params.id) });
+      if (!existing) return new Response('not found', { status: 404 });
+      await assertProductAccessible(store, ctx, existing.productId);
+      if (!body.category && body.subcategory === undefined && !body.teamId) return new Response('payload required', { status: 400 });
+      await store.db
+        .update(categoryRoutes)
+        .set({
+          ...(body.category ? { category: body.category } : {}),
+          ...(body.subcategory !== undefined ? { subcategory: body.subcategory } : {}),
+          ...(body.teamId ? { teamId: body.teamId } : {})
+        })
+        .where(eq(categoryRoutes.id, params.id))
+        .run();
+      return { ok: true };
+    })
+    .delete('/category-routes/:id', async ({ user, store, params }) => {
+      const ctx = await resolveContext(env, user);
+      assertPermission(ctx, 'category.map');
+      const existing = await store.db.query.categoryRoutes.findFirst({ where: eq(categoryRoutes.id, params.id) });
+      if (!existing) return new Response('not found', { status: 404 });
+      await assertProductAccessible(store, ctx, existing.productId);
+      await store.db.delete(categoryRoutes).where(eq(categoryRoutes.id, params.id)).run();
+      return { ok: true };
+    })
     .get('/users', async ({ user, store }) => {
       const ctx = await resolveContext(env, user);
       assertPermission(ctx, 'user.manage');
@@ -162,47 +348,43 @@ export const createAdminRoutes = (env: Bindings) =>
           : await store.db.select().from(users).where(inArray(users.tenantId, ctx.tenantIds));
       return { data: rows };
     })
-    .get('/customers', async ({ user, store }) => {
+    .patch('/users/:id', async ({ user, store, params, request }) => {
       const ctx = await resolveContext(env, user);
-      assertPermission(ctx, 'ticket.read');
-      const rows = await store.db
-        .select({
-          email: tickets.customerEmail,
-          level: tickets.customerLevel,
-          tenantId: tickets.tenantId,
-          productId: tickets.productId
-        })
-        .from(tickets)
-        .where(inArray(tickets.tenantId, ctx.tenantIds));
-      const map = new Map<
-        string,
-        {
-          email: string;
-          tenantIds: Set<string>;
-          productIds: Set<string>;
-          maxLevel?: number | null;
-          count: number;
-        }
-      >();
-      rows.forEach((r: any) => {
-        const key = r.email;
-        if (!map.has(key)) {
-          map.set(key, { email: key, tenantIds: new Set(), productIds: new Set(), maxLevel: r.level ?? null, count: 0 });
-        }
-        const entry = map.get(key)!;
-        entry.count += 1;
-        if (r.level !== null && r.level !== undefined) {
-          entry.maxLevel = entry.maxLevel !== null && entry.maxLevel !== undefined ? Math.max(entry.maxLevel, r.level) : r.level;
-        }
-        if (r.tenantId) entry.tenantIds.add(r.tenantId);
-        if (r.productId) entry.productIds.add(r.productId);
-      });
-      const data = Array.from(map.values()).map((v) => ({
-        email: v.email,
-        maxLevel: v.maxLevel,
-        count: v.count,
-        tenantIds: Array.from(v.tenantIds),
-        productIds: Array.from(v.productIds)
+      assertPermission(ctx, 'role.manage');
+      const body = (await request.json()) as { role?: Role; displayName?: string; tenantId?: string };
+      const target = await store.db.query.users.findFirst({ where: eq(users.id, params.id) });
+      if (!target) return new Response('not found', { status: 404 });
+      if (ctx.user.role !== Role.SuperAdmin && !ctx.tenantIds.includes(target.tenantId as any)) return new Response('forbidden', { status: 403 });
+      const updates: any = {};
+      if (body.role) updates.role = body.role;
+      if (body.displayName) updates.displayName = body.displayName;
+      if (body.tenantId) {
+        if (ctx.user.role !== Role.SuperAdmin && !ctx.tenantIds.includes(body.tenantId as any)) return new Response('forbidden', { status: 403 });
+        updates.tenantId = body.tenantId;
+      }
+      if (!Object.keys(updates).length) return new Response('payload required', { status: 400 });
+      await store.db.update(users).set(updates).where(eq(users.id, params.id)).run();
+      return { ok: true };
+    })
+    .get('/customers', async ({ user, store, query }) => {
+      const ctx = await resolveContext(env, user);
+      assertPermission(ctx, 'customer.read');
+      const email = (query['email'] as string | undefined) ?? undefined;
+      const productId = (query['productId'] as string | undefined) ?? undefined;
+      const tenantId = (query['tenantId'] as string | undefined) ?? undefined;
+      const levelMin = query['levelMin'] ? Number(query['levelMin']) : undefined;
+      const levelMax = query['levelMax'] ? Number(query['levelMax']) : undefined;
+
+      const where = [inArray(customers.tenantId, tenantId ? [tenantId] : ctx.tenantIds)];
+      if (email) where.push(eq(customers.email, email));
+      if (productId) where.push(eq(customers.productId, productId));
+      if (typeof levelMin === 'number' && Number.isFinite(levelMin)) where.push(gte(customers.level, levelMin));
+      if (typeof levelMax === 'number' && Number.isFinite(levelMax)) where.push(lte(customers.level, levelMax));
+
+      const rows = await store.db.select().from(customers).where(and(...where));
+      const data = rows.map((c: any) => ({
+        ...c,
+        meta: parseJsonSafe(c.meta)
       }));
       return { data };
     })

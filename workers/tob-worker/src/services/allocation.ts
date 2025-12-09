@@ -8,7 +8,10 @@ type LoadEntry = { counts: Map<string, number>; ts: number };
 const loadCache = new Map<string, LoadEntry>();
 
 const cacheKey = (teamId: string) => `team:${teamId}`;
-const isFresh = (entry?: LoadEntry) => entry && Date.now() - entry.ts < CACHE_TTL_MS;
+const isFresh = (entry?: LoadEntry): entry is LoadEntry => {
+  if (!entry) return false;
+  return Date.now() - entry.ts < CACHE_TTL_MS;
+};
 
 export const getTeamAgents = async (db: Db, teamId: string) => {
   const rows = await db
@@ -49,7 +52,10 @@ export const bumpLoadCache = (teamId: string, assigneeId: string | null) => {
 export const pickAssignee = async (db: Db, teamId: string, minLevel = 1) => {
   const agents = await getTeamAgents(db, teamId);
   const load = await getLoad(db, teamId);
-  const candidates = agents.filter((a) => a.level >= minLevel);
+  const normalized = agents
+    .filter((a): a is typeof a & { id: string } => Boolean(a.id))
+    .map((a) => ({ ...a, id: a.id, level: a.level ?? 1 }));
+  const candidates = normalized.filter((a) => a.level >= minLevel);
   if (candidates.length === 0) return null;
   candidates.sort((a, b) => {
     const la = load.get(a.id) ?? 0;

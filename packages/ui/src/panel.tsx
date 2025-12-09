@@ -1,14 +1,15 @@
 import type { PropsWithChildren, ReactNode } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './card';
 
 export const Panel = ({ title, description, action, children }: PropsWithChildren<{ title: string; description?: string; action?: ReactNode }>) => (
-  <section className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
-    <div className="mb-3 flex items-start justify-between gap-3">
+  <Card>
+    <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
       <div>
-        <h3 className="text-base font-semibold text-zinc-900">{title}</h3>
-        {description && <p className="text-sm text-zinc-500">{description}</p>}
+        <CardTitle className="text-base">{title}</CardTitle>
+        {description && <CardDescription>{description}</CardDescription>}
       </div>
       {action}
-    </div>
-    <div className="flex flex-col gap-3 text-sm text-zinc-800">{children}</div>
-  </section>
+    </CardHeader>
+    <CardContent className="flex flex-col gap-3 text-sm text-foreground">{children}</CardContent>
+  </Card>
 );

@@ -19,6 +19,18 @@ export const products = sqliteTable('products', {
   slaLowReply: integer('sla_low_reply')
 });
 
+export const customers = sqliteTable('customers', {
+  id: text('id').primaryKey(),
+  tenantId: text('tenant_id').notNull(),
+  productId: text('product_id').notNull(),
+  email: text('email').notNull(),
+  externalId: text('external_id'),
+  level: integer('level'),
+  meta: text('meta'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull()
+});
+
 export const productKeys = sqliteTable('product_keys', {
   id: text('id').primaryKey(),
   productId: text('product_id').notNull(),
@@ -60,12 +72,27 @@ export const agentTeams = sqliteTable('agent_teams', {
   teamId: text('team_id').notNull()
 });
 
+export const agentProfiles = sqliteTable('agent_profiles', {
+  userId: text('user_id').primaryKey(),
+  displayName: text('display_name').notNull(),
+  email: text('email').notNull(),
+  avatarUrl: text('avatar_url')
+});
+
 export const templates = sqliteTable('templates', {
   id: text('id').primaryKey(),
   productId: text('product_id').notNull(),
   title: text('title').notNull(),
   categories: text('categories').notNull(),
   formSchema: text('form_schema').notNull()
+});
+
+export const categoryRoutes = sqliteTable('category_routes', {
+  id: text('id').primaryKey(),
+  productId: text('product_id').notNull(),
+  category: text('category').notNull(),
+  subcategory: text('subcategory'),
+  teamId: text('team_id').notNull()
 });
 
 export const tickets = sqliteTable('tickets', {
@@ -113,4 +140,6 @@ export type TicketRow = typeof tickets.$inferSelect;
 export type ReplyRow = typeof replies.$inferSelect;
 export type TemplateRow = typeof templates.$inferSelect;
 export type ProductKeyRow = typeof productKeys.$inferSelect;
+export type CustomerRow = typeof customers.$inferSelect;
+export type CategoryRouteRow = typeof categoryRoutes.$inferSelect;
 

@@ -1,4 +1,6 @@
 import type { D1Database } from '@cloudflare/workers-types';
+import type { Auth } from 'better-auth';
+import type { Db } from '@onfire/shared/drizzle/client';
 
 export interface Bindings {
   DB: D1Database;
@@ -7,4 +9,29 @@ export interface Bindings {
   JWT_PUBLIC_KEY?: string;
   JWT_AUDIENCE?: string;
   JWT_ISSUER?: string;
+  AUTO_CLOSE_REPLY_HOURS?: string;
 }
+
+export interface AuthUser {
+  id?: string;
+  email?: string;
+  role?: string;
+}
+
+export type AppStore = {
+  env: Bindings;
+  db: Db;
+  auth: Auth<any>;
+};
+
+export type AppContext = {
+  store: AppStore;
+  user?: AuthUser;
+};
+
+export type WorkerSingleton = {
+  decorator: { user?: AuthUser };
+  store: AppStore;
+  derive: {};
+  resolve: {};
+};

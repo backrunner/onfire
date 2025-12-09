@@ -1,16 +1,18 @@
 import { betterAuth } from 'better-auth';
 import { Elysia as ElysiaFactory } from 'elysia';
 import type { Elysia } from 'elysia';
-import type { Bindings } from './types';
+import type { Bindings, WorkerSingleton } from './types';
 
-export const createAuthPlugin = (env: Bindings) => {
-  const auth = betterAuth({
-    secret: env.AUTH_SECRET,
-    emailAndPassword: { enabled: true },
-    session: {
-      sessionToken: { header: 'authorization', scheme: 'Bearer' }
-    }
-  });
+export const createAuthPlugin = (env: Bindings): { plugin: Elysia<string, WorkerSingleton>; auth: ReturnType<typeof betterAuth> } => {
+  const auth = betterAuth(
+    {
+      secret: env.AUTH_SECRET,
+      emailAndPassword: { enabled: true },
+      session: {
+        sessionToken: { header: 'authorization', scheme: 'Bearer' }
+      }
+    } as any
+  );
 
   const resolveSession = async (headers: Headers) => {
     const cloned = new Headers(headers);
@@ -19,7 +21,7 @@ export const createAuthPlugin = (env: Bindings) => {
     return auth.api.getSession({ headers: cloned });
   };
 
-  const plugin = new ElysiaFactory({ name: 'better-auth' })
+  const plugin = new ElysiaFactory<string, WorkerSingleton>({ name: 'better-auth' })
     .mount(auth.handler)
     .macro({
       auth: {
@@ -31,5 +33,5 @@ export const createAuthPlugin = (env: Bindings) => {
       }
     });
 
-  return plugin as any as Elysia;
+  return { plugin: plugin as unknown as Elysia<string, WorkerSingleton>, auth };
 };

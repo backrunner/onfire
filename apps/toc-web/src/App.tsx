@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import { Button, Panel, Input } from '@onfire/ui';
+import { Button, Panel, Input, Textarea, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@onfire/ui';
 import { OnfireClient, type CreateTicketInput } from '@onfire/sdk';
 import type { TicketTemplate } from '@onfire/shared';
 import Tickets from './Tickets';
@@ -119,7 +119,7 @@ const decodeIdentity = (jwt?: string): TokenIdentity => {
 };
 
 const inputClass =
-  'h-11 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-100';
+  'h-10 rounded-lg border border-input bg-background px-3 text-sm shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background';
 
 export default function App() {
   const search = useMemo(() => new URLSearchParams(window.location.search), []);
@@ -127,7 +127,9 @@ export default function App() {
   const identity = useMemo(() => decodeIdentity(rawToken), [rawToken]);
   const productId = identity.productId || search.get('productId') || 'demo-product';
 
+  const [templates, setTemplates] = useState<TemplateView[]>([]);
   const [template, setTemplate] = useState<TemplateView | null>(null);
+  const [templateId, setTemplateId] = useState<string>('');
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [categoryValue, setCategoryValue] = useState<string>('');
   const [subcategoryValue, setSubcategoryValue] = useState<string>('');
@@ -145,16 +147,20 @@ export default function App() {
     client
       .listTemplates(productId)
       .then((list) => {
-        const first = list[0];
-        if (!first) return setTemplate(null);
-        const parsedFields = ensureDetailField(parseFields(first.formSchema ?? {}));
-        const categoriesParsed = parseCategories(first);
-        setTemplate({ ...first, fields: parsedFields, categoriesParsed });
-        if (categoriesParsed[0]) setCategoryValue(categoriesParsed[0].value);
-        if (categoriesParsed[0]?.children?.[0]) setSubcategoryValue(categoriesParsed[0].children[0].value);
+        const parsed = list.map((t) => {
+          const fields = ensureDetailField(parseFields(t.formSchema ?? {}));
+          const categoriesParsed = parseCategories(t);
+          return { ...t, fields, categoriesParsed };
+        });
+        setTemplates(parsed);
+        const target = parsed.find((t) => t.id === templateId) ?? parsed[0];
+        setTemplateId(target?.id ?? '');
+        setTemplate(target ?? null);
+        if (target?.categoriesParsed?.[0]) setCategoryValue(target.categoriesParsed[0].value);
+        if (target?.categoriesParsed?.[0]?.children?.[0]) setSubcategoryValue(target.categoriesParsed[0].children[0].value);
       })
       .catch(() => setTemplate(null));
-  }, [client, productId]);
+  }, [client, productId, templateId]);
 
   useEffect(() => {
     if (turnstileRendered.current) return;
@@ -246,7 +252,7 @@ export default function App() {
       placeholder: field.placeholder ?? field.label
     };
     if (field.type === 'textarea') {
-      return <textarea {...(common as any)} rows={4} className={`${inputClass} resize-y`} />;
+      return <Textarea {...(common as any)} rows={4} className={`${inputClass} resize-y`} />;
     }
     if (field.type === 'select' && field.options?.length) {
       return (
@@ -279,6 +285,32 @@ export default function App() {
             <Button size="sm" variant="outline" onClick={() => setShowList((s) => !s)}>
               {showList ? '返回提交' : '查看我的工单'}
             </Button>
+            <div className="w-56">
+              <Select
+                value={templateId}
+                onValueChange={(v: string) => {
+                  setTemplateId(v);
+                  const found = templates.find((t) => t.id === v);
+                  if (found) {
+                    setTemplate(found);
+                    setCategoryValue(found.categoriesParsed[0]?.value ?? '');
+                    setSubcategoryValue(found.categoriesParsed[0]?.children?.[0]?.value ?? '');
+                    setFieldValues({});
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="选择模版" />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
@@ -303,7 +335,7 @@ export default function App() {
       </header>
 
       {showList ? (
-        <Tickets client={client} productId={productId} />
+        <Tickets client={client} productId={productId} turnstileToken={turnstileToken} />
       ) : (
         <div className="rounded-xl border border-zinc-200 bg-white shadow-sm">
           <Panel title={template?.title ?? '工单模版'} description={template ? '完全由模版驱动，字段与类目由产品侧配置' : '未找到模版'}>
@@ -313,35 +345,44 @@ export default function App() {
                   <div className="grid gap-3 md:grid-cols-2">
                     <label className="flex flex-col gap-2 text-sm text-zinc-700">
                       <span className="font-medium">类目</span>
-                      <select
+                      <Select
                         value={categoryValue}
-                        onChange={(e) => {
-                          const next = e.target.value;
+                        onValueChange={(next: string) => {
                           setCategoryValue(next);
                           const found = template.categoriesParsed.find((c) => c.value === next);
                           if (found?.children?.[0]) setSubcategoryValue(found.children[0].value);
+                          else setSubcategoryValue('');
                         }}
-                        className={inputClass}
                       >
-                        {template.categoriesParsed.map((c) => (
-                          <option key={c.value} value={c.value}>
-                            {c.label}
-                          </option>
-                        ))}
-                      </select>
+                        <SelectTrigger>
+                          <SelectValue placeholder="请选择类目" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {template.categoriesParsed.map((c) => (
+                            <SelectItem key={c.value} value={c.value}>
+                              {c.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </label>
                     {template.categoriesParsed.find((c) => c.value === categoryValue)?.children?.length ? (
                       <label className="flex flex-col gap-2 text-sm text-zinc-700">
                         <span className="font-medium">子类目</span>
-                        <select value={subcategoryValue} onChange={(e) => setSubcategoryValue(e.target.value)} className={inputClass}>
-                          {template.categoriesParsed
-                            .find((c) => c.value === categoryValue)
-                            ?.children?.map((child) => (
-                              <option key={child.value} value={child.value}>
-                                {child.label}
-                              </option>
-                            ))}
-                        </select>
+                        <Select value={subcategoryValue} onValueChange={setSubcategoryValue}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="请选择子类目" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {template.categoriesParsed
+                              .find((c) => c.value === categoryValue)
+                              ?.children?.map((child) => (
+                                <SelectItem key={child.value} value={child.value}>
+                                  {child.label}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
                       </label>
                     ) : null}
                   </div>

@@ -1,10 +1,10 @@
 import { rolePermissions } from '@onfire/shared';
 import { Elysia } from 'elysia';
 import { resolveContext } from '../core/context';
-import type { Bindings } from '../core/types';
+import type { Bindings, WorkerSingleton } from '../core/types';
 
 export const createSystemRoutes = (env: Bindings) =>
-  new Elysia()
+  new Elysia<string, WorkerSingleton>()
     .get('/health', () => ({ ok: true, scope: 'tob', ts: Date.now() }))
     .get('/me', async ({ user }) => {
       const ctx = await resolveContext(env, user);

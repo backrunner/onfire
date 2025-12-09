@@ -1,8 +1,7 @@
 import { ChangeEvent } from 'react';
 import type { Ticket, TicketPriority, TicketStatus } from '@onfire/shared';
-import { Badge, Button } from '@onfire/ui';
 import { Filter, RefreshCw } from 'lucide-react';
-import { Table, THead, TBody, TR, TH, TD } from './ui/table';
+import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@onfire/ui';
 import { usePagination } from '../hooks/usePagination';
 
 const statusColor: Record<string, { label: string; variant: 'info' | 'warning' | 'success' | 'default' }> = {
@@ -52,12 +51,14 @@ export function TicketsPanel({
   canAssign,
   canClose
 }: Props) {
+  const selectClass =
+    'h-9 rounded-lg border border-input bg-background px-2 text-sm shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background';
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-sm text-zinc-600">
         <Filter className="h-4 w-4" />
         <select
-          className="h-9 rounded-lg border border-zinc-200 bg-white px-2 text-sm"
+          className={selectClass}
           value={filters.status ?? ''}
           onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, status: (e.target.value as TicketStatus) || undefined })}
         >
@@ -69,7 +70,7 @@ export function TicketsPanel({
           <option value="closed">已关闭</option>
         </select>
         <select
-          className="h-9 rounded-lg border border-zinc-200 bg-white px-2 text-sm"
+          className={selectClass}
           value={filters.priority ?? ''}
           onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, priority: (e.target.value as TicketPriority) || undefined })}
         >
@@ -79,7 +80,7 @@ export function TicketsPanel({
           <option value="low">低</option>
         </select>
         <select
-          className="h-9 rounded-lg border border-zinc-200 bg-white px-2 text-sm"
+          className={selectClass}
           value={sortBy}
           onChange={(e: ChangeEvent<HTMLSelectElement>) => setSortBy(e.target.value as any)}
         >
@@ -88,7 +89,7 @@ export function TicketsPanel({
           <option value="overdue">按超时优先</option>
         </select>
         <select
-          className="h-9 rounded-lg border border-zinc-200 bg-white px-2 text-sm"
+          className={selectClass}
           value={filters.team ?? ''}
           onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, team: e.target.value || undefined })}
         >
@@ -100,7 +101,7 @@ export function TicketsPanel({
           ))}
         </select>
         <select
-          className="h-9 rounded-lg border border-zinc-200 bg-white px-2 text-sm"
+          className={selectClass}
           value={filters.product ?? ''}
           onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilters({ ...filters, product: e.target.value || undefined })}
         >
@@ -133,9 +134,9 @@ export function TicketsPanel({
       </div>
 
       <Table>
-        <THead>
-          <TR>
-            <TH>
+        <TableHeader>
+          <TableRow>
+            <TableHead>
               <input
                 type="checkbox"
                 className="h-4 w-4 rounded border-zinc-300"
@@ -147,20 +148,20 @@ export function TicketsPanel({
                   setSelectedIds(next);
                 }}
               />
-            </TH>
-            <TH>工单</TH>
-            <TH>状态</TH>
-            <TH>优先级</TH>
-            <TH>SLA</TH>
-            <TH>团队/产品</TH>
-            <TH>指派</TH>
-            <TH>更新时间</TH>
-          </TR>
-        </THead>
-        <TBody>
+            </TableHead>
+            <TableHead>工单</TableHead>
+            <TableHead>状态</TableHead>
+            <TableHead>优先级</TableHead>
+            <TableHead>SLA</TableHead>
+            <TableHead>团队/产品</TableHead>
+            <TableHead>指派</TableHead>
+            <TableHead>更新时间</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {pagination.current.map((t) => (
-            <TR key={t.id} className={`cursor-pointer ${selectedId === t.id ? 'bg-zinc-50' : ''}`} onClick={() => onOpen(t.id)}>
-              <TD>
+            <TableRow key={t.id} className={`cursor-pointer ${selectedId === t.id ? 'bg-zinc-50' : ''}`} onClick={() => onOpen(t.id)}>
+              <TableCell>
                 <input
                   type="checkbox"
                   className="h-4 w-4 rounded border-zinc-300"
@@ -173,18 +174,18 @@ export function TicketsPanel({
                   }}
                   onClick={(e) => e.stopPropagation()}
                 />
-              </TD>
-              <TD>
-                <div className="font-semibold text-zinc-900">{t.subject}</div>
-                <div className="text-xs text-zinc-500">#{t.id}</div>
-              </TD>
-              <TD>
+              </TableCell>
+              <TableCell>
+                <div className="font-semibold text-foreground">{t.subject}</div>
+                <div className="text-xs text-muted-foreground">#{t.id}</div>
+              </TableCell>
+              <TableCell>
                 <Badge variant={statusColor[t.status]?.variant ?? 'default'}>{statusColor[t.status]?.label ?? t.status}</Badge>
-              </TD>
-              <TD>
+              </TableCell>
+              <TableCell>
                 <Badge variant={t.priority === 'high' ? 'warning' : t.priority === 'medium' ? 'info' : 'default'}>{t.priority}</Badge>
-              </TD>
-              <TD className="text-xs text-zinc-600">
+              </TableCell>
+              <TableCell className="text-xs text-muted-foreground">
                 {t.sla?.acceptBreached || t.sla?.replyBreached ? (
                   <span className="text-amber-600">超时</span>
                 ) : (
@@ -193,16 +194,16 @@ export function TicketsPanel({
                     <div>回复: {t.sla?.replyDeadline ?? '--'}</div>
                   </>
                 )}
-              </TD>
-              <TD className="text-xs text-zinc-600">
+              </TableCell>
+              <TableCell className="text-xs text-muted-foreground">
                 <div>Team: {t.teamId}</div>
                 <div>Prod: {t.productId}</div>
-              </TD>
-              <TD className="text-xs text-zinc-600">{t.assigneeId ?? '未指派'}</TD>
-              <TD className="text-xs text-zinc-600">{t.updatedAt ?? t.createdAt}</TD>
-            </TR>
+              </TableCell>
+              <TableCell className="text-xs text-muted-foreground">{t.assigneeId ?? '未指派'}</TableCell>
+              <TableCell className="text-xs text-muted-foreground">{t.updatedAt ?? t.createdAt}</TableCell>
+            </TableRow>
           ))}
-        </TBody>
+        </TableBody>
       </Table>
 
       <div className="flex items-center justify-between text-sm text-zinc-600">

@@ -1,9 +1,9 @@
 import { Elysia } from 'elysia';
 import { verifyJwt } from '../core/jwt';
-import type { Bindings } from '../core/types';
+import type { Bindings, WorkerSingleton } from '../core/types';
 
 export const createSystemRoutes = (env: Bindings) =>
-  new Elysia()
+  new Elysia<string, WorkerSingleton>()
     .get('/health', () => ({ ok: true, ts: Date.now() }))
     .get('/whoami', async ({ request }) => {
       const token = request.headers.get('authorization')?.replace('Bearer ', '');

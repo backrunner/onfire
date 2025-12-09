@@ -4,19 +4,26 @@ export interface TicketDetail {
   ticket: Ticket;
   replies?: unknown[];
   history?: unknown[];
+  timeline?: unknown[];
 }
 
 const baseUrl = '/api/tob';
 
-const authHeaders = () => {
+const authHeaders = (): HeadersInit => {
   const token = localStorage.getItem('onfire.session');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  if (!token) return {};
+  return { Authorization: `Bearer ${token}` };
 };
 
 const json = async (res: Response) => {
   if (res.status === 401) {
     const err = new Error('unauthorized');
     (err as any).status = 401;
+    throw err;
+  }
+  if (res.status === 428) {
+    const err = new Error('setup_required');
+    (err as any).status = 428;
     throw err;
   }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -96,9 +103,28 @@ export const signIn = (body: { email: string; password: string }) =>
     body: JSON.stringify(body)
   }).then(json);
 
+export const signUp = (body: { email: string; password: string; name?: string }) =>
+  fetch(`${baseUrl}/auth/email/sign-up`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }).then(json);
+
 export const signOut = () => {
   localStorage.removeItem('onfire.session');
 };
+
+export const getInstallStatus = () => fetch(`${baseUrl}/install/status`).then(json) as Promise<{ needsSetup: boolean; hasTenant: boolean }>;
+
+export const finalizeInstall = (body: { tenantName: string; displayName?: string }) =>
+  fetch(`${baseUrl}/install/finalize`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(body) }).then(json);
+
+export const changePassword = (body: { currentPassword: string; newPassword: string; revokeOtherSessions?: boolean }) =>
+  fetch(`${baseUrl}/auth/change-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body)
+  }).then(json);
 
 export const adminTenants = () => fetch(`${baseUrl}/admin/tenants`, { headers: authHeaders() }).then(json) as Promise<{ data: any[] }>;
 export const adminProducts = () => fetch(`${baseUrl}/admin/products`, { headers: authHeaders() }).then(json) as Promise<{ data: any[] }>;
@@ -106,6 +132,9 @@ export const adminTeams = () => fetch(`${baseUrl}/admin/teams`, { headers: authH
 export const adminTemplates = () => fetch(`${baseUrl}/admin/templates`, { headers: authHeaders() }).then(json) as Promise<{ data: any[] }>;
 export const adminUsers = () => fetch(`${baseUrl}/admin/users`, { headers: authHeaders() }).then(json) as Promise<{ data: any[] }>;
 export const adminCustomers = () => fetch(`${baseUrl}/admin/customers`, { headers: authHeaders() }).then(json) as Promise<{ data: any[] }>;
+export const adminAgents = () => fetch(`${baseUrl}/admin/agents`, { headers: authHeaders() }).then(json) as Promise<{ data: any[] }>;
+export const adminCategoryRoutes = (productId?: string) =>
+  fetch(`${baseUrl}/admin/category-routes${productId ? `?productId=${encodeURIComponent(productId)}` : ''}`, { headers: authHeaders() }).then(json) as Promise<{ data: any[] }>;
 export const adminProductKeys = (productId?: string) =>
   fetch(`${baseUrl}/admin/product-keys${productId ? `?productId=${encodeURIComponent(productId)}` : ''}`, { headers: authHeaders() }).then(json) as Promise<{
     data: any[];
@@ -148,6 +177,16 @@ export const updateTeam = (id: string, body: { name?: string; allowReassign?: bo
   fetch(`${baseUrl}/admin/teams/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(body) }).then(json);
 export const updateTemplate = (id: string, body: { title?: string; categories?: string; formSchema?: string }) =>
   fetch(`${baseUrl}/admin/templates/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(body) }).then(json);
+export const updateAgent = (id: string, body: { level?: number; active?: boolean; teamIds?: string[]; displayName?: string; email?: string; avatarUrl?: string }) =>
+  fetch(`${baseUrl}/admin/agents/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(body) }).then(json);
+export const updateUser = (id: string, body: { role?: string; displayName?: string; tenantId?: string }) =>
+  fetch(`${baseUrl}/admin/users/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(body) }).then(json);
+export const createCategoryRoute = (body: { productId: string; category: string; subcategory?: string; teamId: string }) =>
+  fetch(`${baseUrl}/admin/category-routes`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(body) }).then(json);
+export const updateCategoryRoute = (id: string, body: { category?: string; subcategory?: string; teamId?: string }) =>
+  fetch(`${baseUrl}/admin/category-routes/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(body) }).then(json);
+export const deleteCategoryRoute = (id: string) =>
+  fetch(`${baseUrl}/admin/category-routes/${id}`, { method: 'DELETE', headers: authHeaders() }).then(json);
 export const deleteTenant = (id: string) => fetch(`${baseUrl}/admin/tenants/${id}`, { method: 'DELETE', headers: authHeaders() }).then(json);
 export const deleteProduct = (id: string) => fetch(`${baseUrl}/admin/products/${id}`, { method: 'DELETE', headers: authHeaders() }).then(json);
 export const deleteTeam = (id: string) => fetch(`${baseUrl}/admin/teams/${id}`, { method: 'DELETE', headers: authHeaders() }).then(json);

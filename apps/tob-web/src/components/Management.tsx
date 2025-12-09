@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Panel, Button, Input } from '@onfire/ui';
+import { Panel, Button, Input, Textarea, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@onfire/ui';
 import { ShieldCheck, Users, Building2, LayoutList, Bot, RefreshCw, Pencil, Trash2, KeyRound, Copy } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import {
   adminTenants,
   adminProducts,
@@ -9,7 +8,9 @@ import {
   adminTemplates,
   adminUsers,
   adminCustomers,
+  adminAgents,
   adminProductKeys,
+  adminCategoryRoutes,
   createTenant,
   createProduct,
   createProductKey,
@@ -21,11 +22,17 @@ import {
   updateProduct,
   updateTeam,
   updateTemplate,
+  updateAgent,
+  updateUser,
+  createCategoryRoute,
+  updateCategoryRoute,
+  deleteCategoryRoute,
   deleteTenant,
   deleteProduct,
   deleteTeam,
   deleteTemplate
 } from '../api';
+import { Role } from '@onfire/shared';
 import { FormBuilder, FormField } from './FormBuilder';
 
 const NoAccess = ({ reason }: { reason: string }) => (
@@ -60,7 +67,9 @@ export function Management({
   const [templates, setTemplates] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
+  const [agents, setAgents] = useState<any[]>([]);
   const [productKeys, setProductKeys] = useState<any[]>([]);
+  const [categoryRoutes, setCategoryRoutes] = useState<any[]>([]);
   const [apiKeyProductId, setApiKeyProductId] = useState('');
   const [apiKeyName, setApiKeyName] = useState('');
   const [issuedApiKey, setIssuedApiKey] = useState<string | null>(null);
@@ -87,6 +96,15 @@ export function Management({
   const [templatePage, setTemplatePage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [templateFields, setTemplateFields] = useState<FormField[]>([]);
+  const [editingAgent, setEditingAgent] = useState<any | null>(null);
+  const [agentTeamsInput, setAgentTeamsInput] = useState('');
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [userRoleDraft, setUserRoleDraft] = useState<Role | ''>('');
+  const [userDisplayDraft, setUserDisplayDraft] = useState('');
+  const [catProductId, setCatProductId] = useState('');
+  const [catCategory, setCatCategory] = useState('');
+  const [catSubcategory, setCatSubcategory] = useState('');
+  const [catTeamId, setCatTeamId] = useState('');
 
   const productOptions = useMemo(() => products.map((p) => ({ label: p.name ?? p.id, value: p.id })), [products]);
   const paged = <T,>(items: T[], page: number) => {
@@ -120,6 +138,8 @@ export function Management({
       if (canManageTeam) setTeams((await adminTeams()).data ?? []);
       if (canManageTemplate) setTemplates((await adminTemplates()).data ?? []);
       if (canManageUser) setUsers((await adminUsers()).data ?? []);
+      if (canManageUser) setAgents((await adminAgents()).data ?? []);
+      setCategoryRoutes((await adminCategoryRoutes()).data ?? []);
       setCustomers((await adminCustomers()).data ?? []);
       // 重置分页到第一页
       setTenantPage(1);
@@ -390,6 +410,94 @@ export function Management({
                   </div>
                 )}
               </div>
+              <div className="rounded-lg border border-zinc-200 bg-white p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-semibold text-zinc-800">{'类目路由（产品 -> 类目 -> 团队）'}</div>
+                  <Button size="sm" variant="outline" onClick={() => refresh()}>
+                    <RefreshCw className="mr-1 h-3 w-3" />
+                    刷新
+                  </Button>
+                </div>
+                <div className="grid gap-2 md:grid-cols-4">
+                  <Input placeholder="产品ID" value={catProductId} onChange={(e) => setCatProductId(e.target.value)} />
+                  <Input placeholder="类目" value={catCategory} onChange={(e) => setCatCategory(e.target.value)} />
+                  <Input placeholder="子类目(可选)" value={catSubcategory} onChange={(e) => setCatSubcategory(e.target.value)} />
+                  <Input placeholder="团队ID" value={catTeamId} onChange={(e) => setCatTeamId(e.target.value)} />
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      if (!catProductId || !catCategory || !catTeamId) return;
+                      setLoading(true);
+                      try {
+                        await createCategoryRoute({ productId: catProductId, category: catCategory, subcategory: catSubcategory || undefined, teamId: catTeamId });
+                        setCatProductId('');
+                        setCatCategory('');
+                        setCatSubcategory('');
+                        setCatTeamId('');
+                        await refresh();
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                  >
+                    新增路由
+                  </Button>
+                </div>
+                <div className="space-y-1 text-xs text-zinc-600">
+                  {categoryRoutes.length === 0 ? (
+                    <NoAccess reason="暂无路由数据" />
+                  ) : (
+                    categoryRoutes.map((r) => (
+                      <div key={r.id} className="flex items-center justify-between rounded border border-zinc-100 px-2 py-1">
+                        <div>
+                          <div className="font-semibold text-zinc-800">
+                            {r.productId} · {r.category}
+                            {r.subcategory ? ` / ${r.subcategory}` : ''}
+                          </div>
+                          <div className="text-[11px] text-zinc-500">team {r.teamId}</div>
+                        </div>
+                        <div className="space-x-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              const nextTeam = prompt('新的团队ID', r.teamId) ?? '';
+                              if (!nextTeam) return;
+                              setLoading(true);
+                              try {
+                                await updateCategoryRoute(r.id, { teamId: nextTeam });
+                                await refresh();
+                              } finally {
+                                setLoading(false);
+                              }
+                            }}
+                          >
+                            更新
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              setLoading(true);
+                              try {
+                                await deleteCategoryRoute(r.id);
+                                await refresh();
+                              } finally {
+                                setLoading(false);
+                              }
+                            }}
+                          >
+                            删
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
               {editingProduct && (
                 <div className="rounded-lg border border-zinc-200 bg-white p-3 space-y-2">
                   <div className="text-xs font-semibold text-zinc-800">编辑产品</div>
@@ -533,7 +641,7 @@ export function Management({
                         <div>
                           <div className="font-semibold text-zinc-800">{k.name ?? k.id}</div>
                           <div className="text-[11px] text-zinc-500">
-                            product {k.productId} · 创建 {k.createdAt ?? '-'} · 最近 {k.lastUsedAt ?? '未使用'}
+                            key {k.masked ?? k.id} · product {k.productId} · 创建 {k.createdAt ?? '-'} · 最近 {k.lastUsedAt ?? '未使用'}
                           </div>
                           {k.revoked && <div className="text-[11px] text-amber-600">已吊销</div>}
                         </div>
@@ -754,10 +862,10 @@ export function Management({
                 <Input placeholder="产品ID" value={templateProductId} onChange={(e) => setTemplateProductId(e.target.value)} list="product-options" />
                 <Input placeholder="分类(JSON)" value={templateCategories} onChange={(e) => setTemplateCategories(e.target.value)} />
               </div>
-              <div>
+              <div className="space-y-1">
                 <label className="text-xs text-zinc-600">表单 Schema (JSON)</label>
-                <textarea
-                  className="mt-1 w-full rounded-lg border border-zinc-200 p-2 text-xs"
+                <Textarea
+                  className="text-xs"
                   rows={4}
                   value={templateSchema}
                   onChange={(e) => setTemplateSchema(e.target.value)}
@@ -844,8 +952,8 @@ export function Management({
                     value={editingTemplate.categories ?? ''}
                     onChange={(e) => setEditingTemplate({ ...editingTemplate, categories: e.target.value })}
                   />
-                  <textarea
-                    className="mt-1 w-full rounded-lg border border-zinc-200 p-2 text-xs"
+                  <Textarea
+                    className="text-xs"
                     rows={4}
                     value={editingTemplate.formSchema ?? ''}
                     onChange={(e) => setEditingTemplate({ ...editingTemplate, formSchema: e.target.value })}
@@ -922,9 +1030,66 @@ export function Management({
                           errors['userSearch'] ? (u.email ?? '').toLowerCase().includes(errors['userSearch']!.toLowerCase()) : true
                         )
                         .map((u) => (
-                          <div key={u.id} className="flex justify-between border-b border-zinc-100 py-1 last:border-b-0">
-                            <span className="font-medium text-zinc-800">{u.email ?? u.id}</span>
-                            <span>tenant {u.tenantId}</span>
+                        <div key={u.id} className="flex items-center justify-between border-b border-zinc-100 py-1 last:border-b-0">
+                          <div>
+                            <div className="font-medium text-zinc-800">{u.email ?? u.id}</div>
+                            <div className="text-[11px] text-zinc-500">
+                              tenant {u.tenantId} · 角色 {u.role}
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setEditingUser(u);
+                              setUserRoleDraft(u.role as Role);
+                              setUserDisplayDraft(u.displayName ?? '');
+                            }}
+                          >
+                            编辑角色
+                          </Button>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-lg border border-zinc-200 bg-white p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="text-xs font-semibold text-zinc-800">坐席/等级</div>
+                    <Input
+                      placeholder="搜索坐席"
+                      value={errors['agentSearch'] ?? ''}
+                      onChange={(e) => setError('agentSearch', e.target.value)}
+                      className="h-8"
+                    />
+                  </div>
+                  {agents.length === 0 ? (
+                    <NoAccess reason="暂无坐席数据" />
+                  ) : (
+                    <div className="space-y-1 text-xs text-zinc-600">
+                      {agents
+                        .filter((a) =>
+                          errors['agentSearch'] ? (a.email ?? '').toLowerCase().includes(errors['agentSearch']!.toLowerCase()) : true
+                        )
+                        .map((a) => (
+                          <div key={a.userId} className="flex items-center justify-between border-b border-zinc-100 py-1 last:border-b-0">
+                            <div>
+                              <div className="font-medium text-zinc-800">{a.email ?? a.userId}</div>
+                              <div className="text-[11px] text-zinc-500">
+                                等级 {a.level ?? 1} · 激活 {String(a.active)} · 团队 {(a.teamIds ?? []).join(', ') || '未绑定'}
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setEditingAgent(a);
+                                setAgentTeamsInput(Array.isArray(a.teamIds) ? a.teamIds.join(',') : '');
+                              }}
+                            >
+                              编辑
+                            </Button>
                           </div>
                         ))}
                     </div>
@@ -950,20 +1115,138 @@ export function Management({
                           errors['customerSearch'] ? (c.email ?? '').toLowerCase().includes(errors['customerSearch']!.toLowerCase()) : true
                         )
                         .map((c) => (
-                          <div key={c.email} className="flex flex-col border-b border-zinc-100 py-1 last:border-b-0">
-                            <div className="flex justify-between">
-                              <span className="font-medium text-zinc-800">{c.email}</span>
-                              <span className="text-[11px] text-zinc-500">工单 {c.count}</span>
-                            </div>
-                            <div className="text-[11px] text-zinc-500">
-                              等级 {c.maxLevel ?? '-'} · 租户 {Array.isArray(c.tenantIds) ? c.tenantIds.join(',') : '-'} · 产品{' '}
-                              {Array.isArray(c.productIds) ? c.productIds.join(',') : '-'}
-                            </div>
+                        <div key={`${c.email}-${c.productId ?? ''}`} className="flex flex-col border-b border-zinc-100 py-1 last:border-b-0">
+                          <div className="flex justify-between">
+                            <span className="font-medium text-zinc-800">{c.email}</span>
+                            <span className="text-[11px] text-zinc-500">等级 {c.level ?? '-'}</span>
                           </div>
+                          <div className="text-[11px] text-zinc-500">
+                            租户 {c.tenantId ?? '-'} · 产品 {c.productId ?? '-'} · 外部ID {c.externalId ?? '-'}
+                          </div>
+                        </div>
                         ))}
                     </div>
                   )}
                 </div>
+
+                {editingUser && (
+                  <div className="rounded-lg border border-zinc-200 bg-white p-3">
+                    <div className="text-xs font-semibold text-zinc-800">编辑用户角色</div>
+                    <div className="grid gap-2 md:grid-cols-3">
+                      <select
+                        className="h-9 rounded-md border border-zinc-200 bg-white px-2 text-sm"
+                        value={userRoleDraft || ''}
+                        onChange={(e) => setUserRoleDraft(e.target.value as Role)}
+                      >
+                        <option value="">选择角色</option>
+                        {Object.values(Role).map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
+                      </select>
+                      <Input placeholder="显示名" value={userDisplayDraft} onChange={(e) => setUserDisplayDraft(e.target.value)} />
+                    </div>
+                    <div className="mt-2 flex justify-end gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setEditingUser(null)}>
+                        取消
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          if (!editingUser) return;
+                          setLoading(true);
+                          try {
+                            await updateUser(editingUser.id, { role: userRoleDraft || undefined, displayName: userDisplayDraft || undefined });
+                            setEditingUser(null);
+                            setUserRoleDraft('');
+                            setUserDisplayDraft('');
+                            await refresh();
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        disabled={!userRoleDraft}
+                      >
+                        保存
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {editingAgent && (
+                  <div className="rounded-lg border border-zinc-200 bg-white p-3">
+                    <div className="text-xs font-semibold text-zinc-800">编辑坐席</div>
+                    <div className="grid gap-2 md:grid-cols-3">
+                      <Input
+                        type="number"
+                        placeholder="等级"
+                        value={editingAgent.level ?? 1}
+                        onChange={(e) => setEditingAgent({ ...editingAgent, level: Number(e.target.value) })}
+                      />
+                      <label className="flex items-center gap-2 text-xs text-zinc-600">
+                        <input
+                          type="checkbox"
+                          checked={editingAgent.active ?? true}
+                          onChange={(e) => setEditingAgent({ ...editingAgent, active: e.target.checked })}
+                          className="h-4 w-4"
+                        />
+                        激活
+                      </label>
+                      <Input
+                        placeholder="团队ID，逗号分隔"
+                        value={agentTeamsInput}
+                        onChange={(e) => setAgentTeamsInput(e.target.value)}
+                      />
+                    <Input
+                      placeholder="显示名（可选）"
+                      value={editingAgent.displayName ?? ''}
+                      onChange={(e) => setEditingAgent({ ...editingAgent, displayName: e.target.value })}
+                    />
+                    <Input
+                      placeholder="邮箱（可选）"
+                      value={editingAgent.email ?? ''}
+                      onChange={(e) => setEditingAgent({ ...editingAgent, email: e.target.value })}
+                    />
+                    <Input
+                      placeholder="头像 URL（可选）"
+                      value={editingAgent.avatarUrl ?? ''}
+                      onChange={(e) => setEditingAgent({ ...editingAgent, avatarUrl: e.target.value })}
+                    />
+                    </div>
+                    <div className="mt-2 flex justify-end gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setEditingAgent(null)}>
+                        取消
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          setLoading(true);
+                          try {
+                            await updateAgent(editingAgent.userId, {
+                              level: Number(editingAgent.level) || 1,
+                              active: Boolean(editingAgent.active),
+                              teamIds: agentTeamsInput
+                                .split(',')
+                                .map((t) => t.trim())
+                                .filter(Boolean),
+                              displayName: editingAgent.displayName || undefined,
+                              email: editingAgent.email || undefined,
+                              avatarUrl: editingAgent.avatarUrl || undefined
+                            });
+                            setEditingAgent(null);
+                            setAgentTeamsInput('');
+                            await refresh();
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                      >
+                        保存
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <NoAccess reason="无用户管理权限" />

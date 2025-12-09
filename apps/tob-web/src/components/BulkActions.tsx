@@ -1,7 +1,5 @@
 import { ChangeEvent } from 'react';
-import { Button, Input, Textarea } from '@onfire/ui';
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerCloseButton } from './ui/drawer';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogCloseButton } from './ui/dialog';
+import { Button, Input, Textarea, Sheet, SheetContent, SheetHeader, SheetTitle, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@onfire/ui';
 
 interface Props {
   openAssign: boolean;
@@ -36,23 +34,25 @@ export function BulkActions({
 }: Props) {
   return (
     <>
-      <Drawer open={openAssign} onOpenChange={setOpenAssign}>
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle>批量指派</DrawerTitle>
-          </DrawerHeader>
-          <div className="space-y-3 px-4 pb-4">
-            <div className="text-sm text-zinc-600">已选 {selectedIds.size} 条工单</div>
+      <Sheet open={openAssign} onOpenChange={setOpenAssign}>
+        <SheetContent side="right">
+          <SheetHeader>
+            <SheetTitle>批量指派</SheetTitle>
+          </SheetHeader>
+          <div className="space-y-3 pb-4">
+            <div className="text-sm text-muted-foreground">已选 {selectedIds.size} 条工单</div>
             <Input placeholder="指派给坐席 ID" value={bulkAssignee} onChange={(e: ChangeEvent<HTMLInputElement>) => setBulkAssignee(e.target.value)} />
             <div className="flex justify-end gap-2">
-              <DrawerCloseButton />
+              <Button size="sm" variant="ghost" onClick={() => setOpenAssign(false)}>
+                取消
+              </Button>
               <Button size="sm" onClick={onBulkAssign} disabled={!bulkAssignee || !canAssign}>
                 确认指派
               </Button>
             </div>
           </div>
-        </DrawerContent>
-      </Drawer>
+        </SheetContent>
+      </Sheet>
 
       <Dialog open={openClose} onOpenChange={setOpenClose}>
         <DialogContent>
@@ -62,7 +62,9 @@ export function BulkActions({
           </DialogHeader>
           <Textarea placeholder="关闭原因" value={bulkReason} onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setBulkReason(e.target.value)} rows={3} />
           <DialogFooter>
-            <DialogCloseButton />
+            <Button variant="ghost" onClick={() => setOpenClose(false)}>
+              取消
+            </Button>
             <Button variant="outline" onClick={onBulkClose} disabled={selectedIds.size === 0 || !canClose}>
               确认关闭
             </Button>
