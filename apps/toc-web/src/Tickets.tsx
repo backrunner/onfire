@@ -12,7 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
   ScrollArea,
-  Avatar
+  Avatar,
+  useTranslation
 } from '@onfire/ui';
 import {
   Ticket as TicketIcon,
@@ -27,18 +28,18 @@ import {
   X
 } from 'lucide-react';
 
-const statusConfig: Record<string, { label: string; variant: 'new' | 'processing' | 'replied' | 'closed' | 'escalated' }> = {
-  new: { label: '待处理', variant: 'new' },
-  processing: { label: '处理中', variant: 'processing' },
-  replied: { label: '已回复', variant: 'replied' },
-  escalated: { label: '已升级', variant: 'escalated' },
-  closed: { label: '已关闭', variant: 'closed' }
+const statusVariants: Record<string, 'new' | 'processing' | 'replied' | 'closed' | 'escalated'> = {
+  new: 'new',
+  processing: 'processing',
+  replied: 'replied',
+  escalated: 'escalated',
+  closed: 'closed'
 };
 
-const priorityConfig: Record<string, { label: string; variant: 'high' | 'medium' | 'low' }> = {
-  high: { label: '高', variant: 'high' },
-  medium: { label: '中', variant: 'medium' },
-  low: { label: '低', variant: 'low' }
+const priorityVariants: Record<string, 'high' | 'medium' | 'low'> = {
+  high: 'high',
+  medium: 'medium',
+  low: 'low'
 };
 
 const priorityWeight: Record<string, number> = { high: 3, medium: 2, low: 1 };
@@ -52,6 +53,7 @@ export default function Tickets({
   productId: string;
   turnstileToken?: string;
 }) {
+  const { t } = useTranslation();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selected, setSelected] = useState<TicketDetail | null>(null);
   const [reply, setReply] = useState('');
@@ -59,6 +61,7 @@ export default function Tickets({
   const [sortBy, setSortBy] = useState<'recent' | 'priority'>('recent');
   const [status, setStatus] = useState<TicketStatus | ''>('');
   const [loading, setLoading] = useState(false);
+  const [replyError, setReplyError] = useState('');
 
   const fetchTickets = async () => {
     setLoading(true);
@@ -97,14 +100,17 @@ export default function Tickets({
   const submitReply = async () => {
     if (!selected || !reply.trim()) return;
     if (!turnstileToken) {
-      alert('请先通过验证码，再提交回复');
+      setReplyError(t('detail.turnstileRequired'));
       return;
     }
+    setReplyError('');
     setSending(true);
     try {
       await client.reply(selected.ticket.id, { content: reply, turnstileToken });
       setReply('');
       openTicket(selected.ticket.id);
+    } catch (err) {
+      setReplyError(t('detail.replyFailed'));
     } finally {
       setSending(false);
     }
@@ -122,22 +128,22 @@ export default function Tickets({
       {/* Stats */}
       <div className="grid gap-3 sm:grid-cols-3">
         <StatCard
-          title="全部工单"
+          title={t('tickets.total')}
           value={stats.total}
           icon={<TicketIcon className="h-4 w-4" />}
-          hint="我提交的工单总数"
+          hint={t('tickets.totalHint')}
         />
         <StatCard
-          title="待处理"
+          title={t('tickets.pending')}
           value={stats.new}
           icon={<Clock className="h-4 w-4" />}
-          hint="等待客服处理"
+          hint={t('tickets.pendingHint')}
         />
         <StatCard
-          title="已回复"
+          title={t('tickets.replied')}
           value={stats.replied}
           icon={<CheckCircle2 className="h-4 w-4" />}
-          hint="客服已回复"
+          hint={t('tickets.repliedHint')}
         />
       </div>
 
@@ -147,7 +153,7 @@ export default function Tickets({
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <div className="flex items-center gap-2">
               <TicketIcon className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">我的工单</span>
+              <span className="font-medium">{t('tickets.title')}</span>
               <Badge variant="secondary" size="sm">
                 {tickets.length}
               </Badge>
@@ -164,12 +170,12 @@ export default function Tickets({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">全部状态</SelectItem>
-                <SelectItem value="new">待处理</SelectItem>
-                <SelectItem value="processing">处理中</SelectItem>
-                <SelectItem value="replied">已回复</SelectItem>
-                <SelectItem value="escalated">已升级</SelectItem>
-                <SelectItem value="closed">已关闭</SelectItem>
+                <SelectItem value="all">{t('tickets.filters.allStatus')}</SelectItem>
+                <SelectItem value="new">{t('tickets.filters.new')}</SelectItem>
+                <SelectItem value="processing">{t('tickets.filters.processing')}</SelectItem>
+                <SelectItem value="replied">{t('tickets.filters.replied')}</SelectItem>
+                <SelectItem value="escalated">{t('tickets.filters.escalated')}</SelectItem>
+                <SelectItem value="closed">{t('tickets.filters.closed')}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
@@ -177,8 +183,8 @@ export default function Tickets({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="recent">按更新时间</SelectItem>
-                <SelectItem value="priority">按优先级</SelectItem>
+                <SelectItem value="recent">{t('tickets.sort.recent')}</SelectItem>
+                <SelectItem value="priority">{t('tickets.sort.priority')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -189,36 +195,36 @@ export default function Tickets({
               {tickets.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                   <TicketIcon className="mb-2 h-8 w-8 opacity-50" />
-                  <p className="text-sm">暂无工单</p>
+                  <p className="text-sm">{t('tickets.noTickets')}</p>
                 </div>
               ) : (
-                tickets.map((t) => (
+                tickets.map((ticket) => (
                   <button
-                    key={t.id}
-                    onClick={() => openTicket(t.id)}
+                    key={ticket.id}
+                    onClick={() => openTicket(ticket.id)}
                     className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${
-                      selected?.ticket.id === t.id ? 'bg-muted' : ''
+                      selected?.ticket.id === ticket.id ? 'bg-muted' : ''
                     }`}
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="truncate font-medium">{t.subject}</span>
-                        {(t.sla?.acceptBreached || t.sla?.replyBreached) && (
+                        <span className="truncate font-medium">{ticket.subject}</span>
+                        {(ticket.sla?.acceptBreached || ticket.sla?.replyBreached) && (
                           <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 text-amber-500" />
                         )}
                       </div>
                       <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <span className="font-mono">#{t.id.slice(0, 8)}</span>
+                        <span className="font-mono">#{ticket.id.slice(0, 8)}</span>
                         <span>·</span>
-                        <span>{formatTime(t.updatedAt ?? t.createdAt)}</span>
+                        <span>{formatTime(ticket.updatedAt ?? ticket.createdAt, t)}</span>
                       </div>
                     </div>
                     <div className="flex flex-shrink-0 items-center gap-2">
-                      <Badge variant={statusConfig[t.status]?.variant ?? 'default'} size="sm">
-                        {statusConfig[t.status]?.label ?? t.status}
+                      <Badge variant={statusVariants[ticket.status] ?? 'default'} size="sm">
+                        {t(`tickets.status.${ticket.status}`)}
                       </Badge>
-                      <Badge variant={priorityConfig[t.priority]?.variant ?? 'default'} size="sm">
-                        {priorityConfig[t.priority]?.label ?? t.priority}
+                      <Badge variant={priorityVariants[ticket.priority] ?? 'default'} size="sm">
+                        {t(`tickets.priority.${ticket.priority}`)}
                       </Badge>
                     </div>
                     <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
@@ -240,16 +246,16 @@ export default function Tickets({
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <span className="font-mono">#{selected.ticket.id.slice(0, 8)}</span>
                     <span>·</span>
-                    <Badge variant={statusConfig[selected.ticket.status]?.variant ?? 'default'} size="sm">
-                      {statusConfig[selected.ticket.status]?.label ?? selected.ticket.status}
+                    <Badge variant={statusVariants[selected.ticket.status] ?? 'default'} size="sm">
+                      {t(`tickets.status.${selected.ticket.status}`)}
                     </Badge>
-                    <Badge variant={priorityConfig[selected.ticket.priority]?.variant ?? 'default'} size="sm">
-                      {priorityConfig[selected.ticket.priority]?.label ?? selected.ticket.priority}
+                    <Badge variant={priorityVariants[selected.ticket.priority] ?? 'default'} size="sm">
+                      {t(`tickets.priority.${selected.ticket.priority}`)}
                     </Badge>
                     {(selected.ticket.sla?.acceptBreached || selected.ticket.sla?.replyBreached) && (
                       <Badge variant="warning" size="sm">
                         <AlertTriangle className="mr-1 h-3 w-3" />
-                        SLA 超时
+                        {t('tickets.slaWarning')}
                       </Badge>
                     )}
                   </div>
@@ -265,10 +271,10 @@ export default function Tickets({
                   <p className="whitespace-pre-wrap text-sm">{selected.ticket.content}</p>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                  <Badge variant="secondary">团队: {selected.ticket.teamId}</Badge>
-                  <Badge variant="secondary">产品: {selected.ticket.productId}</Badge>
+                  <Badge variant="secondary">{t('detail.team')}: {selected.ticket.teamId}</Badge>
+                  <Badge variant="secondary">{t('detail.product')}: {selected.ticket.productId}</Badge>
                   {selected.ticket.customerLevel !== undefined && (
-                    <Badge variant="secondary">等级 Lv.{selected.ticket.customerLevel}</Badge>
+                    <Badge variant="secondary">{t('detail.level')} Lv.{selected.ticket.customerLevel}</Badge>
                   )}
                 </div>
               </div>
@@ -281,7 +287,7 @@ export default function Tickets({
                     <div className="p-4">
                       <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
                         <History className="h-3.5 w-3.5" />
-                        操作历史
+                        {t('detail.history')}
                       </div>
                       <div className="space-y-2">
                         {(selected.history ?? []).map((h: any) => (
@@ -299,7 +305,7 @@ export default function Tickets({
                                 </span>
                               )}
                             </div>
-                            <span className="text-muted-foreground">{formatTime(h.createdAt)}</span>
+                            <span className="text-muted-foreground">{formatTime(h.createdAt, t)}</span>
                           </div>
                         ))}
                       </div>
@@ -310,13 +316,13 @@ export default function Tickets({
                   <div className="p-4">
                     <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
                       <MessageSquare className="h-3.5 w-3.5" />
-                      回复记录
+                      {t('detail.replies')}
                       <Badge variant="secondary" size="sm">
                         {(selected.replies ?? []).length}
                       </Badge>
                     </div>
                     {(selected.replies ?? []).length === 0 ? (
-                      <div className="py-4 text-center text-xs text-muted-foreground">暂无回复</div>
+                      <div className="py-4 text-center text-xs text-muted-foreground">{t('detail.noReplies')}</div>
                     ) : (
                       <div className="space-y-3">
                         {(selected.replies ?? []).map((r: any) => (
@@ -325,17 +331,17 @@ export default function Tickets({
                               <div className="flex items-center gap-2">
                                 <Avatar
                                   size="sm"
-                                  alt={r.senderEmail ?? '系统'}
+                                  alt={r.senderEmail ?? t('common.system')}
                                   fallback={r.senderEmail?.[0] ?? 'S'}
                                 />
-                                <span className="text-sm font-medium">{r.senderEmail ?? '系统'}</span>
+                                <span className="text-sm font-medium">{r.senderEmail ?? t('common.system')}</span>
                                 {r.internal && (
                                   <Badge variant="secondary" size="sm">
-                                    内部
+                                    {t('detail.internal')}
                                   </Badge>
                                 )}
                               </div>
-                              <span className="text-xs text-muted-foreground">{formatTime(r.createdAt)}</span>
+                              <span className="text-xs text-muted-foreground">{formatTime(r.createdAt, t)}</span>
                             </div>
                             <p className="whitespace-pre-wrap text-sm">{r.content}</p>
                           </div>
@@ -350,19 +356,25 @@ export default function Tickets({
               <div className="border-t border-border p-4">
                 <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
                   <Send className="h-3.5 w-3.5" />
-                  追加回复
+                  {t('detail.replyForm')}
                 </div>
                 <Textarea
                   value={reply}
                   onChange={(e) => setReply(e.target.value)}
-                  placeholder="输入回复内容..."
+                  placeholder={t('detail.replyPlaceholder')}
                   rows={3}
                   className="mb-2 resize-none"
                 />
+                {replyError && (
+                  <div className="mb-2 flex items-center gap-1.5 rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    {replyError}
+                  </div>
+                )}
                 <div className="flex justify-end">
                   <Button size="sm" onClick={submitReply} loading={sending} disabled={!reply.trim()}>
                     <Send className="mr-1.5 h-3.5 w-3.5" />
-                    发送
+                    {t('detail.sendReply')}
                   </Button>
                 </div>
               </div>
@@ -370,7 +382,7 @@ export default function Tickets({
           ) : (
             <div className="flex h-full flex-col items-center justify-center py-20 text-muted-foreground">
               <MessageSquare className="mb-2 h-8 w-8 opacity-50" />
-              <p className="text-sm">选择工单查看详情</p>
+              <p className="text-sm">{t('detail.selectTicket')}</p>
             </div>
           )}
         </div>
@@ -379,19 +391,19 @@ export default function Tickets({
   );
 }
 
-function formatTime(time: string): string {
+function formatTime(time: string, t: (key: string, params?: Record<string, string>) => string): string {
   try {
     const date = new Date(time);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const mins = Math.floor(diff / 60000);
-    if (mins < 1) return '刚刚';
-    if (mins < 60) return `${mins}分钟前`;
+    if (mins < 1) return t('time.justNow');
+    if (mins < 60) return t('time.minutesAgo', { count: String(mins) });
     const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}小时前`;
+    if (hours < 24) return t('time.hoursAgo', { count: String(hours) });
     const days = Math.floor(hours / 24);
-    if (days < 7) return `${days}天前`;
-    return date.toLocaleDateString('zh-CN', {
+    if (days < 7) return t('time.daysAgo', { count: String(days) });
+    return date.toLocaleDateString(undefined, {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',

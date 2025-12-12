@@ -201,6 +201,8 @@ export function Management({
   const [catCategory, setCatCategory] = useState('');
   const [catSubcategory, setCatSubcategory] = useState('');
   const [catTeamId, setCatTeamId] = useState('');
+  const [editingCategoryRoute, setEditingCategoryRoute] = useState<any | null>(null);
+  const [editCatTeamId, setEditCatTeamId] = useState('');
 
   // Search states
   const [tenantSearch, setTenantSearch] = useState('');
@@ -889,16 +891,9 @@ export function Management({
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={async () => {
-                                      const nextTeam = prompt('新的团队ID', r.teamId) ?? '';
-                                      if (!nextTeam) return;
-                                      setLoading(true);
-                                      try {
-                                        await updateCategoryRoute(r.id, { teamId: nextTeam });
-                                        await refresh();
-                                      } finally {
-                                        setLoading(false);
-                                      }
+                                    onClick={() => {
+                                      setEditingCategoryRoute(r);
+                                      setEditCatTeamId(r.teamId ?? '');
                                     }}
                                   >
                                     改
@@ -927,6 +922,60 @@ export function Management({
                     </div>
                   </div>
                 </div>
+
+                {/* Edit Category Route Dialog */}
+                {editingCategoryRoute && (
+                  <Dialog open={Boolean(editingCategoryRoute)} onOpenChange={() => setEditingCategoryRoute(null)}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>编辑类目路由</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
+                          <div className="text-sm">
+                            <span className="font-medium">{editingCategoryRoute.productId}</span>
+                            <span className="mx-2">·</span>
+                            <span>{editingCategoryRoute.category}</span>
+                            {editingCategoryRoute.subcategory && (
+                              <span className="text-muted-foreground"> / {editingCategoryRoute.subcategory}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">目标团队ID</label>
+                          <Input
+                            placeholder="团队ID"
+                            value={editCatTeamId}
+                            onChange={(e) => setEditCatTeamId(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditingCategoryRoute(null)}>
+                          取消
+                        </Button>
+                        <Button
+                          onClick={async () => {
+                            if (!editCatTeamId.trim()) return;
+                            setLoading(true);
+                            try {
+                              await updateCategoryRoute(editingCategoryRoute.id, { teamId: editCatTeamId.trim() });
+                              setEditingCategoryRoute(null);
+                              setEditCatTeamId('');
+                              await refresh();
+                            } finally {
+                              setLoading(false);
+                            }
+                          }}
+                          loading={loading}
+                          disabled={!editCatTeamId.trim()}
+                        >
+                          保存
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
 
                 {/* Edit Product Dialog */}
                 {editingProduct && (
@@ -1416,6 +1465,7 @@ export function Management({
                             setEditingTemplate({ ...editingTemplate, formSchema: schemaJson });
                           }}
                         />
+                        <ErrorText text={errors['editTemplate']} />
                       </div>
                       <DialogFooter>
                         <Button variant="outline" onClick={() => setEditingTemplate(null)}>
@@ -1428,9 +1478,10 @@ export function Management({
                               JSON.parse(editingTemplate.formSchema ?? '{}');
                               JSON.parse(editingTemplate.categories ?? '[]');
                             } catch (e) {
-                              alert('请检查 JSON 格式');
+                              setError('editTemplate', '请检查 JSON 格式');
                               return;
                             }
+                            setError('editTemplate', '');
                             setLoading(true);
                             try {
                               await updateTemplate(editingTemplate.id, {

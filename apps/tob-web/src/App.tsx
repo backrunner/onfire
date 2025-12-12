@@ -15,7 +15,7 @@ import {
   listTeams,
   listProducts
 } from './api';
-import { AppShell, Button, Topbar, Input, Badge } from '@onfire/ui';
+import { AppShell, Button, Topbar, Input, Badge, useTranslation, LanguageSwitcher } from '@onfire/ui';
 import { Search, RefreshCw, ArrowUpRight, LayoutDashboard, ListChecks, Shield, KeyRound } from 'lucide-react';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { usePagination } from './hooks/usePagination';
@@ -37,18 +37,19 @@ export default function App() {
 
 const AppRoutes = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { authStatus, authUser, setAuthStatus, setAuthUser, ensureSession, signOut, hasPermission } = useAuth();
   const sidebar = useMemo(() => {
     const base = [
-      { key: 'dashboard', label: 'Dashboard', path: '/', icon: <LayoutDashboard className="h-4 w-4" /> },
-      { key: 'tickets', label: '工单列表', path: '/tickets', icon: <ListChecks className="h-4 w-4" /> },
-      { key: 'account', label: '账户', path: '/account', icon: <KeyRound className="h-4 w-4" /> }
+      { key: 'dashboard', label: t('nav.dashboard'), path: '/', icon: <LayoutDashboard className="h-4 w-4" /> },
+      { key: 'tickets', label: t('nav.tickets'), path: '/tickets', icon: <ListChecks className="h-4 w-4" /> },
+      { key: 'account', label: t('nav.account'), path: '/account', icon: <KeyRound className="h-4 w-4" /> }
     ];
     if (hasPermission('tenant.manage') || hasPermission('product.manage') || hasPermission('team.manage') || hasPermission('template.write') || hasPermission('user.manage')) {
-      base.push({ key: 'admin', label: '管理', path: '/admin', icon: <Shield className="h-4 w-4" /> });
+      base.push({ key: 'admin', label: t('nav.admin'), path: '/admin', icon: <Shield className="h-4 w-4" /> });
     }
     return base;
-  }, [hasPermission]);
+  }, [hasPermission, t]);
   const [summary, setSummary] = useState({
     tenants: 0,
     products: 0,
@@ -260,7 +261,7 @@ const AppRoutes = () => {
   };
 
   if (authStatus === 'loading') {
-    return <div className="flex h-screen items-center justify-center text-sm text-zinc-600">正在检查登录...</div>;
+    return <div className="flex h-screen items-center justify-center text-sm text-zinc-600">{t('common.checkingLogin')}</div>;
   }
 
   if (authStatus === 'setup') {
@@ -286,26 +287,27 @@ const AppRoutes = () => {
       sidebar={sidebar}
       topbarSlot={
         <Topbar
-          title="OnFire 客服工作台"
+          title={t('topbar.title')}
           actions={
             <div className="flex items-center gap-2">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-zinc-400" />
                 <Input
                   className="h-9 w-48 pl-8"
-                  placeholder="搜索主题/ID"
+                  placeholder={t('topbar.searchPlaceholder')}
                   value={filters.keyword ?? ''}
                   onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters((f) => ({ ...f, keyword: e.target.value }))}
                 />
               </div>
               <Button size="sm" variant="outline" onClick={fetchList}>
                 <RefreshCw className="mr-2 h-4 w-4" />
-                刷新
+                {t('common.refresh')}
               </Button>
-              <Badge variant="info">待处理 {summary.pendingTickets}</Badge>
-              <Badge variant="warning">超时 {summary.overdue ?? 0}</Badge>
+              <Badge variant="info">{t('topbar.pending')} {summary.pendingTickets}</Badge>
+              <Badge variant="warning">{t('topbar.overdue')} {summary.overdue ?? 0}</Badge>
+              <LanguageSwitcher />
               {authUser?.email && (
-                <span className="rounded-md bg-zinc-100 px-3 py-1 text-xs text-zinc-700">已登录 {authUser.email}</span>
+                <span className="rounded-md bg-zinc-100 dark:bg-zinc-800 px-3 py-1 text-xs text-zinc-700 dark:text-zinc-300">{t('topbar.loggedIn', { email: authUser.email })}</span>
               )}
               <Button
                 size="sm"
@@ -317,13 +319,13 @@ const AppRoutes = () => {
                   navigate('/login');
                 }}
               >
-                退出
+                {t('common.logout')}
               </Button>
             </div>
           }
         />
       }
-      footerSlot={<span className="text-xs text-zinc-500">Cloudflare Worker · Elysia · D1 · Better Auth</span>}
+      footerSlot={<span className="text-xs text-zinc-500">{t('footer.tech')}</span>}
     >
       <Routes>
         <Route
@@ -440,7 +442,7 @@ const AppRoutes = () => {
           if (selectedIds.size === 0) return;
           setLoading(true);
           try {
-            await bulkUpdateStatus(Array.from(selectedIds), { status: 'closed' as TicketStatus, reason: bulkReason || '批量关闭' });
+            await bulkUpdateStatus(Array.from(selectedIds), { status: 'closed' as TicketStatus, reason: bulkReason || t('tickets.bulk.defaultCloseReason') });
             fetchList();
             setShowCloseDialog(false);
             setSelectedIds(new Set());

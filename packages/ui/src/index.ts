@@ -21,4 +21,6 @@ export * from './separator';
 export * from './progress';
 export * from './skeleton';
 export * from './accordion';
+export * from './i18n';
+export * from './language-switcher';
 

@@ -9,7 +9,9 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Badge
+  Badge,
+  useTranslation,
+  LanguageSwitcher
 } from '@onfire/ui';
 import { OnfireClient, type CreateTicketInput } from '@onfire/sdk';
 import type { TicketTemplate } from '@onfire/shared';
@@ -24,6 +26,7 @@ import {
   Star,
   Package,
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   Shield
 } from 'lucide-react';
@@ -152,10 +155,11 @@ const decodeIdentity = (jwt?: string): TokenIdentity => {
 };
 
 export default function App() {
+  const { t } = useTranslation();
   const search = useMemo(() => new URLSearchParams(window.location.search), []);
   const rawToken = search.get('jwt') || search.get('token') || undefined;
   const identity = useMemo(() => decodeIdentity(rawToken), [rawToken]);
-  const productId = identity.productId || search.get('productId') || 'demo-product';
+  const productId = identity.productId || search.get('productId') || '';
 
   const [templates, setTemplates] = useState<TemplateView[]>([]);
   const [template, setTemplate] = useState<TemplateView | null>(null);
@@ -266,14 +270,14 @@ export default function App() {
 
     try {
       await client.createTicket(payload);
-      setMessage({ type: 'success', text: '提交成功，客服会尽快处理！' });
+      setMessage({ type: 'success', text: t('form.submitSuccess') });
       setFieldValues({});
       setTurnstileToken('');
       if (window.turnstile && turnstileWidgetId.current) {
         window.turnstile.reset(turnstileWidgetId.current);
       }
     } catch (err) {
-      setMessage({ type: 'error', text: '提交失败，请稍后重试' });
+      setMessage({ type: 'error', text: t('form.submitFailed') });
       console.error(err);
     } finally {
       setSubmitting(false);
@@ -299,7 +303,7 @@ export default function App() {
       return (
         <Select value={value} onValueChange={(v) => setFieldValues((prev) => ({ ...prev, [field.name]: v }))}>
           <SelectTrigger>
-            <SelectValue placeholder="请选择" />
+            <SelectValue placeholder={t('form.selectTemplatePlaceholder')} />
           </SelectTrigger>
           <SelectContent>
             {field.options.map((opt) => (
@@ -323,6 +327,32 @@ export default function App() {
     );
   };
 
+  // Show error if no productId is provided
+  if (!productId) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="absolute right-4 top-4">
+          <LanguageSwitcher />
+        </div>
+        <div className="mx-auto max-w-md text-center">
+          <div className="mb-4 flex justify-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10">
+              <AlertTriangle className="h-8 w-8 text-amber-500" />
+            </div>
+          </div>
+          <h1 className="mb-2 text-xl font-semibold">{t('error.configError')}</h1>
+          <p className="mb-4 text-sm text-muted-foreground">
+            {t('error.missingProductId')}
+          </p>
+          <div className="rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 text-left text-xs text-muted-foreground">
+            <p className="mb-1 font-medium">{t('error.urlExample')}</p>
+            <code className="break-all">/?jwt=YOUR_TOKEN&productId=YOUR_PRODUCT_ID</code>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
       {/* Header */}
@@ -333,18 +363,19 @@ export default function App() {
               <Flame className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold">客服中心</h1>
-              <p className="text-xs text-muted-foreground">OnFire 工单系统</p>
+              <h1 className="text-lg font-semibold">{t('header.title')}</h1>
+              <p className="text-xs text-muted-foreground">{t('header.subtitle')}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <LanguageSwitcher />
             <Button
               variant={showList ? 'default' : 'outline'}
               size="sm"
               onClick={() => setShowList((s) => !s)}
             >
               <Ticket className="mr-1.5 h-3.5 w-3.5" />
-              {showList ? '新建工单' : '我的工单'}
+              {showList ? t('header.newTicket') : t('header.myTickets')}
             </Button>
           </div>
         </div>
@@ -356,46 +387,46 @@ export default function App() {
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <User className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">身份信息</span>
+              <span className="text-sm font-medium">{t('identity.title')}</span>
             </div>
             <Badge variant="success" size="sm">
               <Shield className="mr-1 h-3 w-3" />
-              JWT 已验证
+              {t('identity.verified')}
             </Badge>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2">
               <Package className="h-4 w-4 text-muted-foreground" />
               <div className="min-w-0 flex-1">
-                <div className="text-xs text-muted-foreground">产品</div>
+                <div className="text-xs text-muted-foreground">{t('identity.product')}</div>
                 <div className="truncate text-sm font-medium">{productId}</div>
               </div>
             </div>
             <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2">
               <Mail className="h-4 w-4 text-muted-foreground" />
               <div className="min-w-0 flex-1">
-                <div className="text-xs text-muted-foreground">邮箱</div>
-                <div className="truncate text-sm font-medium">{identity.email ?? '未提供'}</div>
+                <div className="text-xs text-muted-foreground">{t('identity.email')}</div>
+                <div className="truncate text-sm font-medium">{identity.email ?? 'N/A'}</div>
               </div>
             </div>
             <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2">
               <Hash className="h-4 w-4 text-muted-foreground" />
               <div className="min-w-0 flex-1">
-                <div className="text-xs text-muted-foreground">外部 ID</div>
-                <div className="truncate text-sm font-medium">{identity.externalId ?? '未提供'}</div>
+                <div className="text-xs text-muted-foreground">{t('identity.externalId')}</div>
+                <div className="truncate text-sm font-medium">{identity.externalId ?? 'N/A'}</div>
               </div>
             </div>
             <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2">
               <Star className="h-4 w-4 text-muted-foreground" />
               <div className="min-w-0 flex-1">
-                <div className="text-xs text-muted-foreground">客户等级</div>
+                <div className="text-xs text-muted-foreground">{t('identity.level')}</div>
                 <div className="text-sm font-medium">
                   {identity.level !== undefined ? (
                     <Badge variant="secondary" size="sm">
                       Lv.{identity.level}
                     </Badge>
                   ) : (
-                    '未标记'
+                    'N/A'
                   )}
                 </div>
               </div>
@@ -411,7 +442,7 @@ export default function App() {
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div className="flex items-center gap-2">
                 <Send className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">提交工单</span>
+                <span className="font-medium">{t('form.submitTicket')}</span>
               </div>
               <div className="w-48">
                 <Select
@@ -428,7 +459,7 @@ export default function App() {
                   }}
                 >
                   <SelectTrigger className="h-8">
-                    <SelectValue placeholder="选择模版" />
+                    <SelectValue placeholder={t('form.selectTemplate')} />
                   </SelectTrigger>
                   <SelectContent>
                     {templates.map((t) => (
@@ -449,7 +480,7 @@ export default function App() {
                   {template.categoriesParsed.length > 0 && (
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">类目</label>
+                        <label className="text-sm font-medium">{t('form.category')}</label>
                         <Select
                           value={categoryValue}
                           onValueChange={(next: string) => {
@@ -460,7 +491,7 @@ export default function App() {
                           }}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="请选择类目" />
+                            <SelectValue placeholder={t('form.selectCategoryPlaceholder')} />
                           </SelectTrigger>
                           <SelectContent>
                             {template.categoriesParsed.map((c) => (
@@ -473,10 +504,10 @@ export default function App() {
                       </div>
                       {template.categoriesParsed.find((c) => c.value === categoryValue)?.children?.length ? (
                         <div className="space-y-2">
-                          <label className="text-sm font-medium">子类目</label>
+                          <label className="text-sm font-medium">{t('form.subcategory')}</label>
                           <Select value={subcategoryValue} onValueChange={setSubcategoryValue}>
                             <SelectTrigger>
-                              <SelectValue placeholder="请选择子类目" />
+                              <SelectValue placeholder={t('form.selectSubcategoryPlaceholder')} />
                             </SelectTrigger>
                             <SelectContent>
                               {template.categoriesParsed
@@ -543,7 +574,7 @@ export default function App() {
                       )}
                       <Button type="submit" loading={submitting}>
                         <Send className="mr-1.5 h-3.5 w-3.5" />
-                        提交工单
+                        {t('form.submitTicket')}
                       </Button>
                     </div>
                   </div>
@@ -551,7 +582,7 @@ export default function App() {
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                   <AlertCircle className="mb-2 h-8 w-8 opacity-50" />
-                  <p className="text-sm">当前产品未配置模版，请联系管理员</p>
+                  <p className="text-sm">{t('error.noTemplate')}</p>
                 </div>
               )}
             </div>
@@ -561,7 +592,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className="border-t border-border bg-card/50 py-4 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} OnFire · 现代化客服工单系统
+        {t('footer.copyright', { year: new Date().getFullYear().toString() })}
       </footer>
     </div>
   );

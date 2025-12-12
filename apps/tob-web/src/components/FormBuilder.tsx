@@ -82,17 +82,17 @@ export function FormBuilder({ value, onChange }: FormBuilderProps) {
   };
 
   return (
-    <div className="space-y-3 rounded-md border border-dashed border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-700">
+    <div className="space-y-3 rounded-md border border-dashed border-border bg-muted/50 p-3 text-xs text-foreground">
       <div className="flex items-center justify-between">
-        <div className="font-semibold text-zinc-800">可视化表单构建</div>
-        <span className="text-[11px] text-zinc-500">添加字段并生成 Schema JSON</span>
+        <div className="font-semibold">可视化表单构建</div>
+        <span className="text-[11px] text-muted-foreground">添加字段并生成 Schema JSON</span>
       </div>
 
       <div className="grid gap-2 md:grid-cols-2">
         <Input placeholder="字段标题" value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} />
         <Input placeholder="字段 key" value={draft.key} onChange={(e) => setDraft({ ...draft, key: e.target.value })} />
         <select
-          className="h-9 rounded-md border border-zinc-200 bg-white px-2 text-sm"
+          className="h-9 rounded-md border border-border bg-background px-2 text-sm"
           value={draft.type}
           onChange={(e) => setDraft({ ...draft, type: e.target.value as FormFieldType })}
         >
@@ -102,7 +102,7 @@ export function FormBuilder({ value, onChange }: FormBuilderProps) {
           <option value="email">邮箱</option>
           <option value="select">下拉</option>
         </select>
-        <label className="flex items-center gap-2 text-xs text-zinc-600">
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
           <input
             type="checkbox"
             checked={draft.required}
@@ -136,8 +136,8 @@ export function FormBuilder({ value, onChange }: FormBuilderProps) {
       {fields.length > 0 && (
         <div className="space-y-1">
           {fields.map((f, idx) => (
-            <div key={idx} className="flex items-center justify-between rounded border border-zinc-200 bg-white px-2 py-1">
-              <div className="text-zinc-800">
+            <div key={idx} className="flex items-center justify-between rounded border border-border bg-background px-2 py-1">
+              <div>
                 <span className="font-semibold">{f.label}</span> ({f.key}) · {f.type} {f.required ? '· 必填' : ''}{' '}
                 {f.options && f.options.length ? `· 选项: ${f.options.join(', ')}` : ''}
               </div>
@@ -174,8 +174,8 @@ export function FormBuilder({ value, onChange }: FormBuilderProps) {
       )}
 
       <div>
-        <div className="mb-1 text-xs font-semibold text-zinc-700">Schema 预览</div>
-        <pre className="max-h-48 overflow-auto rounded-md bg-zinc-900 px-3 py-2 text-[11px] text-zinc-100">
+        <div className="mb-1 text-xs font-semibold">Schema 预览</div>
+        <pre className="max-h-48 overflow-auto rounded-md bg-zinc-900 px-3 py-2 text-[11px] text-zinc-100 dark:bg-zinc-800">
 {JSON.stringify(fields, null, 2)}
         </pre>
       </div>
