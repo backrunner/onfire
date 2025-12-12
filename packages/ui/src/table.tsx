@@ -32,3 +32,6 @@ export const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttr
   ({ className, ...props }, ref) => <td ref={ref} className={cn('px-4 py-3 align-top', className)} {...props} />
 );
 TableCell.displayName = 'TableCell';
+
+
+

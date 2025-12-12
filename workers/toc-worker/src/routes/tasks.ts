@@ -5,7 +5,14 @@ import { eq, ne } from 'drizzle-orm';
 import type { WorkerSingleton } from '../core/types';
 
 export const createTaskRoutes = () =>
-  new Elysia<string, WorkerSingleton>().post('/tasks/sla-scan', async ({ store }) => {
+  new Elysia<string, WorkerSingleton>().post('/tasks/sla-scan', async ({ request, store }) => {
+    // Require internal secret for cron/scheduled tasks
+    const authHeader = request.headers.get('authorization')?.replace('Bearer ', '');
+    const taskSecret = store.env.TASK_SECRET;
+    // If TASK_SECRET is configured, require it; otherwise allow (for dev mode)
+    if (taskSecret && authHeader !== taskSecret) {
+      return new Response('unauthorized', { status: 401 });
+    }
     const now = new Date();
     const isoNow = now.toISOString();
     const rows = await store.db

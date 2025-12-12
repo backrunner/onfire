@@ -235,10 +235,14 @@ export const createTicketRoutes = (env: Bindings) =>
     .get('/tickets', async ({ query, request, store }) => {
       const token = request.headers.get('authorization')?.replace('Bearer ', '');
       if (!token) return new Response('missing token', { status: 401 });
-      const identity = await verifyJwt(token, env, store.db);
+      const identity = await verifyJwt(token, store.env, store.db);
       const productId = query['productId'] as string | undefined;
       const status = query['status'] as TicketStatus | undefined;
-      const where = [eq(tickets.tenantId, identity.tenantId ?? 'demo-tenant')];
+      // Filter by tenant AND customer email to prevent viewing other customers' tickets
+      const where = [
+        eq(tickets.tenantId, identity.tenantId ?? 'demo-tenant'),
+        eq(tickets.customerEmail, identity.email ?? '')
+      ];
       if (productId) where.push(eq(tickets.productId, productId));
       else if (identity.productId) where.push(eq(tickets.productId, identity.productId));
       if (status) where.push(eq(tickets.status, status));
@@ -253,10 +257,12 @@ export const createTicketRoutes = (env: Bindings) =>
     .get('/tickets/:id', async ({ params, request, store }) => {
       const token = request.headers.get('authorization')?.replace('Bearer ', '');
       if (!token) return new Response('missing token', { status: 401 });
-      const identity = await verifyJwt(token, env, store.db);
+      const identity = await verifyJwt(token, store.env, store.db);
       const ticket = await store.db.query.tickets.findFirst({ where: eq(tickets.id, params.id) });
       if (!ticket) return new Response('not found', { status: 404 });
       if (ticket.tenantId !== (identity.tenantId ?? 'demo-tenant')) return new Response('forbidden', { status: 403 });
+      // Verify ticket belongs to this customer (prevent IDOR)
+      if (ticket.customerEmail !== identity.email) return new Response('forbidden', { status: 403 });
       const replyRows = await store.db.select().from(replies).where(eq(replies.ticketId, ticket.id)).orderBy(replies.createdAt);
       const historyRows = await store.db.select().from(history).where(eq(history.ticketId, ticket.id)).orderBy(history.createdAt);
       return { ticket: enrichTicket(ticket), replies: replyRows, history: historyRows };
@@ -270,6 +276,8 @@ export const createTicketRoutes = (env: Bindings) =>
       const ticket = await store.db.query.tickets.findFirst({ where: eq(tickets.id, params.id) });
       if (!ticket) return new Response('not found', { status: 404 });
       if (ticket.tenantId !== (identity.tenantId ?? 'demo-tenant')) return new Response('forbidden', { status: 403 });
+      // Verify ticket belongs to this customer (prevent IDOR)
+      if (ticket.customerEmail !== identity.email) return new Response('forbidden', { status: 403 });
       const now = new Date().toISOString();
       const replyId = crypto.randomUUID();
       await store.db
@@ -295,10 +303,12 @@ export const createTicketRoutes = (env: Bindings) =>
       // 需要客户 JWT，避免匿名越权升级
       const token = request.headers.get('authorization')?.replace('Bearer ', '');
       if (!token) return new Response('missing token', { status: 401 });
-      const identity = await verifyJwt(token, env, store.db);
+      const identity = await verifyJwt(token, store.env, store.db);
       const ticket = await store.db.query.tickets.findFirst({ where: eq(tickets.id, params.id) });
       if (!ticket) return new Response('not found', { status: 404 });
       if (ticket.tenantId !== (identity.tenantId ?? 'demo-tenant')) return new Response('forbidden', { status: 403 });
+      // Verify ticket belongs to this customer (prevent IDOR)
+      if (ticket.customerEmail !== identity.email) return new Response('forbidden', { status: 403 });
       const assignee = await chooseEscalationAssignee(store.db, ticket.teamId, ticket.assigneeId);
       if (!assignee) return new Response('no assignee available', { status: 409 });
       const now = new Date().toISOString();
@@ -320,4 +330,74 @@ export const createTicketRoutes = (env: Bindings) =>
         .run();
       bumpLoadCache(ticket.teamId, assignee.id);
       return { ok: true, assignee };
+    })
+    .post('/tickets/:id/close', async ({ params, request, store }) => {
+      // Customer can close their own ticket
+      const body = (await request.json()) as { reason?: string; turnstileToken?: string };
+      const token = request.headers.get('authorization')?.replace('Bearer ', '');
+      if (!token) return new Response('missing token', { status: 401 });
+      const identity = await verifyJwt(token, store.env, store.db);
+      await verifyTurnstile(body.turnstileToken, store.env.TURNSTILE_SECRET);
+      const ticket = await store.db.query.tickets.findFirst({ where: eq(tickets.id, params.id) });
+      if (!ticket) return new Response('not found', { status: 404 });
+      if (ticket.tenantId !== (identity.tenantId ?? 'demo-tenant')) return new Response('forbidden', { status: 403 });
+      // Verify ticket belongs to this customer
+      if (ticket.customerEmail !== identity.email) return new Response('forbidden', { status: 403 });
+      // Only allow closing if not already closed
+      if (ticket.status === TicketStatus.Closed) return new Response('ticket already closed', { status: 400 });
+      const now = new Date().toISOString();
+      await store.db
+        .update(tickets)
+        .set({ status: TicketStatus.Closed, updatedAt: now })
+        .where(eq(tickets.id, ticket.id))
+        .run();
+      await store.db
+        .insert(history)
+        .values({
+          id: crypto.randomUUID(),
+          ticketId: ticket.id,
+          actorId: identity.sub ?? identity.email ?? null,
+          action: 'customer_closed',
+          snapshot: JSON.stringify({ reason: body.reason ?? 'Customer closed' }),
+          createdAt: now
+        })
+        .run();
+      return { ok: true, status: TicketStatus.Closed };
+    })
+    .post('/tickets/:id/reopen', async ({ params, request, store }) => {
+      // Customer can reopen a closed ticket within 7 days
+      const body = (await request.json()) as { reason?: string; turnstileToken?: string };
+      const token = request.headers.get('authorization')?.replace('Bearer ', '');
+      if (!token) return new Response('missing token', { status: 401 });
+      const identity = await verifyJwt(token, store.env, store.db);
+      await verifyTurnstile(body.turnstileToken, store.env.TURNSTILE_SECRET);
+      const ticket = await store.db.query.tickets.findFirst({ where: eq(tickets.id, params.id) });
+      if (!ticket) return new Response('not found', { status: 404 });
+      if (ticket.tenantId !== (identity.tenantId ?? 'demo-tenant')) return new Response('forbidden', { status: 403 });
+      // Verify ticket belongs to this customer
+      if (ticket.customerEmail !== identity.email) return new Response('forbidden', { status: 403 });
+      // Only allow reopening closed tickets
+      if (ticket.status !== TicketStatus.Closed) return new Response('ticket is not closed', { status: 400 });
+      // Check if within 7 days of closure
+      const closedAt = new Date(ticket.updatedAt ?? ticket.createdAt);
+      const daysSinceClosure = (Date.now() - closedAt.getTime()) / (1000 * 60 * 60 * 24);
+      if (daysSinceClosure > 7) return new Response('ticket can only be reopened within 7 days', { status: 400 });
+      const now = new Date().toISOString();
+      await store.db
+        .update(tickets)
+        .set({ status: TicketStatus.New, updatedAt: now })
+        .where(eq(tickets.id, ticket.id))
+        .run();
+      await store.db
+        .insert(history)
+        .values({
+          id: crypto.randomUUID(),
+          ticketId: ticket.id,
+          actorId: identity.sub ?? identity.email ?? null,
+          action: 'customer_reopened',
+          snapshot: JSON.stringify({ reason: body.reason ?? 'Customer reopened' }),
+          createdAt: now
+        })
+        .run();
+      return { ok: true, status: TicketStatus.New };
     });

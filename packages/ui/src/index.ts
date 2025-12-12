@@ -1,4 +1,5 @@
 export * from './theme';
+export * from './theme-provider';
 export * from './button';
 export * from './layout';
 export * from './panel';
@@ -11,4 +12,13 @@ export * from './dialog';
 export * from './sheet';
 export * from './utils';
 export * from './select';
+export * from './tabs';
+export * from './avatar';
+export * from './dropdown-menu';
+export * from './tooltip';
+export * from './scroll-area';
+export * from './separator';
+export * from './progress';
+export * from './skeleton';
+export * from './accordion';
 

@@ -67,6 +67,16 @@ export interface EscalateInput {
   reason?: string;
 }
 
+export interface CloseTicketInput {
+  reason?: string;
+  turnstileToken?: string;
+}
+
+export interface ReopenTicketInput {
+  reason?: string;
+  turnstileToken?: string;
+}
+
 export interface TicketDetail {
   ticket: Ticket;
   replies?: unknown[];
@@ -230,6 +240,32 @@ export class OnfireClient {
     await ensureOk(res, 'escalate');
     const data = await res.json();
     return { ...data, ticket: data.ticket ? this.normalizeTicket(data.ticket) : undefined };
+  }
+
+  /**
+   * Customer closes their own ticket
+   */
+  async closeTicket(ticketId: TicketID, input: CloseTicketInput = {}) {
+    const res = await this.fetcher(`${this.tocBase()}/tickets/${encodeURIComponent(ticketId)}/close`, {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify(input)
+    });
+    await ensureOk(res, 'closeTicket');
+    return res.json();
+  }
+
+  /**
+   * Customer reopens a closed ticket (within 7 days)
+   */
+  async reopenTicket(ticketId: TicketID, input: ReopenTicketInput = {}) {
+    const res = await this.fetcher(`${this.tocBase()}/tickets/${encodeURIComponent(ticketId)}/reopen`, {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify(input)
+    });
+    await ensureOk(res, 'reopenTicket');
+    return res.json();
   }
 
   async issueCustomerJwt(input: IssueCustomerJwtInput): Promise<{ token: string; productId: string; tenantId: string }> {

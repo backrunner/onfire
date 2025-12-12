@@ -242,6 +242,29 @@ export const createAdminRoutes = (env: Bindings) =>
       const targetUser = await store.db.query.users.findFirst({ where: eq(users.id, params.id) });
       if (!targetUser) return new Response('not found', { status: 404 });
       if (ctx.user.role !== Role.SuperAdmin && !ctx.tenantIds.includes(targetUser.tenantId as any)) return new Response('forbidden', { status: 403 });
+
+      // Role-based restrictions for agent profile modification
+      // Agents can only modify their own profile (displayName, email, avatarUrl)
+      // Higher roles can modify other agents
+      const isSelf = ctx.user.id === params.id;
+      const isRestrictedField = body.level !== undefined || body.active !== undefined || body.teamIds !== undefined;
+
+      if (ctx.user.role === Role.Agent) {
+        // Agents can only modify themselves and cannot change level/active/teamIds
+        if (!isSelf) return new Response('forbidden', { status: 403 });
+        if (isRestrictedField) return new Response('forbidden: cannot modify level, active, or teamIds', { status: 403 });
+      } else if (ctx.user.role === Role.TeamAdmin) {
+        // TeamAdmins can modify agents in their teams, but cannot elevate level above their own
+        if (!isSelf) {
+          // Check if target is in one of the TeamAdmin's teams
+          const targetTeamRows = await store.db.select().from(agentTeams).where(eq(agentTeams.userId, params.id));
+          const targetTeamIds = targetTeamRows.map((r: any) => r.teamId);
+          const hasSharedTeam = ctx.teamIds.some((t: string) => targetTeamIds.includes(t));
+          if (!hasSharedTeam) return new Response('forbidden', { status: 403 });
+        }
+      }
+      // TenantAdmin, ProductAdmin, SuperAdmin can modify any agent in their tenant scope
+
       if (body.teamIds) {
         await assertTeamIdsAccessible(store, body.teamIds, ctx.tenantIds, ctx.user.role === Role.SuperAdmin);
         await store.db.delete(agentTeams).where(eq(agentTeams.userId, params.id)).run();
@@ -304,6 +327,8 @@ export const createAdminRoutes = (env: Bindings) =>
       const body = (await request.json()) as { productId: string; category: string; subcategory?: string; teamId: string };
       if (!body.productId || !body.category || !body.teamId) return new Response('productId, category, teamId required', { status: 400 });
       await assertProductAccessible(store, ctx, body.productId);
+      // Validate team belongs to accessible tenant (prevent cross-tenant team mapping)
+      await assertTeamIdsAccessible(store, [body.teamId], ctx.tenantIds, ctx.user.role === Role.SuperAdmin);
       const id = crypto.randomUUID();
       await store.db
         .insert(categoryRoutes)
@@ -319,6 +344,10 @@ export const createAdminRoutes = (env: Bindings) =>
       if (!existing) return new Response('not found', { status: 404 });
       await assertProductAccessible(store, ctx, existing.productId);
       if (!body.category && body.subcategory === undefined && !body.teamId) return new Response('payload required', { status: 400 });
+      // Validate team belongs to accessible tenant if teamId is being changed
+      if (body.teamId) {
+        await assertTeamIdsAccessible(store, [body.teamId], ctx.tenantIds, ctx.user.role === Role.SuperAdmin);
+      }
       await store.db
         .update(categoryRoutes)
         .set({
@@ -589,7 +618,14 @@ export const createAdminRoutes = (env: Bindings) =>
     })
     .patch('/tenants/:id', async ({ user, store, request, params }) => {
       const ctx = await resolveContext(env, user);
-      assertPermission(ctx, 'tenant.manage', { tenantId: params.id });
+      // Verify tenant exists BEFORE permission check
+      const existing = await store.db.query.tenants.findFirst({ where: eq(tenants.id, params.id) });
+      if (!existing) return new Response('not found', { status: 404 });
+      assertPermission(ctx, 'tenant.manage', { tenantId: existing.id });
+      // Verify user has access to this tenant
+      if (ctx.user.role !== Role.SuperAdmin && !ctx.tenantIds.includes(existing.id as any)) {
+        return new Response('forbidden', { status: 403 });
+      }
       const body = (await request.json()) as { name?: string };
       if (!body.name) return new Response('name required', { status: 400 });
       await store.db.update(tenants).set({ name: body.name }).where(eq(tenants.id, params.id)).run();
@@ -597,7 +633,14 @@ export const createAdminRoutes = (env: Bindings) =>
     })
     .delete('/tenants/:id', async ({ user, store, params }) => {
       const ctx = await resolveContext(env, user);
-      assertPermission(ctx, 'tenant.manage', { tenantId: params.id });
+      // Verify tenant exists BEFORE permission check
+      const existing = await store.db.query.tenants.findFirst({ where: eq(tenants.id, params.id) });
+      if (!existing) return new Response('not found', { status: 404 });
+      assertPermission(ctx, 'tenant.manage', { tenantId: existing.id });
+      // Verify user has access to this tenant
+      if (ctx.user.role !== Role.SuperAdmin && !ctx.tenantIds.includes(existing.id as any)) {
+        return new Response('forbidden', { status: 403 });
+      }
       await store.db.delete(tenants).where(eq(tenants.id, params.id)).run();
       return { ok: true };
     });

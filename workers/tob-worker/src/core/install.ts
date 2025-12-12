@@ -22,3 +22,6 @@ export const assertInstalled = async (db: D1Database) => {
   if (!state.hasUser) throw new Response('setup_required', { status: 428 });
   return state;
 };
+
+
+

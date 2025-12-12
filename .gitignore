@@ -17,3 +17,5 @@ pnpm-lock.yaml
 yarn.lock
 package-lock.json
 .history
+workers/tob-worker/public
+workers/toc-worker/public

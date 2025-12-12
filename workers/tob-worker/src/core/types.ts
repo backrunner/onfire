@@ -10,6 +10,7 @@ export interface Bindings {
   JWT_AUDIENCE?: string;
   JWT_ISSUER?: string;
   AUTO_CLOSE_REPLY_HOURS?: string;
+  ASSETS?: Fetcher;
 }
 
 export interface AuthUser {

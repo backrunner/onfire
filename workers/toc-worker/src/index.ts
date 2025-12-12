@@ -32,9 +32,40 @@ const createApp = (env: Bindings) => {
 };
 
 export default {
-  fetch(request: Request, env: Bindings, ctx: ExecutionContext) {
-    const app = createApp(env);
-    const handler = app.fetch as (req: Request, bindings: Bindings, executionCtx: ExecutionContext) => Response | Promise<Response>;
-    return handler(request, env, ctx);
+  async fetch(request: Request, env: Bindings, ctx: ExecutionContext) {
+    const url = new URL(request.url);
+    const prefix = env.APP_PREFIX ?? '/api/toc';
+
+    // Handle API routes
+    if (url.pathname.startsWith(prefix)) {
+      const app = createApp(env);
+      const handler = app.fetch as (req: Request, bindings: Bindings, executionCtx: ExecutionContext) => Response | Promise<Response>;
+      return handler(request, env, ctx);
+    }
+
+    // For non-API routes, let wrangler's asset handling serve static files
+    // This handler won't be reached if assets are configured properly
+    // It serves as a fallback for SPA routing
+    if (env.ASSETS) {
+      try {
+        // Try to serve the exact file
+        const assetResponse = await env.ASSETS.fetch(request);
+        if (assetResponse.status !== 404) {
+          return assetResponse;
+        }
+      } catch {
+        // Asset not found, continue to SPA fallback
+      }
+
+      // SPA fallback - serve index.html for any non-asset route
+      try {
+        const indexRequest = new Request(new URL('/index.html', request.url), request);
+        return await env.ASSETS.fetch(indexRequest);
+      } catch {
+        return new Response('Not Found', { status: 404 });
+      }
+    }
+
+    return new Response('Not Found', { status: 404 });
   }
 };

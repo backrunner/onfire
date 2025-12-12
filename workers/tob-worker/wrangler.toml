@@ -3,6 +3,9 @@ main = "src/index.ts"
 compatibility_date = "2025-06-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Static assets configuration
+assets = { directory = "./public", binding = "ASSETS" }
+
 [vars]
 APP_PREFIX = "/api/tob"
 
@@ -10,3 +13,10 @@ APP_PREFIX = "/api/tob"
 binding = "DB"
 database_name = "onfire-d1"
 database_id = "local"
+
+# Production environment (use real database_id)
+# [env.production]
+# [[env.production.d1_databases]]
+# binding = "DB"
+# database_name = "onfire-d1"
+# database_id = "YOUR_D1_DATABASE_ID"

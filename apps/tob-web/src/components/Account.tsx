@@ -34,25 +34,25 @@ export function Account() {
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <Card>
-        <div className="border-b border-zinc-100 px-6 py-4">
-          <div className="text-lg font-semibold text-zinc-900">账户安全</div>
-          <p className="text-sm text-zinc-600">更新登录密码。不会提供找回密码入口，请妥善保存。</p>
+        <div className="border-b border-border px-6 py-4">
+          <div className="text-lg font-semibold text-foreground">账户安全</div>
+          <p className="text-sm text-muted-foreground">更新登录密码。不会提供找回密码入口，请妥善保存。</p>
         </div>
         <form className="space-y-4 p-6" onSubmit={handleSubmit}>
           <div className="space-y-1">
-            <div className="text-sm font-medium text-zinc-800">当前密码</div>
+            <div className="text-sm font-medium text-foreground">当前密码</div>
             <Input required type="password" value={currentPassword} onChange={(e: ChangeEvent<HTMLInputElement>) => setCurrentPassword(e.target.value)} />
           </div>
           <div className="space-y-1">
-            <div className="text-sm font-medium text-zinc-800">新密码</div>
+            <div className="text-sm font-medium text-foreground">新密码</div>
             <Input required type="password" value={newPassword} onChange={(e: ChangeEvent<HTMLInputElement>) => setNewPassword(e.target.value)} />
           </div>
           <div className="space-y-1">
-            <div className="text-sm font-medium text-zinc-800">确认新密码</div>
+            <div className="text-sm font-medium text-foreground">确认新密码</div>
             <Input required type="password" value={confirmPassword} onChange={(e: ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)} />
           </div>
           {message && (
-            <div className={`rounded-md px-3 py-2 text-sm ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+            <div className={`rounded-md px-3 py-2 text-sm ${message.type === 'success' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'}`}>
               {message.text}
             </div>
           )}

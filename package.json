@@ -18,7 +18,10 @@
     "db:generate": "drizzle-kit generate:sqlite --schema=packages/shared/src/drizzle/schema.ts --out=drizzle/migrations",
     "db:migrate:toc": "WRANGLER_CONFIG=workers/toc-worker/wrangler.toml bunx wrangler d1 migrations apply DB --local",
     "db:migrate:tob": "WRANGLER_CONFIG=workers/tob-worker/wrangler.toml bunx wrangler d1 migrations apply DB --local",
-    "db:migrate:all": "npm run db:migrate:toc && npm run db:migrate:tob"
+    "db:migrate:all": "npm run db:migrate:toc && npm run db:migrate:tob",
+    "deploy:tob": "cd workers/tob-worker && bun run deploy",
+    "deploy:toc": "cd workers/toc-worker && bun run deploy",
+    "deploy:all": "npm run deploy:tob && npm run deploy:toc"
   },
   "devDependencies": {
     "@types/bun": "^1.1.12",
@@ -28,4 +31,3 @@
     "wrangler": "^4.53.0"
   }
 }
-

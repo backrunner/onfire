@@ -10,6 +10,8 @@ export interface Bindings {
   JWT_AUDIENCE?: string;
   JWT_ISSUER?: string;
   TURNSTILE_SECRET?: string;
+  TASK_SECRET?: string;
+  ASSETS?: Fetcher;
 }
 
 export interface AuthUser {
