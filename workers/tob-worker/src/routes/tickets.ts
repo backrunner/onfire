@@ -124,6 +124,7 @@ export const createTicketRoutes = (env: Bindings) =>
   new Elysia<string, WorkerSingleton>()
     .get('/tickets', async ({ query, store, user }) => {
       const ctx = await resolveContext(env, user);
+      assertPermission(ctx, 'ticket.read');
       const filter: TicketFilter = {
         productId: (query['productId'] as string) ?? undefined,
         teamId: (query['teamId'] as string) ?? undefined,
@@ -137,6 +138,7 @@ export const createTicketRoutes = (env: Bindings) =>
     })
     .get('/tickets/:id', async ({ params, store, user }) => {
       const ctx = await resolveContext(env, user);
+      assertPermission(ctx, 'ticket.read');
       let ticket = await store.db.query.tickets.findFirst({ where: eq(tickets.id, params.id) });
       if (!ticket) return new Response('not found', { status: 404 });
       if (!ctx.tenantIds.includes(ticket.tenantId as any)) return new Response('forbidden', { status: 403 });
