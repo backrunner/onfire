@@ -11,6 +11,11 @@ import { createMetaRoutes } from './routes/meta';
 import { createTicketRoutes } from './routes/tickets';
 import { createInstallRoutes } from './routes/install';
 import { createAccountRoutes } from './routes/account';
+import { createAIConfigRoutes } from './routes/ai-config';
+import { createKnowledgeRoutes } from './routes/knowledge';
+import { createAIScreenRoutes } from './routes/ai-screen';
+import { createAIChatRoutes } from './routes/ai-chat';
+import { createSearchRoutes } from './routes/search';
 
 const ensureEnv = (env: Bindings) => {
   if (!env.AUTH_SECRET) console.warn('AUTH_SECRET missing - auth will fail');
@@ -33,6 +38,11 @@ const createApp = (env: Bindings) => {
     .use(createSystemRoutes(env))
     .use(createDashboardRoutes(env))
     .use(createAdminRoutes(env))
+    .use(createAIConfigRoutes(env))
+    .use(createKnowledgeRoutes(env))
+    .use(createAIScreenRoutes(env))
+    .use(createAIChatRoutes(env))
+    .use(createSearchRoutes(env))
     .use(createMetaRoutes(env))
     .use(createTicketRoutes(env))
     .compile();

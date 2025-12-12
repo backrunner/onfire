@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import type { FormEvent, ChangeEvent } from 'react';
+import type { FormEvent } from 'react';
 import { TicketPriority, type Ticket, type TicketStatus } from '@onfire/shared';
 import {
   listTickets,
@@ -15,8 +15,9 @@ import {
   listTeams,
   listProducts
 } from './api';
-import { AppShell, Button, Topbar, Input, Badge, useTranslation, LanguageSwitcher } from '@onfire/ui';
-import { Search, RefreshCw, ArrowUpRight, LayoutDashboard, ListChecks, Shield, KeyRound } from 'lucide-react';
+import { AppShell, Button, Topbar, Badge, useTranslation, LanguageSwitcher } from '@onfire/ui';
+import { RefreshCw, LayoutDashboard, ListChecks, Shield, KeyRound } from 'lucide-react';
+import { GlobalSearch } from './components/search/GlobalSearch';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { usePagination } from './hooks/usePagination';
 import { useAuth } from './hooks/useAuth';
@@ -28,6 +29,7 @@ import { Dashboard } from './components/Dashboard';
 import { Management } from './components/Management';
 import { InstallPage } from './components/InstallPage';
 import { Account } from './components/Account';
+import { AIChatPanel } from './components/ai/AIChatPanel';
 
 export default function App() {
   return (
@@ -290,15 +292,7 @@ const AppRoutes = () => {
           title={t('topbar.title')}
           actions={
             <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-zinc-400" />
-                <Input
-                  className="h-9 w-48 pl-8"
-                  placeholder={t('topbar.searchPlaceholder')}
-                  value={filters.keyword ?? ''}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => setFilters((f) => ({ ...f, keyword: e.target.value }))}
-                />
-              </div>
+              <GlobalSearch onSelectTicket={openTicket} />
               <Button size="sm" variant="outline" onClick={fetchList}>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 {t('common.refresh')}
@@ -452,6 +446,9 @@ const AppRoutes = () => {
           }
         }}
       />
+
+      {/* AI Chat Floating Panel */}
+      <AIChatPanel />
     </AppShell>
   );
 };

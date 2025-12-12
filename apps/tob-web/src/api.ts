@@ -192,3 +192,338 @@ export const deleteProduct = (id: string) => fetch(`${baseUrl}/admin/products/${
 export const deleteTeam = (id: string) => fetch(`${baseUrl}/admin/teams/${id}`, { method: 'DELETE', headers: authHeaders() }).then(json);
 export const deleteTemplate = (id: string) => fetch(`${baseUrl}/admin/templates/${id}`, { method: 'DELETE', headers: authHeaders() }).then(json);
 
+// AI Config APIs
+export interface AIConfigMeta {
+  providers: {
+    id: string;
+    name: string;
+    models: string[];
+    baseUrl?: string;
+    supportsStreaming: boolean;
+    supportsTools: boolean;
+  }[];
+  taskTypes: {
+    id: string;
+    name: string;
+    description: string;
+  }[];
+}
+
+export interface AIConfig {
+  id: string;
+  taskType: string;
+  provider: string;
+  model: string;
+  apiKey: string;
+  baseUrl?: string | null;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const getAIConfigMeta = () =>
+  fetch(`${baseUrl}/admin/ai-config/meta`, { headers: authHeaders() }).then(json) as Promise<AIConfigMeta>;
+
+export const listAIConfigs = () =>
+  fetch(`${baseUrl}/admin/ai-config`, { headers: authHeaders() }).then(json) as Promise<AIConfig[]>;
+
+export const createAIConfig = (body: {
+  taskType: string;
+  provider: string;
+  model: string;
+  apiKey: string;
+  baseUrl?: string;
+  enabled?: boolean;
+}) =>
+  fetch(`${baseUrl}/admin/ai-config`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body)
+  }).then(json);
+
+export const updateAIConfig = (
+  id: string,
+  body: {
+    provider?: string;
+    model?: string;
+    apiKey?: string;
+    baseUrl?: string;
+    enabled?: boolean;
+  }
+) =>
+  fetch(`${baseUrl}/admin/ai-config/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body)
+  }).then(json);
+
+export const deleteAIConfig = (id: string) =>
+  fetch(`${baseUrl}/admin/ai-config/${id}`, { method: 'DELETE', headers: authHeaders() }).then(json);
+
+export const testAIConfig = (id: string) =>
+  fetch(`${baseUrl}/admin/ai-config/${id}/test`, {
+    method: 'POST',
+    headers: authHeaders()
+  }).then(json) as Promise<{ success: boolean; message: string }>;
+
+// Knowledge Base APIs
+export interface ProductDocument {
+  id: string;
+  productId: string;
+  filename: string;
+  r2Key: string;
+  mimeType: string;
+  sizeBytes: number;
+  status: 'pending' | 'processing' | 'ready' | 'error';
+  vectorizeIds: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductKnowledge {
+  id: string;
+  productId: string;
+  title: string;
+  content: string;
+  knowledgeType: 'description' | 'faq' | 'feature' | 'policy' | 'troubleshooting';
+  vectorizeIds: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const listProductDocuments = (productId: string) =>
+  fetch(`${baseUrl}/admin/products/${productId}/documents`, { headers: authHeaders() }).then(json) as Promise<{ data: ProductDocument[] }>;
+
+export const uploadProductDocument = async (productId: string, file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const token = localStorage.getItem('onfire.session');
+  return fetch(`${baseUrl}/admin/products/${productId}/documents`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData
+  }).then(json);
+};
+
+export const deleteProductDocument = (productId: string, docId: string) =>
+  fetch(`${baseUrl}/admin/products/${productId}/documents/${docId}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  }).then(json);
+
+export const downloadProductDocument = (productId: string, docId: string) =>
+  `${baseUrl}/admin/products/${productId}/documents/${docId}/download`;
+
+export const listProductKnowledge = (productId: string) =>
+  fetch(`${baseUrl}/admin/products/${productId}/knowledge`, { headers: authHeaders() }).then(json) as Promise<{ data: ProductKnowledge[] }>;
+
+export const createProductKnowledge = (
+  productId: string,
+  body: { title: string; content: string; knowledgeType: string }
+) =>
+  fetch(`${baseUrl}/admin/products/${productId}/knowledge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body)
+  }).then(json);
+
+export const updateProductKnowledge = (
+  productId: string,
+  knowledgeId: string,
+  body: { title?: string; content?: string; knowledgeType?: string }
+) =>
+  fetch(`${baseUrl}/admin/products/${productId}/knowledge/${knowledgeId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body)
+  }).then(json);
+
+export const deleteProductKnowledge = (productId: string, knowledgeId: string) =>
+  fetch(`${baseUrl}/admin/products/${productId}/knowledge/${knowledgeId}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  }).then(json);
+
+// AI Screening APIs
+export interface AIScreeningResult {
+  id: string;
+  status: string | null;
+  result: {
+    validity: 'valid' | 'invalid' | 'spam' | 'rant';
+    confidence: number;
+    extractedIssues: string[];
+    suggestedTags: string[];
+    keywords: string[];
+    autoAction?: 'close' | 'reply' | null;
+    reasoning: string;
+  } | null;
+  suggestedReply: string | null;
+  extractedIssues: string[];
+  keywords: string[];
+}
+
+export const screenTicket = (ticketId: string) =>
+  fetch(`${baseUrl}/ai/screen/${ticketId}`, {
+    method: 'POST',
+    headers: authHeaders()
+  }).then(json) as Promise<{ success: boolean; result?: any; message?: string }>;
+
+export const getTicketScreening = (ticketId: string) =>
+  fetch(`${baseUrl}/ai/screen/${ticketId}`, { headers: authHeaders() }).then(json) as Promise<AIScreeningResult>;
+
+export const generatePreReply = (ticketId: string) =>
+  fetch(`${baseUrl}/ai/prereply/${ticketId}`, {
+    method: 'POST',
+    headers: authHeaders()
+  }).then(json) as Promise<{ success: boolean; result?: { reply: string; confidence: number; sourcesUsed: string[] }; message?: string }>;
+
+export const batchScreenTickets = (body: { ticketIds?: string[]; limit?: number }) =>
+  fetch(`${baseUrl}/tasks/ai-screen`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body)
+  }).then(json) as Promise<{ success: boolean; processed: number; succeeded: number; failed: number }>;
+
+// AI Chat APIs
+export interface AIChatMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'tool';
+  content: string;
+  toolCalls?: any[];
+  toolResults?: any[];
+  createdAt: string;
+}
+
+export interface AIChatResponse {
+  sessionId: string;
+  message: string;
+  toolCalls?: { name: string; args: any }[];
+  toolResults?: { name: string; result: any }[];
+}
+
+export const sendAIChatMessage = (body: { message: string; sessionId?: string }) =>
+  fetch(`${baseUrl}/ai/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body)
+  }).then(json) as Promise<AIChatResponse>;
+
+export const sendAIChatMessageStream = async (
+  body: { message: string; sessionId?: string },
+  onChunk: (chunk: { type: string; content?: string; sessionId?: string; message?: string }) => void
+) => {
+  const token = localStorage.getItem('onfire.session');
+  const response = await fetch(`${baseUrl}/ai/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('No response body');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        try {
+          const data = JSON.parse(line.slice(6));
+          onChunk(data);
+        } catch {}
+      }
+    }
+  }
+};
+
+export const getAIChatHistory = (sessionId?: string) =>
+  fetch(`${baseUrl}/ai/chat/history${sessionId ? `?sessionId=${sessionId}` : ''}`, {
+    headers: authHeaders()
+  }).then(json) as Promise<{ sessionId?: string; messages?: AIChatMessage[]; sessions?: string[] }>;
+
+export const deleteAIChatSession = (sessionId: string) =>
+  fetch(`${baseUrl}/ai/chat/session/${sessionId}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  }).then(json);
+
+// Search APIs
+export interface SearchResult {
+  id: string;
+  subject: string;
+  content: string;
+  status: string;
+  priority: string;
+  productId: string;
+  teamId: string;
+  customerEmail: string;
+  createdAt: string;
+  score?: number;
+  matchType: 'semantic' | 'keyword' | 'filter';
+}
+
+export interface SearchResponse {
+  results: SearchResult[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+  searchType: 'semantic' | 'keyword' | 'hybrid';
+}
+
+export interface SearchParams {
+  q: string;
+  semantic?: boolean;
+  status?: string;
+  priority?: string;
+  teamId?: string;
+  productId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  tags?: string[];
+  excludeTags?: string[];
+  page?: number;
+  pageSize?: number;
+}
+
+export const searchTickets = (params: SearchParams) => {
+  const search = new URLSearchParams();
+  search.set('q', params.q);
+  if (params.semantic) search.set('semantic', 'true');
+  if (params.status) search.set('status', params.status);
+  if (params.priority) search.set('priority', params.priority);
+  if (params.teamId) search.set('teamId', params.teamId);
+  if (params.productId) search.set('productId', params.productId);
+  if (params.dateFrom) search.set('dateFrom', params.dateFrom);
+  if (params.dateTo) search.set('dateTo', params.dateTo);
+  if (params.tags?.length) search.set('tags', params.tags.join(','));
+  if (params.excludeTags?.length) search.set('excludeTags', params.excludeTags.join(','));
+  if (params.page) search.set('page', String(params.page));
+  if (params.pageSize) search.set('pageSize', String(params.pageSize));
+
+  return fetch(`${baseUrl}/search?${search.toString()}`, {
+    headers: authHeaders()
+  }).then(json) as Promise<SearchResponse>;
+};
+
+export const getSearchSuggestions = (q: string) =>
+  fetch(`${baseUrl}/search/suggestions?q=${encodeURIComponent(q)}`, {
+    headers: authHeaders()
+  }).then(json) as Promise<{ suggestions: string[] }>;
+

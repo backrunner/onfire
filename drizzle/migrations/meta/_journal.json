@@ -8,9 +8,24 @@
       "when": 1733743200000,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "0001_extensions",
+      "when": 1733829600000,
+      "tag": "0001_extensions",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "0002_ai_features",
+      "when": 1734019200000,
+      "tag": "0002_ai_features",
+      "breakpoints": true
     }
   ]
 }
+
 
 
 

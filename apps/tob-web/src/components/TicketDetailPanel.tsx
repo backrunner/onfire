@@ -33,6 +33,7 @@ import {
   AlertTriangle,
   CheckCircle2
 } from 'lucide-react';
+import { AIPreReply } from './ai/AIPreReply';
 
 const statusConfig: Record<
   string,
@@ -408,6 +409,9 @@ export function TicketDetailPanel({
               </ScrollArea>
             </div>
           </div>
+
+          {/* AI Pre-Reply */}
+          <AIPreReply ticketId={t.id} onUseReply={setReplyText} />
 
           {/* Reply Form */}
           <div className="rounded-lg border border-border bg-card p-4">

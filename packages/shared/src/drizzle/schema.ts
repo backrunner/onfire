@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
 import { Role, TicketPriority, TicketStatus } from '../index';
 
 export const tenants = sqliteTable('tenants', {
@@ -113,6 +113,13 @@ export const tickets = sqliteTable('tickets', {
   slaReplyDeadline: text('sla_reply_deadline'),
   slaAcceptBreached: integer('sla_accept_breached', { mode: 'boolean' }).default(false),
   slaReplyBreached: integer('sla_reply_breached', { mode: 'boolean' }).default(false),
+  // AI-related fields
+  aiScreeningStatus: text('ai_screening_status').$type<'pending' | 'processing' | 'completed' | 'error'>(),
+  aiScreeningResult: text('ai_screening_result'), // JSON: {validity, confidence, classification}
+  aiSuggestedReply: text('ai_suggested_reply'),
+  aiExtractedIssues: text('ai_extracted_issues'), // JSON array
+  aiKeywords: text('ai_keywords'), // JSON array
+  vectorizeId: text('vectorize_id'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull()
 });
@@ -136,10 +143,94 @@ export const history = sqliteTable('history', {
   createdAt: text('created_at').notNull()
 });
 
+// ==================== AI Feature Tables ====================
+
+// AI Configuration - System-level settings for AI providers
+export type AITaskType = 'agent' | 'prescreening' | 'prereply' | 'embedding';
+export type AIProvider = 'openai' | 'anthropic' | 'google' | 'xai' | 'deepseek';
+
+export const aiConfigs = sqliteTable('ai_configs', {
+  id: text('id').primaryKey(),
+  taskType: text('task_type').$type<AITaskType>().notNull().unique(),
+  provider: text('provider').$type<AIProvider>().notNull(),
+  model: text('model').notNull(),
+  apiKey: text('api_key').notNull(),
+  baseUrl: text('base_url'),
+  enabled: integer('enabled', { mode: 'boolean' }).default(true),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull()
+});
+
+// Product Documents - References to uploaded documents in R2
+export type DocumentStatus = 'pending' | 'processing' | 'ready' | 'error';
+
+export const productDocuments = sqliteTable('product_documents', {
+  id: text('id').primaryKey(),
+  productId: text('product_id').notNull(),
+  filename: text('filename').notNull(),
+  r2Key: text('r2_key').notNull(),
+  mimeType: text('mime_type').notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
+  status: text('status').$type<DocumentStatus>().default('pending'),
+  errorMessage: text('error_message'),
+  vectorizeIds: text('vectorize_ids'), // JSON array
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull()
+});
+
+// Product Knowledge - Manual text entries for AI context
+export type KnowledgeType = 'description' | 'faq' | 'feature' | 'policy' | 'troubleshooting';
+
+export const productKnowledge = sqliteTable('product_knowledge', {
+  id: text('id').primaryKey(),
+  productId: text('product_id').notNull(),
+  title: text('title').notNull(),
+  content: text('content').notNull(),
+  knowledgeType: text('knowledge_type').$type<KnowledgeType>().notNull(),
+  vectorizeIds: text('vectorize_ids'), // JSON array
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull()
+});
+
+// AI Chat Messages - Conversation history for AI Agent
+export type ChatRole = 'user' | 'assistant' | 'tool';
+
+export const aiChatMessages = sqliteTable('ai_chat_messages', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  sessionId: text('session_id').notNull(),
+  role: text('role').$type<ChatRole>().notNull(),
+  content: text('content').notNull(),
+  toolCalls: text('tool_calls'), // JSON
+  toolResults: text('tool_results'), // JSON
+  createdAt: text('created_at').notNull()
+});
+
+// Ticket Tags - AI-generated, manual, or system tags
+export type TagSource = 'ai' | 'manual' | 'system';
+
+export const ticketTags = sqliteTable('ticket_tags', {
+  id: text('id').primaryKey(),
+  ticketId: text('ticket_id').notNull(),
+  tag: text('tag').notNull(),
+  source: text('source').$type<TagSource>().notNull(),
+  confidence: real('confidence'), // AI confidence score 0-1
+  createdAt: text('created_at').notNull()
+});
+
+// ==================== Type Exports ====================
+
 export type TicketRow = typeof tickets.$inferSelect;
 export type ReplyRow = typeof replies.$inferSelect;
 export type TemplateRow = typeof templates.$inferSelect;
 export type ProductKeyRow = typeof productKeys.$inferSelect;
 export type CustomerRow = typeof customers.$inferSelect;
 export type CategoryRouteRow = typeof categoryRoutes.$inferSelect;
+
+// AI Feature Row Types
+export type AIConfigRow = typeof aiConfigs.$inferSelect;
+export type ProductDocumentRow = typeof productDocuments.$inferSelect;
+export type ProductKnowledgeRow = typeof productKnowledge.$inferSelect;
+export type AIChatMessageRow = typeof aiChatMessages.$inferSelect;
+export type TicketTagRow = typeof ticketTags.$inferSelect;
 

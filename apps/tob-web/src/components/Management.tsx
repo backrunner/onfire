@@ -37,7 +37,9 @@ import {
   ChevronRight,
   AlertCircle,
   CheckCircle2,
-  Settings2
+  Settings2,
+  Sparkles,
+  BookOpen
 } from 'lucide-react';
 import {
   adminTenants,
@@ -72,6 +74,8 @@ import {
 } from '../api';
 import { Role } from '@onfire/shared';
 import { FormBuilder, FormField } from './FormBuilder';
+import { AIConfigPanel } from './ai/AIConfigPanel';
+import { KnowledgeBaseDialog } from './knowledge/KnowledgeBaseDialog';
 
 const NoAccess = ({ reason }: { reason: string }) => (
   <div className="flex items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 px-4 py-8 text-sm text-muted-foreground">
@@ -142,6 +146,7 @@ export function Management({
   const canSeeTeams = canManageTeam;
   const canSeeTemplates = canManageTemplate;
   const canSeeUsers = canManageUser;
+  const canSeeAI = canManageTenant; // SuperAdmin only
 
   const [loading, setLoading] = useState(false);
   const [tenants, setTenants] = useState<any[]>([]);
@@ -203,6 +208,7 @@ export function Management({
   const [catTeamId, setCatTeamId] = useState('');
   const [editingCategoryRoute, setEditingCategoryRoute] = useState<any | null>(null);
   const [editCatTeamId, setEditCatTeamId] = useState('');
+  const [knowledgeProduct, setKnowledgeProduct] = useState<{ id: string; name: string } | null>(null);
 
   // Search states
   const [tenantSearch, setTenantSearch] = useState('');
@@ -373,6 +379,12 @@ export function Management({
             <TabsTrigger value="users">
               <Building2 className="mr-1.5 h-3.5 w-3.5" />
               用户
+            </TabsTrigger>
+          )}
+          {canSeeAI && (
+            <TabsTrigger value="ai">
+              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+              AI 配置
             </TabsTrigger>
           )}
         </TabsList>
@@ -630,6 +642,14 @@ export function Management({
                                 </div>
                               </div>
                               <div className="flex gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  title="知识库"
+                                  onClick={() => setKnowledgeProduct({ id: p.id, name: p.name ?? p.id })}
+                                >
+                                  <BookOpen className="h-3 w-3" />
+                                </Button>
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -1839,6 +1859,13 @@ export function Management({
             )}
           </TabsContent>
         )}
+
+        {/* AI Config Tab */}
+        {canSeeAI && (
+          <TabsContent value="ai" className="mt-4">
+            <AIConfigPanel onRefresh={refresh} />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Delete Confirmation Dialog */}
@@ -1891,6 +1918,16 @@ export function Management({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Knowledge Base Dialog */}
+      {knowledgeProduct && (
+        <KnowledgeBaseDialog
+          productId={knowledgeProduct.id}
+          productName={knowledgeProduct.name}
+          open={Boolean(knowledgeProduct)}
+          onOpenChange={(open) => !open && setKnowledgeProduct(null)}
+        />
+      )}
     </div>
   );
 }
