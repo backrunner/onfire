@@ -86,3 +86,4 @@ export function InstallPage({ onFinished }: { onFinished: () => void }) {
   );
 }
 
+
