@@ -1,10 +1,7 @@
 name = "onfire-tob-worker"
 main = "src/index.ts"
-compatibility_date = "2025-06-01"
+compatibility_date = "2025-12-01"
 compatibility_flags = ["nodejs_compat"]
-
-# Static assets configuration
-assets = { directory = "./public", binding = "ASSETS" }
 
 [vars]
 APP_PREFIX = "/api/tob"
@@ -12,29 +9,4 @@ APP_PREFIX = "/api/tob"
 [[d1_databases]]
 binding = "DB"
 database_name = "onfire-d1"
-database_id = "local"
-
-# R2 bucket for knowledge base documents
-[[r2_buckets]]
-binding = "KNOWLEDGE_BUCKET"
-bucket_name = "onfire-knowledge"
-
-# Vectorize index for semantic search
-[[vectorize]]
-binding = "VECTORIZE_INDEX"
-index_name = "onfire-tickets"
-
-# Production environment (use real database_id)
-# [env.production]
-# [[env.production.d1_databases]]
-# binding = "DB"
-# database_name = "onfire-d1"
-# database_id = "YOUR_D1_DATABASE_ID"
-#
-# [[env.production.r2_buckets]]
-# binding = "KNOWLEDGE_BUCKET"
-# bucket_name = "onfire-knowledge"
-#
-# [[env.production.vectorize]]
-# binding = "VECTORIZE_INDEX"
-# index_name = "onfire-tickets"
+database_id = "REPLACE_WITH_D1_ID"
