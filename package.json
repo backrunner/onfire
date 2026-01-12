@@ -9,25 +9,39 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "bun run dev:workers & bun run dev:web",
+    "dev:workers": "wrangler dev -c wrangler.tob.toml -c wrangler.toc.toml --persist-to ./.wrangler/state --port 8787",
+    "dev:web": "turbo dev --filter='@onfire/tob-web' --filter='@onfire/toc-web'",
     "build": "turbo build",
     "lint": "turbo lint",
     "format": "turbo format",
     "test": "turbo test",
     "init": "bash scripts/init.sh",
-    "db:generate": "drizzle-kit generate:sqlite --schema=packages/shared/src/drizzle/schema.ts --out=drizzle/migrations",
-    "db:migrate:toc": "WRANGLER_CONFIG=workers/toc-worker/wrangler.toml bunx wrangler d1 migrations apply DB --local",
-    "db:migrate:tob": "WRANGLER_CONFIG=workers/tob-worker/wrangler.toml bunx wrangler d1 migrations apply DB --local",
-    "db:migrate:all": "npm run db:migrate:toc && npm run db:migrate:tob",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "wrangler d1 migrations apply DB --local -c wrangler.tob.toml",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote -c wrangler.tob.toml",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
     "deploy:tob": "cd workers/tob-worker && bun run deploy",
     "deploy:toc": "cd workers/toc-worker && bun run deploy",
-    "deploy:all": "npm run deploy:tob && npm run deploy:toc"
+    "deploy:all": "bun run deploy:tob && bun run deploy:toc"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.11",
+    "@ai-sdk/google": "^3.0.6",
+    "@ai-sdk/openai": "^3.0.8",
+    "ai": "^6.0.28",
+    "better-auth": "^1.4.11",
+    "drizzle-orm": "^0.45.1",
+    "elysia": "^1.4.21",
+    "nanoid": "^5.1.6"
   },
   "devDependencies": {
-    "@types/bun": "^1.1.12",
-    "turbo": "^2.6.3",
-    "typescript": "^5.9.3",
+    "@cloudflare/workers-types": "^4.20260111.0",
+    "@types/bun": "^1.3.5",
     "drizzle-kit": "^0.31.8",
-    "wrangler": "^4.53.0"
+    "turbo": "^2.7.4",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.58.0"
   }
 }

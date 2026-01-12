@@ -4,11 +4,7 @@ import { createAuthPlugin } from './core/auth';
 import type { Bindings, WorkerSingleton } from './core/types';
 import { prepare } from './core/db';
 import { createDb } from '@onfire/shared/drizzle/client';
-import { createSystemRoutes } from './routes/system';
-import { createTemplateRoutes } from './routes/templates';
-import { createTicketRoutes } from './routes/tickets';
-import { createTaskRoutes } from './routes/tasks';
-import { createTokenRoutes } from './routes/tokens';
+import { createAllRoutes } from './routes';
 
 const ensureEnv = (env: Bindings) => {
   if (!env.AUTH_SECRET) console.warn('AUTH_SECRET missing - auth will fail');
@@ -19,15 +15,15 @@ const createApp = (env: Bindings) => {
   ensureEnv(env);
   const { plugin: authPlugin, auth } = createAuthPlugin(env);
   const db = createDb(env.DB);
-  return new Elysia<string, WorkerSingleton>({ adapter: CloudflareAdapter, prefix: env.APP_PREFIX ?? '/api/toc' })
+  return new Elysia<string, WorkerSingleton>({
+    adapter: CloudflareAdapter,
+    prefix: env.APP_PREFIX ?? '/api/toc',
+    aot: false,
+  })
     .state({ env, db, auth })
     .use(authPlugin)
     .onStart(() => prepare(env.DB))
-    .use(createSystemRoutes(env))
-    .use(createTemplateRoutes(env))
-    .use(createTicketRoutes(env))
-    .use(createTokenRoutes(env))
-    .use(createTaskRoutes())
+    .use(createAllRoutes(env))
     .compile();
 };
 

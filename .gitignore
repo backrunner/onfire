@@ -11,6 +11,7 @@ coverage
 .DS_Store
 .env
 .env.*
+.dev.vars
 *.log
 *.lock
 pnpm-lock.yaml
@@ -19,3 +20,6 @@ package-lock.json
 .history
 workers/tob-worker/public
 workers/toc-worker/public
+wrangler.toml
+wrangler.tob.toml
+wrangler.toc.toml

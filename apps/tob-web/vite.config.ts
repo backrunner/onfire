@@ -11,7 +11,7 @@ export default defineConfig({
     port: 4173,
     proxy: {
       '/api/tob': {
-        target: 'http://localhost:8788',
+        target: 'http://localhost:8787',
         changeOrigin: true
       }
     }

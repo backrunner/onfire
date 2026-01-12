@@ -4,18 +4,7 @@ import { createAuthPlugin } from './core/auth';
 import type { Bindings, WorkerSingleton } from './core/types';
 import { prepare } from './core/db';
 import { createDb } from '@onfire/shared/drizzle/client';
-import { createSystemRoutes } from './routes/system';
-import { createDashboardRoutes } from './routes/dashboard';
-import { createAdminRoutes } from './routes/admin';
-import { createMetaRoutes } from './routes/meta';
-import { createTicketRoutes } from './routes/tickets';
-import { createInstallRoutes } from './routes/install';
-import { createAccountRoutes } from './routes/account';
-import { createAIConfigRoutes } from './routes/ai-config';
-import { createKnowledgeRoutes } from './routes/knowledge';
-import { createAIScreenRoutes } from './routes/ai-screen';
-import { createAIChatRoutes } from './routes/ai-chat';
-import { createSearchRoutes } from './routes/search';
+import { createAllRoutes } from './routes';
 
 const ensureEnv = (env: Bindings) => {
   if (!env.AUTH_SECRET) console.warn('AUTH_SECRET missing - auth will fail');
@@ -26,25 +15,18 @@ const createApp = (env: Bindings) => {
   ensureEnv(env);
   const { plugin: authPlugin, auth } = createAuthPlugin(env);
   const db = createDb(env.DB);
-  return new Elysia<string, WorkerSingleton>({ adapter: CloudflareAdapter, prefix: env.APP_PREFIX ?? '/api/tob' })
+  return new Elysia<string, WorkerSingleton>({
+    adapter: CloudflareAdapter,
+    prefix: env.APP_PREFIX ?? '/api/tob',
+    aot: false,
+  })
     .state({ env, db, auth })
     .use(authPlugin)
     .onStart(() => prepare(env.DB))
     .onError(({ code }) => {
       if (code === 'NOT_FOUND') return new Response('not found', { status: 404 });
     })
-    .use(createInstallRoutes(env, auth))
-    .use(createAccountRoutes(env, auth))
-    .use(createSystemRoutes(env))
-    .use(createDashboardRoutes(env))
-    .use(createAdminRoutes(env))
-    .use(createAIConfigRoutes(env))
-    .use(createKnowledgeRoutes(env))
-    .use(createAIScreenRoutes(env))
-    .use(createAIChatRoutes(env))
-    .use(createSearchRoutes(env))
-    .use(createMetaRoutes(env))
-    .use(createTicketRoutes(env))
+    .use(createAllRoutes(env, auth))
     .compile();
 };
 
