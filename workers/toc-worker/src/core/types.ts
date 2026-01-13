@@ -1,6 +1,7 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { Auth } from 'better-auth';
 import type { Db } from '@onfire/shared/drizzle/client';
+import type { Context } from 'hono';
 
 export interface Bindings {
   DB: D1Database;
@@ -20,20 +21,10 @@ export interface AuthUser {
   role?: string;
 }
 
-export type AppStore = {
-  env: Bindings;
+export interface Variables {
   db: Db;
   auth: Auth<any>;
-};
-
-export type AppContext = {
-  store: AppStore;
   user?: AuthUser;
-};
+}
 
-export type WorkerSingleton = {
-  decorator: { user?: AuthUser };
-  store: AppStore;
-  derive: {};
-  resolve: {};
-};
+export type AppContext = Context<{ Bindings: Bindings; Variables: Variables }>;

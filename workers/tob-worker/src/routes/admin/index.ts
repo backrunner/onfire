@@ -1,4 +1,3 @@
-import type { Bindings } from '../../core/types';
 import { createRouter } from '../../core/router';
 import { tenantRoutes } from './tenants';
 import { productRoutes } from './products';
@@ -10,15 +9,18 @@ import { customerRoutes } from './customers';
 import { categoryRouteRoutes } from './category-routes';
 import { productKeyRoutes } from './product-keys';
 
-export const adminRoutes = (env: Bindings) =>
-  createRouter({ prefix: '/admin' })
-    .use(tenantRoutes(env))
-    .use(productRoutes(env))
-    .use(teamRoutes(env))
-    .use(templateRoutes(env))
-    .use(userRoutes(env))
-    .use(agentRoutes(env))
-    .use(customerRoutes(env))
-    .use(categoryRouteRoutes(env))
-    .use(productKeyRoutes(env))
-;
+export const adminRoutes = () => {
+  const router = createRouter();
+
+  router.route('/admin', tenantRoutes());
+  router.route('/admin', productRoutes());
+  router.route('/admin', teamRoutes());
+  router.route('/admin', templateRoutes());
+  router.route('/admin', userRoutes());
+  router.route('/admin', agentRoutes());
+  router.route('/admin', customerRoutes());
+  router.route('/admin', categoryRouteRoutes());
+  router.route('/admin', productKeyRoutes());
+
+  return router;
+};

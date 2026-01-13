@@ -1,27 +1,82 @@
-import { t } from 'elysia';
-import type { Auth } from 'better-auth';
-import type { Bindings } from '../../core/types';
+import { Role } from '@onfire/shared';
+import { agentTeams, agents, teams, tenants, users } from '@onfire/shared/drizzle/schema';
 import { createRouter } from '../../core/router';
-import * as handlers from './handlers';
+import { handleResult, errorResult } from '../../core/route-utils';
+import { readInstallState } from '../../core/install';
+import { ok } from '../../core/response';
 
-export const authRoutes = (_env: Bindings, auth: Auth) =>
-  createRouter()
-    // Password change
-    .post('/auth/change-password', ({ request, body }) =>
-      handlers.changePassword(auth, request, body), {
-      body: t.Object({
-        currentPassword: t.Optional(t.String()),
-        newPassword: t.Optional(t.String()),
-        revokeOtherSessions: t.Optional(t.Boolean())
-      })
-    })
-    // Install routes
-    .get('/install/status', ({ store }) => handlers.getInstallStatus(store))
-    .post('/install/finalize', ({ store, request, body }) =>
-      handlers.finalizeInstall(store, auth, request, body), {
-      body: t.Object({
-        tenantName: t.Optional(t.String()),
-        displayName: t.Optional(t.String())
-      })
-    })
-;
+export const authRoutes = () => {
+  const router = createRouter();
+
+  // POST /auth/change-password
+  router.post('/auth/change-password', async (c) => {
+    const body = await c.req.json<{ currentPassword?: string; newPassword?: string; revokeOtherSessions?: boolean }>();
+    const auth = c.get('auth');
+
+    if (!body.currentPassword || !body.newPassword) {
+      return handleResult(c, errorResult(400, 'currentPassword and newPassword required'));
+    }
+
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session?.user) {
+      return handleResult(c, errorResult(401, 'unauthorized'));
+    }
+
+    try {
+      await auth.api.changePassword({
+        headers: c.req.raw.headers,
+        body: {
+          currentPassword: body.currentPassword,
+          newPassword: body.newPassword,
+          revokeOtherSessions: body.revokeOtherSessions ?? true
+        }
+      });
+      return c.json(ok({ ok: true }));
+    } catch (e) {
+      console.error('changePassword failed', e);
+      return handleResult(c, errorResult(400, 'change-password failed'));
+    }
+  });
+
+  // GET /install/status
+  router.get('/install/status', async (c) => {
+    const db = c.get('db');
+    const state = await readInstallState(db);
+    return c.json(ok({ needsSetup: !state.hasUser, hasTenant: state.hasTenant }));
+  });
+
+  // POST /install/finalize
+  router.post('/install/finalize', async (c) => {
+    const body = await c.req.json<{ tenantName?: string; displayName?: string }>();
+    const db = c.get('db');
+    const auth = c.get('auth');
+
+    const state = await readInstallState(db);
+    if (state.hasUser) {
+      return handleResult(c, errorResult(400, 'already-installed'));
+    }
+
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session?.user?.id || !session?.user?.email) {
+      return handleResult(c, errorResult(401, 'unauthorized'));
+    }
+
+    if (!body.tenantName) {
+      return handleResult(c, errorResult(400, 'tenantName required'));
+    }
+
+    const tenantId = crypto.randomUUID();
+    const defaultTeamId = crypto.randomUUID();
+    const displayName = body.displayName?.trim() || session.user.email.split('@')[0] || 'Super Admin';
+
+    await db.insert(tenants).values({ id: tenantId, name: body.tenantName, defaultTeamId }).run();
+    await db.insert(teams).values({ id: defaultTeamId, tenantId, name: '默认团队', allowReassign: true }).run();
+    await db.insert(users).values({ id: session.user.id, email: session.user.email, displayName, tenantId, role: Role.SuperAdmin }).run();
+    await db.insert(agents).values({ userId: session.user.id, level: 1, active: true }).onConflictDoNothing();
+    await db.insert(agentTeams).values({ userId: session.user.id, teamId: defaultTeamId }).onConflictDoNothing();
+
+    return c.json(ok({ ok: true, tenantId, teamId: defaultTeamId, userId: session.user.id }));
+  });
+
+  return router;
+};

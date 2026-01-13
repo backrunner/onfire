@@ -362,7 +362,7 @@ export const en: Translations = {
 
   // Footer
   footer: {
-    tech: 'Cloudflare Worker · Elysia · D1 · Better Auth'
+    tech: 'Cloudflare Worker · Hono · D1 · Better Auth'
   },
 
   // Errors

@@ -2,8 +2,6 @@
  * Route Registry
  * Central place to register all routes for the TOB Worker
  */
-import type { Auth } from 'better-auth';
-import type { Bindings } from '../core/types';
 import { createRouter } from '../core/router';
 import { systemRoutes } from './system';
 import { authRoutes } from './auth';
@@ -15,15 +13,18 @@ import { aiRoutes } from './ai';
 import { knowledgeRoutes } from './knowledge';
 import { searchRoutes } from './search';
 
-export const createAllRoutes = (env: Bindings, auth: Auth) =>
-  createRouter()
-    .use(systemRoutes(env))
-    .use(authRoutes(env, auth))
-    .use(ticketRoutes(env))
-    .use(dashboardRoutes(env))
-    .use(metaRoutes(env))
-    .use(adminRoutes(env))
-    .use(aiRoutes(env))
-    .use(knowledgeRoutes(env))
-    .use(searchRoutes(env))
-;
+export const createAllRoutes = () => {
+  const router = createRouter();
+
+  router.route('/', systemRoutes());
+  router.route('/', authRoutes());
+  router.route('/', ticketRoutes());
+  router.route('/', dashboardRoutes());
+  router.route('/', metaRoutes());
+  router.route('/', adminRoutes());
+  router.route('/', aiRoutes());
+  router.route('/', knowledgeRoutes());
+  router.route('/', searchRoutes());
+
+  return router;
+};

@@ -4,14 +4,14 @@ OnFire 是一个从简设计的现代工单系统，旨在让用户可以快速�
 
 ## 技术栈
 
-- **运行时**: Bun + Cloudflare Workers
-- **后端框架**: ElysiaJS with Cloudflare Worker adapter
+- **运行时**: Node.js + Cloudflare Workers
+- **后端框架**: Hono
 - **数据库**: Cloudflare D1 (SQLite) + Drizzle ORM
 - **认证**: Better Auth (ToB) / JWT + API Key (ToC)
 - **前端**: React 18 + TypeScript + Vite
 - **UI 组件库**: shadcn/ui (zinc 主题)
 - **样式**: Tailwind CSS
-- **Monorepo**: Turborepo
+- **Monorepo**: Turborepo + pnpm
 
 ## 项目结构
 
@@ -464,22 +464,24 @@ VITE_TURNSTILE_SITE_KEY=xxx  # Turnstile 站点密钥
 
 ```bash
 # 安装依赖
-bun install
+pnpm install
 
 # 开发模式
-turbo dev
+pnpm dev
 
 # 构建
-turbo build
+pnpm build
 
 # 类型检查
-turbo lint
+pnpm lint
 
 # 数据库迁移
-npm run db:generate      # 生成迁移
-npm run db:migrate:all   # 应用迁移
+pnpm db:generate      # 生成迁移
+pnpm db:migrate       # 应用迁移 (本地)
+pnpm db:migrate:remote # 应用迁移 (远程)
 
 # 部署
-cd workers/tob-worker && wrangler deploy
-cd workers/toc-worker && wrangler deploy
+pnpm deploy:tob       # 部署 ToB Worker
+pnpm deploy:toc       # 部署 ToC Worker
+pnpm deploy:all       # 部署所有 Worker
 ```

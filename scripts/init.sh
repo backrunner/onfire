@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-echo "🔧 Installing dependencies with bun..."
-bun install
+echo "Installing dependencies with pnpm..."
+pnpm install
 
 # Generate a random secret for AUTH_SECRET
 generate_secret() {
@@ -29,9 +29,9 @@ AUTH_SECRET=$secret
 # ToC Worker - Turnstile test secret (always passes)
 TURNSTILE_SECRET=1x0000000000000000000000000000000AA
 EOF
-    echo "🔑 Created .dev.vars with auto-generated AUTH_SECRET"
+    echo "Created .dev.vars with auto-generated AUTH_SECRET"
   else
-    echo "⏭️  .dev.vars already exists, skipping"
+    echo ".dev.vars already exists, skipping"
   fi
 }
 
@@ -41,21 +41,20 @@ setup_local_db() {
 
   if [ ! -d "$db_dir" ]; then
     mkdir -p "$db_dir"
-    echo "📁 Created local D1 database directory"
+    echo "Created local D1 database directory"
   fi
 }
 
 setup_dev_vars
 setup_local_db
 
-echo "🗄️  Running database migrations..."
-bun run db:migrate || echo "⚠️  db:migrate skipped (run 'bun run dev' first to create database, then 'bun run db:migrate')"
+echo "Running database migrations..."
+pnpm db:migrate || echo "db:migrate skipped (run 'pnpm dev' first to create database, then 'pnpm db:migrate')"
 
 cat <<'INFO'
-⚡ Init done.
+Init done.
 - .dev.vars has been created with development secrets.
-- Run `bun run dev` to start the development server.
+- Run `pnpm dev` to start the development server.
 - Workers: http://localhost:8787/api/tob and http://localhost:8787/api/toc
 - For production, configure secrets via `wrangler secret put AUTH_SECRET` etc.
 INFO
-

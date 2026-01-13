@@ -6,13 +6,14 @@
   "scripts": {
     "dev": "wrangler dev --port 8787 --inspector-port 0",
     "dev:worker": "wrangler dev --port 8787 --inspector-port 0",
-    "build:web": "cd ../../apps/toc-web && bun run build",
-    "build": "bun run build:web && wrangler deploy --dry-run --outdir dist",
-    "deploy": "bun run build:web && wrangler deploy",
+    "build:web": "cd ../../apps/toc-web && pnpm run build",
+    "build": "pnpm run build:web && wrangler deploy --dry-run --outdir dist",
+    "deploy": "pnpm run build:web && wrangler deploy",
     "lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@onfire/sdk": "workspace:*",
-    "@onfire/shared": "workspace:*"
+    "@onfire/shared": "workspace:*",
+    "hono": "^4.6.0"
   }
 }

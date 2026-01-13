@@ -1,6 +1,23 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { useState, useMemo, type ChangeEvent, type FormEvent } from 'react';
 import { Button, Input } from '@onfire/ui';
 import { signUp, finalizeInstall } from '../api';
+
+interface PasswordValidation {
+  minLength: boolean;
+  hasUppercase: boolean;
+  hasLowercase: boolean;
+  hasNumber: boolean;
+}
+
+const validatePassword = (password: string): PasswordValidation => ({
+  minLength: password.length >= 8,
+  hasUppercase: /[A-Z]/.test(password),
+  hasLowercase: /[a-z]/.test(password),
+  hasNumber: /[0-9]/.test(password)
+});
+
+const isPasswordValid = (validation: PasswordValidation): boolean =>
+  validation.minLength && validation.hasUppercase && validation.hasLowercase && validation.hasNumber;
 
 export function InstallPage({ onFinished }: { onFinished: () => void }) {
   const [email, setEmail] = useState('');
@@ -11,12 +28,22 @@ export function InstallPage({ onFinished }: { onFinished: () => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [touched, setTouched] = useState({ password: false, confirmPassword: false });
+
+  const passwordValidation = useMemo(() => validatePassword(password), [password]);
+  const passwordsMatch = password === confirmPassword;
+  const canSubmit = isPasswordValid(passwordValidation) && passwordsMatch && email && tenantName.trim();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
-    if (password !== confirmPassword) {
+
+    if (!isPasswordValid(passwordValidation)) {
+      setError('密码不符合要求');
+      return;
+    }
+    if (!passwordsMatch) {
       setError('两次输入的密码不一致');
       return;
     }
@@ -24,6 +51,7 @@ export function InstallPage({ onFinished }: { onFinished: () => void }) {
       setError('请填写租户名称');
       return;
     }
+
     setLoading(true);
     try {
       const signupRes = await signUp({ email, password, name: displayName || email.split('@')[0] });
@@ -44,6 +72,13 @@ export function InstallPage({ onFinished }: { onFinished: () => void }) {
     }
   };
 
+  const ValidationItem = ({ valid, text }: { valid: boolean; text: string }) => (
+    <div className={`flex items-center gap-1.5 text-xs ${valid ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+      <span className={`inline-block w-3 h-3 rounded-full ${valid ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-600'}`} />
+      {text}
+    </div>
+  );
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-2xl rounded-2xl border border-border bg-card p-8 shadow-lg">
@@ -62,11 +97,37 @@ export function InstallPage({ onFinished }: { onFinished: () => void }) {
           </div>
           <div className="space-y-2 md:col-span-1">
             <div className="text-sm font-medium text-foreground">密码</div>
-            <Input required type="password" value={password} onChange={(e: ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)} />
+            <Input
+              required
+              type="password"
+              value={password}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+              onBlur={() => setTouched((t) => ({ ...t, password: true }))}
+            />
+            {touched.password && password && (
+              <div className="grid grid-cols-2 gap-1 mt-2">
+                <ValidationItem valid={passwordValidation.minLength} text="至少 8 个字符" />
+                <ValidationItem valid={passwordValidation.hasUppercase} text="包含大写字母" />
+                <ValidationItem valid={passwordValidation.hasLowercase} text="包含小写字母" />
+                <ValidationItem valid={passwordValidation.hasNumber} text="包含数字" />
+              </div>
+            )}
           </div>
           <div className="space-y-2 md:col-span-1">
             <div className="text-sm font-medium text-foreground">确认密码</div>
-            <Input required type="password" value={confirmPassword} onChange={(e: ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)} />
+            <Input
+              required
+              type="password"
+              value={confirmPassword}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)}
+              onBlur={() => setTouched((t) => ({ ...t, confirmPassword: true }))}
+            />
+            {touched.confirmPassword && confirmPassword && !passwordsMatch && (
+              <div className="text-xs text-red-500 dark:text-red-400 mt-1">密码不一致</div>
+            )}
+            {touched.confirmPassword && confirmPassword && passwordsMatch && (
+              <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">密码一致</div>
+            )}
           </div>
           <div className="space-y-2 md:col-span-2">
             <div className="text-sm font-medium text-foreground">租户名称</div>
@@ -76,7 +137,7 @@ export function InstallPage({ onFinished }: { onFinished: () => void }) {
           {error && <div className="md:col-span-2 rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-600 dark:text-amber-400">{error}</div>}
           {success && <div className="md:col-span-2 rounded-md bg-emerald-500/10 px-3 py-2 text-sm text-emerald-600 dark:text-emerald-400">{success}</div>}
           <div className="md:col-span-2 flex items-center justify-end gap-3">
-            <Button type="submit" loading={loading}>
+            <Button type="submit" loading={loading} disabled={!canSubmit}>
               完成安装
             </Button>
           </div>
@@ -85,5 +146,3 @@ export function InstallPage({ onFinished }: { onFinished: () => void }) {
     </div>
   );
 }
-
-

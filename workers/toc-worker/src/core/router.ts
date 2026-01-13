@@ -1,21 +1,14 @@
 /**
  * Router Factory
- * Provides a unified way to create Elysia router instances with consistent settings
+ * Provides a unified way to create Hono router instances with consistent settings
  */
-import { Elysia } from 'elysia';
-import type { WorkerSingleton } from './types';
+import { Hono } from 'hono';
+import type { Bindings, Variables } from './types';
 
-export interface RouterOptions {
-  prefix?: string;
-  name?: string;
-}
+export type AppRouter = Hono<{ Bindings: Bindings; Variables: Variables }>;
 
 /**
- * Creates a new Elysia router instance with consistent type parameters and settings.
- * Use this instead of `new Elysia()` directly in route modules.
+ * Creates a new Hono router instance with consistent type parameters.
+ * Use this instead of `new Hono()` directly in route modules.
  */
-export const createRouter = (options?: RouterOptions) =>
-  new Elysia<string, WorkerSingleton>({
-    ...options,
-    aot: false,
-  });
+export const createRouter = (): AppRouter => new Hono<{ Bindings: Bindings; Variables: Variables }>();

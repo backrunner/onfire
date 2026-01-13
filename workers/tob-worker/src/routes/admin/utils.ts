@@ -3,8 +3,8 @@
  */
 import { Role, type SessionContext } from '@onfire/shared';
 import { teams, products, productTeams, agents, users, agentTeams, agentProfiles } from '@onfire/shared/drizzle/schema';
+import type { Db } from '@onfire/shared/drizzle/client';
 import { eq, inArray } from 'drizzle-orm';
-import type { AppStore } from '../../core/types';
 
 type TeamRow = typeof teams.$inferSelect;
 type AgentTeamRow = typeof agentTeams.$inferSelect;
@@ -30,16 +30,16 @@ export const slaColumnsFromPayload = (sla?: ProductSlaInput) =>
       }
     : {};
 
-export const syncProductTeams = async (store: AppStore, productId: string, teamIds: string[], allowedTenantIds: string[], isSuperAdmin: boolean) => {
+export const syncProductTeams = async (db: Db, productId: string, teamIds: string[], allowedTenantIds: string[], isSuperAdmin: boolean) => {
   if (!teamIds) return;
   if (!isSuperAdmin) {
-    const rows = await store.db.select().from(teams).where(inArray(teams.id, teamIds));
+    const rows = await db.select().from(teams).where(inArray(teams.id, teamIds));
     const invalid = rows.filter((t: TeamRow) => !allowedTenantIds.includes(t.tenantId));
     if (invalid.length) throw new Response('forbidden', { status: 403 });
   }
-  await store.db.delete(productTeams).where(eq(productTeams.productId, productId)).run();
+  await db.delete(productTeams).where(eq(productTeams.productId, productId)).run();
   if (teamIds.length === 0) return;
-  await store.db
+  await db
     .insert(productTeams)
     .values(teamIds.map((tid) => ({ productId, teamId: tid })))
     .run();
@@ -53,10 +53,10 @@ export const createApiKeyValue = () => {
 
 export const maskApiKey = (id: string) => `${id.slice(0, 6)}…${id.slice(-4)}`;
 
-export const assertTeamIdsAccessible = async (store: AppStore, teamIds: string[], allowedTenantIds: string[], isSuperAdmin: boolean) => {
+export const assertTeamIdsAccessible = async (db: Db, teamIds: string[], allowedTenantIds: string[], isSuperAdmin: boolean) => {
   if (!teamIds?.length) return;
   if (isSuperAdmin) return;
-  const rows = await store.db.select().from(teams).where(inArray(teams.id, teamIds));
+  const rows = await db.select().from(teams).where(inArray(teams.id, teamIds));
   const invalid = rows.filter((t: TeamRow) => !allowedTenantIds.includes(t.tenantId));
   if (invalid.length) throw new Response('forbidden', { status: 403 });
 };
@@ -74,7 +74,7 @@ interface AgentJoinRow {
   avatarUrl: string | null;
 }
 
-export const loadAgents = async (store: AppStore, tenantIds: string[], isSuperAdmin: boolean) => {
+export const loadAgents = async (db: Db, tenantIds: string[], isSuperAdmin: boolean) => {
   const baseSelect = {
     userId: users.id,
     email: users.email,
@@ -89,8 +89,8 @@ export const loadAgents = async (store: AppStore, tenantIds: string[], isSuperAd
   };
   const joined: AgentJoinRow[] =
     isSuperAdmin
-      ? await store.db.select(baseSelect).from(agents).leftJoin(users, eq(users.id, agents.userId)).leftJoin(agentProfiles, eq(agentProfiles.userId, agents.userId))
-      : await store.db
+      ? await db.select(baseSelect).from(agents).leftJoin(users, eq(users.id, agents.userId)).leftJoin(agentProfiles, eq(agentProfiles.userId, agents.userId))
+      : await db
           .select(baseSelect)
           .from(agents)
           .leftJoin(users, eq(users.id, agents.userId))
@@ -99,7 +99,7 @@ export const loadAgents = async (store: AppStore, tenantIds: string[], isSuperAd
 
   const ids = joined.map((a: AgentJoinRow) => a.userId).filter((id): id is string => id !== null);
   const teamRows: AgentTeamRow[] = ids.length
-    ? await store.db.select({ userId: agentTeams.userId, teamId: agentTeams.teamId }).from(agentTeams).where(inArray(agentTeams.userId, ids))
+    ? await db.select({ userId: agentTeams.userId, teamId: agentTeams.teamId }).from(agentTeams).where(inArray(agentTeams.userId, ids))
     : [];
   const teamMap = new Map<string, string[]>();
   teamRows.forEach((r: AgentTeamRow) => teamMap.set(r.userId, [...(teamMap.get(r.userId) ?? []), r.teamId]));
@@ -117,9 +117,9 @@ export const loadAgents = async (store: AppStore, tenantIds: string[], isSuperAd
   }));
 };
 
-export const upsertAgentProfile = async (store: AppStore, userId: string, profile?: { displayName?: string; email?: string; avatarUrl?: string }) => {
+export const upsertAgentProfile = async (db: Db, userId: string, profile?: { displayName?: string; email?: string; avatarUrl?: string }) => {
   if (!profile) return;
-  const baseUser = await store.db.query.users.findFirst({ where: eq(users.id, userId) });
+  const baseUser = await db.query.users.findFirst({ where: eq(users.id, userId) });
   const payload = {
     userId,
     ...(profile.displayName ? { displayName: profile.displayName } : {}),
@@ -129,7 +129,7 @@ export const upsertAgentProfile = async (store: AppStore, userId: string, profil
   if (Object.keys(payload).length <= 1 && !profile.avatarUrl) return;
   const displayName = payload.displayName ?? baseUser?.displayName ?? 'Agent';
   const email = payload.email ?? baseUser?.email ?? 'unknown@agent';
-  await store.db
+  await db
     .insert(agentProfiles)
     .values({ userId, displayName, email, avatarUrl: profile.avatarUrl ?? null })
     .onConflictDoUpdate({
@@ -152,8 +152,8 @@ export const parseJsonSafe = (val: string | null) => {
   }
 };
 
-export const assertProductAccessible = async (store: AppStore, ctx: SessionContext, productId: string) => {
-  const existing = await store.db.query.products.findFirst({ where: eq(products.id, productId) });
+export const assertProductAccessible = async (db: Db, ctx: SessionContext, productId: string) => {
+  const existing = await db.query.products.findFirst({ where: eq(products.id, productId) });
   if (!existing) throw new Response('not found', { status: 404 });
   if (ctx.user.role !== Role.SuperAdmin && !ctx.tenantIds.includes(existing.tenantId as string)) throw new Response('forbidden', { status: 403 });
   return existing;

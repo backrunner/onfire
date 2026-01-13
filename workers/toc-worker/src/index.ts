@@ -1,7 +1,6 @@
-import { Elysia } from 'elysia';
-import { CloudflareAdapter } from 'elysia/adapter/cloudflare-worker';
+import { Hono } from 'hono';
 import { createAuthPlugin } from './core/auth';
-import type { Bindings, WorkerSingleton } from './core/types';
+import type { Bindings, Variables } from './core/types';
 import { prepare } from './core/db';
 import { createDb } from '@onfire/shared/drizzle/client';
 import { createAllRoutes } from './routes';
@@ -12,59 +11,49 @@ const ensureEnv = (env: Bindings) => {
   if (!env.DB) console.warn('DB binding missing');
 };
 
-const createApp = (env: Bindings) => {
-  ensureEnv(env);
-  const { plugin: authPlugin, auth } = createAuthPlugin(env);
-  const db = createDb(env.DB);
-  return new Elysia<string, WorkerSingleton>({
-    adapter: CloudflareAdapter,
-    prefix: env.APP_PREFIX ?? '/api/toc',
-    aot: false,
-  })
-    .state({ env, db, auth })
-    .use(authPlugin)
-    .onStart(() => prepare(env.DB))
-    .onAfterHandle(({ response }) => {
-      // Don't wrap raw Response objects (streaming, files, redirects, etc.)
-      if (isRawResponse(response)) {
-        return response;
-      }
-      // Wrap all other responses in unified format
-      return wrapResponse(response);
-    })
-    .onError(({ code, error }) => {
-      if (code === 'NOT_FOUND') {
-        const { response, status } = errorToResponse(new Error('Not found'));
-        return new Response(JSON.stringify(response), {
-          status,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-      // Handle all other errors
-      const { response, status } = errorToResponse(error);
-      return new Response(JSON.stringify(response), {
-        status,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    })
-    .use(createAllRoutes(env));
-};
+const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+
+// Middleware to set up db and auth
+app.use('*', async (c, next) => {
+  ensureEnv(c.env);
+  const db = createDb(c.env.DB);
+  const { auth } = createAuthPlugin(c.env);
+  c.set('db', db);
+  c.set('auth', auth);
+
+  // Run DB preparation
+  await prepare(c.env.DB);
+
+  await next();
+});
+
+// Mount API routes
+const prefix = '/api/toc';
+app.route(prefix, createAllRoutes());
+
+// Error handler
+app.onError((err, c) => {
+  const { response, status } = errorToResponse(err);
+  return c.json(response, status as any);
+});
+
+// 404 handler for API routes
+app.notFound((c) => {
+  const { response, status } = errorToResponse(new Error('Not found'));
+  return c.json(response, status as any);
+});
 
 export default {
   async fetch(request: Request, env: Bindings, ctx: ExecutionContext) {
     const url = new URL(request.url);
-    const prefix = env.APP_PREFIX ?? '/api/toc';
+    const apiPrefix = env.APP_PREFIX ?? '/api/toc';
 
     // Handle API routes
-    if (url.pathname.startsWith(prefix)) {
-      const app = createApp(env);
-      const handler = app.fetch as (req: Request, bindings: Bindings, executionCtx: ExecutionContext) => Response | Promise<Response>;
-      return handler(request, env, ctx);
+    if (url.pathname.startsWith(apiPrefix)) {
+      return app.fetch(request, env, ctx);
     }
 
     // For non-API routes, let wrangler's asset handling serve static files
-    // This handler won't be reached if assets are configured properly
-    // It serves as a fallback for SPA routing
     if (env.ASSETS) {
       try {
         // Try to serve the exact file
