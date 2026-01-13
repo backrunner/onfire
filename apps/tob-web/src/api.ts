@@ -7,6 +7,31 @@ export interface TicketDetail {
   timeline?: unknown[];
 }
 
+/**
+ * Unified API Response Format
+ */
+export interface ApiResponse<T = unknown> {
+  success: boolean;
+  ret: number;
+  data: T | null;
+  message?: string;
+}
+
+/**
+ * API Error class for unified error handling
+ */
+export class ApiError extends Error {
+  status: number;
+  ret: number;
+
+  constructor(message: string, status: number, ret: number = status) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.ret = ret;
+  }
+}
+
 const baseUrl = '/api/tob';
 
 const authHeaders = (): HeadersInit => {
@@ -15,19 +40,48 @@ const authHeaders = (): HeadersInit => {
   return { Authorization: `Bearer ${token}` };
 };
 
-const json = async (res: Response) => {
+/**
+ * Response interceptor that unwraps the unified response format
+ * Extracts data from { success, ret, data } wrapper
+ */
+const json = async <T = any>(res: Response): Promise<T> => {
+  // Handle HTTP errors first
   if (res.status === 401) {
-    const err = new Error('unauthorized');
-    (err as any).status = 401;
-    throw err;
+    throw new ApiError('unauthorized', 401);
   }
   if (res.status === 428) {
-    const err = new Error('setup_required');
-    (err as any).status = 428;
-    throw err;
+    throw new ApiError('setup_required', 428);
   }
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+
+  // Try to parse JSON
+  let body: any;
+  try {
+    body = await res.json();
+  } catch {
+    if (!res.ok) throw new ApiError(`HTTP ${res.status}`, res.status);
+    throw new ApiError('Invalid JSON response', 500);
+  }
+
+  // Check if response is in unified format
+  if (body && typeof body === 'object' && 'success' in body && 'ret' in body && 'data' in body) {
+    const apiResponse = body as ApiResponse<T>;
+
+    if (!apiResponse.success) {
+      // Map ret codes to HTTP-like status codes for compatibility
+      const status = apiResponse.ret >= 400 ? apiResponse.ret : res.status || 500;
+      throw new ApiError(apiResponse.message || 'Request failed', status, apiResponse.ret);
+    }
+
+    // Return unwrapped data
+    return apiResponse.data as T;
+  }
+
+  // Legacy response format - return as-is
+  if (!res.ok) {
+    throw new ApiError(body?.message || `HTTP ${res.status}`, res.status);
+  }
+
+  return body as T;
 };
 
 export const fetchSummary = () => fetch(`${baseUrl}/dashboard/summary`, { headers: authHeaders() }).then(json);

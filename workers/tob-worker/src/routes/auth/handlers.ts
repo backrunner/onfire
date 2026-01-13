@@ -1,8 +1,10 @@
 import { Role } from '@onfire/shared';
 import { agentTeams, agents, teams, tenants, users } from '@onfire/shared/drizzle/schema';
 import { readInstallState } from '../../core/install';
+import type { Auth } from 'better-auth';
+import type { AppStore } from '../../core/types';
 
-export const changePassword = async (auth: any, request: Request, body: { currentPassword?: string; newPassword?: string; revokeOtherSessions?: boolean }) => {
+export const changePassword = async (auth: Auth, request: Request, body: { currentPassword?: string; newPassword?: string; revokeOtherSessions?: boolean }) => {
   if (!body.currentPassword || !body.newPassword) {
     return new Response('currentPassword and newPassword required', { status: 400 });
   }
@@ -26,14 +28,14 @@ export const changePassword = async (auth: any, request: Request, body: { curren
   }
 };
 
-export const getInstallStatus = async (store: any) => {
+export const getInstallStatus = async (store: AppStore) => {
   const state = await readInstallState(store.db);
   return { needsSetup: !state.hasUser, hasTenant: state.hasTenant };
 };
 
 export const finalizeInstall = async (
-  store: any,
-  auth: any,
+  store: AppStore,
+  auth: Auth,
   request: Request,
   body: { tenantName?: string; displayName?: string }
 ) => {

@@ -1,9 +1,13 @@
 /**
  * Shared utilities for admin routes
  */
-import { Role } from '@onfire/shared';
+import { Role, type SessionContext } from '@onfire/shared';
 import { teams, products, productTeams, agents, users, agentTeams, agentProfiles } from '@onfire/shared/drizzle/schema';
 import { eq, inArray } from 'drizzle-orm';
+import type { AppStore } from '../../core/types';
+
+type TeamRow = typeof teams.$inferSelect;
+type AgentTeamRow = typeof agentTeams.$inferSelect;
 
 export type ProductSlaInput = {
   highAccept?: number;
@@ -26,11 +30,11 @@ export const slaColumnsFromPayload = (sla?: ProductSlaInput) =>
       }
     : {};
 
-export const syncProductTeams = async (store: any, productId: string, teamIds: string[], allowedTenantIds: string[], isSuperAdmin: boolean) => {
+export const syncProductTeams = async (store: AppStore, productId: string, teamIds: string[], allowedTenantIds: string[], isSuperAdmin: boolean) => {
   if (!teamIds) return;
   if (!isSuperAdmin) {
     const rows = await store.db.select().from(teams).where(inArray(teams.id, teamIds));
-    const invalid = rows.filter((t: any) => !allowedTenantIds.includes(t.tenantId));
+    const invalid = rows.filter((t: TeamRow) => !allowedTenantIds.includes(t.tenantId));
     if (invalid.length) throw new Response('forbidden', { status: 403 });
   }
   await store.db.delete(productTeams).where(eq(productTeams.productId, productId)).run();
@@ -49,15 +53,28 @@ export const createApiKeyValue = () => {
 
 export const maskApiKey = (id: string) => `${id.slice(0, 6)}…${id.slice(-4)}`;
 
-export const assertTeamIdsAccessible = async (store: any, teamIds: string[], allowedTenantIds: string[], isSuperAdmin: boolean) => {
+export const assertTeamIdsAccessible = async (store: AppStore, teamIds: string[], allowedTenantIds: string[], isSuperAdmin: boolean) => {
   if (!teamIds?.length) return;
   if (isSuperAdmin) return;
   const rows = await store.db.select().from(teams).where(inArray(teams.id, teamIds));
-  const invalid = rows.filter((t: any) => !allowedTenantIds.includes(t.tenantId));
+  const invalid = rows.filter((t: TeamRow) => !allowedTenantIds.includes(t.tenantId));
   if (invalid.length) throw new Response('forbidden', { status: 403 });
 };
 
-export const loadAgents = async (store: any, tenantIds: string[], isSuperAdmin: boolean) => {
+interface AgentJoinRow {
+  userId: string | null;
+  email: string | null;
+  displayName: string | null;
+  tenantId: string | null;
+  role: string | null;
+  level: number | null;
+  active: number | boolean | null;
+  profileName: string | null;
+  profileEmail: string | null;
+  avatarUrl: string | null;
+}
+
+export const loadAgents = async (store: AppStore, tenantIds: string[], isSuperAdmin: boolean) => {
   const baseSelect = {
     userId: users.id,
     email: users.email,
@@ -70,7 +87,7 @@ export const loadAgents = async (store: any, tenantIds: string[], isSuperAdmin: 
     profileEmail: agentProfiles.email,
     avatarUrl: agentProfiles.avatarUrl
   };
-  const joined =
+  const joined: AgentJoinRow[] =
     isSuperAdmin
       ? await store.db.select(baseSelect).from(agents).leftJoin(users, eq(users.id, agents.userId)).leftJoin(agentProfiles, eq(agentProfiles.userId, agents.userId))
       : await store.db
@@ -80,27 +97,27 @@ export const loadAgents = async (store: any, tenantIds: string[], isSuperAdmin: 
           .leftJoin(agentProfiles, eq(agentProfiles.userId, agents.userId))
           .where(inArray(users.tenantId, tenantIds));
 
-  const ids = joined.map((a: any) => a.userId).filter(Boolean);
-  const teamRows = ids.length
+  const ids = joined.map((a: AgentJoinRow) => a.userId).filter((id): id is string => id !== null);
+  const teamRows: AgentTeamRow[] = ids.length
     ? await store.db.select({ userId: agentTeams.userId, teamId: agentTeams.teamId }).from(agentTeams).where(inArray(agentTeams.userId, ids))
     : [];
   const teamMap = new Map<string, string[]>();
-  teamRows.forEach((r: any) => teamMap.set(r.userId, [...(teamMap.get(r.userId) ?? []), r.teamId]));
+  teamRows.forEach((r: AgentTeamRow) => teamMap.set(r.userId, [...(teamMap.get(r.userId) ?? []), r.teamId]));
 
-  return joined.map((a: any) => ({
-    userId: a.userId,
+  return joined.map((a: AgentJoinRow) => ({
+    userId: a.userId ?? '',
     email: a.profileEmail ?? a.email,
     displayName: a.profileName ?? a.displayName,
     tenantId: a.tenantId,
     role: a.role,
     level: a.level ?? 1,
     active: Boolean(a.active ?? true),
-    teamIds: teamMap.get(a.userId) ?? [],
+    teamIds: (a.userId ? teamMap.get(a.userId) : undefined) ?? [],
     avatarUrl: a.avatarUrl ?? undefined
   }));
 };
 
-export const upsertAgentProfile = async (store: any, userId: string, profile?: { displayName?: string; email?: string; avatarUrl?: string }) => {
+export const upsertAgentProfile = async (store: AppStore, userId: string, profile?: { displayName?: string; email?: string; avatarUrl?: string }) => {
   if (!profile) return;
   const baseUser = await store.db.query.users.findFirst({ where: eq(users.id, userId) });
   const payload = {
@@ -135,9 +152,9 @@ export const parseJsonSafe = (val: string | null) => {
   }
 };
 
-export const assertProductAccessible = async (store: any, ctx: any, productId: string) => {
+export const assertProductAccessible = async (store: AppStore, ctx: SessionContext, productId: string) => {
   const existing = await store.db.query.products.findFirst({ where: eq(products.id, productId) });
   if (!existing) throw new Response('not found', { status: 404 });
-  if (ctx.user.role !== Role.SuperAdmin && !ctx.tenantIds.includes(existing.tenantId as any)) throw new Response('forbidden', { status: 403 });
+  if (ctx.user.role !== Role.SuperAdmin && !ctx.tenantIds.includes(existing.tenantId as string)) throw new Response('forbidden', { status: 403 });
   return existing;
 };

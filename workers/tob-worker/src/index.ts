@@ -5,6 +5,7 @@ import type { Bindings, WorkerSingleton } from './core/types';
 import { prepare } from './core/db';
 import { createDb } from '@onfire/shared/drizzle/client';
 import { createAllRoutes } from './routes';
+import { wrapResponse, errorToResponse, isRawResponse } from './core/response';
 
 const ensureEnv = (env: Bindings) => {
   if (!env.AUTH_SECRET) console.warn('AUTH_SECRET missing - auth will fail');
@@ -23,11 +24,30 @@ const createApp = (env: Bindings) => {
     .state({ env, db, auth })
     .use(authPlugin)
     .onStart(() => prepare(env.DB))
-    .onError(({ code }) => {
-      if (code === 'NOT_FOUND') return new Response('not found', { status: 404 });
+    .onAfterHandle(({ response }) => {
+      // Don't wrap raw Response objects (streaming, files, redirects, etc.)
+      if (isRawResponse(response)) {
+        return response;
+      }
+      // Wrap all other responses in unified format
+      return wrapResponse(response);
     })
-    .use(createAllRoutes(env, auth))
-    .compile();
+    .onError(({ code, error }) => {
+      if (code === 'NOT_FOUND') {
+        const { response, status } = errorToResponse(new Error('Not found'));
+        return new Response(JSON.stringify(response), {
+          status,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      // Handle all other errors
+      const { response, status } = errorToResponse(error);
+      return new Response(JSON.stringify(response), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    })
+    .use(createAllRoutes(env, auth));
 };
 
 export default {
@@ -38,7 +58,7 @@ export default {
     // Handle API routes
     if (url.pathname.startsWith(prefix)) {
       const app = createApp(env);
-      return (app as any).fetch(request, env, ctx);
+      return app.fetch(request);
     }
 
     // For non-API routes, let wrangler's asset handling serve static files

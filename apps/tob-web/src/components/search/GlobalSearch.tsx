@@ -65,7 +65,7 @@ export function GlobalSearch({ onSelectTicket }: GlobalSearchProps) {
   const [priorityFilter, setPriorityFilter] = useState<string>('');
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load recent searches from localStorage
   useEffect(() => {

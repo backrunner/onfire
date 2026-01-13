@@ -1,16 +1,18 @@
-import { Elysia } from 'elysia';
-import type { Bindings, WorkerSingleton } from '../../../core/types';
+import { t } from 'elysia';
+import type { Bindings } from '../../../core/types';
+import { createRouter } from '../../../core/router';
 import * as handlers from './handlers';
 
 export const tenantRoutes = (env: Bindings) =>
-  new Elysia<string, WorkerSingleton>()
+  createRouter()
     .get('/tenants', ({ store, user }) => handlers.listTenants(env, store, user))
-    .post('/tenants', async ({ store, user, request }) => {
-      const body = await request.json() as { name: string };
-      return handlers.createTenant(env, store, user, body);
+    .post('/tenants', ({ store, user, body }) =>
+      handlers.createTenant(env, store, user, body), {
+      body: t.Object({ name: t.String() })
     })
-    .patch('/tenants/:id', async ({ store, user, params, request }) => {
-      const body = await request.json() as { name?: string };
-      return handlers.updateTenant(env, store, user, params.id, body);
+    .patch('/tenants/:id', ({ store, user, params, body }) =>
+      handlers.updateTenant(env, store, user, params.id, body), {
+      body: t.Object({ name: t.Optional(t.String()) })
     })
-    .delete('/tenants/:id', ({ store, user, params }) => handlers.deleteTenant(env, store, user, params.id));
+    .delete('/tenants/:id', ({ store, user, params }) => handlers.deleteTenant(env, store, user, params.id))
+;

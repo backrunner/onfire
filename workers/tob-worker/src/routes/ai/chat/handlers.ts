@@ -98,8 +98,7 @@ export const sendChatMessage = async (
         system: systemPrompt,
         messages,
         tools,
-        toolChoice: 'auto',
-        maxSteps: 5
+        toolChoice: 'auto'
       });
 
       const encoder = new TextEncoder();
@@ -153,8 +152,7 @@ export const sendChatMessage = async (
         system: systemPrompt,
         messages,
         tools,
-        toolChoice: 'auto',
-        maxSteps: 5
+        toolChoice: 'auto'
       });
 
       const content = result.text;

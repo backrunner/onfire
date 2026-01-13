@@ -1,9 +1,11 @@
 import { resolveContext } from '../../core/context';
 import { assertPermission } from '@onfire/shared/rbac';
 import { searchTickets, getSearchSuggestions, indexTicket, type SearchParams } from '../../services/search';
-import type { Bindings } from '../../core/types';
+import type { AppStore, AuthUser, Bindings } from '../../core/types';
 
-export const search = async (env: Bindings, store: any, user: any, query: any) => {
+type SearchQuery = Record<string, string | undefined>;
+
+export const search = async (env: Bindings, store: AppStore, user: AuthUser | undefined, query: SearchQuery) => {
   if (!user?.id) throw new Response('Unauthorized', { status: 401 });
   const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'ticket.read');
@@ -27,7 +29,7 @@ export const search = async (env: Bindings, store: any, user: any, query: any) =
   return results;
 };
 
-export const getSuggestions = async (env: Bindings, store: any, user: any, prefix: string) => {
+export const getSuggestions = async (env: Bindings, store: AppStore, user: AuthUser | undefined, prefix: string) => {
   if (!user?.id) throw new Response('Unauthorized', { status: 401 });
   const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'ticket.read');
@@ -40,7 +42,7 @@ export const getSuggestions = async (env: Bindings, store: any, user: any, prefi
   return { suggestions };
 };
 
-export const indexSingleTicket = async (env: Bindings, store: any, user: any, ticketId: string) => {
+export const indexSingleTicket = async (env: Bindings, store: AppStore, user: AuthUser | undefined, ticketId: string) => {
   if (!user?.id) throw new Response('Unauthorized', { status: 401 });
   const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'tenant.manage');
@@ -53,7 +55,7 @@ export const indexSingleTicket = async (env: Bindings, store: any, user: any, ti
   return { success, ticketId };
 };
 
-export const batchIndex = async (env: Bindings, store: any, user: any, ticketIds: string[]) => {
+export const batchIndex = async (env: Bindings, store: AppStore, user: AuthUser | undefined, ticketIds: string[]) => {
   if (!user?.id) throw new Response('Unauthorized', { status: 401 });
   const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'tenant.manage');

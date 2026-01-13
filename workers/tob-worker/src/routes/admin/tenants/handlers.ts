@@ -3,9 +3,9 @@ import { assertPermission } from '@onfire/shared/rbac';
 import { tenants } from '@onfire/shared/drizzle/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { resolveContext } from '../../../core/context';
-import type { Bindings } from '../../../core/types';
+import type { AppStore, AuthUser, Bindings } from '../../../core/types';
 
-export const listTenants = async (env: Bindings, store: any, user: any) => {
+export const listTenants = async (env: Bindings, store: AppStore, user: AuthUser | undefined) => {
   const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'tenant.manage');
   const rows =
@@ -15,7 +15,7 @@ export const listTenants = async (env: Bindings, store: any, user: any) => {
   return { data: rows };
 };
 
-export const createTenant = async (env: Bindings, store: any, user: any, body: { name: string }) => {
+export const createTenant = async (env: Bindings, store: AppStore, user: AuthUser | undefined, body: { name: string }) => {
   const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'tenant.manage');
   if (!body.name) return new Response('name required', { status: 400 });
@@ -24,12 +24,12 @@ export const createTenant = async (env: Bindings, store: any, user: any, body: {
   return { ok: true, id };
 };
 
-export const updateTenant = async (env: Bindings, store: any, user: any, id: string, body: { name?: string }) => {
+export const updateTenant = async (env: Bindings, store: AppStore, user: AuthUser | undefined, id: string, body: { name?: string }) => {
   const ctx = await resolveContext(env, user);
   const existing = await store.db.query.tenants.findFirst({ where: eq(tenants.id, id) });
   if (!existing) return new Response('not found', { status: 404 });
   assertPermission(ctx, 'tenant.manage', { tenantId: existing.id });
-  if (ctx.user.role !== Role.SuperAdmin && !ctx.tenantIds.includes(existing.id as any)) {
+  if (ctx.user.role !== Role.SuperAdmin && !ctx.tenantIds.includes(existing.id as string)) {
     return new Response('forbidden', { status: 403 });
   }
   if (!body.name) return new Response('name required', { status: 400 });
@@ -37,12 +37,12 @@ export const updateTenant = async (env: Bindings, store: any, user: any, id: str
   return { ok: true };
 };
 
-export const deleteTenant = async (env: Bindings, store: any, user: any, id: string) => {
+export const deleteTenant = async (env: Bindings, store: AppStore, user: AuthUser | undefined, id: string) => {
   const ctx = await resolveContext(env, user);
   const existing = await store.db.query.tenants.findFirst({ where: eq(tenants.id, id) });
   if (!existing) return new Response('not found', { status: 404 });
   assertPermission(ctx, 'tenant.manage', { tenantId: existing.id });
-  if (ctx.user.role !== Role.SuperAdmin && !ctx.tenantIds.includes(existing.id as any)) {
+  if (ctx.user.role !== Role.SuperAdmin && !ctx.tenantIds.includes(existing.id as string)) {
     return new Response('forbidden', { status: 403 });
   }
   await store.db.delete(tenants).where(eq(tenants.id, id)).run();

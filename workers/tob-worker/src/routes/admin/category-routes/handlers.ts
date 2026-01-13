@@ -3,10 +3,12 @@ import { assertPermission } from '@onfire/shared/rbac';
 import { categoryRoutes } from '@onfire/shared/drizzle/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { resolveContext } from '../../../core/context';
-import type { Bindings } from '../../../core/types';
+import type { AppStore, AuthUser, Bindings } from '../../../core/types';
 import { assertProductAccessible, assertTeamIdsAccessible } from '../utils';
 
-export const listCategoryRoutes = async (env: Bindings, store: any, user: any, query: any) => {
+type CategoryRouteQuery = Record<string, string | undefined>;
+
+export const listCategoryRoutes = async (env: Bindings, store: AppStore, user: AuthUser | undefined, query: CategoryRouteQuery) => {
   const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'category.map');
   const productId = (query['productId'] as string | undefined) ?? undefined;
@@ -19,7 +21,7 @@ export const listCategoryRoutes = async (env: Bindings, store: any, user: any, q
   return { data: rows };
 };
 
-export const createCategoryRoute = async (env: Bindings, store: any, user: any, body: { productId: string; category: string; subcategory?: string; teamId: string }) => {
+export const createCategoryRoute = async (env: Bindings, store: AppStore, user: AuthUser | undefined, body: { productId: string; category: string; subcategory?: string; teamId: string }) => {
   const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'category.map');
   if (!body.productId || !body.category || !body.teamId) return new Response('productId, category, teamId required', { status: 400 });
@@ -33,7 +35,7 @@ export const createCategoryRoute = async (env: Bindings, store: any, user: any, 
   return { ok: true, id };
 };
 
-export const updateCategoryRoute = async (env: Bindings, store: any, user: any, id: string, body: { category?: string; subcategory?: string | null; teamId?: string }) => {
+export const updateCategoryRoute = async (env: Bindings, store: AppStore, user: AuthUser | undefined, id: string, body: { category?: string; subcategory?: string | null; teamId?: string }) => {
   const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'category.map');
   const existing = await store.db.query.categoryRoutes.findFirst({ where: eq(categoryRoutes.id, id) });
@@ -55,7 +57,7 @@ export const updateCategoryRoute = async (env: Bindings, store: any, user: any, 
   return { ok: true };
 };
 
-export const deleteCategoryRoute = async (env: Bindings, store: any, user: any, id: string) => {
+export const deleteCategoryRoute = async (env: Bindings, store: AppStore, user: AuthUser | undefined, id: string) => {
   const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'category.map');
   const existing = await store.db.query.categoryRoutes.findFirst({ where: eq(categoryRoutes.id, id) });

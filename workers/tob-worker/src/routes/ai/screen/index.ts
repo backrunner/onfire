@@ -1,9 +1,10 @@
-import { Elysia, t } from 'elysia';
-import type { Bindings, WorkerSingleton } from '../../../core/types';
+import { t } from 'elysia';
+import type { Bindings } from '../../../core/types';
+import { createRouter } from '../../../core/router';
 import * as handlers from './handlers';
 
 export const aiScreenRoutes = (env: Bindings) =>
-  new Elysia<string, WorkerSingleton>()
+  createRouter()
     .post('/ai/screen/:ticketId', ({ store, user, params }) =>
       handlers.screenSingleTicket(env, store, user, params.ticketId))
     .post('/ai/prereply/:ticketId', ({ store, user, params }) =>
@@ -16,4 +17,5 @@ export const aiScreenRoutes = (env: Bindings) =>
       })
     })
     .get('/ai/screen/:ticketId', ({ store, user, params }) =>
-      handlers.getScreeningResult(env, store, user, params.ticketId));
+      handlers.getScreeningResult(env, store, user, params.ticketId))
+;

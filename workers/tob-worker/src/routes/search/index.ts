@@ -1,9 +1,10 @@
-import { Elysia, t } from 'elysia';
-import type { Bindings, WorkerSingleton } from '../../core/types';
+import { t } from 'elysia';
+import type { Bindings } from '../../core/types';
+import { createRouter } from '../../core/router';
 import * as handlers from './handlers';
 
 export const searchRoutes = (env: Bindings) =>
-  new Elysia<string, WorkerSingleton>()
+  createRouter()
     .get('/search', ({ store, user, query }) =>
       handlers.search(env, store, user, query))
     .get('/search/suggestions', ({ store, user, query }) =>
@@ -15,4 +16,5 @@ export const searchRoutes = (env: Bindings) =>
       body: t.Object({
         ticketIds: t.Array(t.String())
       })
-    });
+    })
+;

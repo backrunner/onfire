@@ -1,16 +1,25 @@
-import { Elysia } from 'elysia';
-import type { Bindings, WorkerSingleton } from '../../../core/types';
+import { t } from 'elysia';
+import type { Bindings } from '../../../core/types';
+import { createRouter } from '../../../core/router';
 import * as handlers from './handlers';
 
 export const teamRoutes = (env: Bindings) =>
-  new Elysia<string, WorkerSingleton>()
+  createRouter()
     .get('/teams', ({ store, user }) => handlers.listTeams(env, store, user))
-    .post('/teams', async ({ store, user, request }) => {
-      const body = await request.json() as { name: string; allowReassign?: boolean; tenantId?: string };
-      return handlers.createTeam(env, store, user, body);
+    .post('/teams', ({ store, user, body }) =>
+      handlers.createTeam(env, store, user, body), {
+      body: t.Object({
+        name: t.String(),
+        allowReassign: t.Optional(t.Boolean()),
+        tenantId: t.Optional(t.String())
+      })
     })
-    .patch('/teams/:id', async ({ store, user, params, request }) => {
-      const body = await request.json() as { name?: string; allowReassign?: boolean };
-      return handlers.updateTeam(env, store, user, params.id, body);
+    .patch('/teams/:id', ({ store, user, params, body }) =>
+      handlers.updateTeam(env, store, user, params.id, body), {
+      body: t.Object({
+        name: t.Optional(t.String()),
+        allowReassign: t.Optional(t.Boolean())
+      })
     })
-    .delete('/teams/:id', ({ store, user, params }) => handlers.deleteTeam(env, store, user, params.id));
+    .delete('/teams/:id', ({ store, user, params }) => handlers.deleteTeam(env, store, user, params.id))
+;

@@ -1,11 +1,12 @@
-import { Elysia } from 'elysia';
-import type { Bindings, WorkerSingleton } from '../../core/types';
+import type { Bindings } from '../../core/types';
+import { createRouter } from '../../core/router';
 import { aiConfigRoutes } from './config';
 import { aiScreenRoutes } from './screen';
 import { aiChatRoutes } from './chat';
 
 export const aiRoutes = (env: Bindings) =>
-  new Elysia<string, WorkerSingleton>()
+  createRouter()
     .use(aiConfigRoutes(env))
     .use(aiScreenRoutes(env))
-    .use(aiChatRoutes(env));
+    .use(aiChatRoutes(env))
+;

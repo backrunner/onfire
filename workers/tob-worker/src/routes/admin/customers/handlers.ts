@@ -1,11 +1,13 @@
 import { assertPermission } from '@onfire/shared/rbac';
-import { customers } from '@onfire/shared/drizzle/schema';
+import { customers, type CustomerRow } from '@onfire/shared/drizzle/schema';
 import { and, eq, gte, lte, inArray } from 'drizzle-orm';
 import { resolveContext } from '../../../core/context';
-import type { Bindings } from '../../../core/types';
+import type { AppStore, AuthUser, Bindings } from '../../../core/types';
 import { parseJsonSafe } from '../utils';
 
-export const listCustomers = async (env: Bindings, store: any, user: any, query: any) => {
+type CustomerQuery = Record<string, string | undefined>;
+
+export const listCustomers = async (env: Bindings, store: AppStore, user: AuthUser | undefined, query: CustomerQuery) => {
   const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'customer.read');
   const email = (query['email'] as string | undefined) ?? undefined;
@@ -21,7 +23,7 @@ export const listCustomers = async (env: Bindings, store: any, user: any, query:
   if (typeof levelMax === 'number' && Number.isFinite(levelMax)) where.push(lte(customers.level, levelMax));
 
   const rows = await store.db.select().from(customers).where(and(...where));
-  const data = rows.map((c: any) => ({
+  const data = rows.map((c: CustomerRow) => ({
     ...c,
     meta: parseJsonSafe(c.meta)
   }));

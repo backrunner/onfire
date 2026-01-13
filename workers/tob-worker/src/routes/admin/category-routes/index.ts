@@ -1,16 +1,27 @@
-import { Elysia } from 'elysia';
-import type { Bindings, WorkerSingleton } from '../../../core/types';
+import { t } from 'elysia';
+import type { Bindings } from '../../../core/types';
+import { createRouter } from '../../../core/router';
 import * as handlers from './handlers';
 
 export const categoryRouteRoutes = (env: Bindings) =>
-  new Elysia<string, WorkerSingleton>()
+  createRouter()
     .get('/category-routes', ({ store, user, query }) => handlers.listCategoryRoutes(env, store, user, query))
-    .post('/category-routes', async ({ store, user, request }) => {
-      const body = await request.json() as { productId: string; category: string; subcategory?: string; teamId: string };
-      return handlers.createCategoryRoute(env, store, user, body);
+    .post('/category-routes', ({ store, user, body }) =>
+      handlers.createCategoryRoute(env, store, user, body), {
+      body: t.Object({
+        productId: t.String(),
+        category: t.String(),
+        subcategory: t.Optional(t.String()),
+        teamId: t.String()
+      })
     })
-    .patch('/category-routes/:id', async ({ store, user, params, request }) => {
-      const body = await request.json() as { category?: string; subcategory?: string | null; teamId?: string };
-      return handlers.updateCategoryRoute(env, store, user, params.id, body);
+    .patch('/category-routes/:id', ({ store, user, params, body }) =>
+      handlers.updateCategoryRoute(env, store, user, params.id, body), {
+      body: t.Object({
+        category: t.Optional(t.String()),
+        subcategory: t.Optional(t.Union([t.String(), t.Null()])),
+        teamId: t.Optional(t.String())
+      })
     })
-    .delete('/category-routes/:id', ({ store, user, params }) => handlers.deleteCategoryRoute(env, store, user, params.id));
+    .delete('/category-routes/:id', ({ store, user, params }) => handlers.deleteCategoryRoute(env, store, user, params.id))
+;

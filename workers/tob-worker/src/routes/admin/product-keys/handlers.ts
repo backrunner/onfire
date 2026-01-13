@@ -1,12 +1,14 @@
 import { Role } from '@onfire/shared';
 import { assertPermission } from '@onfire/shared/rbac';
-import { productKeys } from '@onfire/shared/drizzle/schema';
+import { productKeys, type ProductKeyRow } from '@onfire/shared/drizzle/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { resolveContext } from '../../../core/context';
-import type { Bindings } from '../../../core/types';
+import type { AppStore, AuthUser, Bindings } from '../../../core/types';
 import { createApiKeyValue, maskApiKey, assertProductAccessible } from '../utils';
 
-export const listProductKeys = async (env: Bindings, store: any, user: any, query: any) => {
+type ProductKeyQuery = Record<string, string | undefined>;
+
+export const listProductKeys = async (env: Bindings, store: AppStore, user: AuthUser | undefined, query: ProductKeyQuery) => {
   const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'product.manage');
   const productId = query['productId'] as string | undefined;
@@ -20,7 +22,7 @@ export const listProductKeys = async (env: Bindings, store: any, user: any, quer
           .from(productKeys)
           .where(inArray(productKeys.productId, targetIds));
   return {
-    data: rows.map((r: any) => ({
+    data: rows.map((r: ProductKeyRow) => ({
       ...r,
       secret: undefined,
       masked: maskApiKey(r.id)
@@ -28,7 +30,7 @@ export const listProductKeys = async (env: Bindings, store: any, user: any, quer
   };
 };
 
-export const createProductKey = async (env: Bindings, store: any, user: any, body: { productId: string; name?: string }) => {
+export const createProductKey = async (env: Bindings, store: AppStore, user: AuthUser | undefined, body: { productId: string; name?: string }) => {
   const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'product.manage');
   if (!body.productId) return new Response('productId required', { status: 400 });
@@ -42,7 +44,7 @@ export const createProductKey = async (env: Bindings, store: any, user: any, bod
   return { ok: true, id, productId: product.id, apiKey };
 };
 
-export const rotateProductKey = async (env: Bindings, store: any, user: any, id: string) => {
+export const rotateProductKey = async (env: Bindings, store: AppStore, user: AuthUser | undefined, id: string) => {
   const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'product.manage');
   const existing = await store.db.query.productKeys.findFirst({ where: eq(productKeys.id, id) });
@@ -54,7 +56,7 @@ export const rotateProductKey = async (env: Bindings, store: any, user: any, id:
   return { ok: true, id: existing.id, apiKey };
 };
 
-export const revokeProductKey = async (env: Bindings, store: any, user: any, id: string, body: { revoked?: boolean }) => {
+export const revokeProductKey = async (env: Bindings, store: AppStore, user: AuthUser | undefined, id: string, body: { revoked?: boolean }) => {
   const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'product.manage');
   const existing = await store.db.query.productKeys.findFirst({ where: eq(productKeys.id, id) });

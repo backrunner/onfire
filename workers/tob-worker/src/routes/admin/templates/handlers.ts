@@ -3,9 +3,21 @@ import { assertPermission } from '@onfire/shared/rbac';
 import { templates } from '@onfire/shared/drizzle/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { resolveContext } from '../../../core/context';
-import type { Bindings } from '../../../core/types';
+import type { AppStore, AuthUser, Bindings } from '../../../core/types';
 
-export const listTemplates = async (env: Bindings, store: any, user: any) => {
+interface FormField {
+  label?: string;
+  key?: string;
+  type?: string;
+  required?: boolean;
+  placeholder?: string;
+}
+
+interface FormSchema {
+  fields?: FormField[];
+}
+
+export const listTemplates = async (env: Bindings, store: AppStore, user: AuthUser | undefined) => {
   const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'template.read');
   const rows =
@@ -15,18 +27,18 @@ export const listTemplates = async (env: Bindings, store: any, user: any) => {
   return { data: rows };
 };
 
-export const createTemplate = async (env: Bindings, store: any, user: any, body: { productId: string; title: string; categories: string; formSchema: string }) => {
+export const createTemplate = async (env: Bindings, store: AppStore, user: AuthUser | undefined, body: { productId: string; title: string; categories: string; formSchema: string }) => {
   const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'template.write');
   if (!body.productId || !body.title) return new Response('productId and title required', { status: 400 });
   if (!ctx.productIds.includes(body.productId)) return new Response('forbidden', { status: 403 });
-  let parsedSchema: any = null;
+  let parsedSchema: FormSchema | FormField[] | null = null;
   try {
     parsedSchema = JSON.parse(body.formSchema ?? '{}');
   } catch {
     return new Response('invalid formSchema json', { status: 400 });
   }
-  const fields: any[] = Array.isArray(parsedSchema) ? parsedSchema : parsedSchema.fields;
+  const fields: FormField[] = Array.isArray(parsedSchema) ? parsedSchema : (parsedSchema as FormSchema).fields ?? [];
   const hasTextarea = Array.isArray(fields) && fields.some((f) => f.type === 'textarea' || f.type === 'longtext');
   const ensuredSchema = hasTextarea
     ? parsedSchema
@@ -57,13 +69,13 @@ export const createTemplate = async (env: Bindings, store: any, user: any, body:
   return { ok: true, id };
 };
 
-export const updateTemplate = async (env: Bindings, store: any, user: any, id: string, body: { title?: string; categories?: string; formSchema?: string }) => {
+export const updateTemplate = async (env: Bindings, store: AppStore, user: AuthUser | undefined, id: string, body: { title?: string; categories?: string; formSchema?: string }) => {
   const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'template.write');
   const existing = await store.db.query.templates.findFirst({ where: eq(templates.id, id) });
   if (!existing) return new Response('not found', { status: 404 });
-  if (ctx.user.role !== Role.SuperAdmin && !ctx.productIds.includes(existing.productId as any)) return new Response('forbidden', { status: 403 });
-  let parsedSchema: any = null;
+  if (ctx.user.role !== Role.SuperAdmin && !ctx.productIds.includes(existing.productId as string)) return new Response('forbidden', { status: 403 });
+  let parsedSchema: FormSchema | FormField[] | null = null;
   if (body.formSchema) {
     try {
       parsedSchema = JSON.parse(body.formSchema);
@@ -71,8 +83,8 @@ export const updateTemplate = async (env: Bindings, store: any, user: any, id: s
       return new Response('invalid formSchema json', { status: 400 });
     }
   }
-  const fields: any[] =
-    parsedSchema !== null ? (Array.isArray(parsedSchema) ? parsedSchema : parsedSchema.fields) : (() => {
+  const fields: FormField[] =
+    parsedSchema !== null ? (Array.isArray(parsedSchema) ? parsedSchema : (parsedSchema as FormSchema).fields ?? []) : (() => {
         try { return JSON.parse(existing.formSchema).fields; } catch { return []; }
       })();
   const hasTextarea = Array.isArray(fields) && fields.some((f) => f.type === 'textarea' || f.type === 'longtext');
@@ -106,12 +118,12 @@ export const updateTemplate = async (env: Bindings, store: any, user: any, id: s
   return { ok: true };
 };
 
-export const deleteTemplate = async (env: Bindings, store: any, user: any, id: string) => {
+export const deleteTemplate = async (env: Bindings, store: AppStore, user: AuthUser | undefined, id: string) => {
   const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'template.write');
   const existing = await store.db.query.templates.findFirst({ where: eq(templates.id, id) });
   if (!existing) return new Response('not found', { status: 404 });
-  if (ctx.user.role !== Role.SuperAdmin && !ctx.productIds.includes(existing.productId as any)) return new Response('forbidden', { status: 403 });
+  if (ctx.user.role !== Role.SuperAdmin && !ctx.productIds.includes(existing.productId as string)) return new Response('forbidden', { status: 403 });
   await store.db.delete(templates).where(eq(templates.id, id)).run();
   return { ok: true };
 };

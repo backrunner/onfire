@@ -2,25 +2,26 @@ import { nanoid } from 'nanoid';
 import { eq, and } from 'drizzle-orm';
 import { resolveContext } from '../../core/context';
 import { assertPermission } from '@onfire/shared/rbac';
+import { Role } from '@onfire/shared';
 import { productDocuments, productKnowledge, products, type KnowledgeType, type DocumentStatus } from '@onfire/shared/drizzle/schema';
-import type { Bindings } from '../../core/types';
+import type { AppStore, AuthUser, Bindings } from '../../core/types';
 
-const assertProductAccess = async (store: any, env: Bindings, userId: string, productId: string) => {
-  const user = { id: userId };
-  const ctx = await resolveContext(env, user as any);
+const assertProductAccess = async (store: AppStore, env: Bindings, userId: string, productId: string) => {
+  const user: AuthUser = { id: userId };
+  const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'product.manage');
 
   const product = await store.db.select().from(products).where(eq(products.id, productId)).get();
   if (!product) throw new Response('Product not found', { status: 404 });
 
-  if (ctx.user.role !== 'SuperAdmin' && !ctx.tenantIds.includes(product.tenantId)) {
+  if (ctx.user.role !== Role.SuperAdmin && !ctx.tenantIds.includes(product.tenantId)) {
     throw new Response('Access denied', { status: 403 });
   }
 
   return { ctx, product };
 };
 
-export const listDocuments = async (env: Bindings, store: any, user: any, productId: string) => {
+export const listDocuments = async (env: Bindings, store: AppStore, user: AuthUser | undefined, productId: string) => {
   if (!user?.id) throw new Response('Unauthorized', { status: 401 });
   await assertProductAccess(store, env, user.id, productId);
 
@@ -33,7 +34,7 @@ export const listDocuments = async (env: Bindings, store: any, user: any, produc
   return { data: docs };
 };
 
-export const uploadDocument = async (env: Bindings, store: any, user: any, productId: string, request: Request) => {
+export const uploadDocument = async (env: Bindings, store: AppStore, user: AuthUser | undefined, productId: string, request: Request) => {
   if (!user?.id) throw new Response('Unauthorized', { status: 401 });
   await assertProductAccess(store, env, user.id, productId);
 
@@ -76,7 +77,7 @@ export const uploadDocument = async (env: Bindings, store: any, user: any, produ
   return { id: docId, filename: file.name, success: true };
 };
 
-export const deleteDocument = async (env: Bindings, store: any, user: any, productId: string, docId: string) => {
+export const deleteDocument = async (env: Bindings, store: AppStore, user: AuthUser | undefined, productId: string, docId: string) => {
   if (!user?.id) throw new Response('Unauthorized', { status: 401 });
   await assertProductAccess(store, env, user.id, productId);
 
@@ -100,7 +101,7 @@ export const deleteDocument = async (env: Bindings, store: any, user: any, produ
   return { success: true };
 };
 
-export const downloadDocument = async (env: Bindings, store: any, user: any, productId: string, docId: string) => {
+export const downloadDocument = async (env: Bindings, store: AppStore, user: AuthUser | undefined, productId: string, docId: string) => {
   if (!user?.id) throw new Response('Unauthorized', { status: 401 });
   await assertProductAccess(store, env, user.id, productId);
 
@@ -116,7 +117,7 @@ export const downloadDocument = async (env: Bindings, store: any, user: any, pro
   const object = await env.KNOWLEDGE_BUCKET.get(doc.r2Key);
   if (!object) throw new Response('File not found in storage', { status: 404 });
 
-  return new Response(object.body, {
+  return new Response(object.body as unknown as BodyInit, {
     headers: {
       'Content-Type': doc.mimeType,
       'Content-Disposition': `attachment; filename="${doc.filename}"`,
@@ -125,7 +126,7 @@ export const downloadDocument = async (env: Bindings, store: any, user: any, pro
   });
 };
 
-export const listKnowledge = async (env: Bindings, store: any, user: any, productId: string) => {
+export const listKnowledge = async (env: Bindings, store: AppStore, user: AuthUser | undefined, productId: string) => {
   if (!user?.id) throw new Response('Unauthorized', { status: 401 });
   await assertProductAccess(store, env, user.id, productId);
 
@@ -138,10 +139,17 @@ export const listKnowledge = async (env: Bindings, store: any, user: any, produc
   return { data: entries };
 };
 
+interface KnowledgeUpdate {
+  title?: string;
+  content?: string;
+  knowledgeType?: KnowledgeType;
+  updatedAt: string;
+}
+
 export const createKnowledge = async (
   env: Bindings,
-  store: any,
-  user: any,
+  store: AppStore,
+  user: AuthUser | undefined,
   productId: string,
   body: { title: string; content: string; knowledgeType: string }
 ) => {
@@ -167,8 +175,8 @@ export const createKnowledge = async (
 
 export const updateKnowledge = async (
   env: Bindings,
-  store: any,
-  user: any,
+  store: AppStore,
+  user: AuthUser | undefined,
   productId: string,
   knowledgeId: string,
   body: { title?: string; content?: string; knowledgeType?: string }
@@ -184,16 +192,16 @@ export const updateKnowledge = async (
 
   if (!existing) throw new Response('Knowledge entry not found', { status: 404 });
 
-  const updates: Record<string, any> = { updatedAt: new Date().toISOString() };
+  const updates: KnowledgeUpdate = { updatedAt: new Date().toISOString() };
   if (body.title !== undefined) updates.title = body.title;
   if (body.content !== undefined) updates.content = body.content;
-  if (body.knowledgeType !== undefined) updates.knowledgeType = body.knowledgeType;
+  if (body.knowledgeType !== undefined) updates.knowledgeType = body.knowledgeType as KnowledgeType;
 
   await store.db.update(productKnowledge).set(updates).where(eq(productKnowledge.id, knowledgeId));
   return { success: true };
 };
 
-export const deleteKnowledge = async (env: Bindings, store: any, user: any, productId: string, knowledgeId: string) => {
+export const deleteKnowledge = async (env: Bindings, store: AppStore, user: AuthUser | undefined, productId: string, knowledgeId: string) => {
   if (!user?.id) throw new Response('Unauthorized', { status: 401 });
   await assertProductAccess(store, env, user.id, productId);
 

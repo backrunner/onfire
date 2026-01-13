@@ -1,12 +1,28 @@
 import { Role, TicketPriority, TicketStatus } from '@onfire/shared';
-import { tickets } from '@onfire/shared/drizzle/schema';
+import { tickets, type TicketRow } from '@onfire/shared/drizzle/schema';
 import { inArray } from 'drizzle-orm';
-import type { Bindings } from '../../core/types';
+import type { AppStore, AuthUser, Bindings } from '../../core/types';
 import { resolveContext } from '../../core/context';
 
-export const getSummary = async (env: Bindings, store: any, user: any) => {
+interface DashboardTicket {
+  id: string;
+  status: string | null;
+  tenantId: string;
+  productId: string;
+  teamId: string;
+  priority: string | null;
+  updatedAt: string | null;
+  createdAt: string;
+  subject: string;
+  slaAcceptDeadline: string | null;
+  slaReplyDeadline: string | null;
+  slaAcceptBreached: boolean | null;
+  slaReplyBreached: boolean | null;
+}
+
+export const getSummary = async (env: Bindings, store: AppStore, user: AuthUser | undefined) => {
   const ctx = await resolveContext(env, user);
-  const rows = await store.db
+  const rows: DashboardTicket[] = await store.db
     .select({
       id: tickets.id,
       status: tickets.status,
@@ -38,12 +54,12 @@ export const getSummary = async (env: Bindings, store: any, user: any) => {
             : 'agent';
 
   const pending = rows.filter(
-    (t: any) =>
+    (t: DashboardTicket) =>
       [TicketStatus.New, TicketStatus.Processing].includes(t.status as TicketStatus) &&
-      (ctx.user.role === Role.Agent ? ctx.teamIds.includes(t.teamId as any) : true)
+      (ctx.user.role === Role.Agent ? ctx.teamIds.includes(t.teamId as string) : true)
   );
-  const escalated = rows.filter((t: any) => t.status === TicketStatus.Escalated);
-  const overdue = rows.filter((t: any) => {
+  const escalated = rows.filter((t: DashboardTicket) => t.status === TicketStatus.Escalated);
+  const overdue = rows.filter((t: DashboardTicket) => {
     if ([TicketStatus.Closed].includes(t.status as TicketStatus)) return false;
     const acceptDeadline = t.slaAcceptDeadline ? Date.parse(t.slaAcceptDeadline) : undefined;
     const replyDeadline = t.slaReplyDeadline ? Date.parse(t.slaReplyDeadline) : undefined;
@@ -51,9 +67,9 @@ export const getSummary = async (env: Bindings, store: any, user: any) => {
   });
 
   const priorityWeight: Record<string, number> = { [TicketPriority.High]: 0, [TicketPriority.Medium]: 1, [TicketPriority.Low]: 2 };
-  const sortByPriority = (list: any[]) =>
+  const sortByPriority = (list: DashboardTicket[]) =>
     [...list].sort((a, b) => {
-      const wDiff = (priorityWeight[a.priority] ?? 3) - (priorityWeight[b.priority] ?? 3);
+      const wDiff = (priorityWeight[a.priority ?? ''] ?? 3) - (priorityWeight[b.priority ?? ''] ?? 3);
       if (wDiff !== 0) return wDiff;
       return (b.updatedAt ?? b.createdAt).localeCompare(a.updatedAt ?? a.createdAt);
     });

@@ -1,5 +1,6 @@
-import { Elysia, t } from 'elysia';
-import type { Bindings, WorkerSingleton } from '../../../core/types';
+import { t } from 'elysia';
+import type { Bindings } from '../../../core/types';
+import { createRouter } from '../../../core/router';
 import * as handlers from './handlers';
 
 const AIConfigBody = t.Object({
@@ -39,10 +40,11 @@ const AIConfigUpdateBody = t.Object({
 });
 
 export const aiConfigRoutes = (env: Bindings) =>
-  new Elysia<string, WorkerSingleton>()
+  createRouter()
     .get('/admin/ai-config/meta', ({ store, user }) => handlers.getMeta(env, store, user))
     .get('/admin/ai-config', ({ store, user }) => handlers.listConfigs(env, store, user))
     .post('/admin/ai-config', ({ store, user, body }) => handlers.createConfig(env, store, user, body), { body: AIConfigBody })
     .patch('/admin/ai-config/:id', ({ store, user, params, body }) => handlers.updateConfig(env, store, user, params.id, body), { body: AIConfigUpdateBody })
     .delete('/admin/ai-config/:id', ({ store, user, params }) => handlers.deleteConfig(env, store, user, params.id))
-    .post('/admin/ai-config/:id/test', ({ store, user, params }) => handlers.testConfig(env, store, user, params.id));
+    .post('/admin/ai-config/:id/test', ({ store, user, params }) => handlers.testConfig(env, store, user, params.id))
+;

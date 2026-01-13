@@ -1,7 +1,8 @@
-import { Elysia } from 'elysia';
-import type { Bindings, WorkerSingleton } from '../../core/types';
+import type { Bindings } from '../../core/types';
+import { createRouter } from '../../core/router';
 import * as handlers from './handlers';
 
 export const authRoutes = (env: Bindings) =>
-  new Elysia<string, WorkerSingleton>({ prefix: '/tokens' })
-    .post('/issue', ({ request, store }) => handlers.issueToken(env, store, request));
+  createRouter({ prefix: '/tokens' })
+    .post('/issue', ({ request, store }) => handlers.issueToken(env, store, request))
+;

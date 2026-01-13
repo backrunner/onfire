@@ -2,8 +2,9 @@
  * Route Registry
  * Central place to register all routes for the TOB Worker
  */
-import { Elysia } from 'elysia';
-import type { Bindings, WorkerSingleton } from '../core/types';
+import type { Auth } from 'better-auth';
+import type { Bindings } from '../core/types';
+import { createRouter } from '../core/router';
 import { systemRoutes } from './system';
 import { authRoutes } from './auth';
 import { ticketRoutes } from './tickets';
@@ -14,8 +15,8 @@ import { aiRoutes } from './ai';
 import { knowledgeRoutes } from './knowledge';
 import { searchRoutes } from './search';
 
-export const createAllRoutes = (env: Bindings, auth: any) =>
-  new Elysia<string, WorkerSingleton>()
+export const createAllRoutes = (env: Bindings, auth: Auth) =>
+  createRouter()
     .use(systemRoutes(env))
     .use(authRoutes(env, auth))
     .use(ticketRoutes(env))
@@ -24,4 +25,5 @@ export const createAllRoutes = (env: Bindings, auth: any) =>
     .use(adminRoutes(env))
     .use(aiRoutes(env))
     .use(knowledgeRoutes(env))
-    .use(searchRoutes(env));
+    .use(searchRoutes(env))
+;

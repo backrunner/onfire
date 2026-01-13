@@ -1,7 +1,8 @@
-import { Elysia } from 'elysia';
-import type { Bindings, WorkerSingleton } from '../../core/types';
+import type { Bindings } from '../../core/types';
+import { createRouter } from '../../core/router';
 import * as handlers from './handlers';
 
 export const dashboardRoutes = (env: Bindings) =>
-  new Elysia<string, WorkerSingleton>({ prefix: '/dashboard' })
-    .get('/summary', ({ user, store }) => handlers.getSummary(env, store, user));
+  createRouter({ prefix: '/dashboard' })
+    .get('/summary', ({ user, store }) => handlers.getSummary(env, store, user))
+;

@@ -1,5 +1,6 @@
-import { Elysia, t } from 'elysia';
-import type { Bindings, WorkerSingleton } from '../../core/types';
+import { t } from 'elysia';
+import type { Bindings } from '../../core/types';
+import { createRouter } from '../../core/router';
 import * as handlers from './handlers';
 
 const KnowledgeBody = t.Object({
@@ -27,7 +28,7 @@ const KnowledgeUpdateBody = t.Object({
 });
 
 export const knowledgeRoutes = (env: Bindings) =>
-  new Elysia<string, WorkerSingleton>()
+  createRouter()
     // Product Documents
     .get('/admin/products/:id/documents', ({ store, user, params }) =>
       handlers.listDocuments(env, store, user, params.id))
@@ -45,4 +46,5 @@ export const knowledgeRoutes = (env: Bindings) =>
     .patch('/admin/products/:id/knowledge/:knowledgeId', ({ store, user, params, body }) =>
       handlers.updateKnowledge(env, store, user, params.id, params.knowledgeId, body), { body: KnowledgeUpdateBody })
     .delete('/admin/products/:id/knowledge/:knowledgeId', ({ store, user, params }) =>
-      handlers.deleteKnowledge(env, store, user, params.id, params.knowledgeId));
+      handlers.deleteKnowledge(env, store, user, params.id, params.knowledgeId))
+;

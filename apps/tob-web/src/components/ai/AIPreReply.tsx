@@ -13,9 +13,9 @@ const getValidityBadge = (validity: string) => {
     case 'valid':
       return <Badge variant="success" size="sm">有效工单</Badge>;
     case 'invalid':
-      return <Badge variant="error" size="sm">无效工单</Badge>;
+      return <Badge variant="destructive" size="sm">无效工单</Badge>;
     case 'spam':
-      return <Badge variant="error" size="sm">垃圾信息</Badge>;
+      return <Badge variant="destructive" size="sm">垃圾信息</Badge>;
     case 'rant':
       return <Badge variant="warning" size="sm">纯抱怨</Badge>;
     default:

@@ -1,8 +1,9 @@
-import { Elysia } from 'elysia';
-import type { Bindings, WorkerSingleton } from '../../core/types';
+import type { Bindings } from '../../core/types';
+import { createRouter } from '../../core/router';
 import * as handlers from './handlers';
 
 export const systemRoutes = (env: Bindings) =>
-  new Elysia<string, WorkerSingleton>()
+  createRouter()
     .get('/health', handlers.health)
-    .get('/whoami', ({ request }) => handlers.whoami(request, env));
+    .get('/whoami', ({ request }) => handlers.whoami(request, env))
+;

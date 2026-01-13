@@ -1,7 +1,8 @@
-import { Elysia } from 'elysia';
-import type { Bindings, WorkerSingleton } from '../../../core/types';
+import type { Bindings } from '../../../core/types';
+import { createRouter } from '../../../core/router';
 import * as handlers from './handlers';
 
 export const customerRoutes = (env: Bindings) =>
-  new Elysia<string, WorkerSingleton>()
-    .get('/customers', ({ store, user, query }) => handlers.listCustomers(env, store, user, query));
+  createRouter()
+    .get('/customers', ({ store, user, query }) => handlers.listCustomers(env, store, user, query))
+;

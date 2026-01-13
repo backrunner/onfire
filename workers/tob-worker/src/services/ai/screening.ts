@@ -126,11 +126,11 @@ ${ticket.metadata ? JSON.stringify(JSON.parse(ticket.metadata), null, 2) : 'None
     const modelId = getModelId(config);
 
     const result = await generateText({
-      model: client(modelId),
+      model: client(modelId) as any,
       system: systemPrompt,
       prompt: userPrompt,
       temperature: 0.3,
-      maxTokens: 1000
+      maxOutputTokens: 1000
     });
 
     // Parse the response
@@ -256,11 +256,11 @@ ${ticket.content}`;
     const modelId = getModelId(config);
 
     const result = await generateText({
-      model: client(modelId),
+      model: client(modelId) as any,
       system: systemPrompt,
       prompt: userPrompt,
       temperature: 0.7,
-      maxTokens: 1500
+      maxOutputTokens: 1500
     });
 
     const reply = result.text.trim();

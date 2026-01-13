@@ -1,5 +1,5 @@
-import { Elysia } from 'elysia';
-import type { Bindings, WorkerSingleton } from '../../core/types';
+import type { Bindings } from '../../core/types';
+import { createRouter } from '../../core/router';
 import { tenantRoutes } from './tenants';
 import { productRoutes } from './products';
 import { teamRoutes } from './teams';
@@ -11,7 +11,7 @@ import { categoryRouteRoutes } from './category-routes';
 import { productKeyRoutes } from './product-keys';
 
 export const adminRoutes = (env: Bindings) =>
-  new Elysia<string, WorkerSingleton>({ prefix: '/admin' })
+  createRouter({ prefix: '/admin' })
     .use(tenantRoutes(env))
     .use(productRoutes(env))
     .use(teamRoutes(env))
@@ -20,4 +20,5 @@ export const adminRoutes = (env: Bindings) =>
     .use(agentRoutes(env))
     .use(customerRoutes(env))
     .use(categoryRouteRoutes(env))
-    .use(productKeyRoutes(env));
+    .use(productKeyRoutes(env))
+;

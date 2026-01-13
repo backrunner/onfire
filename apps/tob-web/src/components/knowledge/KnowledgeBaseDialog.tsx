@@ -80,7 +80,7 @@ const getStatusBadge = (status: ProductDocument['status']) => {
     case 'pending':
       return <Badge variant="secondary" size="sm">待处理</Badge>;
     case 'error':
-      return <Badge variant="error" size="sm">错误</Badge>;
+      return <Badge variant="destructive" size="sm">错误</Badge>;
     default:
       return <Badge variant="secondary" size="sm">{status}</Badge>;
   }

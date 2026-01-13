@@ -34,8 +34,8 @@ export const batchScreen = async (env: Bindings, store: any, user: any, body: { 
   const ctx = await resolveContext(env, user);
   assertPermission(ctx, 'ticket.read');
 
-  let ticketIds = body.ticketIds;
-  if (!ticketIds || ticketIds.length === 0) {
+  let ticketIds: string[] = body.ticketIds ?? [];
+  if (ticketIds.length === 0) {
     const unscreened = await store.db
       .select({ id: tickets.id })
       .from(tickets)

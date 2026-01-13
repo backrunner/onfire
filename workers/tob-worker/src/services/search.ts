@@ -3,10 +3,11 @@
  * Semantic search using Cloudflare Vectorize and traditional filters
  */
 
-import { eq, and, gte, lte, like, or, desc, sql } from 'drizzle-orm';
+import { eq, and, gte, lte, like, or, desc, sql, type SQL } from 'drizzle-orm';
 import type { Db } from '@onfire/shared/drizzle/client';
 import type { VectorizeIndex } from '@cloudflare/workers-types';
 import { tickets, ticketTags } from '@onfire/shared/drizzle/schema';
+import { TicketStatus, TicketPriority } from '@onfire/shared';
 import { getAIConfig } from './ai/screening';
 import { createAIClient } from './ai/providers';
 
@@ -189,13 +190,13 @@ export async function searchTickets(
   }
 
   // Build SQL conditions for traditional search
-  const conditions: any[] = [];
+  const conditions: SQL[] = [];
 
   if (params.status) {
-    conditions.push(eq(tickets.status, params.status));
+    conditions.push(eq(tickets.status, params.status as TicketStatus));
   }
   if (params.priority) {
-    conditions.push(eq(tickets.priority, params.priority));
+    conditions.push(eq(tickets.priority, params.priority as TicketPriority));
   }
   if (params.teamId) {
     conditions.push(eq(tickets.teamId, params.teamId));
@@ -213,12 +214,13 @@ export async function searchTickets(
   // Keyword search in subject and content
   if (params.q && !params.semantic) {
     const keyword = `%${params.q}%`;
-    conditions.push(
-      or(
-        like(tickets.subject, keyword),
-        like(tickets.content, keyword)
-      )
+    const keywordCondition = or(
+      like(tickets.subject, keyword),
+      like(tickets.content, keyword)
     );
+    if (keywordCondition) {
+      conditions.push(keywordCondition);
+    }
   }
 
   // Execute query

@@ -1,16 +1,27 @@
-import { Elysia } from 'elysia';
-import type { Bindings, WorkerSingleton } from '../../../core/types';
+import { t } from 'elysia';
+import type { Bindings } from '../../../core/types';
+import { createRouter } from '../../../core/router';
 import * as handlers from './handlers';
 
 export const templateRoutes = (env: Bindings) =>
-  new Elysia<string, WorkerSingleton>()
+  createRouter()
     .get('/templates', ({ store, user }) => handlers.listTemplates(env, store, user))
-    .post('/templates', async ({ store, user, request }) => {
-      const body = await request.json() as { productId: string; title: string; categories: string; formSchema: string };
-      return handlers.createTemplate(env, store, user, body);
+    .post('/templates', ({ store, user, body }) =>
+      handlers.createTemplate(env, store, user, body), {
+      body: t.Object({
+        productId: t.String(),
+        title: t.String(),
+        categories: t.String(),
+        formSchema: t.String()
+      })
     })
-    .patch('/templates/:id', async ({ store, user, params, request }) => {
-      const body = await request.json() as { title?: string; categories?: string; formSchema?: string };
-      return handlers.updateTemplate(env, store, user, params.id, body);
+    .patch('/templates/:id', ({ store, user, params, body }) =>
+      handlers.updateTemplate(env, store, user, params.id, body), {
+      body: t.Object({
+        title: t.Optional(t.String()),
+        categories: t.Optional(t.String()),
+        formSchema: t.Optional(t.String())
+      })
     })
-    .delete('/templates/:id', ({ store, user, params }) => handlers.deleteTemplate(env, store, user, params.id));
+    .delete('/templates/:id', ({ store, user, params }) => handlers.deleteTemplate(env, store, user, params.id))
+;
