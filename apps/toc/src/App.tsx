@@ -15,7 +15,7 @@ import {
 } from '@onfire/ui';
 import { OnfireClient, type CreateTicketInput } from '@onfire/sdk';
 import type { TicketTemplate } from '@onfire/shared';
-import Tickets from './Tickets';
+import Tickets from './components/Tickets';
 import {
   Flame,
   Send,
@@ -154,9 +154,18 @@ const decodeIdentity = (jwt?: string): TokenIdentity => {
   }
 };
 
-export default function App() {
+export interface AppProps {
+  searchParams?: string;
+}
+
+export default function App({ searchParams }: AppProps) {
   const { t } = useTranslation();
-  const search = useMemo(() => new URLSearchParams(window.location.search), []);
+  const search = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search);
+    }
+    return new URLSearchParams(searchParams || '');
+  }, [searchParams]);
   const rawToken = search.get('jwt') || search.get('token') || undefined;
   const identity = useMemo(() => decodeIdentity(rawToken), [rawToken]);
   const productId = identity.productId || search.get('productId') || '';
@@ -331,9 +340,6 @@ export default function App() {
   if (!productId) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <div className="absolute right-4 top-4">
-          <LanguageSwitcher />
-        </div>
         <div className="mx-auto max-w-md text-center">
           <div className="mb-4 flex justify-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10">
@@ -346,7 +352,7 @@ export default function App() {
           </p>
           <div className="rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 text-left text-xs text-muted-foreground">
             <p className="mb-1 font-medium">{t('error.urlExample')}</p>
-            <code className="break-all">/?jwt=YOUR_TOKEN&productId=YOUR_PRODUCT_ID</code>
+            <code className="break-all">/?jwt=YOUR_TOKEN&amp;productId=YOUR_PRODUCT_ID</code>
           </div>
         </div>
       </div>

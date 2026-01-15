@@ -28,20 +28,20 @@
     --radius: 0.75rem;
 
     /* Status colors */
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 100%;
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 98%;
     --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    --warning-foreground: 0 0% 98%;
     --info: 199 89% 48%;
-    --info-foreground: 0 0% 100%;
+    --info-foreground: 0 0% 98%;
   }
 
   .dark {
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
-    --card: 240 10% 5.9%;
+    --card: 240 10% 3.9%;
     --card-foreground: 0 0% 98%;
-    --popover: 240 10% 5.9%;
+    --popover: 240 10% 3.9%;
     --popover-foreground: 0 0% 98%;
     --primary: 0 0% 98%;
     --primary-foreground: 240 5.9% 10%;
@@ -51,19 +51,19 @@
     --muted-foreground: 240 5% 64.9%;
     --accent: 240 3.7% 15.9%;
     --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 50.6%;
+    --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
 
     /* Status colors - dark mode */
-    --success: 142 71% 40%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 92% 45%;
-    --warning-foreground: 0 0% 100%;
-    --info: 199 89% 43%;
-    --info-foreground: 0 0% 100%;
+    --success: 142 69% 58%;
+    --success-foreground: 240 10% 3.9%;
+    --warning: 38 92% 60%;
+    --warning-foreground: 240 10% 3.9%;
+    --info: 199 89% 58%;
+    --info-foreground: 240 10% 3.9%;
   }
 
   * {
@@ -75,3 +75,4 @@
     @apply bg-background text-foreground antialiased;
   }
 }
+
