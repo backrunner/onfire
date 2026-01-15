@@ -1,26 +1,12 @@
 {
-  "version": "5",
+  "version": "7",
   "dialect": "sqlite",
   "entries": [
     {
       "idx": 0,
-      "version": "0000_init",
-      "when": 1733743200000,
-      "tag": "0000_init",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "0001_extensions",
-      "when": 1733829600000,
-      "tag": "0001_extensions",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "0002_ai_features",
-      "when": 1734019200000,
-      "tag": "0002_ai_features",
+      "version": "6",
+      "when": 1768491012441,
+      "tag": "0000_lame_gauntlet",
       "breakpoints": true
     }
   ]

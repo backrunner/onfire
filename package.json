@@ -1,11 +1,12 @@
 {
   "name": "onfire",
-  "private": true,
-  "version": "0.0.1",
-  "packageManager": "pnpm@9.15.0",
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.28.0",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
+  "author": "BackRunner",
+  "license": "Apache-2.0",
   "scripts": {
     "dev": "pnpm run dev:workers & pnpm run dev:web",
     "dev:workers": "wrangler dev -c wrangler.tob.toml -c wrangler.toc.toml --persist-to ./.wrangler/state --port 8787",
@@ -16,7 +17,7 @@
     "test": "turbo test",
     "init": "bash scripts/init.sh",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "wrangler d1 migrations apply DB --local -c wrangler.tob.toml",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local -c wrangler.tob.toml",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote -c wrangler.tob.toml",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
@@ -25,23 +26,23 @@
     "deploy:all": "pnpm run deploy:tob && pnpm run deploy:toc"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.11",
-    "@ai-sdk/google": "^3.0.6",
-    "@ai-sdk/openai": "^3.0.8",
-    "@hono/zod-validator": "^0.4.2",
-    "ai": "^6.0.28",
-    "better-auth": "^1.4.11",
+    "@ai-sdk/anthropic": "^3.0.14",
+    "@ai-sdk/google": "^3.0.9",
+    "@ai-sdk/openai": "^3.0.11",
+    "@hono/zod-validator": "^0.7.6",
+    "ai": "^6.0.37",
+    "better-auth": "^1.4.13",
     "drizzle-orm": "^0.45.1",
-    "hono": "^4.6.0",
+    "hono": "^4.11.4",
     "nanoid": "^5.1.6",
-    "zod": "^3.24.0"
+    "zod": "^4.3.5"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260111.0",
-    "@types/node": "^22.10.0",
+    "@cloudflare/workers-types": "^4.20260115.0",
+    "@types/node": "^22.19.6",
     "drizzle-kit": "^0.31.8",
     "turbo": "^2.7.4",
     "typescript": "^5.9.3",
-    "wrangler": "^4.58.0"
+    "wrangler": "^4.59.2"
   }
 }

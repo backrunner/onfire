@@ -17,7 +17,7 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 app.use('*', async (c, next) => {
   ensureEnv(c.env);
   const db = createDb(c.env.DB);
-  const { auth } = createAuthPlugin(c.env);
+  const { auth } = createAuthPlugin(c.env, db);
   c.set('db', db);
   c.set('auth', auth);
 
@@ -45,8 +45,22 @@ app.use('*', async (c, next) => {
   await next();
 });
 
-// Mount API routes
+// Mount Better Auth handler BEFORE other routes
+// This handles all auth routes
 const prefix = '/api/tob';
+
+// Use a more specific pattern to catch all auth routes
+app.all(`${prefix}/auth/*`, async (c) => {
+  const auth = c.get('auth');
+  console.log('[Better Auth] Request URL:', c.req.raw.url);
+  console.log('[Better Auth] Request method:', c.req.method);
+  console.log('[Better Auth] Request path:', c.req.path);
+  const response = await auth.handler(c.req.raw);
+  console.log('[Better Auth] Response status:', response.status);
+  return response;
+});
+
+// Mount API routes
 app.route(prefix, createAllRoutes());
 
 // Response wrapper middleware - applied after route handlers

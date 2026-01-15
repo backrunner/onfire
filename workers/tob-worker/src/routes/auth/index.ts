@@ -8,35 +8,9 @@ import { ok } from '../../core/response';
 export const authRoutes = () => {
   const router = createRouter();
 
-  // POST /auth/change-password
-  router.post('/auth/change-password', async (c) => {
-    const body = await c.req.json<{ currentPassword?: string; newPassword?: string; revokeOtherSessions?: boolean }>();
-    const auth = c.get('auth');
-
-    if (!body.currentPassword || !body.newPassword) {
-      return handleResult(c, errorResult(400, 'currentPassword and newPassword required'));
-    }
-
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session?.user) {
-      return handleResult(c, errorResult(401, 'unauthorized'));
-    }
-
-    try {
-      await auth.api.changePassword({
-        headers: c.req.raw.headers,
-        body: {
-          currentPassword: body.currentPassword,
-          newPassword: body.newPassword,
-          revokeOtherSessions: body.revokeOtherSessions ?? true
-        }
-      });
-      return c.json(ok({ ok: true }));
-    } catch (e) {
-      console.error('changePassword failed', e);
-      return handleResult(c, errorResult(400, 'change-password failed'));
-    }
-  });
+  // Note: Better Auth routes (/auth/sign-in/email, /auth/sign-up/email, etc.)
+  // are mounted directly in index.ts using app.on(['POST', 'GET'], '/api/tob/auth/*')
+  // This file only contains custom auth-related routes
 
   // GET /install/status
   router.get('/install/status', async (c) => {
