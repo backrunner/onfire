@@ -8,6 +8,8 @@ import { agentRoutes } from './agents';
 import { customerRoutes } from './customers';
 import { categoryRouteRoutes } from './category-routes';
 import { productKeyRoutes } from './product-keys';
+import { emailConfigRoutes } from './email-config';
+import { notificationChannelRoutes } from './notification-channels';
 
 export const adminRoutes = () => {
   const router = createRouter();
@@ -21,6 +23,8 @@ export const adminRoutes = () => {
   router.route('/admin', customerRoutes());
   router.route('/admin', categoryRouteRoutes());
   router.route('/admin', productKeyRoutes());
+  router.route('/admin', emailConfigRoutes());
+  router.route('/admin', notificationChannelRoutes());
 
   return router;
 };

@@ -120,6 +120,9 @@ export const tickets = sqliteTable('tickets', {
   aiExtractedIssues: text('ai_extracted_issues'), // JSON array
   aiKeywords: text('ai_keywords'), // JSON array
   vectorizeId: text('vectorize_id'),
+  // Email-related fields
+  source: text('source').$type<'web' | 'email' | 'api'>().default('web'),
+  sourceEmailId: text('source_email_id'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull()
 });
@@ -131,6 +134,10 @@ export const replies = sqliteTable('replies', {
   senderEmail: text('sender_email'),
   content: text('content').notNull(),
   internal: integer('internal', { mode: 'boolean' }).default(false),
+  // Email-related fields
+  source: text('source').$type<'web' | 'email'>().default('web'),
+  sourceEmailId: text('source_email_id'),
+  emailSent: integer('email_sent', { mode: 'boolean' }).default(false),
   createdAt: text('created_at').notNull()
 });
 
@@ -233,4 +240,151 @@ export type ProductDocumentRow = typeof productDocuments.$inferSelect;
 export type ProductKnowledgeRow = typeof productKnowledge.$inferSelect;
 export type AIChatMessageRow = typeof aiChatMessages.$inferSelect;
 export type TicketTagRow = typeof ticketTags.$inferSelect;
+
+// ==================== Email Feature Tables ====================
+
+// Email Provider Types
+export type EmailProvider = 'resend' | 'sendgrid' | 'mailgun' | 'maileroo' | 'smtp';
+export type InboundEmailProvider = 'maileroo' | 'sendgrid' | 'mailgun' | 'generic';
+export type EmailTemplateType = 'ticket_created' | 'ticket_replied' | 'ticket_closed' | 'ticket_escalated';
+export type EmailProcessingStatus = 'pending' | 'processed' | 'filtered' | 'error';
+export type EmailDeliveryStatus = 'pending' | 'sent' | 'delivered' | 'bounced' | 'failed';
+export type AIFilterStrictness = 'low' | 'medium' | 'high';
+
+// Email Configuration - Per-product email settings
+export const emailConfigs = sqliteTable('email_configs', {
+  id: text('id').primaryKey(),
+  productId: text('product_id').notNull().unique(),
+  // Inbound settings
+  inboundEnabled: integer('inbound_enabled', { mode: 'boolean' }).default(false),
+  inboundProvider: text('inbound_provider').$type<InboundEmailProvider>(),
+  inboundAddress: text('inbound_address'),
+  inboundWebhookSecret: text('inbound_webhook_secret'),
+  // Outbound settings
+  outboundEnabled: integer('outbound_enabled', { mode: 'boolean' }).default(false),
+  outboundProvider: text('outbound_provider').$type<EmailProvider>(),
+  outboundApiKey: text('outbound_api_key'),
+  outboundSmtpHost: text('outbound_smtp_host'),
+  outboundSmtpPort: integer('outbound_smtp_port'),
+  outboundSmtpUser: text('outbound_smtp_user'),
+  outboundSmtpPass: text('outbound_smtp_pass'),
+  outboundSenderName: text('outbound_sender_name'),
+  outboundSenderEmail: text('outbound_sender_email'),
+  outboundReplyTo: text('outbound_reply_to'),
+  // AI filtering settings
+  aiFilterEnabled: integer('ai_filter_enabled', { mode: 'boolean' }).default(true),
+  aiFilterStrictness: text('ai_filter_strictness').$type<AIFilterStrictness>().default('medium'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull()
+});
+
+// Email Templates - Customizable notification templates
+export const emailTemplates = sqliteTable('email_templates', {
+  id: text('id').primaryKey(),
+  productId: text('product_id').notNull(),
+  templateType: text('template_type').$type<EmailTemplateType>().notNull(),
+  subjectTemplate: text('subject_template').notNull(),
+  bodyTemplate: text('body_template').notNull(),
+  enabled: integer('enabled', { mode: 'boolean' }).default(true),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull()
+});
+
+// Inbound Emails - Log of all received emails
+export const inboundEmails = sqliteTable('inbound_emails', {
+  id: text('id').primaryKey(),
+  productId: text('product_id').notNull(),
+  messageId: text('message_id').notNull(),
+  provider: text('provider').$type<InboundEmailProvider>().notNull(),
+  // Sender info
+  fromEmail: text('from_email').notNull(),
+  fromName: text('from_name'),
+  toEmail: text('to_email').notNull(),
+  // Content
+  subject: text('subject'),
+  bodyPlain: text('body_plain'),
+  bodyHtml: text('body_html'),
+  // Processing result
+  processingStatus: text('processing_status').$type<EmailProcessingStatus>().notNull().default('pending'),
+  filterResult: text('filter_result'), // JSON: AI classification result
+  ticketId: text('ticket_id'),
+  replyId: text('reply_id'),
+  errorMessage: text('error_message'),
+  // Security checks
+  spfResult: text('spf_result'),
+  dkimResult: integer('dkim_result', { mode: 'boolean' }),
+  isSpam: integer('is_spam', { mode: 'boolean' }),
+  // Raw payload
+  rawPayload: text('raw_payload'),
+  createdAt: text('created_at').notNull(),
+  processedAt: text('processed_at')
+});
+
+// Outbound Emails - Log of all sent emails
+export const outboundEmails = sqliteTable('outbound_emails', {
+  id: text('id').primaryKey(),
+  productId: text('product_id').notNull(),
+  ticketId: text('ticket_id'),
+  replyId: text('reply_id'),
+  // Email details
+  toEmail: text('to_email').notNull(),
+  toName: text('to_name'),
+  fromEmail: text('from_email').notNull(),
+  fromName: text('from_name'),
+  subject: text('subject').notNull(),
+  bodyHtml: text('body_html').notNull(),
+  bodyPlain: text('body_plain'),
+  // Delivery info
+  provider: text('provider').$type<EmailProvider>().notNull(),
+  providerMessageId: text('provider_message_id'),
+  status: text('status').$type<EmailDeliveryStatus>().notNull().default('pending'),
+  errorMessage: text('error_message'),
+  createdAt: text('created_at').notNull(),
+  sentAt: text('sent_at')
+});
+
+// Email Feature Row Types
+export type EmailConfigRow = typeof emailConfigs.$inferSelect;
+export type EmailTemplateRow = typeof emailTemplates.$inferSelect;
+export type InboundEmailRow = typeof inboundEmails.$inferSelect;
+export type OutboundEmailRow = typeof outboundEmails.$inferSelect;
+
+// ==================== Notification Feature Tables ====================
+
+// Notification Channel Types
+export type NotificationChannelType = 'email' | 'pushdeer' | 'bark' | 'ntfy' | 'telegram' | 'discord';
+export type NotificationTriggerEvent = 'ticket_assigned' | 'ticket_reassigned' | 'ticket_escalated';
+export type NotificationStatus = 'pending' | 'sent' | 'failed';
+
+// Notification Channels - Per-product notification configuration
+export const notificationChannels = sqliteTable('notification_channels', {
+  id: text('id').primaryKey(),
+  productId: text('product_id').notNull(),
+  channelType: text('channel_type').$type<NotificationChannelType>().notNull(),
+  name: text('name').notNull(),
+  enabled: integer('enabled', { mode: 'boolean' }).default(true),
+  config: text('config').notNull(), // JSON: channel-specific credentials
+  triggerEvents: text('trigger_events').notNull(), // JSON array of NotificationTriggerEvent
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull()
+});
+
+// Notification Logs - Track sent notifications
+export const notificationLogs = sqliteTable('notification_logs', {
+  id: text('id').primaryKey(),
+  productId: text('product_id').notNull(),
+  channelId: text('channel_id').notNull(),
+  channelType: text('channel_type').$type<NotificationChannelType>().notNull(),
+  ticketId: text('ticket_id').notNull(),
+  agentId: text('agent_id').notNull(),
+  triggerEvent: text('trigger_event').$type<NotificationTriggerEvent>().notNull(),
+  status: text('status').$type<NotificationStatus>().notNull().default('pending'),
+  errorMessage: text('error_message'),
+  createdAt: text('created_at').notNull(),
+  sentAt: text('sent_at')
+});
+
+// Notification Feature Row Types
+export type NotificationChannelRow = typeof notificationChannels.$inferSelect;
+export type NotificationLogRow = typeof notificationLogs.$inferSelect;
 

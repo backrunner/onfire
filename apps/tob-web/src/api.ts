@@ -581,3 +581,224 @@ export const getSearchSuggestions = (q: string) =>
     headers: authHeaders()
   }).then(json) as Promise<{ suggestions: string[] }>;
 
+// Email Config APIs
+export interface EmailConfig {
+  id: string;
+  productId: string;
+  inboundEnabled: boolean;
+  inboundProvider: string | null;
+  inboundAddress: string | null;
+  inboundWebhookSecret: string | null;
+  outboundEnabled: boolean;
+  outboundProvider: string | null;
+  outboundApiKey: string | null;
+  outboundSmtpHost: string | null;
+  outboundSmtpPort: number | null;
+  outboundSmtpUser: string | null;
+  outboundSmtpPass: string | null;
+  outboundSenderName: string | null;
+  outboundSenderEmail: string | null;
+  outboundReplyTo: string | null;
+  aiFilterEnabled: boolean;
+  aiFilterStrictness: 'low' | 'medium' | 'high' | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmailConfigMeta {
+  providers: { id: string; name: string; type: string }[];
+  templateTypes: string[];
+  defaultTemplates: Record<string, { subject: string; body: string }>;
+}
+
+export interface EmailTemplate {
+  id: string;
+  productId: string;
+  templateType: string;
+  subjectTemplate: string;
+  bodyTemplate: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const getEmailConfigMeta = () =>
+  fetch(`${baseUrl}/admin/email-config/meta`, { headers: authHeaders() }).then(json) as Promise<EmailConfigMeta>;
+
+export const listEmailConfigs = (productId?: string) =>
+  fetch(`${baseUrl}/admin/email-config${productId ? `?productId=${encodeURIComponent(productId)}` : ''}`, {
+    headers: authHeaders()
+  }).then(json) as Promise<{ data: EmailConfig[] }>;
+
+export const getEmailConfig = (productId: string) =>
+  fetch(`${baseUrl}/admin/email-config/${productId}`, { headers: authHeaders() }).then(json) as Promise<{ data: EmailConfig | null }>;
+
+export const createEmailConfig = (body: Partial<EmailConfig> & { productId: string }) =>
+  fetch(`${baseUrl}/admin/email-config`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body)
+  }).then(json);
+
+export const updateEmailConfig = (productId: string, body: Partial<EmailConfig>) =>
+  fetch(`${baseUrl}/admin/email-config/${productId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body)
+  }).then(json);
+
+export const deleteEmailConfig = (productId: string) =>
+  fetch(`${baseUrl}/admin/email-config/${productId}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  }).then(json);
+
+export const testEmailConfig = (productId: string, email: string) =>
+  fetch(`${baseUrl}/admin/email-config/${productId}/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ email })
+  }).then(json) as Promise<{ ok: boolean; messageId?: string }>;
+
+export const generateWebhookSecret = (productId: string) =>
+  fetch(`${baseUrl}/admin/email-config/${productId}/webhook-secret`, {
+    method: 'POST',
+    headers: authHeaders()
+  }).then(json) as Promise<{ ok: boolean; webhookSecret: string; message: string }>;
+
+// Email Templates
+export const listEmailTemplates = (productId?: string) =>
+  fetch(`${baseUrl}/admin/email-templates${productId ? `?productId=${encodeURIComponent(productId)}` : ''}`, {
+    headers: authHeaders()
+  }).then(json) as Promise<{ data: EmailTemplate[] }>;
+
+export const createEmailTemplate = (body: {
+  productId: string;
+  templateType: string;
+  subjectTemplate: string;
+  bodyTemplate: string;
+  enabled?: boolean;
+}) =>
+  fetch(`${baseUrl}/admin/email-templates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body)
+  }).then(json);
+
+export const updateEmailTemplate = (id: string, body: Partial<EmailTemplate>) =>
+  fetch(`${baseUrl}/admin/email-templates/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body)
+  }).then(json);
+
+export const deleteEmailTemplate = (id: string) =>
+  fetch(`${baseUrl}/admin/email-templates/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  }).then(json);
+
+// Notification Channel APIs
+export type NotificationChannelType = 'email' | 'pushdeer' | 'bark' | 'ntfy' | 'telegram' | 'discord';
+export type NotificationTriggerEvent = 'ticket_assigned' | 'ticket_reassigned' | 'ticket_escalated';
+
+export interface NotificationChannel {
+  id: string;
+  productId: string;
+  channelType: NotificationChannelType;
+  name: string;
+  enabled: boolean;
+  config: string;
+  triggerEvents: NotificationTriggerEvent[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationChannelMeta {
+  channelTypes: {
+    id: string;
+    name: string;
+    description: string;
+    configFields: { key: string; label: string; type: string; required: boolean; placeholder?: string }[];
+  }[];
+  triggerEvents: { id: string; name: string }[];
+}
+
+export interface NotificationLog {
+  id: string;
+  productId: string;
+  channelId: string;
+  channelType: NotificationChannelType;
+  ticketId: string;
+  agentId: string;
+  triggerEvent: NotificationTriggerEvent;
+  status: 'pending' | 'sent' | 'failed';
+  errorMessage: string | null;
+  createdAt: string;
+  sentAt: string | null;
+}
+
+export const getNotificationChannelMeta = () =>
+  fetch(`${baseUrl}/admin/notification-channels/meta`, { headers: authHeaders() }).then(json) as Promise<NotificationChannelMeta>;
+
+export const listNotificationChannels = (productId?: string) =>
+  fetch(`${baseUrl}/admin/notification-channels${productId ? `?productId=${encodeURIComponent(productId)}` : ''}`, {
+    headers: authHeaders()
+  }).then(json) as Promise<{ data: NotificationChannel[] }>;
+
+export const getNotificationChannel = (id: string) =>
+  fetch(`${baseUrl}/admin/notification-channels/${id}`, { headers: authHeaders() }).then(json) as Promise<{ data: NotificationChannel }>;
+
+export const createNotificationChannel = (body: {
+  productId: string;
+  channelType: NotificationChannelType;
+  name: string;
+  enabled?: boolean;
+  config: Record<string, unknown>;
+  triggerEvents: NotificationTriggerEvent[];
+}) =>
+  fetch(`${baseUrl}/admin/notification-channels`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body)
+  }).then(json);
+
+export const updateNotificationChannel = (
+  id: string,
+  body: {
+    name?: string;
+    enabled?: boolean;
+    config?: Record<string, unknown>;
+    triggerEvents?: NotificationTriggerEvent[];
+  }
+) =>
+  fetch(`${baseUrl}/admin/notification-channels/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body)
+  }).then(json);
+
+export const deleteNotificationChannel = (id: string) =>
+  fetch(`${baseUrl}/admin/notification-channels/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  }).then(json);
+
+export const testNotificationChannel = (id: string) =>
+  fetch(`${baseUrl}/admin/notification-channels/${id}/test`, {
+    method: 'POST',
+    headers: authHeaders()
+  }).then(json) as Promise<{ ok: boolean; messageId?: string }>;
+
+export const listNotificationLogs = (params: { productId?: string; channelId?: string; ticketId?: string; limit?: number; offset?: number } = {}) => {
+  const search = new URLSearchParams();
+  if (params.productId) search.set('productId', params.productId);
+  if (params.channelId) search.set('channelId', params.channelId);
+  if (params.ticketId) search.set('ticketId', params.ticketId);
+  if (params.limit) search.set('limit', String(params.limit));
+  if (params.offset) search.set('offset', String(params.offset));
+  return fetch(`${baseUrl}/admin/notification-logs?${search.toString()}`, {
+    headers: authHeaders()
+  }).then(json) as Promise<{ data: NotificationLog[]; total: number }>;
+};
+

@@ -23,4 +23,9 @@ export * from './skeleton';
 export * from './accordion';
 export * from './i18n';
 export * from './language-switcher';
+export * from './switch';
+export * from './checkbox';
+export * from './label';
+export * from './alert';
+export * from './alert-dialog';
 

@@ -39,7 +39,9 @@ import {
   CheckCircle2,
   Settings2,
   Sparkles,
-  BookOpen
+  BookOpen,
+  Bell,
+  Mail
 } from 'lucide-react';
 import {
   adminTenants,
@@ -76,6 +78,10 @@ import { Role } from '@onfire/shared';
 import { FormBuilder, FormField } from './FormBuilder';
 import { AIConfigPanel } from './ai/AIConfigPanel';
 import { KnowledgeBaseDialog } from './knowledge/KnowledgeBaseDialog';
+import { NotificationConfigPanel } from './NotificationConfigPanel';
+import { EmailConfigPanel } from './email/EmailConfigPanel';
+import { EmailTemplatePanel } from './email/EmailTemplatePanel';
+import { EmailLogsPanel } from './email/EmailLogsPanel';
 
 const NoAccess = ({ reason }: { reason: string }) => (
   <div className="flex items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 px-4 py-8 text-sm text-muted-foreground">
@@ -147,6 +153,8 @@ export function Management({
   const canSeeTemplates = canManageTemplate;
   const canSeeUsers = canManageUser;
   const canSeeAI = canManageTenant; // SuperAdmin only
+  const canSeeNotifications = canManageProduct; // ProductAdmin and above
+  const canSeeEmail = canManageProduct; // ProductAdmin and above
 
   const [loading, setLoading] = useState(false);
   const [tenants, setTenants] = useState<any[]>([]);
@@ -321,6 +329,9 @@ export function Management({
     if (canSeeTeams) return 'teams';
     if (canSeeTemplates) return 'templates';
     if (canSeeUsers) return 'users';
+    if (canSeeAI) return 'ai';
+    if (canSeeNotifications) return 'notifications';
+    if (canSeeEmail) return 'email';
     return 'tenants';
   };
 
@@ -385,6 +396,18 @@ export function Management({
             <TabsTrigger value="ai">
               <Sparkles className="mr-1.5 h-3.5 w-3.5" />
               AI 配置
+            </TabsTrigger>
+          )}
+          {canSeeNotifications && (
+            <TabsTrigger value="notifications">
+              <Bell className="mr-1.5 h-3.5 w-3.5" />
+              通知
+            </TabsTrigger>
+          )}
+          {canSeeEmail && (
+            <TabsTrigger value="email">
+              <Mail className="mr-1.5 h-3.5 w-3.5" />
+              邮件
             </TabsTrigger>
           )}
         </TabsList>
@@ -1864,6 +1887,38 @@ export function Management({
         {canSeeAI && (
           <TabsContent value="ai" className="mt-4">
             <AIConfigPanel onRefresh={refresh} />
+          </TabsContent>
+        )}
+
+        {/* Notifications Tab */}
+        {canSeeNotifications && (
+          <TabsContent value="notifications" className="mt-4">
+            <NotificationConfigPanel canManage={canManageProduct} />
+          </TabsContent>
+        )}
+
+        {/* Email Tab */}
+        {canSeeEmail && (
+          <TabsContent value="email" className="mt-4">
+            <Tabs defaultValue="config" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="config">配置</TabsTrigger>
+                <TabsTrigger value="templates">模板</TabsTrigger>
+                <TabsTrigger value="logs">日志</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="config" className="mt-4">
+                <EmailConfigPanel products={products} onSuccess={refresh} />
+              </TabsContent>
+
+              <TabsContent value="templates" className="mt-4">
+                <EmailTemplatePanel products={products} onSuccess={refresh} />
+              </TabsContent>
+
+              <TabsContent value="logs" className="mt-4">
+                <EmailLogsPanel products={products} />
+              </TabsContent>
+            </Tabs>
           </TabsContent>
         )}
       </Tabs>

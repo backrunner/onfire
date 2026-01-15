@@ -1,6 +1,6 @@
 import { Role, TicketPriority, TicketStatus, type TicketFilter, type TicketReply, type TenantID } from '@onfire/shared';
 import { assertPermission } from '@onfire/shared/rbac';
-import { history, replies, tickets, teams, type TicketRow, type ReplyRow } from '@onfire/shared/drizzle/schema';
+import { history, replies, tickets, teams, users, agentProfiles, type TicketRow, type ReplyRow } from '@onfire/shared/drizzle/schema';
 import type { Db } from '@onfire/shared/drizzle/client';
 import { and, desc, eq, inArray, or } from 'drizzle-orm';
 import { bumpLoadCache, chooseEscalationAssignee, pickAssignee } from '../../services/allocation';
@@ -8,6 +8,8 @@ import { createRouter } from '../../core/router';
 import { handleResult, errorResult } from '../../core/route-utils';
 import { resolveContext } from '../../core/context';
 import { ok } from '../../core/response';
+import { sendTicketNotification } from '../../services/email/outbound';
+import { sendAgentNotification } from '../../services/notification/service';
 
 type HistoryRow = typeof history.$inferSelect;
 
@@ -95,6 +97,21 @@ const enrichHistory = (rows: HistoryRow[]) =>
     ...h,
     snapshot: parseJson(h.snapshot)
   }));
+
+// Helper to get agent display name for notifications
+const getAgentDisplayName = async (db: Db, agentId: string | null | undefined): Promise<string | undefined> => {
+  if (!agentId) return undefined;
+  // Try agent profile first
+  const profile = await db.query.agentProfiles.findFirst({
+    where: eq(agentProfiles.userId, agentId)
+  });
+  if (profile) return profile.displayName;
+  // Fall back to user
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, agentId)
+  });
+  return user?.displayName;
+};
 
 const queryTickets = async (db: Db, filter: TicketFilter, tenantIds: TenantID[], autoCloseHours = 72) => {
   const where = [];
@@ -234,7 +251,10 @@ export const ticketRoutes = () => {
     }
 
     const now = new Date().toISOString();
+    const previousAssigneeId = ticket.assigneeId;
     const assigneeId = body.assigneeId ?? (await pickAssignee(db, ticket.teamId))?.id ?? null;
+    const isReassignment = previousAssigneeId && previousAssigneeId !== assigneeId;
+
     await db
       .update(tickets)
       .set({ assigneeId, status: TicketStatus.Processing, updatedAt: now })
@@ -245,6 +265,20 @@ export const ticketRoutes = () => {
       .values({ id: crypto.randomUUID(), ticketId: ticket.id, actorId: ctx.user.id, action: 'assign', snapshot: JSON.stringify({ assigneeId }), createdAt: now })
       .run();
     bumpLoadCache(ticket.teamId, assigneeId);
+
+    // Send agent notification (async, don't block response)
+    if (assigneeId) {
+      const previousAgentName = isReassignment ? await getAgentDisplayName(db, previousAssigneeId) : undefined;
+      c.executionCtx.waitUntil(
+        sendAgentNotification(db, {
+          ticketId: ticket.id,
+          agentId: assigneeId,
+          triggerEvent: isReassignment ? 'ticket_reassigned' : 'ticket_assigned',
+          previousAgentName
+        }).catch(err => console.error('Failed to send agent notification:', err))
+      );
+    }
+
     const updated = await db.query.tickets.findFirst({ where: eq(tickets.id, ticket.id) });
     return c.json(ok({ ok: true, ticket: enrichTicket(updated) }));
   });
@@ -378,8 +412,19 @@ export const ticketRoutes = () => {
 
     const rows = await db.select().from(tickets).where(inArray(tickets.id, body.ids));
     const now = new Date().toISOString();
+
+    // Collect notifications to send
+    const notificationsToSend: { ticketId: string; previousAssigneeId: string | null }[] = [];
+
     for (const t of rows) {
       assertPermission(ctx, 'ticket.assign', { tenantId: t.tenantId as any, teamId: t.teamId as any, productId: t.productId as any });
+
+      const isReassignment = t.assigneeId && t.assigneeId !== body.assigneeId;
+      notificationsToSend.push({
+        ticketId: t.id,
+        previousAssigneeId: isReassignment ? t.assigneeId : null
+      });
+
       await db
         .update(tickets)
         .set({ assigneeId: body.assigneeId, status: TicketStatus.Processing, updatedAt: now })
@@ -398,6 +443,22 @@ export const ticketRoutes = () => {
         .run();
       bumpLoadCache(t.teamId, body.assigneeId);
     }
+
+    // Send notifications asynchronously
+    c.executionCtx.waitUntil(
+      Promise.all(
+        notificationsToSend.map(async ({ ticketId, previousAssigneeId }) => {
+          const previousAgentName = previousAssigneeId ? await getAgentDisplayName(db, previousAssigneeId) : undefined;
+          return sendAgentNotification(db, {
+            ticketId,
+            agentId: body.assigneeId!,
+            triggerEvent: previousAssigneeId ? 'ticket_reassigned' : 'ticket_assigned',
+            previousAgentName
+          }).catch(err => console.error('Failed to send agent notification:', err));
+        })
+      )
+    );
+
     return c.json(ok({ ok: true, count: rows.length }));
   });
 
@@ -419,6 +480,7 @@ export const ticketRoutes = () => {
     assertPermission(ctx, 'ticket.escalate', { tenantId: ticket.tenantId as any, teamId: ticket.teamId as any, productId: ticket.productId as any });
 
     const now = new Date().toISOString();
+    const previousAssigneeId = ticket.assigneeId;
     const assignee = await chooseEscalationAssignee(db, ticket.teamId, ticket.assigneeId);
     if (!assignee) {
       return handleResult(c, errorResult(409, 'no assignee available'));
@@ -447,6 +509,18 @@ export const ticketRoutes = () => {
       })
       .run();
     bumpLoadCache(ticket.teamId, assignee.id);
+
+    // Send agent notification for escalation (async, don't block response)
+    const previousAgentName = await getAgentDisplayName(db, previousAssigneeId);
+    c.executionCtx.waitUntil(
+      sendAgentNotification(db, {
+        ticketId: ticket.id,
+        agentId: assignee.id,
+        triggerEvent: 'ticket_escalated',
+        previousAgentName
+      }).catch(err => console.error('Failed to send agent notification:', err))
+    );
+
     const updated = await db.query.tickets.findFirst({ where: eq(tickets.id, ticket.id) });
     return c.json(ok({ ok: true, ticket: enrichTicket(updated), assignee }));
   });
@@ -497,6 +571,21 @@ export const ticketRoutes = () => {
       .insert(history)
       .values({ id: crypto.randomUUID(), ticketId: ticket.id, actorId: ctx.user.id, action: 'agent_replied', createdAt: reply.createdAt })
       .run();
+
+    // Send email notification if not internal reply
+    if (!body.internal) {
+      try {
+        await sendTicketNotification(db, {
+          ticketId: ticket.id,
+          templateType: 'ticket_replied',
+          replyId: reply.id
+        });
+      } catch (error) {
+        // Log error but don't fail the reply
+        console.error('Failed to send email notification:', error);
+      }
+    }
+
     const refreshed = await db.query.tickets.findFirst({ where: eq(tickets.id, ticket.id) });
     return c.json(ok({ ok: true, ticket: enrichTicket(refreshed), reply }));
   });
