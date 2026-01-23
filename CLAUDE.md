@@ -5,30 +5,72 @@ OnFire is a minimalist modern ticket system designed to enable users to quickly 
 ## Tech Stack
 
 - **Runtime**: Node.js + Cloudflare Workers
-- **Backend Framework**: Hono
+- **Framework**: Next.js 15 (App Router) + OpenNext/Cloudflare
 - **Database**: Cloudflare D1 (SQLite) + Drizzle ORM
 - **Authentication**: Better Auth (ToB) / JWT + API Key (ToC)
-- **Frontend**: React 18 + TypeScript + Vite
+- **Frontend**: React 19 + TypeScript
 - **UI Components**: shadcn/ui (zinc theme)
-- **Styling**: Tailwind CSS
-- **Monorepo**: Turborepo + pnpm
+- **Styling**: Tailwind CSS 4
 
 ## Project Structure
 
 ```
 onfire/
-├── apps/
-│   ├── tob-web/          # ToB Frontend - Internal Admin Dashboard
-│   └── toc-web/          # ToC Frontend - Customer Ticket Portal
-├── workers/
-│   ├── tob-worker/       # ToB Backend - Internal Service API
-│   └── toc-worker/       # ToC Backend - Public Service API
-├── packages/
-│   ├── shared/           # Shared Types, Schema, RBAC
-│   ├── sdk/              # TypeScript SDK
-│   └── ui/               # Shared UI Components
-└── drizzle/
-    └── migrations/       # Database Migration Files
+├── src/
+│   ├── app/
+│   │   ├── (toc)/                    # ToC routes (customer portal)
+│   │   │   ├── page.tsx              # Home/ticket submission
+│   │   │   └── layout.tsx
+│   │   ├── admin/                    # ToB routes (admin dashboard)
+│   │   │   ├── page.tsx              # Dashboard
+│   │   │   ├── tickets/
+│   │   │   ├── management/
+│   │   │   ├── account/
+│   │   │   ├── login/page.tsx
+│   │   │   ├── install/page.tsx
+│   │   │   └── layout.tsx
+│   │   ├── api/
+│   │   │   ├── tob/                  # ToB API routes
+│   │   │   │   ├── auth/[...all]/route.ts
+│   │   │   │   ├── tickets/route.ts
+│   │   │   │   ├── dashboard/route.ts
+│   │   │   │   └── admin/[...path]/route.ts
+│   │   │   └── toc/                  # ToC API routes
+│   │   │       ├── tokens/route.ts
+│   │   │       ├── tickets/route.ts
+│   │   │       └── webhooks/[...path]/route.ts
+│   │   ├── layout.tsx
+│   │   └── globals.css
+│   ├── components/                   # Shared components
+│   │   ├── ui/                       # shadcn/ui components
+│   │   ├── tob/                      # ToB-specific components
+│   │   └── toc/                      # ToC-specific components
+│   ├── lib/
+│   │   ├── db.ts                     # D1 database client
+│   │   ├── auth.ts                   # Better Auth config
+│   │   ├── auth-client.ts            # Client-side auth
+│   │   ├── types.ts                  # Shared types and RBAC
+│   │   ├── i18n.tsx                  # Internationalization
+│   │   └── utils.ts
+│   ├── services/                     # Business logic
+│   │   ├── allocation.ts
+│   │   ├── email/
+│   │   └── notification/
+│   ├── drizzle/
+│   │   └── schema.ts
+│   ├── locales/                      # i18n
+│   │   ├── en.ts
+│   │   └── zh.ts
+│   └── middleware.ts                 # Multi-domain routing
+├── drizzle/
+│   └── migrations/                   # Database Migration Files
+├── public/
+├── package.json
+├── next.config.ts
+├── wrangler.jsonc
+├── open-next.config.ts
+├── drizzle.config.ts
+└── tsconfig.json
 ```
 
 ## Architecture
@@ -51,7 +93,7 @@ Ticket submission and query system for end users, including:
 - Ticket list and detail viewing
 - Ticket reply functionality
 
-Both systems are deployed as independent Cloudflare Workers, sharing the same D1 database.
+Both systems are served by a single Cloudflare Worker via OpenNext, with multi-domain routing handled by Next.js middleware.
 
 ---
 
