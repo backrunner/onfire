@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
-import { getDb, getEnv } from "./db";
+import { getDb, getEnv } from "@/lib/db";
 import * as schema from "@/drizzle/schema";
 
 let authInstance: ReturnType<typeof betterAuth> | null = null;
