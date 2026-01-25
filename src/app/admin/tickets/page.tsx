@@ -46,7 +46,7 @@ export default function AdminTicketsPage() {
         const res = await fetch(`/api/tob/tickets?${params.toString()}`, {
           credentials: "include",
         });
-        const data = await res.json();
+        const data = (await res.json()) as { ok: boolean; data: { data: Ticket[] } };
         if (data.ok) {
           setTickets(data.data.data || []);
         }

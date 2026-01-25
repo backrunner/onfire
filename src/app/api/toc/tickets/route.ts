@@ -95,7 +95,15 @@ export async function POST(request: NextRequest) {
     }
 
     const db = getDb();
-    const body = await request.json();
+    const body = (await request.json()) as {
+      productId?: string;
+      templateId?: string;
+      subject?: string;
+      content?: string;
+      priority?: string;
+      metadata?: Record<string, unknown>;
+      customer?: { email?: string; externalId?: string; level?: number };
+    };
     const {
       productId,
       templateId,
@@ -138,7 +146,7 @@ export async function POST(request: NextRequest) {
 
     // Determine team based on category routing or default
     let teamId = tenant.defaultTeamId;
-    if (metadata?.category) {
+    if (metadata?.category && typeof metadata.category === "string") {
       const route = await db.query.categoryRoutes.findFirst({
         where: and(
           eq(categoryRoutes.productId, productId),

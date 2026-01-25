@@ -65,7 +65,7 @@ export default function TicketDetailPage() {
         const res = await fetch(`/api/tob/tickets/${ticketId}`, {
           credentials: "include",
         });
-        const data = await res.json();
+        const data = (await res.json()) as { ok: boolean; data: { ticket: TicketDetail; timeline: TimelineEntry[] } };
         if (data.ok) {
           setTicket(data.data.ticket);
           setTimeline(data.data.timeline || []);
@@ -92,14 +92,14 @@ export default function TicketDetailPage() {
         credentials: "include",
         body: JSON.stringify({ content: replyContent }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as { ok: boolean };
       if (data.ok) {
         setReplyContent("");
         // Refresh ticket data
         const refreshRes = await fetch(`/api/tob/tickets/${ticketId}`, {
           credentials: "include",
         });
-        const refreshData = await refreshRes.json();
+        const refreshData = (await refreshRes.json()) as { ok: boolean; data: { ticket: TicketDetail; timeline: TimelineEntry[] } };
         if (refreshData.ok) {
           setTicket(refreshData.data.ticket);
           setTimeline(refreshData.data.timeline || []);

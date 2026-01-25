@@ -4,15 +4,11 @@ import { nextCookies } from "better-auth/next-js";
 import { getDb, getEnv } from "@/lib/db";
 import * as schema from "@/drizzle/schema";
 
-let authInstance: ReturnType<typeof betterAuth> | null = null;
-
 export const getAuth = () => {
-  if (authInstance) return authInstance;
-
   const db = getDb();
   const env = getEnv();
 
-  authInstance = betterAuth({
+  return betterAuth({
     database: drizzleAdapter(db, {
       provider: "sqlite",
       schema: {
@@ -30,8 +26,6 @@ export const getAuth = () => {
     },
     plugins: [nextCookies()],
   });
-
-  return authInstance;
 };
 
 export type Auth = ReturnType<typeof getAuth>;

@@ -27,7 +27,7 @@ export default function AdminInstallPage() {
     async function checkInstallStatus() {
       try {
         const res = await fetch("/api/tob/install");
-        const data = await res.json();
+        const data = (await res.json()) as { ok: boolean; data: { needsInstall: boolean } };
         if (data.ok && data.data.needsInstall) {
           setNeedsInstall(true);
         } else {
@@ -76,7 +76,7 @@ export default function AdminInstallPage() {
         }),
       });
 
-      const data = await res.json();
+      const data = (await res.json()) as { ok: boolean; error?: string };
       if (data.ok) {
         router.push("/admin/login");
       } else {

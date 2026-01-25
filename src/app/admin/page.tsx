@@ -40,7 +40,7 @@ export default function AdminDashboardPage() {
         const res = await fetch("/api/tob/dashboard", {
           credentials: "include",
         });
-        const data = await res.json();
+        const data = (await res.json()) as { ok: boolean; data: { stats: DashboardStats; recentTickets: RecentTicket[] } };
         if (data.ok) {
           setStats(data.data.stats);
           setRecentTickets(data.data.recentTickets || []);

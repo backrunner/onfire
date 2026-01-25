@@ -217,7 +217,10 @@ export async function POST(
       );
     }
 
-    const body = await request.json();
+    const body = (await request.json()) as {
+      content?: string;
+      internal?: boolean;
+    };
     const now = new Date().toISOString();
 
     // Handle reply

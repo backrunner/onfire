@@ -6,7 +6,12 @@ import { eq, and } from "drizzle-orm";
 // POST /api/toc/tokens - Issue JWT token
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = (await request.json()) as {
+      apiKey?: string;
+      email?: string;
+      externalId?: string;
+      level?: number;
+    };
     const { apiKey, email, externalId, level } = body;
 
     if (!apiKey || !email) {
