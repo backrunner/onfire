@@ -15,6 +15,17 @@ const TOC_DOMAINS = [
   "127.0.0.1",
 ];
 
+// Port-based routing configuration
+const TOC_PORT = process.env.NEXT_PUBLIC_TOC_PORT || "3000";
+const TOB_PORT = process.env.NEXT_PUBLIC_TOB_PORT || "3001";
+
+function isPortBasedRoutingEnabled(): boolean {
+  return (
+    process.env.NEXT_PUBLIC_PORT_ROUTING === "true" ||
+    process.env.NODE_ENV === "development"
+  );
+}
+
 export function middleware(request: NextRequest) {
   const host = request.headers.get("host") || "";
   const pathname = request.nextUrl.pathname;
@@ -27,6 +38,27 @@ export function middleware(request: NextRequest) {
     pathname.includes(".")
   ) {
     return NextResponse.next();
+  }
+
+  // Port-based routing (development mode or explicitly enabled)
+  if (isPortBasedRoutingEnabled()) {
+    const port = host.split(":")[1];
+
+    // ToB port → rewrite to /admin routes
+    if (port === TOB_PORT) {
+      if (pathname.startsWith("/admin")) {
+        return NextResponse.next();
+      }
+      return NextResponse.rewrite(new URL(`/admin${pathname}`, request.url));
+    }
+
+    // ToC port → ensure not accessing /admin
+    if (port === TOC_PORT) {
+      if (pathname.startsWith("/admin")) {
+        return NextResponse.redirect(new URL("/", request.url));
+      }
+      return NextResponse.next();
+    }
   }
 
   // Check if this is an admin domain

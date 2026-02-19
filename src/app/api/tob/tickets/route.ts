@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { getAuth } from "@/lib/auth";
-import {
-  tickets,
-  users,
-  agents,
-  agentTeams,
-  productTeams,
-} from "@/drizzle/schema";
+import { resolveUserContext } from "@/lib/api-utils";
+import { tickets } from "@/drizzle/schema";
 import {
   TicketStatus,
   TicketPriority,
@@ -53,38 +48,6 @@ const enrichTicket = (row: typeof tickets.$inferSelect | null | undefined) => {
 };
 
 const weightPriority: Record<string, number> = { high: 0, medium: 1, low: 2 };
-
-async function resolveUserContext(db: ReturnType<typeof getDb>, userId: string) {
-  const userProfile = await db.query.users.findFirst({
-    where: eq(users.id, userId),
-  });
-
-  if (!userProfile) {
-    return null;
-  }
-
-  const agentTeamRows = await db
-    .select()
-    .from(agentTeams)
-    .where(eq(agentTeams.userId, userId));
-  const teamIds = agentTeamRows.map((at) => at.teamId);
-
-  let productIds: string[] = [];
-  if (teamIds.length > 0) {
-    const productTeamRows = await db
-      .select()
-      .from(productTeams)
-      .where(inArray(productTeams.teamId, teamIds));
-    productIds = [...new Set(productTeamRows.map((pt) => pt.productId))];
-  }
-
-  return {
-    user: userProfile,
-    tenantIds: [userProfile.tenantId],
-    productIds,
-    teamIds,
-  };
-}
 
 export async function GET(request: NextRequest) {
   try {

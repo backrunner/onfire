@@ -6,3 +6,9 @@ AUTH_SECRET=REPLACE_WITH_RANDOM_SECRET
 
 # ToC Worker - Turnstile test secret (always passes in dev)
 TURNSTILE_SECRET=1x0000000000000000000000000000000AA
+
+# Feature Flags (optional - defaults shown)
+# NEXT_PUBLIC_DEBUG_MODE=true        # Show debug details in error pages
+# NEXT_PUBLIC_PORT_ROUTING=true      # Enable port-based routing (ToC:3000, ToB:3001)
+# NEXT_PUBLIC_TOC_PORT=3000          # ToC port
+# NEXT_PUBLIC_TOB_PORT=3001          # ToB port

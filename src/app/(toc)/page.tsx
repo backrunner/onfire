@@ -1,68 +1,207 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Suspense, useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
+import { useTocCredentials } from "@/lib/hooks/use-toc-credentials";
+import { CredentialError } from "@/components/toc/credential-error";
+import { TocHeader } from "@/components/toc/toc-header";
+import { TicketForm } from "@/components/toc/ticket-form";
+import { TicketList } from "@/components/toc/ticket-list";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TicketStatus, TicketPriority } from "@/lib/types";
+import { PlusCircle, List, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-export default function TocHomePage() {
+interface Template {
+  id: string;
+  title: string;
+  categories: string[];
+  formSchema?: {
+    fields?: Array<{
+      key: string;
+      label: string;
+      type: "text" | "textarea" | "number" | "email" | "select";
+      required?: boolean;
+      placeholder?: string;
+      options?: string[];
+    }>;
+  };
+}
+
+interface TicketSummary {
+  id: string;
+  subject: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface CustomerInfo {
+  email: string;
+  productName?: string;
+}
+
+function TocHomeContent() {
   const { t } = useI18n();
-  const [productId, setProductId] = useState("");
-  const [token, setToken] = useState("");
+  const router = useRouter();
+  const { credentials, isValid, missingFields } = useTocCredentials();
+  const [activeTab, setActiveTab] = useState("submit");
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [tickets, setTickets] = useState<TicketSummary[]>([]);
+  const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
+  const [loadingTemplates, setLoadingTemplates] = useState(true);
+  const [loadingTickets, setLoadingTickets] = useState(true);
+
+  const productId = credentials.productId || "";
+  const token = credentials.token || "";
+
+  const fetchTemplates = useCallback(async () => {
+    if (!productId || !token) return;
+
+    try {
+      const res = await fetch(`/api/toc/templates?productId=${productId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = (await res.json()) as { ok: boolean; data: Template[] };
+      if (data.ok) {
+        setTemplates(data.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch templates:", error);
+    } finally {
+      setLoadingTemplates(false);
+    }
+  }, [productId, token]);
+
+  const fetchTickets = useCallback(async () => {
+    if (!productId || !token) return;
+
+    setLoadingTickets(true);
+    try {
+      const res = await fetch(`/api/toc/tickets?productId=${productId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = (await res.json()) as { ok: boolean; data: TicketSummary[] };
+      if (data.ok) {
+        setTickets(data.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch tickets:", error);
+    } finally {
+      setLoadingTickets(false);
+    }
+  }, [productId, token]);
+
+  const fetchCustomerInfo = useCallback(async () => {
+    if (!token) return;
+
+    try {
+      const res = await fetch("/api/toc/whoami", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = (await res.json()) as { ok: boolean; data: CustomerInfo };
+      if (data.ok) {
+        setCustomerInfo(data.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch customer info:", error);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (isValid) {
+      fetchTemplates();
+      fetchTickets();
+      fetchCustomerInfo();
+    }
+  }, [isValid, fetchTemplates, fetchTickets, fetchCustomerInfo]);
+
+  if (!isValid) {
+    return <CredentialError missingFields={missingFields} />;
+  }
+
+  const handleTicketCreated = (ticketId: string) => {
+    setActiveTab("list");
+    fetchTickets();
+  };
+
+  const handleTicketSelect = (ticketId: string) => {
+    router.push(`/tickets/${ticketId}?productId=${productId}&token=${token}`);
+  };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold">OnFire Support</h1>
-        <p className="text-muted-foreground mt-2">
-          Submit and track your support tickets
-        </p>
-      </div>
+    <div className="min-h-screen flex flex-col">
+      <TocHeader
+        productName={customerInfo?.productName}
+        customerEmail={customerInfo?.email}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Access Your Tickets</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="productId">Product ID</Label>
-            <Input
-              id="productId"
-              placeholder="Enter your product ID"
-              value={productId}
-              onChange={(e) => setProductId(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="token">Access Token</Label>
-            <Input
-              id="token"
-              type="password"
-              placeholder="Enter your access token"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-            />
-          </div>
-          <Button className="w-full" disabled={!productId || !token}>
-            View My Tickets
-          </Button>
-        </CardContent>
-      </Card>
+      <main className="flex-1 container mx-auto px-4 py-6 max-w-2xl">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <div className="flex items-center justify-between mb-6">
+            <TabsList>
+              <TabsTrigger value="submit" className="gap-2">
+                <PlusCircle className="h-4 w-4" />
+                {t.toc.tabs?.submit || "Submit Ticket"}
+              </TabsTrigger>
+              <TabsTrigger value="list" className="gap-2">
+                <List className="h-4 w-4" />
+                {t.toc.tabs?.list || "My Tickets"}
+              </TabsTrigger>
+            </TabsList>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Need Help?</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">
-            Contact your service provider to get your product ID and access
-            token. These credentials allow you to submit and track support
-            tickets.
-          </p>
-        </CardContent>
-      </Card>
+            {activeTab === "list" && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={fetchTickets}
+                disabled={loadingTickets}
+              >
+                <RefreshCw className={`h-4 w-4 ${loadingTickets ? "animate-spin" : ""}`} />
+              </Button>
+            )}
+          </div>
+
+          <TabsContent value="submit" className="mt-0">
+            {loadingTemplates ? (
+              <div className="flex justify-center py-8">
+                <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <TicketForm
+                productId={productId}
+                token={token}
+                templates={templates}
+                onSuccess={handleTicketCreated}
+              />
+            )}
+          </TabsContent>
+
+          <TabsContent value="list" className="mt-0">
+            <TicketList
+              tickets={tickets}
+              loading={loadingTickets}
+              onSelect={handleTicketSelect}
+            />
+          </TabsContent>
+        </Tabs>
+      </main>
     </div>
+  );
+}
+
+export default function TocHomePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex justify-center items-center min-h-screen">
+          <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
+      <TocHomeContent />
+    </Suspense>
   );
 }

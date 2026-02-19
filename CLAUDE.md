@@ -4,13 +4,14 @@ OnFire is a minimalist modern ticket system designed to enable users to quickly 
 
 ## Tech Stack
 
-- **Runtime**: Node.js + Cloudflare Workers
-- **Framework**: Next.js 15 (App Router) + OpenNext/Cloudflare
+- **Runtime**: Node.js 22+ + Cloudflare Workers
+- **Framework**: Next.js 16 (App Router) + OpenNext/Cloudflare
 - **Database**: Cloudflare D1 (SQLite) + Drizzle ORM
 - **Authentication**: Better Auth (ToB) / JWT + API Key (ToC)
 - **Frontend**: React 19 + TypeScript
 - **UI Components**: shadcn/ui (zinc theme)
 - **Styling**: Tailwind CSS 4
+- **AI**: Vercel AI SDK v6 (支持 OpenAI/Anthropic/Google/xAI/DeepSeek)
 
 ## Project Structure
 
@@ -196,6 +197,14 @@ Product administrators can configure different SLA timeframes for each priority:
 
 Overdue tickets are marked as breached in the system and displayed with alerts on the Dashboard.
 
+### Auto-Close Configuration
+
+Product administrators can configure automatic ticket closure:
+
+- **Auto-Close Timeout** (autoCloseMinutes): Minutes of customer inactivity before auto-closing a ticket in "replied" status
+- When set, tickets in "replied" status will be automatically closed if the customer doesn't respond within the configured time
+- Set to `null` to disable auto-close for a product
+
 ---
 
 ## Ticket Assignment Mechanism
@@ -227,6 +236,44 @@ Lower-level agents can escalate tickets they cannot handle:
 Team administrators can control whether agents can reassign tickets:
 - If allowed, agents can reassign to others within the current team
 - Reassignment resets SLA timers
+
+---
+
+## Notification System
+
+OnFire supports multi-channel notifications to keep agents informed about ticket events.
+
+### Notification Channels
+
+| Channel | Description |
+|---------|-------------|
+| Email | Email notifications via configured provider |
+| PushDeer | iOS/macOS push notifications |
+| Bark | iOS push notifications |
+| ntfy | Open-source push notification service |
+| Telegram | Telegram bot notifications |
+| Discord | Discord webhook notifications |
+
+### Notification Events
+
+Each notification channel can be configured to trigger on specific events:
+
+| Event | Description |
+|-------|-------------|
+| ticket_created | New ticket has been created |
+| ticket_assigned | Ticket assigned to an agent |
+| ticket_reassigned | Ticket reassigned to a different agent |
+| ticket_escalated | Ticket escalated to higher-level agent |
+| ticket_expiring | Ticket SLA is about to breach |
+| customer_replied | Customer has replied to a ticket |
+| ticket_closed | Ticket has been closed |
+
+### Channel Configuration
+
+Each product can have multiple notification channels configured:
+- **Channel Type**: Select from available notification providers
+- **Trigger Events**: Choose which events trigger notifications
+- **Channel Config**: Provider-specific configuration (API keys, webhook URLs, etc.)
 
 ---
 
@@ -495,7 +542,7 @@ const url = await client.buildTocUrlWithSigning(productId, {
 | Table | Description |
 |-------|-------------|
 | tenants | Tenants |
-| products | Products |
+| products | Products (with SLA and auto-close settings) |
 | teams | Teams |
 | product_teams | Product-Team association (many-to-many) |
 | users | System users |
@@ -513,6 +560,8 @@ const url = await client.buildTocUrlWithSigning(productId, {
 | email_templates | Email templates |
 | inbound_emails | Inbound email logs |
 | outbound_emails | Outbound email logs |
+| notification_channels | Notification channel configuration |
+| notification_logs | Notification delivery logs |
 
 ---
 

@@ -6,22 +6,25 @@ import {
   products,
   agentProfiles,
   users,
+  customers,
 } from "@/drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import type { NotificationTriggerEvent } from "@/drizzle/schema";
+import { createChannel, type ChannelConfig } from "./channels";
 
 export interface SendNotificationOptions {
   ticketId: string;
-  agentId: string;
+  agentId?: string;
   triggerEvent: NotificationTriggerEvent;
   previousAgentName?: string;
+  customerEmail?: string;
 }
 
 export async function sendAgentNotification(
   db: Database,
   options: SendNotificationOptions
 ): Promise<void> {
-  const { ticketId, agentId, triggerEvent, previousAgentName } = options;
+  const { ticketId, agentId, triggerEvent, previousAgentName, customerEmail } = options;
 
   // Get ticket
   const ticket = await db.query.tickets.findFirst({
@@ -61,25 +64,28 @@ export async function sendAgentNotification(
       channelId: channel.id,
       channelType: channel.channelType,
       ticketId,
-      agentId,
+      agentId: agentId || "",
       triggerEvent,
       status: "pending",
       createdAt: now,
     });
 
     try {
-      // Get agent info
-      const profile = await db.query.agentProfiles.findFirst({
-        where: eq(agentProfiles.userId, agentId),
-      });
-      const agentName =
-        profile?.displayName ||
-        (
-          await db.query.users.findFirst({
-            where: eq(users.id, agentId),
-          })
-        )?.displayName ||
-        "Agent";
+      // Get agent info if available
+      let agentName = "System";
+      if (agentId) {
+        const profile = await db.query.agentProfiles.findFirst({
+          where: eq(agentProfiles.userId, agentId),
+        });
+        agentName =
+          profile?.displayName ||
+          (
+            await db.query.users.findFirst({
+              where: eq(users.id, agentId),
+            })
+          )?.displayName ||
+          "Agent";
+      }
 
       // Get product name
       const product = await db.query.products.findFirst({
@@ -94,20 +100,34 @@ export async function sendAgentNotification(
         agentName,
         productName: product?.name || "",
         previousAgentName,
+        customerEmail: customerEmail || ticket.customerEmail,
       });
 
-      // TODO: Send via channel provider
-      console.log(
-        `Notification [${channel.channelType}] to ${agentId}: ${message}`
-      );
+      // Create channel provider and send
+      const channelConfig: ChannelConfig = {
+        type: channel.channelType,
+        config: JSON.parse(channel.config || "{}"),
+      };
 
-      // Update log as sent
-      await db
-        .update(notificationLogs)
-        .set({ status: "sent", sentAt: new Date().toISOString() })
-        .where(eq(notificationLogs.id, logId));
+      const provider = await createChannel(channelConfig);
+      const result = await provider.send({
+        title: message.title,
+        body: message.body,
+        url: message.url,
+      });
+
+      if (result.success) {
+        await db
+          .update(notificationLogs)
+          .set({ status: "sent", sentAt: new Date().toISOString() })
+          .where(eq(notificationLogs.id, logId));
+      } else {
+        await db
+          .update(notificationLogs)
+          .set({ status: "failed", errorMessage: result.error })
+          .where(eq(notificationLogs.id, logId));
+      }
     } catch (error) {
-      // Update log as failed
       await db
         .update(notificationLogs)
         .set({
@@ -126,7 +146,8 @@ function buildNotificationMessage(params: {
   agentName: string;
   productName: string;
   previousAgentName?: string;
-}): string {
+  customerEmail?: string;
+}): { title: string; body: string; url?: string } {
   const {
     triggerEvent,
     ticketId,
@@ -134,16 +155,51 @@ function buildNotificationMessage(params: {
     agentName,
     productName,
     previousAgentName,
+    customerEmail,
   } = params;
 
+  const shortId = ticketId.slice(-8);
+
   switch (triggerEvent) {
+    case "ticket_created":
+      return {
+        title: `New Ticket Created`,
+        body: `[#${shortId}] ${ticketSubject}\n\nFrom: ${customerEmail || "Unknown"}\nProduct: ${productName}`,
+      };
     case "ticket_assigned":
-      return `New ticket assigned to ${agentName}: [${ticketId}] ${ticketSubject} (${productName})`;
+      return {
+        title: `New Ticket Assigned`,
+        body: `[#${shortId}] ${ticketSubject}\n\nAssigned to: ${agentName}\nProduct: ${productName}`,
+      };
     case "ticket_reassigned":
-      return `Ticket reassigned from ${previousAgentName || "another agent"} to ${agentName}: [${ticketId}] ${ticketSubject}`;
+      return {
+        title: `Ticket Reassigned`,
+        body: `[#${shortId}] ${ticketSubject}\n\nReassigned from ${previousAgentName || "another agent"} to ${agentName}`,
+      };
     case "ticket_escalated":
-      return `Ticket escalated to ${agentName}: [${ticketId}] ${ticketSubject} (from ${previousAgentName || "another agent"})`;
+      return {
+        title: `Ticket Escalated`,
+        body: `[#${shortId}] ${ticketSubject}\n\nEscalated to: ${agentName}\nFrom: ${previousAgentName || "another agent"}`,
+      };
+    case "ticket_expiring":
+      return {
+        title: `Ticket SLA Expiring Soon`,
+        body: `[#${shortId}] ${ticketSubject}\n\nAssigned to: ${agentName}\nProduct: ${productName}\n\nPlease respond before SLA breach.`,
+      };
+    case "customer_replied":
+      return {
+        title: `Customer Replied`,
+        body: `[#${shortId}] ${ticketSubject}\n\nCustomer: ${customerEmail || "Unknown"}\nAssigned to: ${agentName}`,
+      };
+    case "ticket_closed":
+      return {
+        title: `Ticket Closed`,
+        body: `[#${shortId}] ${ticketSubject}\n\nProduct: ${productName}\nHandled by: ${agentName}`,
+      };
     default:
-      return `Notification for ${agentName}: [${ticketId}] ${ticketSubject}`;
+      return {
+        title: `Ticket Notification`,
+        body: `[#${shortId}] ${ticketSubject}\n\nAgent: ${agentName}`,
+      };
   }
 }

@@ -11,7 +11,14 @@
     {
       "binding": "DB",
       "database_name": "onfire-d1",
-      "database_id": "your-database-id"
+      "database_id": "your-database-id",
+      "migrations_dir": "drizzle/migrations"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      "id": "your-kv-namespace-id"
     }
   ],
   "r2_buckets": [

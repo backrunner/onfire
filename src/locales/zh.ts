@@ -480,6 +480,140 @@ export const zh = {
     serverError: '服务器错误',
     networkError: '网络错误',
     unknownError: '未知错误'
+  },
+
+  // Search
+  search: {
+    title: '高级搜索',
+    subtitle: '使用多条件筛选搜索工单',
+    filters: '搜索条件',
+    keyword: '关键词',
+    keywordPlaceholder: '主题、内容、ID...',
+    customerEmail: '客户邮箱',
+    dateFrom: '开始日期',
+    dateTo: '结束日期',
+    results: '搜索结果',
+    found: '条记录',
+    noResults: '未找到符合条件的工单',
+    subject: '主题',
+    page: '第'
+  },
+
+  // ToC
+  toc: {
+    errors: {
+      configurationError: '配置错误',
+      missingCredentialsMessage: '访问此支持门户需要有效的凭证。请确保您的链接包含正确的产品 ID 和访问令牌。',
+      contactProvider: '请联系您的服务提供商获取正确的访问链接。',
+      technicalDetails: '技术详情'
+    },
+    tabs: {
+      submit: '提交工单',
+      list: '我的工单'
+    },
+    submit: {
+      title: '提交工单',
+      template: '模板',
+      selectTemplate: '选择模板',
+      category: '分类',
+      selectCategory: '选择分类',
+      subject: '主题',
+      subjectPlaceholder: '简要描述您的问题',
+      content: '详细描述',
+      contentPlaceholder: '请详细描述您遇到的问题'
+    },
+    list: {
+      noTickets: '暂无工单',
+      noTicketsHint: '提交工单后将显示在这里'
+    },
+    detail: {
+      agentReply: '客服回复',
+      replyPlaceholder: '输入您的回复...',
+      ticketClosed: '此工单已关闭，无法继续回复。'
+    }
+  },
+
+  // AI
+  ai: {
+    title: 'AI 配置',
+    subtitle: '配置 AI 功能和知识库',
+    tabs: {
+      config: '配置',
+      knowledge: '知识库',
+      documents: '文档'
+    },
+    config: {
+      taskType: '任务类型',
+      provider: '服务商',
+      model: '模型',
+      apiKey: 'API 密钥',
+      apiKeyPlaceholder: '输入 API 密钥',
+      baseUrl: '自定义 API 地址',
+      baseUrlPlaceholder: 'https://api.example.com/v1',
+      enabled: '启用',
+      save: '保存配置',
+      delete: '删除配置',
+      noConfig: '暂无 AI 配置',
+      addConfig: '添加配置',
+      taskTypes: {
+        agent: 'AI 助手',
+        prescreening: '工单预审',
+        prereply: '预回复生成',
+        embedding: '向量嵌入'
+      },
+      providers: {
+        openai: 'OpenAI',
+        anthropic: 'Anthropic',
+        google: 'Google AI',
+        xai: 'xAI (Grok)',
+        deepseek: 'DeepSeek'
+      }
+    },
+    knowledge: {
+      title: '知识库',
+      add: '添加知识',
+      edit: '编辑知识',
+      titleLabel: '标题',
+      titlePlaceholder: '知识条目标题',
+      content: '内容',
+      contentPlaceholder: '知识内容...',
+      type: '类型',
+      types: {
+        description: '产品描述',
+        faq: '常见问题',
+        feature: '功能说明',
+        policy: '政策条款',
+        troubleshooting: '故障排除'
+      },
+      noKnowledge: '暂无知识条目',
+      reembed: '重新生成向量',
+      embedded: '已向量化',
+      notEmbedded: '未向量化'
+    },
+    documents: {
+      title: '文档管理',
+      upload: '上传文档',
+      uploadHint: '支持 PDF、TXT、MD、DOC、DOCX 格式',
+      filename: '文件名',
+      size: '大小',
+      status: '状态',
+      statuses: {
+        pending: '待处理',
+        processing: '处理中',
+        ready: '就绪',
+        error: '错误'
+      },
+      noDocuments: '暂无文档',
+      reprocess: '重新处理',
+      delete: '删除'
+    },
+    chat: {
+      title: 'AI 助手',
+      placeholder: '输入问题...',
+      send: '发送',
+      clear: '清空对话',
+      thinking: '思考中...'
+    }
   }
 };
 

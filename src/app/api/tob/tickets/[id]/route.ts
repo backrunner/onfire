@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { getAuth } from "@/lib/auth";
+import { resolveUserContext } from "@/lib/api-utils";
 import {
   tickets,
   replies,
   history,
-  users,
-  agentTeams,
-  productTeams,
 } from "@/drizzle/schema";
 import { TicketStatus, hasPermission, Role } from "@/lib/types";
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 const parseJson = (val: string | null | undefined): unknown => {
   if (val === null || val === undefined) return undefined;
@@ -52,36 +50,6 @@ const enrichHistory = (rows: (typeof history.$inferSelect)[]) =>
     ...h,
     snapshot: parseJson(h.snapshot),
   }));
-
-async function resolveUserContext(db: ReturnType<typeof getDb>, userId: string) {
-  const userProfile = await db.query.users.findFirst({
-    where: eq(users.id, userId),
-  });
-
-  if (!userProfile) return null;
-
-  const agentTeamRows = await db
-    .select()
-    .from(agentTeams)
-    .where(eq(agentTeams.userId, userId));
-  const teamIds = agentTeamRows.map((at) => at.teamId);
-
-  let productIds: string[] = [];
-  if (teamIds.length > 0) {
-    const productTeamRows = await db
-      .select()
-      .from(productTeams)
-      .where(inArray(productTeams.teamId, teamIds));
-    productIds = [...new Set(productTeamRows.map((pt) => pt.productId))];
-  }
-
-  return {
-    user: userProfile,
-    tenantIds: [userProfile.tenantId],
-    productIds,
-    teamIds,
-  };
-}
 
 export async function GET(
   request: NextRequest,

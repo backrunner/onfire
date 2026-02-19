@@ -81,6 +81,8 @@ export const products = sqliteTable("products", {
   slaMediumReply: integer("sla_medium_reply"),
   slaLowAccept: integer("sla_low_accept"),
   slaLowReply: integer("sla_low_reply"),
+  // Auto-close settings: minutes of customer inactivity before auto-closing
+  autoCloseMinutes: integer("auto_close_minutes"),
 });
 
 export const customers = sqliteTable("customers", {
@@ -435,9 +437,13 @@ export type NotificationChannelType =
   | "telegram"
   | "discord";
 export type NotificationTriggerEvent =
+  | "ticket_created"
   | "ticket_assigned"
   | "ticket_reassigned"
-  | "ticket_escalated";
+  | "ticket_escalated"
+  | "ticket_expiring"
+  | "customer_replied"
+  | "ticket_closed";
 export type NotificationStatus = "pending" | "sent" | "failed";
 
 export const notificationChannels = sqliteTable("notification_channels", {

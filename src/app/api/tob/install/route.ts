@@ -19,6 +19,17 @@ export async function GET() {
       },
     });
   } catch (error) {
+    // If table doesn't exist, installation is needed
+    const errorMessage = String(error);
+    if (errorMessage.includes("no such table") || errorMessage.includes("SQLITE_ERROR")) {
+      return NextResponse.json({
+        ok: true,
+        data: {
+          needsInstall: true,
+        },
+      });
+    }
+
     console.error("Error in GET /api/tob/install:", error);
     return NextResponse.json(
       { ok: false, error: "Internal server error" },

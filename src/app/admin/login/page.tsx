@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
@@ -12,10 +12,29 @@ import { Label } from "@/components/ui/label";
 export default function AdminLoginPage() {
   const { t } = useI18n();
   const router = useRouter();
+  const [checkingInstall, setCheckingInstall] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function checkInstallStatus() {
+      try {
+        const res = await fetch("/api/tob/install");
+        const data = (await res.json()) as { ok?: boolean; data?: { needsInstall?: boolean } };
+        if (data.ok && data.data?.needsInstall) {
+          router.push("/admin/install");
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to check install status:", err);
+      } finally {
+        setCheckingInstall(false);
+      }
+    }
+    checkInstallStatus();
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +58,14 @@ export default function AdminLoginPage() {
       setLoading(false);
     }
   };
+
+  if (checkingInstall) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-muted-foreground">{t.common.loading}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">

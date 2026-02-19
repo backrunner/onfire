@@ -482,5 +482,139 @@ export const en: Translations = {
     serverError: 'Server error',
     networkError: 'Network error',
     unknownError: 'Unknown error'
+  },
+
+  // Search
+  search: {
+    title: 'Advanced Search',
+    subtitle: 'Search tickets with multiple filters',
+    filters: 'Search Filters',
+    keyword: 'Keyword',
+    keywordPlaceholder: 'Subject, content, ID...',
+    customerEmail: 'Customer Email',
+    dateFrom: 'From Date',
+    dateTo: 'To Date',
+    results: 'Results',
+    found: 'found',
+    noResults: 'No tickets found matching your criteria',
+    subject: 'Subject',
+    page: 'Page'
+  },
+
+  // ToC
+  toc: {
+    errors: {
+      configurationError: 'Configuration Error',
+      missingCredentialsMessage: 'Valid credentials are required to access this support portal. Please ensure your link includes the correct product ID and access token.',
+      contactProvider: 'Please contact your service provider to obtain the correct access link.',
+      technicalDetails: 'Technical Details'
+    },
+    tabs: {
+      submit: 'Submit Ticket',
+      list: 'My Tickets'
+    },
+    submit: {
+      title: 'Submit a Ticket',
+      template: 'Template',
+      selectTemplate: 'Select a template',
+      category: 'Category',
+      selectCategory: 'Select a category',
+      subject: 'Subject',
+      subjectPlaceholder: 'Brief description of your issue',
+      content: 'Description',
+      contentPlaceholder: 'Please describe your issue in detail'
+    },
+    list: {
+      noTickets: 'No tickets found',
+      noTicketsHint: 'Submit a ticket to get started'
+    },
+    detail: {
+      agentReply: 'Support Agent',
+      replyPlaceholder: 'Enter your reply...',
+      ticketClosed: 'This ticket is closed and no longer accepts replies.'
+    }
+  },
+
+  // AI
+  ai: {
+    title: 'AI Configuration',
+    subtitle: 'Configure AI features and knowledge base',
+    tabs: {
+      config: 'Configuration',
+      knowledge: 'Knowledge Base',
+      documents: 'Documents'
+    },
+    config: {
+      taskType: 'Task Type',
+      provider: 'Provider',
+      model: 'Model',
+      apiKey: 'API Key',
+      apiKeyPlaceholder: 'Enter API key',
+      baseUrl: 'Custom API URL',
+      baseUrlPlaceholder: 'https://api.example.com/v1',
+      enabled: 'Enabled',
+      save: 'Save Configuration',
+      delete: 'Delete Configuration',
+      noConfig: 'No AI configuration',
+      addConfig: 'Add Configuration',
+      taskTypes: {
+        agent: 'AI Assistant',
+        prescreening: 'Ticket Prescreening',
+        prereply: 'Pre-reply Generation',
+        embedding: 'Vector Embedding'
+      },
+      providers: {
+        openai: 'OpenAI',
+        anthropic: 'Anthropic',
+        google: 'Google AI',
+        xai: 'xAI (Grok)',
+        deepseek: 'DeepSeek'
+      }
+    },
+    knowledge: {
+      title: 'Knowledge Base',
+      add: 'Add Knowledge',
+      edit: 'Edit Knowledge',
+      titleLabel: 'Title',
+      titlePlaceholder: 'Knowledge entry title',
+      content: 'Content',
+      contentPlaceholder: 'Knowledge content...',
+      type: 'Type',
+      types: {
+        description: 'Product Description',
+        faq: 'FAQ',
+        feature: 'Feature',
+        policy: 'Policy',
+        troubleshooting: 'Troubleshooting'
+      },
+      noKnowledge: 'No knowledge entries',
+      reembed: 'Regenerate Vectors',
+      embedded: 'Vectorized',
+      notEmbedded: 'Not Vectorized'
+    },
+    documents: {
+      title: 'Document Management',
+      upload: 'Upload Document',
+      uploadHint: 'Supports PDF, TXT, MD, DOC, DOCX formats',
+      filename: 'Filename',
+      size: 'Size',
+      status: 'Status',
+      statuses: {
+        pending: 'Pending',
+        processing: 'Processing',
+        ready: 'Ready',
+        error: 'Error'
+      },
+      noDocuments: 'No documents',
+      reprocess: 'Reprocess',
+      delete: 'Delete'
+    },
+    chat: {
+      title: 'AI Assistant',
+      placeholder: 'Enter your question...',
+      send: 'Send',
+      clear: 'Clear Chat',
+      thinking: 'Thinking...'
+    }
   }
 };

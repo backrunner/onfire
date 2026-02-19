@@ -1,45 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { getAuth } from "@/lib/auth";
-import {
-  tickets,
-  products,
-  users,
-  agentTeams,
-  productTeams,
-} from "@/drizzle/schema";
+import { tickets, products } from "@/drizzle/schema";
 import { TicketStatus, hasPermission, Role } from "@/lib/types";
-import { eq, inArray, and, or, desc } from "drizzle-orm";
-
-async function resolveUserContext(db: ReturnType<typeof getDb>, userId: string) {
-  const userProfile = await db.query.users.findFirst({
-    where: eq(users.id, userId),
-  });
-
-  if (!userProfile) return null;
-
-  const agentTeamRows = await db
-    .select()
-    .from(agentTeams)
-    .where(eq(agentTeams.userId, userId));
-  const teamIds = agentTeamRows.map((at) => at.teamId);
-
-  let productIds: string[] = [];
-  if (teamIds.length > 0) {
-    const productTeamRows = await db
-      .select()
-      .from(productTeams)
-      .where(inArray(productTeams.teamId, teamIds));
-    productIds = [...new Set(productTeamRows.map((pt) => pt.productId))];
-  }
-
-  return {
-    user: userProfile,
-    tenantIds: [userProfile.tenantId],
-    productIds,
-    teamIds,
-  };
-}
+import { eq, inArray, or, desc, sql, and } from "drizzle-orm";
+import { resolveUserContext } from "@/lib/api-utils";
 
 export async function GET(request: NextRequest) {
   try {
@@ -72,31 +37,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get all tickets for the user's tenants
-    const allTickets = await db
-      .select()
+    // Use database aggregation instead of loading all tickets into memory
+    const statsResult = await db
+      .select({
+        pending: sql<number>`COUNT(CASE WHEN ${tickets.status} IN ('new', 'processing') THEN 1 END)`,
+        escalated: sql<number>`COUNT(CASE WHEN ${tickets.status} = 'escalated' THEN 1 END)`,
+        overdue: sql<number>`COUNT(CASE WHEN ${tickets.slaAcceptBreached} = 1 OR ${tickets.slaReplyBreached} = 1 THEN 1 END)`,
+      })
       .from(tickets)
       .where(inArray(tickets.tenantId, ctx.tenantIds));
 
-    // Calculate stats
-    const pendingCount = allTickets.filter(
-      (t) =>
-        t.status === TicketStatus.New || t.status === TicketStatus.Processing
-    ).length;
-
-    const escalatedCount = allTickets.filter(
-      (t) => t.status === TicketStatus.Escalated
-    ).length;
-
-    const overdueCount = allTickets.filter(
-      (t) => t.slaAcceptBreached || t.slaReplyBreached
-    ).length;
+    const stats = statsResult[0] || { pending: 0, escalated: 0, overdue: 0 };
 
     // Get product count
-    const productList = await db
-      .select()
+    const productCountResult = await db
+      .select({ count: sql<number>`COUNT(*)` })
       .from(products)
       .where(inArray(products.tenantId, ctx.tenantIds));
+
+    const productCount = productCountResult[0]?.count || 0;
 
     // Get recent tickets
     const recentTickets = await db
@@ -106,18 +65,23 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(tickets.createdAt))
       .limit(5);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       ok: true,
       data: {
         stats: {
-          pending: pendingCount,
-          escalated: escalatedCount,
-          overdue: overdueCount,
-          products: productList.length,
+          pending: Number(stats.pending),
+          escalated: Number(stats.escalated),
+          overdue: Number(stats.overdue),
+          products: Number(productCount),
         },
         recentTickets,
       },
     });
+
+    // Add cache headers for dashboard data (short TTL)
+    response.headers.set("Cache-Control", "private, max-age=60");
+
+    return response;
   } catch (error) {
     console.error("Error in GET /api/tob/dashboard:", error);
     return NextResponse.json(

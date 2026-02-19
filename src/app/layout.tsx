@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { I18nProvider } from "@/lib/i18n";
+import { ServiceWorkerRegister } from "@/components/sw-register";
 
 export const metadata: Metadata = {
   title: "OnFire - Modern Ticket System",
@@ -24,6 +25,7 @@ export default function RootLayout({
         >
           <I18nProvider>{children}</I18nProvider>
         </ThemeProvider>
+        <ServiceWorkerRegister />
       </body>
     </html>
   );

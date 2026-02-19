@@ -5,6 +5,7 @@ node_modules
 .wrangler-site
 .cache
 .next
+.next-tob
 .open-next
 dist
 build
