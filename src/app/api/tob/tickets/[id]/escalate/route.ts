@@ -1,103 +1,90 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { getAuth } from "@/lib/auth";
-import { resolveUserContext } from "@/lib/api-utils";
-import { tickets, history } from "@/drizzle/schema";
-import { hasPermission, Role, TicketStatus } from "@/lib/types";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { eq } from "drizzle-orm";
+import { tickets, history } from "@/drizzle/schema";
+import { TicketStatus } from "@/lib/types";
+import { ok, notFound, badRequest } from "@/lib/api/response";
+import { withAuth, parseBody } from "@/lib/api/handler";
+import { assertTicketVisible } from "@/lib/api/scope";
+import { serializeTicket } from "@/lib/tickets/serialize";
+import { isOpen } from "@/lib/tickets/state-machine";
 import { chooseEscalationAssignee } from "@/services/allocation";
+import { emitTicketEvent } from "@/services/ticket-events";
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const auth = getAuth();
-    const session = await auth.api.getSession({ headers: request.headers });
+const escalateSchema = z.object({
+  reason: z.string().max(2000).optional(),
+});
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+/**
+ * POST /api/tob/tickets/:id/escalate — escalate to a higher-level agent in
+ * the same team, chosen by the load-balancing algorithm.
+ */
+export const POST = withAuth({ permission: "ticket.escalate" }, async (req: NextRequest, ctx) => {
+  const ticket = await ctx.db.query.tickets.findFirst({
+    where: eq(tickets.id, ctx.params.id),
+  });
+  if (!ticket) throw notFound("Ticket not found");
+  assertTicketVisible(ctx, ticket);
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
+  if (!isOpen(ticket.status)) {
+    throw badRequest("Cannot escalate a closed ticket");
+  }
+  if (ticket.status === TicketStatus.Escalated) {
+    throw badRequest("Ticket is already escalated");
+  }
 
-    if (!ctx) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
+  const body = await parseBody(req, escalateSchema);
 
-    if (!hasPermission(ctx.user.role as Role, "ticket.escalate")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
+  const newAssignee = await chooseEscalationAssignee(
+    ctx.db,
+    ticket.teamId,
+    ticket.assigneeId
+  );
+  if (!newAssignee) {
+    throw badRequest("No higher-level agent available for escalation");
+  }
 
-    const ticket = await db.query.tickets.findFirst({ where: eq(tickets.id, id) });
+  const now = new Date().toISOString();
 
-    if (!ticket) {
-      return NextResponse.json({ ok: false, error: "Ticket not found" }, { status: 404 });
-    }
-
-    if (!ctx.tenantIds.includes(ticket.tenantId)) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    if (ticket.status === TicketStatus.Closed) {
-      return NextResponse.json({ ok: false, error: "Cannot escalate closed ticket" }, { status: 400 });
-    }
-
-    const body = (await request.json()) as { reason?: string };
-
-    // Find a higher-level agent
-    const newAssignee = await chooseEscalationAssignee(db, ticket.teamId, ticket.assigneeId);
-
-    if (!newAssignee) {
-      return NextResponse.json(
-        { ok: false, error: "No higher-level agent available for escalation" },
-        { status: 400 }
-      );
-    }
-
-    const now = new Date().toISOString();
-    const previousAssignee = ticket.assigneeId;
-
-    await db
+  await ctx.db.batch([
+    ctx.db
       .update(tickets)
       .set({
         assigneeId: newAssignee.id,
         status: TicketStatus.Escalated,
         updatedAt: now,
       })
-      .where(eq(tickets.id, id));
-
-    await db.insert(history).values({
+      .where(eq(tickets.id, ticket.id)),
+    ctx.db.insert(history).values({
       id: crypto.randomUUID(),
-      ticketId: id,
+      ticketId: ticket.id,
       actorId: ctx.user.id,
       action: "escalated",
       snapshot: JSON.stringify({
-        previousAssignee,
+        previousAssignee: ticket.assigneeId,
         newAssignee: newAssignee.id,
         newAssigneeLevel: newAssignee.level,
         reason: body.reason,
       }),
       createdAt: now,
-    });
+    }),
+  ]);
 
-    const updated = await db.query.tickets.findFirst({ where: eq(tickets.id, id) });
+  emitTicketEvent(ctx.db, {
+    type: "ticket_escalated",
+    ticketId: ticket.id,
+    agentId: newAssignee.id,
+  });
 
-    return NextResponse.json({
-      ok: true,
-      data: {
-        ticket: updated,
-        escalatedTo: {
-          id: newAssignee.id,
-          displayName: newAssignee.displayName,
-          level: newAssignee.level,
-        },
-      },
-    });
-  } catch (error) {
-    console.error("Error in POST /api/tob/tickets/[id]/escalate:", error);
-    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
-  }
-}
+  const updated = await ctx.db.query.tickets.findFirst({
+    where: eq(tickets.id, ticket.id),
+  });
+  return ok({
+    ticket: updated ? serializeTicket(updated) : null,
+    escalatedTo: {
+      id: newAssignee.id,
+      displayName: newAssignee.displayName,
+      level: newAssignee.level,
+    },
+  });
+});

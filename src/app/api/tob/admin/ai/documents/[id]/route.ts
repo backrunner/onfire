@@ -1,168 +1,61 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { getAuth } from "@/lib/auth";
-import { productDocuments } from "@/drizzle/schema";
-import { hasPermission, Role } from "@/lib/types";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { resolveUserContext, verifyProductOwnership } from "@/lib/api-utils";
+import { productDocuments } from "@/drizzle/schema";
+import { ok, notFound, badRequest } from "@/lib/api/response";
+import { withAuth, parseBody } from "@/lib/api/handler";
+import type { AuthedContext } from "@/lib/api/handler";
+import { assertProductAccess } from "@/lib/api/scope";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
+const actionSchema = z.object({
+  action: z.string().min(1),
+});
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
-
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
-
-    if (!ctx || !hasPermission(ctx.user.role as Role, "product.manage")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const { id } = await params;
-    const document = await db.query.productDocuments.findFirst({
-      where: eq(productDocuments.id, id),
-    });
-
-    if (!document) {
-      return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
-    }
-
-    // Verify product ownership
-    const hasAccess = await verifyProductOwnership(db, document.productId, ctx.tenantIds);
-    if (!hasAccess) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    return NextResponse.json({ ok: true, data: document });
-  } catch (error) {
-    console.error("Error in GET /api/tob/admin/ai/documents/[id]:", error);
-    return NextResponse.json(
-      { ok: false, error: "Internal server error" },
-      { status: 500 }
-    );
-  }
+async function findAccessibleDocument(ctx: AuthedContext) {
+  const document = await ctx.db.query.productDocuments.findFirst({
+    where: eq(productDocuments.id, ctx.params.id),
+  });
+  if (!document) throw notFound();
+  // Cross-tenant access yields 404
+  await assertProductAccess(ctx, document.productId);
+  return document;
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
+export const GET = withAuth({ permission: "product.manage" }, async (_req: NextRequest, ctx) => {
+  const document = await findAccessibleDocument(ctx);
+  return ok(document);
+});
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+export const DELETE = withAuth({ permission: "product.manage" }, async (_req: NextRequest, ctx) => {
+  const existing = await findAccessibleDocument(ctx);
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
+  // TODO: Delete from R2
+  // await env.R2_BUCKET.delete(existing.r2Key);
 
-    if (!ctx || !hasPermission(ctx.user.role as Role, "product.manage")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
+  await ctx.db.delete(productDocuments).where(eq(productDocuments.id, existing.id));
 
-    const { id } = await params;
-    const existing = await db.query.productDocuments.findFirst({
-      where: eq(productDocuments.id, id),
-    });
+  return ok({ deleted: true });
+});
 
-    if (!existing) {
-      return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
-    }
+export const POST = withAuth({ permission: "product.manage" }, async (req: NextRequest, ctx) => {
+  const existing = await findAccessibleDocument(ctx);
+  const body = await parseBody(req, actionSchema);
 
-    // Verify product ownership
-    const hasAccess = await verifyProductOwnership(db, existing.productId, ctx.tenantIds);
-    if (!hasAccess) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
+  if (body.action === "reprocess") {
+    // Trigger reprocessing
+    await ctx.db
+      .update(productDocuments)
+      .set({
+        status: "pending",
+        errorMessage: null,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(productDocuments.id, existing.id));
 
-    // TODO: Delete from R2
-    // await env.R2_BUCKET.delete(existing.r2Key);
+    // TODO: Trigger async processing job
 
-    await db.delete(productDocuments).where(eq(productDocuments.id, id));
-
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error("Error in DELETE /api/tob/admin/ai/documents/[id]:", error);
-    return NextResponse.json(
-      { ok: false, error: "Internal server error" },
-      { status: 500 }
-    );
+    return ok({ message: "Reprocessing started" });
   }
-}
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
-
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
-
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
-
-    if (!ctx || !hasPermission(ctx.user.role as Role, "product.manage")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const { id } = await params;
-    const body = (await request.json()) as { action: string };
-
-    const existing = await db.query.productDocuments.findFirst({
-      where: eq(productDocuments.id, id),
-    });
-
-    if (!existing) {
-      return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
-    }
-
-    // Verify product ownership
-    const hasAccess = await verifyProductOwnership(db, existing.productId, ctx.tenantIds);
-    if (!hasAccess) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    if (body.action === "reprocess") {
-      // Trigger reprocessing
-      await db
-        .update(productDocuments)
-        .set({
-          status: "pending",
-          errorMessage: null,
-          updatedAt: new Date().toISOString(),
-        })
-        .where(eq(productDocuments.id, id));
-
-      // TODO: Trigger async processing job
-
-      return NextResponse.json({ ok: true, message: "Reprocessing started" });
-    }
-
-    return NextResponse.json({ ok: false, error: "Unknown action" }, { status: 400 });
-  } catch (error) {
-    console.error("Error in POST /api/tob/admin/ai/documents/[id]:", error);
-    return NextResponse.json(
-      { ok: false, error: "Internal server error" },
-      { status: 500 }
-    );
-  }
-}
+  throw badRequest("Unknown action");
+});

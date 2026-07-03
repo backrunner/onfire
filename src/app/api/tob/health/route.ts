@@ -1,8 +1,6 @@
-import { NextResponse } from "next/server";
+import { ok } from "@/lib/api/response";
+import { withPublic } from "@/lib/api/handler";
 
-export async function GET() {
-  return NextResponse.json({
-    ok: true,
-    data: { ok: true, scope: "tob", ts: Date.now() },
-  });
-}
+export const GET = withPublic(async () =>
+  ok({ ok: true, scope: "tob", ts: Date.now() })
+);

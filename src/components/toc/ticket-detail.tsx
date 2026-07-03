@@ -1,248 +1,352 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Headset,
+  Loader2,
+  Lock,
+  Send,
+} from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { tocApi, ApiClientError } from "@/lib/api/toc-client";
+import {
+  formatDateTime,
+  formatRelativeTime,
+  type TocReply,
+  type TocTicket,
+} from "@/lib/toc/portal";
+import { TicketStatus } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { TicketStatus, TicketPriority } from "@/lib/types";
-import { ArrowLeft, Send, Loader2, Clock, User } from "lucide-react";
-
-interface TicketDetailData {
-  id: string;
-  subject: string;
-  content: string;
-  status: TicketStatus;
-  priority: TicketPriority;
-  customerEmail: string;
-  createdAt: string;
-  updatedAt: string;
-  metadata?: Record<string, unknown>;
-}
-
-interface Reply {
-  id: string;
-  content: string;
-  senderEmail?: string;
-  senderId?: string;
-  createdAt: string;
-  internal?: boolean;
-}
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { TocStatusBadge } from "./status-badge";
+import {
+  TurnstileWidget,
+  turnstileEnabled,
+  type TurnstileInstance,
+} from "./turnstile-widget";
 
 interface TicketDetailProps {
-  ticket: TicketDetailData;
-  replies: Reply[];
-  token: string;
-  onBack?: () => void;
-  onReplySuccess?: () => void;
+  ticket: TocTicket;
+  replies: TocReply[];
+  onBack: () => void;
+  /** Refetch the ticket after a successful reply / escalation. */
+  onRefresh: () => void;
 }
 
-const statusColors: Record<TicketStatus, "default" | "secondary" | "destructive" | "outline" | "success" | "warning"> = {
-  [TicketStatus.New]: "warning",
-  [TicketStatus.Processing]: "default",
-  [TicketStatus.Replied]: "success",
-  [TicketStatus.Escalated]: "destructive",
-  [TicketStatus.Closed]: "secondary",
-};
+interface Message {
+  id: string;
+  content: string;
+  fromAgent: boolean;
+  createdAt: string;
+}
 
-const priorityColors: Record<TicketPriority, "default" | "secondary" | "destructive" | "outline" | "warning"> = {
-  [TicketPriority.High]: "destructive",
-  [TicketPriority.Medium]: "warning",
-  [TicketPriority.Low]: "secondary",
-};
+function MessageBubble({ message, language, agentLabel, youLabel }: {
+  message: Message;
+  language: string;
+  agentLabel: string;
+  youLabel: string;
+}) {
+  const { fromAgent } = message;
+  return (
+    <div className={cn("flex gap-2.5", fromAgent ? "justify-start" : "justify-end")}>
+      {fromAgent && (
+        <Avatar className="mt-0.5 size-7 shrink-0">
+          <AvatarFallback className="bg-primary/10 text-primary">
+            <Headset className="size-3.5" />
+          </AvatarFallback>
+        </Avatar>
+      )}
+      <div className={cn("max-w-[85%] space-y-1", !fromAgent && "items-end")}>
+        <div
+          className={cn(
+            "flex items-baseline gap-2 text-[11px] text-muted-foreground",
+            !fromAgent && "flex-row-reverse"
+          )}
+        >
+          <span className="font-medium">{fromAgent ? agentLabel : youLabel}</span>
+          <time dateTime={message.createdAt} title={formatDateTime(message.createdAt, language)}>
+            {formatRelativeTime(message.createdAt, language)}
+          </time>
+        </div>
+        <div
+          className={cn(
+            "rounded-2xl px-3.5 py-2.5 text-sm whitespace-pre-wrap break-words transition-colors",
+            fromAgent
+              ? "rounded-tl-sm bg-muted text-foreground"
+              : "rounded-tr-sm bg-primary text-primary-foreground"
+          )}
+        >
+          {message.content}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-export function TicketDetail({
-  ticket,
-  replies,
-  token,
-  onBack,
-  onReplySuccess,
-}: TicketDetailProps) {
-  const { t } = useI18n();
+export function TicketDetail({ ticket, replies, onBack, onRefresh }: TicketDetailProps) {
+  const { t, language } = useI18n();
+
+  // Reply composer
   const [replyContent, setReplyContent] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const [sending, setSending] = useState(false);
+  const [replyError, setReplyError] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileInstance | undefined>(undefined);
+
+  // Escalation
+  const [escalateOpen, setEscalateOpen] = useState(false);
+  const [escalateReason, setEscalateReason] = useState("");
+  const [escalating, setEscalating] = useState(false);
 
   const isClosed = ticket.status === TicketStatus.Closed;
+  const isEscalated = ticket.status === TicketStatus.Escalated;
+  const canEscalate = !isClosed && !isEscalated;
+
+  const messages: Message[] = [
+    {
+      id: `ticket-${ticket.id}`,
+      content: ticket.content,
+      fromAgent: false,
+      createdAt: ticket.createdAt,
+    },
+    ...replies.map((reply) => ({
+      id: reply.id,
+      content: reply.content,
+      fromAgent: reply.fromAgent,
+      createdAt: reply.createdAt,
+    })),
+  ];
+
+  const sendDisabled =
+    sending || !replyContent.trim() || (turnstileEnabled && !turnstileToken);
 
   const handleReply = async () => {
-    if (!replyContent.trim()) return;
-
-    setSubmitting(true);
-    setError("");
-
+    if (sendDisabled) return;
+    setSending(true);
+    setReplyError("");
     try {
-      const res = await fetch(`/api/toc/tickets/${ticket.id}/reply`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ content: replyContent }),
-      });
-
-      const data = (await res.json()) as { ok: boolean; error?: string };
-
-      if (data.ok) {
-        setReplyContent("");
-        onReplySuccess?.();
+      const result = await tocApi.post<{ status: TicketStatus }>(
+        `/api/toc/tickets/${ticket.id}/reply`,
+        {
+          content: replyContent.trim(),
+          turnstileToken: turnstileToken ?? undefined,
+        }
+      );
+      setReplyContent("");
+      if (
+        ticket.status === TicketStatus.Replied &&
+        result.status === TicketStatus.Processing
+      ) {
+        toast.success(t.toc.detail.replySent, {
+          description: t.toc.detail.backInProcessing,
+        });
       } else {
-        setError(data.error || t.errors.unknownError);
+        toast.success(t.toc.detail.replySent);
       }
-    } catch (err) {
-      setError(t.errors.networkError);
+      onRefresh();
+    } catch (error) {
+      if (error instanceof ApiClientError && error.status === 401) return;
+      setReplyError(
+        error instanceof ApiClientError ? error.message : t.toc.detail.replyFailed
+      );
     } finally {
-      setSubmitting(false);
+      setTurnstileToken(null);
+      turnstileRef.current?.reset();
+      setSending(false);
+    }
+  };
+
+  const handleEscalate = async () => {
+    setEscalating(true);
+    try {
+      await tocApi.post(`/api/toc/tickets/${ticket.id}/escalate`, {
+        reason: escalateReason.trim() || undefined,
+      });
+      setEscalateOpen(false);
+      setEscalateReason("");
+      toast.success(t.toc.detail.escalateSuccess);
+      onRefresh();
+    } catch (error) {
+      if (error instanceof ApiClientError && error.status === 401) return;
+      toast.error(t.toc.detail.escalateFailed, {
+        description:
+          error instanceof ApiClientError ? error.message : undefined,
+      });
+    } finally {
+      setEscalating(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        {onBack && (
-          <Button variant="ghost" size="icon" onClick={onBack}>
-            <ArrowLeft className="h-5 w-5" />
+    <div className="space-y-4">
+      {/* Back link + escalate action */}
+      <div className="flex items-center justify-between gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ml-2 gap-1.5 text-muted-foreground hover:text-foreground"
+          onClick={onBack}
+        >
+          <ArrowLeft className="size-4" />
+          {t.toc.detail.back}
+        </Button>
+        {canEscalate && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setEscalateOpen(true)}
+          >
+            <ArrowUpRight className="size-4" />
+            {t.toc.detail.escalate}
           </Button>
         )}
-        <div className="flex-1">
-          <h1 className="text-xl font-bold">{ticket.subject}</h1>
-          <p className="text-sm text-muted-foreground font-mono">
-            #{ticket.id.slice(-8)}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant={priorityColors[ticket.priority]}>
-            {t.tickets.priority[ticket.priority]}
-          </Badge>
-          <Badge variant={statusColors[ticket.status]}>
-            {t.tickets.status[ticket.status]}
-          </Badge>
-        </div>
       </div>
 
-      {/* Ticket Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t.tickets.detail.content}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="prose dark:prose-invert max-w-none">
-            <p className="whitespace-pre-wrap">{ticket.content}</p>
+      {/* Ticket header */}
+      <Card className="py-4">
+        <CardContent className="space-y-2 px-4">
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="min-w-0 text-base font-semibold break-words">
+              {ticket.subject}
+            </h1>
+            <TocStatusBadge status={ticket.status} className="mt-0.5 shrink-0" />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            <span className="font-mono">#{ticket.id.slice(-8)}</span>
+            <span className="mx-1.5">·</span>
+            {t.toc.detail.created}{" "}
+            <time
+              dateTime={ticket.createdAt}
+              title={formatDateTime(ticket.createdAt, language)}
+            >
+              {formatRelativeTime(ticket.createdAt, language)}
+            </time>
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Conversation */}
+      <Card className="py-4">
+        <CardContent className="space-y-4 px-4">
+          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            {t.toc.detail.conversation}
+          </p>
+          <div className="space-y-4">
+            {messages.map((message) => (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                language={language}
+                agentLabel={t.toc.detail.support}
+                youLabel={t.toc.detail.you}
+              />
+            ))}
           </div>
 
           <Separator />
 
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <Label className="text-muted-foreground">{t.tickets.detail.createdAt}</Label>
-              <p>{new Date(ticket.createdAt).toLocaleString()}</p>
+          {/* Composer */}
+          {isClosed ? (
+            <div className="flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground">
+              <Lock className="size-4" />
+              {t.toc.detail.ticketClosed}
             </div>
-            <div>
-              <Label className="text-muted-foreground">{t.tickets.detail.updatedAt}</Label>
-              <p>{new Date(ticket.updatedAt).toLocaleString()}</p>
-            </div>
-          </div>
-
-          {ticket.metadata && Object.keys(ticket.metadata).length > 0 && (
-            <>
-              <Separator />
-              <div>
-                <Label className="text-muted-foreground">{t.tickets.detail.metadata}</Label>
-                <div className="mt-2 p-3 bg-muted rounded-md text-sm font-mono">
-                  {Object.entries(ticket.metadata).map(([key, value]) => (
-                    <div key={key}>
-                      <span className="text-muted-foreground">{key}:</span>{" "}
-                      {String(value)}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Replies */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t.tickets.detail.replies}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {replies.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">
-              {t.tickets.detail.noReplies}
-            </p>
           ) : (
-            <div className="space-y-4">
-              {replies
-                .filter((r) => !r.internal)
-                .map((reply) => (
-                  <div
-                    key={reply.id}
-                    className={`p-4 rounded-lg ${
-                      reply.senderId
-                        ? "bg-accent ml-8"
-                        : "bg-muted/50 mr-8"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                      <User className="h-3 w-3" />
-                      <span>
-                        {reply.senderId
-                          ? t.toc.detail?.agentReply || "Support Agent"
-                          : ticket.customerEmail}
-                      </span>
-                      <Clock className="h-3 w-3 ml-2" />
-                      <span>{new Date(reply.createdAt).toLocaleString()}</span>
-                    </div>
-                    <p className="whitespace-pre-wrap">{reply.content}</p>
-                  </div>
-                ))}
+            <div className="space-y-3">
+              <Textarea
+                value={replyContent}
+                onChange={(e) => setReplyContent(e.target.value)}
+                onKeyDown={(e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                    e.preventDefault();
+                    void handleReply();
+                  }
+                }}
+                placeholder={t.toc.detail.replyPlaceholder}
+                className="min-h-24"
+                disabled={sending}
+              />
+              <TurnstileWidget widgetRef={turnstileRef} onToken={setTurnstileToken} />
+              {replyError && (
+                <p className="text-sm text-destructive">{replyError}</p>
+              )}
+              <div className="flex items-center justify-between gap-3">
+                <p className="hidden text-xs text-muted-foreground sm:block">
+                  {t.toc.detail.replyShortcutHint}
+                </p>
+                <Button
+                  onClick={handleReply}
+                  disabled={sendDisabled}
+                  size="sm"
+                  className="ml-auto gap-1.5"
+                >
+                  {sending ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      {t.toc.detail.sending}
+                    </>
+                  ) : (
+                    <>
+                      <Send className="size-4" />
+                      {t.toc.detail.sendReply}
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Reply Form */}
-      {!isClosed && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t.tickets.actions.reply}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      {/* Escalate confirm dialog */}
+      <Dialog open={escalateOpen} onOpenChange={setEscalateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t.toc.detail.escalateTitle}</DialogTitle>
+            <DialogDescription>{t.toc.detail.escalateDescription}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>{t.toc.detail.escalateReasonLabel}</Label>
             <Textarea
-              className="min-h-[100px]"
-              placeholder={t.toc.detail?.replyPlaceholder || "Enter your reply..."}
-              value={replyContent}
-              onChange={(e) => setReplyContent(e.target.value)}
+              value={escalateReason}
+              onChange={(e) => setEscalateReason(e.target.value)}
+              placeholder={t.toc.detail.escalateReasonPlaceholder}
+              maxLength={2000}
+              className="min-h-20"
             />
-            {error && <p className="text-sm text-destructive">{error}</p>}
+          </div>
+          <DialogFooter>
             <Button
-              onClick={handleReply}
-              disabled={submitting || !replyContent.trim()}
+              variant="outline"
+              onClick={() => setEscalateOpen(false)}
+              disabled={escalating}
             >
-              {submitting ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4 mr-2" />
-              )}
-              {t.tickets.actions.sendReply}
+              {t.common.cancel}
             </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {isClosed && (
-        <Card>
-          <CardContent className="p-4 text-center text-muted-foreground">
-            {t.toc.detail?.ticketClosed || "This ticket is closed and no longer accepts replies."}
-          </CardContent>
-        </Card>
-      )}
+            <Button onClick={handleEscalate} disabled={escalating}>
+              {escalating && <Loader2 className="size-4 animate-spin" />}
+              {t.toc.detail.escalateConfirm}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

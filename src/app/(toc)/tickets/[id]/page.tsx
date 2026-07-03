@@ -1,178 +1,138 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
+import { tocApi, ApiClientError } from "@/lib/api/toc-client";
 import { useTocCredentials } from "@/lib/hooks/use-toc-credentials";
-import { CredentialError } from "@/components/toc/credential-error";
-import { TocHeader } from "@/components/toc/toc-header";
+import type { TocTicketDetail } from "@/lib/toc/portal";
+import { TocPortalShell } from "@/components/toc/portal-shell";
 import { TicketDetail } from "@/components/toc/ticket-detail";
-import { TicketStatus, TicketPriority } from "@/lib/types";
-import { RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
-interface TicketDetailData {
-  id: string;
-  subject: string;
-  content: string;
-  status: TicketStatus;
-  priority: TicketPriority;
-  customerEmail: string;
-  createdAt: string;
-  updatedAt: string;
-  metadata?: Record<string, unknown>;
-}
-
-interface Reply {
-  id: string;
-  content: string;
-  senderEmail?: string;
-  senderId?: string;
-  createdAt: string;
-  internal?: boolean;
-}
-
-interface CustomerInfo {
-  email: string;
-  productName?: string;
-}
-
-function TicketDetailContent() {
-  const params = useParams();
-  const router = useRouter();
-  const ticketId = params.id as string;
-  const { credentials, isValid, missingFields } = useTocCredentials();
-
-  const [ticket, setTicket] = useState<TicketDetailData | null>(null);
-  const [replies, setReplies] = useState<Reply[]>([]);
-  const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const productId = credentials.productId || "";
-  const token = credentials.token || "";
-
-  const fetchTicket = useCallback(async () => {
-    if (!ticketId || !token) return;
-
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/toc/tickets/${ticketId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = (await res.json()) as {
-        ok: boolean;
-        data: { ticket: TicketDetailData; replies: Reply[] };
-        error?: string;
-      };
-
-      if (data.ok) {
-        setTicket(data.data.ticket);
-        setReplies(data.data.replies || []);
-      } else {
-        setError(data.error || "Failed to load ticket");
-      }
-    } catch (err) {
-      setError("Network error");
-    } finally {
-      setLoading(false);
-    }
-  }, [ticketId, token]);
-
-  const fetchCustomerInfo = useCallback(async () => {
-    if (!token) return;
-
-    try {
-      const res = await fetch("/api/toc/whoami", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = (await res.json()) as { ok: boolean; data: CustomerInfo };
-      if (data.ok) {
-        setCustomerInfo(data.data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch customer info:", error);
-    }
-  }, [token]);
-
-  useEffect(() => {
-    if (isValid) {
-      fetchTicket();
-      fetchCustomerInfo();
-    }
-  }, [isValid, fetchTicket, fetchCustomerInfo]);
-
-  if (!isValid) {
-    return <CredentialError missingFields={missingFields} />;
-  }
-
-  const handleBack = () => {
-    router.push(`/?productId=${productId}&token=${token}`);
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <TocHeader
-          productName={customerInfo?.productName}
-          customerEmail={customerInfo?.email}
-        />
-        <main className="flex-1 flex items-center justify-center">
-          <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
-        </main>
-      </div>
-    );
-  }
-
-  if (error || !ticket) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <TocHeader
-          productName={customerInfo?.productName}
-          customerEmail={customerInfo?.email}
-        />
-        <main className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-destructive">{error || "Ticket not found"}</p>
-            <button
-              onClick={handleBack}
-              className="mt-4 text-sm text-muted-foreground hover:underline"
-            >
-              Back to tickets
-            </button>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
+function DetailSkeleton() {
   return (
-    <div className="min-h-screen flex flex-col">
-      <TocHeader
-        productName={customerInfo?.productName}
-        customerEmail={customerInfo?.email}
-      />
-      <main className="flex-1 container mx-auto px-4 py-6 max-w-2xl">
-        <TicketDetail
-          ticket={ticket}
-          replies={replies}
-          token={token}
-          onBack={handleBack}
-          onReplySuccess={fetchTicket}
-        />
-      </main>
+    <div className="space-y-4">
+      <Skeleton className="h-8 w-40" />
+      <Card className="py-4">
+        <CardContent className="space-y-2.5 px-4">
+          <div className="flex items-center justify-between gap-3">
+            <Skeleton className="h-5 w-2/3" />
+            <Skeleton className="h-5 w-20 rounded-full" />
+          </div>
+          <Skeleton className="h-4 w-44" />
+        </CardContent>
+      </Card>
+      <Card className="py-4">
+        <CardContent className="space-y-4 px-4">
+          <Skeleton className="ml-auto h-16 w-3/4 rounded-2xl" />
+          <Skeleton className="h-16 w-3/4 rounded-2xl" />
+          <Skeleton className="h-24 w-full" />
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-export default function TocTicketDetailPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex justify-center items-center min-h-screen">
-          <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+function TicketDetailBody({ ticketId }: { ticketId: string }) {
+  const { t } = useI18n();
+  const router = useRouter();
+  const { isValid } = useTocCredentials();
+
+  const [detail, setDetail] = useState<TocTicketDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<"notFound" | "failed" | null>(null);
+
+  const fetchDetail = useCallback(
+    async (silent = false) => {
+      if (!silent) {
+        setLoading(true);
+        setError(null);
       }
-    >
-      <TicketDetailContent />
-    </Suspense>
+      try {
+        const data = await tocApi.get<TocTicketDetail>(
+          `/api/toc/tickets/${ticketId}`
+        );
+        setDetail(data);
+        setError(null);
+      } catch (err) {
+        if (err instanceof ApiClientError && err.status === 401) return;
+        if (!silent) {
+          setError(
+            err instanceof ApiClientError && err.status === 404
+              ? "notFound"
+              : "failed"
+          );
+        }
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [ticketId]
+  );
+
+  useEffect(() => {
+    if (isValid && ticketId) void fetchDetail();
+  }, [isValid, ticketId, fetchDetail]);
+
+  const goBack = () => router.push("/");
+
+  if (loading) return <DetailSkeleton />;
+
+  if (error || !detail) {
+    return (
+      <div className="space-y-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ml-2 gap-1.5 text-muted-foreground hover:text-foreground"
+          onClick={goBack}
+        >
+          <ArrowLeft className="size-4" />
+          {t.toc.detail.back}
+        </Button>
+        <Card>
+          <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+            <p className="font-medium">
+              {error === "notFound"
+                ? t.toc.errors.ticketNotFound
+                : t.toc.errors.loadFailed}
+            </p>
+            {error !== "notFound" && (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  {t.toc.errors.loadFailedMessage}
+                </p>
+                <Button variant="outline" size="sm" onClick={() => void fetchDetail()}>
+                  {t.toc.errors.retry}
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <TicketDetail
+      ticket={detail.ticket}
+      replies={detail.replies}
+      onBack={goBack}
+      onRefresh={() => void fetchDetail(true)}
+    />
+  );
+}
+
+export default function TocTicketDetailPage() {
+  const params = useParams<{ id: string }>();
+
+  return (
+    <TocPortalShell>
+      <TicketDetailBody ticketId={params.id} />
+    </TocPortalShell>
   );
 }

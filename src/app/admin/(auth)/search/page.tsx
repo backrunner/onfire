@@ -1,13 +1,30 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import useSWR from "swr";
+import {
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
+  Search,
+  SearchX,
+} from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
+import { swrFetcher, qs } from "@/lib/api/client";
+import { TicketStatus, TicketPriority } from "@/lib/types";
+import {
+  StatusBadge,
+  PriorityBadge,
+  SlaBadge,
+} from "@/components/admin/status-badges";
+import { ProductSelect, ALL_PRODUCTS } from "@/components/admin/product-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -15,357 +32,322 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
-import { TicketStatus, TicketPriority } from "@/lib/types";
-import { Search, X, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 
-interface SearchResult {
+interface SearchTicket {
   id: string;
   subject: string;
   status: TicketStatus;
   priority: TicketPriority;
   customerEmail: string;
-  productId: string;
   productName: string;
-  teamId: string;
   teamName: string;
-  assigneeId: string | null;
-  isOverdue: boolean;
+  isOverdue: boolean | null;
   createdAt: string;
   updatedAt: string;
 }
 
-interface Pagination {
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
+interface SearchResponse {
+  tickets: SearchTicket[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
-const statusColors: Record<TicketStatus, "default" | "secondary" | "destructive" | "outline" | "success" | "warning"> = {
-  [TicketStatus.New]: "warning",
-  [TicketStatus.Processing]: "default",
-  [TicketStatus.Replied]: "success",
-  [TicketStatus.Escalated]: "destructive",
-  [TicketStatus.Closed]: "secondary",
-};
+const ALL = "__all__";
 
-const priorityColors: Record<TicketPriority, "default" | "secondary" | "destructive" | "outline" | "warning"> = {
-  [TicketPriority.High]: "destructive",
-  [TicketPriority.Medium]: "warning",
-  [TicketPriority.Low]: "secondary",
-};
+export default function AdminSearchPage() {
+  return (
+    <Suspense fallback={<SearchSkeleton />}>
+      <SearchContent />
+    </Suspense>
+  );
+}
 
-export default function SearchPage() {
-  const { t } = useI18n();
+function SearchContent() {
+  const { t, language } = useI18n();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Search state
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<string>("");
-  const [priority, setPriority] = useState<string>("");
-  const [customerEmail, setCustomerEmail] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [overdue, setOverdue] = useState(false);
+  const q = searchParams.get("q") ?? "";
+  const status = searchParams.get("status") ?? "";
+  const priority = searchParams.get("priority") ?? "";
+  const productId = searchParams.get("product") ?? "";
+  const overdue = searchParams.get("overdue") === "true";
+  const page = Math.max(1, Number(searchParams.get("page")) || 1);
 
-  // Results state
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [pagination, setPagination] = useState<Pagination | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [searched, setSearched] = useState(false);
+  const [draft, setDraft] = useState(q);
+  useEffect(() => setDraft(q), [q]);
+  useEffect(() => inputRef.current?.focus(), []);
 
-  const performSearch = useCallback(async (page = 1) => {
-    setLoading(true);
-    setSearched(true);
-
-    const params = new URLSearchParams();
-    if (query) params.set("q", query);
-    if (status) params.set("status", status);
-    if (priority) params.set("priority", priority);
-    if (customerEmail) params.set("customerEmail", customerEmail);
-    if (dateFrom) params.set("dateFrom", dateFrom);
-    if (dateTo) params.set("dateTo", dateTo);
-    if (overdue) params.set("overdue", "true");
-    params.set("page", page.toString());
-
-    try {
-      const res = await fetch(`/api/tob/search?${params.toString()}`, {
-        credentials: "include",
-      });
-      const data = (await res.json()) as {
-        ok: boolean;
-        data: { tickets: SearchResult[]; pagination: Pagination };
-      };
-
-      if (data.ok) {
-        setResults(data.data.tickets);
-        setPagination(data.data.pagination);
+  const setParams = useCallback(
+    (patch: Record<string, string | null>) => {
+      const next = new URLSearchParams(searchParams.toString());
+      for (const [key, value] of Object.entries(patch)) {
+        if (value === null || value === "") next.delete(key);
+        else next.set(key, value);
       }
-    } catch (error) {
-      console.error("Search failed:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [query, status, priority, customerEmail, dateFrom, dateTo, overdue]);
+      const search = next.toString();
+      router.replace(`${pathname}${search ? `?${search}` : ""}`, { scroll: false });
+    },
+    [router, pathname, searchParams]
+  );
 
-  const handleSearch = () => {
-    performSearch(1);
-  };
+  // Debounced keyword → URL
+  useEffect(() => {
+    if (draft === q) return;
+    const handle = setTimeout(
+      () => setParams({ q: draft, page: null }),
+      350
+    );
+    return () => clearTimeout(handle);
+  }, [draft, q, setParams]);
 
-  const handleClear = () => {
-    setQuery("");
-    setStatus("");
-    setPriority("");
-    setCustomerEmail("");
-    setDateFrom("");
-    setDateTo("");
-    setOverdue(false);
-    setResults([]);
-    setPagination(null);
-    setSearched(false);
-  };
+  const hasCriteria = Boolean(q || status || priority || productId || overdue);
 
-  const handlePageChange = (newPage: number) => {
-    performSearch(newPage);
-  };
+  const key = hasCriteria
+    ? `/api/tob/search${qs({
+        q,
+        status,
+        priority,
+        productId,
+        overdue: overdue ? "true" : "",
+        page,
+        pageSize: 20,
+      })}`
+    : null;
 
-  const handleTicketClick = (ticketId: string) => {
-    router.push(`/admin/tickets/${ticketId}`);
-  };
+  const { data, error, isLoading, mutate } = useSWR<SearchResponse>(key, swrFetcher, {
+    keepPreviousData: true,
+  });
+
+  const dateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(language === "zh" ? "zh-CN" : "en-US", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }),
+    [language]
+  );
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-4xl space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">{t.search?.title || "Advanced Search"}</h1>
-        <p className="text-muted-foreground">
-          {t.search?.subtitle || "Search tickets with multiple filters"}
-        </p>
+        <h1 className="text-xl font-semibold tracking-tight">{t.search.title}</h1>
+        <p className="text-sm text-muted-foreground">{t.search.subtitle}</p>
       </div>
 
-      {/* Search Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t.search?.filters || "Search Filters"}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <div className="space-y-2">
-              <Label>{t.search?.keyword || "Keyword"}</Label>
-              <Input
-                placeholder={t.search?.keywordPlaceholder || "Subject, content, ID..."}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              />
-            </div>
+      {/* Search bar + filters */}
+      <div className="space-y-2">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            ref={inputRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={t.search.keywordPlaceholder}
+            className="h-10 pl-9 text-sm"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select
+            value={status || ALL}
+            onValueChange={(v) => setParams({ status: v === ALL ? null : v, page: null })}
+          >
+            <SelectTrigger className="h-8 w-[140px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>
+                {t.common.all} · {t.common.status}
+              </SelectItem>
+              {Object.values(TicketStatus).map((s) => (
+                <SelectItem key={s} value={s}>
+                  {t.tickets.status[s]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-            <div className="space-y-2">
-              <Label>{t.common.status}</Label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t.tickets.filters.allStatus} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">{t.tickets.filters.allStatus}</SelectItem>
-                  {Object.values(TicketStatus).map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {t.tickets.status[s]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <Select
+            value={priority || ALL}
+            onValueChange={(v) => setParams({ priority: v === ALL ? null : v, page: null })}
+          >
+            <SelectTrigger className="h-8 w-[140px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>
+                {t.common.all} · {t.common.priority}
+              </SelectItem>
+              {Object.values(TicketPriority).map((p) => (
+                <SelectItem key={p} value={p}>
+                  {t.tickets.priority[p]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-            <div className="space-y-2">
-              <Label>{t.common.priority}</Label>
-              <Select value={priority} onValueChange={setPriority}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t.tickets.filters.allPriority} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">{t.tickets.filters.allPriority}</SelectItem>
-                  {Object.values(TicketPriority).map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {t.tickets.priority[p]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <ProductSelect
+            value={productId}
+            onChange={(v) =>
+              setParams({ product: v === ALL_PRODUCTS ? null : v, page: null })
+            }
+            placeholder={t.common.all}
+            allLabel={t.common.all}
+            className="h-8 w-[160px] text-xs"
+          />
 
-            <div className="space-y-2">
-              <Label>{t.search?.customerEmail || "Customer Email"}</Label>
-              <Input
-                placeholder="customer@example.com"
-                value={customerEmail}
-                onChange={(e) => setCustomerEmail(e.target.value)}
-              />
-            </div>
+          <Button
+            variant={overdue ? "default" : "outline"}
+            size="sm"
+            className="h-8 gap-1.5 text-xs"
+            onClick={() => setParams({ overdue: overdue ? null : "true", page: null })}
+          >
+            <AlertTriangle className="size-3.5" />
+            {t.dashboard.viewOverdue}
+          </Button>
+        </div>
+      </div>
 
-            <div className="space-y-2">
-              <Label>{t.search?.dateFrom || "From Date"}</Label>
-              <Input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>{t.search?.dateTo || "To Date"}</Label>
-              <Input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={overdue}
-                onChange={(e) => setOverdue(e.target.checked)}
-                className="rounded border-input"
-              />
-              <span className="text-sm">{t.tickets.filters.overdueOnly}</span>
-            </label>
-          </div>
-
-          <div className="flex gap-2">
-            <Button onClick={handleSearch} disabled={loading}>
-              <Search className="h-4 w-4 mr-2" />
-              {t.common.search}
-            </Button>
-            <Button variant="outline" onClick={handleClear}>
-              <X className="h-4 w-4 mr-2" />
-              {t.common.reset}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Search Results */}
-      {searched && (
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {t.search?.results || "Results"}
-              {pagination && (
-                <span className="text-sm font-normal text-muted-foreground ml-2">
-                  ({pagination.total} {t.search?.found || "found"})
-                </span>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-            ) : results.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">
-                {t.search?.noResults || "No tickets found matching your criteria"}
-              </p>
-            ) : (
-              <>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t.tickets.detail.ticketId}</TableHead>
-                      <TableHead>{t.search?.subject || "Subject"}</TableHead>
-                      <TableHead>{t.common.status}</TableHead>
-                      <TableHead>{t.common.priority}</TableHead>
-                      <TableHead>{t.tickets.detail.customer}</TableHead>
-                      <TableHead>{t.tickets.detail.product}</TableHead>
-                      <TableHead>{t.tickets.detail.createdAt}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {results.map((ticket) => (
-                      <TableRow
-                        key={ticket.id}
-                        className="cursor-pointer hover:bg-accent/50"
-                        onClick={() => handleTicketClick(ticket.id)}
-                      >
-                        <TableCell className="font-mono text-xs">
-                          {ticket.id.slice(-8)}
-                          {ticket.isOverdue && (
-                            <AlertTriangle className="h-3 w-3 text-destructive inline ml-1" />
-                          )}
-                        </TableCell>
-                        <TableCell className="max-w-[200px] truncate">
-                          {ticket.subject}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={statusColors[ticket.status]}>
-                            {t.tickets.status[ticket.status]}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={priorityColors[ticket.priority]}>
-                            {t.tickets.priority[ticket.priority]}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {ticket.customerEmail}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {ticket.productName}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {new Date(ticket.createdAt).toLocaleDateString()}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-
-                {/* Pagination */}
-                {pagination && pagination.totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-4">
-                    <p className="text-sm text-muted-foreground">
-                      {t.search?.page || "Page"} {pagination.page} / {pagination.totalPages}
-                    </p>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handlePageChange(pagination.page - 1)}
-                        disabled={pagination.page <= 1}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                        {t.common.previous}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handlePageChange(pagination.page + 1)}
-                        disabled={pagination.page >= pagination.totalPages}
-                      >
-                        {t.common.next}
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+      {/* Results */}
+      {!hasCriteria ? (
+        <EmptyHint
+          icon={<Search className="size-8 text-muted-foreground/40" />}
+          title={t.search.keyword}
+          hint={t.search.keywordPlaceholder}
+        />
+      ) : isLoading && !data ? (
+        <div className="space-y-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-[72px] w-full rounded-lg" />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-border py-12 text-center">
+          <p className="text-sm text-muted-foreground">{t.tickets.list.loadError}</p>
+          <Button variant="outline" size="sm" onClick={() => void mutate()}>
+            <RefreshCw className="size-4" />
+            {t.tickets.list.retry}
+          </Button>
+        </div>
+      ) : (data?.tickets.length ?? 0) === 0 ? (
+        <EmptyHint
+          icon={<SearchX className="size-8 text-muted-foreground/40" />}
+          title={t.search.noResults}
+        />
+      ) : (
+        <>
+          <p className="text-xs text-muted-foreground">
+            {data!.pagination.total} {t.search.found}
+          </p>
+          <div className="space-y-2">
+            {data!.tickets.map((ticket) => (
+              <Link
+                key={ticket.id}
+                href={`/admin/tickets?ticket=${ticket.id}`}
+                className={cn(
+                  "block rounded-lg border border-border bg-card px-4 py-3 transition-colors",
+                  "hover:border-border hover:bg-accent/50"
                 )}
-              </>
-            )}
-          </CardContent>
-        </Card>
+              >
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={ticket.status} />
+                  <PriorityBadge priority={ticket.priority} />
+                  <SlaBadge breached={Boolean(ticket.isOverdue)} />
+                  <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                    {dateFormatter.format(new Date(ticket.createdAt))}
+                  </span>
+                </div>
+                <div className="mt-1.5 truncate text-sm font-medium">
+                  {ticket.subject}
+                </div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                  <span className="truncate">{ticket.customerEmail}</span>
+                  {ticket.productName && (
+                    <>
+                      <span aria-hidden>·</span>
+                      <span>{ticket.productName}</span>
+                    </>
+                  )}
+                  {ticket.teamName && (
+                    <>
+                      <span aria-hidden>·</span>
+                      <span>{ticket.teamName}</span>
+                    </>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          {data!.pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-xs text-muted-foreground">
+                {t.search.page} {data!.pagination.page} / {data!.pagination.totalPages}
+              </span>
+              <div className="flex gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="size-8"
+                  disabled={page <= 1}
+                  onClick={() => setParams({ page: String(page - 1) })}
+                  aria-label={t.common.previous}
+                >
+                  <ChevronLeft className="size-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="size-8"
+                  disabled={page >= data!.pagination.totalPages}
+                  onClick={() => setParams({ page: String(page + 1) })}
+                  aria-label={t.common.next}
+                >
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
+    </div>
+  );
+}
+
+function EmptyHint({
+  icon,
+  title,
+  hint,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  hint?: string;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-1.5 rounded-lg border border-dashed border-border py-16 text-center">
+      {icon}
+      <p className="text-sm font-medium">{title}</p>
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+function SearchSkeleton() {
+  return (
+    <div className="mx-auto max-w-4xl space-y-4">
+      <Skeleton className="h-7 w-44" />
+      <Skeleton className="h-10 w-full" />
+      <div className="flex gap-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-8 w-32" />
+        ))}
+      </div>
     </div>
   );
 }

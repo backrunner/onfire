@@ -1,155 +1,67 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { getAuth } from "@/lib/auth";
-import { aiConfigs } from "@/drizzle/schema";
-import { Role } from "@/lib/types";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { resolveUserContext, isSuperAdmin } from "@/lib/api-utils";
+import { aiConfigs } from "@/drizzle/schema";
+import { ok, forbidden, notFound } from "@/lib/api/response";
+import { withAuth, parseBody } from "@/lib/api/handler";
+import type { AuthedContext } from "@/lib/api/handler";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ taskType: string }> }
-) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
+const taskTypeEnum = z.enum(["agent", "prescreening", "prereply", "embedding"]);
+const providerEnum = z.enum(["openai", "anthropic", "google", "xai", "deepseek"]);
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+const updateConfigSchema = z.object({
+  provider: providerEnum.optional(),
+  model: z.string().min(1).max(200).optional(),
+  apiKey: z.string().min(1).max(500).optional(),
+  baseUrl: z.url().nullable().optional(),
+  enabled: z.boolean().optional(),
+});
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
+async function findConfigByTaskType(ctx: AuthedContext) {
+  // AI configs are global — only SuperAdmin may manage them
+  if (!ctx.isSuperAdmin) throw forbidden();
 
-    // Only SuperAdmin can manage AI configs
-    if (!ctx || !isSuperAdmin(ctx.user.role as Role)) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
+  const parsed = taskTypeEnum.safeParse(ctx.params.taskType);
+  if (!parsed.success) throw notFound();
 
-    const { taskType } = await params;
-    const config = await db.query.aiConfigs.findFirst({
-      where: eq(aiConfigs.taskType, taskType as "agent" | "prescreening" | "prereply" | "embedding"),
-    });
-
-    if (!config) {
-      return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
-    }
-
-    return NextResponse.json({
-      ok: true,
-      data: {
-        ...config,
-        apiKey: config.apiKey ? "***" + config.apiKey.slice(-4) : "",
-      },
-    });
-  } catch (error) {
-    console.error("Error in GET /api/tob/admin/ai/config/[taskType]:", error);
-    return NextResponse.json(
-      { ok: false, error: "Internal server error" },
-      { status: 500 }
-    );
-  }
+  const config = await ctx.db.query.aiConfigs.findFirst({
+    where: eq(aiConfigs.taskType, parsed.data),
+  });
+  if (!config) throw notFound();
+  return config;
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ taskType: string }> }
-) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
+export const GET = withAuth({ permission: "product.manage" }, async (_req: NextRequest, ctx) => {
+  const config = await findConfigByTaskType(ctx);
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+  // Never return the stored API key — mask it
+  return ok({
+    ...config,
+    apiKey: config.apiKey ? `${config.apiKey.slice(0, 6)}...` : "",
+    hasKey: Boolean(config.apiKey),
+  });
+});
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
+export const PATCH = withAuth({ permission: "product.manage" }, async (req: NextRequest, ctx) => {
+  const existing = await findConfigByTaskType(ctx);
+  const body = await parseBody(req, updateConfigSchema);
 
-    // Only SuperAdmin can manage AI configs
-    if (!ctx || !isSuperAdmin(ctx.user.role as Role)) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
+  const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+  if (body.provider) updates.provider = body.provider;
+  if (body.model) updates.model = body.model;
+  if (body.apiKey) updates.apiKey = body.apiKey;
+  if (body.baseUrl !== undefined) updates.baseUrl = body.baseUrl;
+  if (body.enabled !== undefined) updates.enabled = body.enabled;
 
-    const { taskType } = await params;
-    const body = (await request.json()) as {
-      provider?: string;
-      model?: string;
-      apiKey?: string;
-      baseUrl?: string | null;
-      enabled?: boolean;
-    };
+  await ctx.db.update(aiConfigs).set(updates).where(eq(aiConfigs.id, existing.id));
 
-    const existing = await db.query.aiConfigs.findFirst({
-      where: eq(aiConfigs.taskType, taskType as "agent" | "prescreening" | "prereply" | "embedding"),
-    });
+  return ok({ updated: true });
+});
 
-    if (!existing) {
-      return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
-    }
+export const DELETE = withAuth({ permission: "product.manage" }, async (_req: NextRequest, ctx) => {
+  const existing = await findConfigByTaskType(ctx);
 
-    const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
-    if (body.provider) updates.provider = body.provider;
-    if (body.model) updates.model = body.model;
-    if (body.apiKey) updates.apiKey = body.apiKey;
-    if (body.baseUrl !== undefined) updates.baseUrl = body.baseUrl;
-    if (body.enabled !== undefined) updates.enabled = body.enabled;
+  await ctx.db.delete(aiConfigs).where(eq(aiConfigs.id, existing.id));
 
-    await db.update(aiConfigs).set(updates).where(eq(aiConfigs.id, existing.id));
-
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error("Error in PATCH /api/tob/admin/ai/config/[taskType]:", error);
-    return NextResponse.json(
-      { ok: false, error: "Internal server error" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ taskType: string }> }
-) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
-
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
-
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
-
-    // Only SuperAdmin can manage AI configs
-    if (!ctx || !isSuperAdmin(ctx.user.role as Role)) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const { taskType } = await params;
-    const existing = await db.query.aiConfigs.findFirst({
-      where: eq(aiConfigs.taskType, taskType as "agent" | "prescreening" | "prereply" | "embedding"),
-    });
-
-    if (!existing) {
-      return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
-    }
-
-    await db.delete(aiConfigs).where(eq(aiConfigs.id, existing.id));
-
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error("Error in DELETE /api/tob/admin/ai/config/[taskType]:", error);
-    return NextResponse.json(
-      { ok: false, error: "Internal server error" },
-      { status: 500 }
-    );
-  }
-}
+  return ok({ deleted: true });
+});

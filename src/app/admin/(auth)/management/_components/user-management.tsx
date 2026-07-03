@@ -1,10 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useMemo, useState } from "react";
+import useSWR from "swr";
+import { toast } from "sonner";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { api, swrFetcher } from "@/lib/api/client";
+import { useMe } from "@/lib/hooks/use-me";
+import { Role } from "@/lib/types";
+import { ROLE_HIERARCHY, canManageRole } from "@/lib/api-utils";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -16,9 +23,9 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -27,13 +34,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { Pencil, Search } from "lucide-react";
-import { Role } from "@/lib/types";
+import { DeleteConfirmDialog } from "./delete-confirm-dialog";
+import {
+  EmptyState,
+  ErrorState,
+  FormField,
+  ManagerPanel,
+  RowActions,
+  TableSkeleton,
+  errorMessage,
+} from "./manager-ui";
 
-interface User {
+interface UserRow {
   id: string;
   email: string;
   displayName: string;
@@ -42,18 +54,14 @@ interface User {
   isAgent?: boolean;
   agentLevel?: number;
   agentActive?: boolean;
-  teamIds?: string[];
 }
 
-const roleLabels: Record<Role, string> = {
-  [Role.SuperAdmin]: "Super Admin",
-  [Role.TenantAdmin]: "Tenant Admin",
-  [Role.ProductAdmin]: "Product Admin",
-  [Role.TeamAdmin]: "Team Admin",
-  [Role.Agent]: "Agent",
-};
+interface Tenant {
+  id: string;
+  name: string;
+}
 
-const roleColors: Record<Role, "default" | "secondary" | "destructive" | "outline"> = {
+const ROLE_BADGE: Record<Role, "default" | "secondary" | "destructive" | "outline"> = {
   [Role.SuperAdmin]: "destructive",
   [Role.TenantAdmin]: "default",
   [Role.ProductAdmin]: "secondary",
@@ -61,209 +69,342 @@ const roleColors: Record<Role, "default" | "secondary" | "destructive" | "outlin
   [Role.Agent]: "outline",
 };
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function UserManagement() {
   const { t } = useI18n();
-  const [users, setUsers] = useState<User[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const m = t.management;
+  const { me, can } = useMe();
+  const myRole = me?.role;
+  const isSuperAdmin = can("tenant.manage");
+
+  const roleLabels: Record<Role, string> = {
+    [Role.SuperAdmin]: m.users.roles.superAdmin,
+    [Role.TenantAdmin]: m.users.roles.tenantAdmin,
+    [Role.ProductAdmin]: m.users.roles.productAdmin,
+    [Role.TeamAdmin]: m.users.roles.teamAdmin,
+    [Role.Agent]: m.users.roles.agent,
+  };
+
+  const {
+    data: users,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR<UserRow[]>("/api/tob/admin/users", swrFetcher);
+  const { data: tenants } = useSWR<Tenant[]>(
+    isSuperAdmin ? "/api/tob/admin/tenants" : null,
+    swrFetcher
+  );
+
+  const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [formData, setFormData] = useState({
+  const [editing, setEditing] = useState<UserRow | null>(null);
+  const [deleting, setDeleting] = useState<UserRow | null>(null);
+  const [form, setForm] = useState({
+    email: "",
     displayName: "",
-    role: Role.Agent as Role,
+    role: "" as Role | "",
+    tenantId: "",
   });
-  const [saving, setSaving] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [pending, setPending] = useState(false);
 
-  const fetchUsers = useCallback(async () => {
-    try {
-      const res = await fetch("/api/tob/admin/users");
-      const data = (await res.json()) as { ok: boolean; data: User[] };
-      if (data.ok) {
-        setUsers(data.data);
-        setFilteredUsers(data.data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch users:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const tenantNames = useMemo(
+    () => new Map((tenants ?? []).map((tenant) => [tenant.id, tenant.name])),
+    [tenants]
+  );
 
-  useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+  /** Roles strictly below the current user's role, highest first. */
+  const assignableRoles = useMemo(() => {
+    if (!myRole) return [];
+    return Object.values(Role)
+      .filter((role) => canManageRole(myRole, role))
+      .sort((a, b) => ROLE_HIERARCHY[b] - ROLE_HIERARCHY[a]);
+  }, [myRole]);
 
-  useEffect(() => {
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      setFilteredUsers(
-        users.filter(
+  const canManageTarget = (user: UserRow) =>
+    !!myRole && canManageRole(myRole, user.role);
+
+  const filtered = useMemo(() => {
+    const list = users ?? [];
+    const q = search.trim().toLowerCase();
+    return q
+      ? list.filter(
           (u) =>
-            u.email.toLowerCase().includes(query) ||
-            u.displayName.toLowerCase().includes(query)
+            u.email.toLowerCase().includes(q) ||
+            u.displayName.toLowerCase().includes(q)
         )
-      );
-    } else {
-      setFilteredUsers(users);
-    }
-  }, [searchQuery, users]);
+      : list;
+  }, [users, search]);
 
-  const handleEdit = (user: User) => {
-    setEditingUser(user);
-    setFormData({
-      displayName: user.displayName,
-      role: user.role,
-    });
+  const openCreate = () => {
+    setEditing(null);
+    setForm({ email: "", displayName: "", role: "", tenantId: "" });
+    setFormErrors({});
     setDialogOpen(true);
   };
 
-  const handleSave = async () => {
-    if (!editingUser) return;
+  const openEdit = (user: UserRow) => {
+    setEditing(user);
+    setForm({
+      email: user.email,
+      displayName: user.displayName,
+      role: user.role,
+      tenantId: user.tenantId,
+    });
+    setFormErrors({});
+    setDialogOpen(true);
+  };
 
-    setSaving(true);
+  const handleSubmit = async () => {
+    const errors: Record<string, string> = {};
+    if (!editing) {
+      if (!form.email.trim()) errors.email = m.fieldRequired;
+      else if (!EMAIL_RE.test(form.email.trim())) errors.email = m.users.emailInvalid;
+    }
+    if (!form.displayName.trim()) errors.displayName = m.fieldRequired;
+    if (!form.role) errors.role = m.users.selectRole;
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    setPending(true);
     try {
-      const res = await fetch(`/api/tob/admin/users/${editingUser.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          displayName: formData.displayName,
-          role: formData.role,
-        }),
-      });
-
-      if (res.ok) {
-        setDialogOpen(false);
-        fetchUsers();
+      if (editing) {
+        await api.patch(`/api/tob/admin/users/${editing.id}`, {
+          displayName: form.displayName.trim(),
+          role: form.role,
+        });
+        toast.success(m.toastUpdated);
+      } else {
+        await api.post("/api/tob/admin/users", {
+          email: form.email.trim(),
+          displayName: form.displayName.trim(),
+          role: form.role,
+          ...(isSuperAdmin && form.tenantId ? { tenantId: form.tenantId } : {}),
+        });
+        toast.success(m.toastCreated);
       }
-    } catch (error) {
-      console.error("Failed to save user:", error);
+      setDialogOpen(false);
+      await mutate();
+    } catch (err) {
+      toast.error(errorMessage(err, m.loadFailed));
     } finally {
-      setSaving(false);
+      setPending(false);
     }
   };
 
-  if (loading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{t.management.tabs.users}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const handleDelete = async () => {
+    if (!deleting) return;
+    try {
+      await api.delete(`/api/tob/admin/users/${deleting.id}`);
+      toast.success(m.toastDeleted);
+      setDeleting(null);
+      await mutate();
+    } catch (err) {
+      toast.error(errorMessage(err, m.loadFailed));
+      throw err;
+    }
+  };
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>{t.management.users.accounts}</CardTitle>
-          <div className="relative w-64">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder={t.management.users.searchEmail}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8"
-            />
-          </div>
-        </CardHeader>
-        <CardContent>
-          {filteredUsers.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
-              {t.management.noData.replace("{{type}}", t.management.tabs.users)}
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>{t.management.users.displayName}</TableHead>
-                  <TableHead>{t.management.users.role}</TableHead>
-                  <TableHead>Agent</TableHead>
-                  <TableHead className="w-16">{t.common.actions}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsers.map((user) => (
+      <ManagerPanel
+        title={m.users.accounts}
+        description={m.users.description}
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder={m.users.searchEmail}
+        actions={
+          <Button size="sm" className="h-8" onClick={openCreate}>
+            <Plus className="mr-1.5 size-3.5" />
+            {m.users.create}
+          </Button>
+        }
+      >
+        {isLoading ? (
+          <TableSkeleton />
+        ) : error ? (
+          <ErrorState onRetry={() => void mutate()} />
+        ) : filtered.length === 0 ? (
+          <EmptyState message={m.noData.replace("{{type}}", m.tabs.users)} />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{m.users.displayName}</TableHead>
+                <TableHead>{m.users.email}</TableHead>
+                <TableHead>{m.users.role}</TableHead>
+                {isSuperAdmin && <TableHead>{m.users.tenant}</TableHead>}
+                <TableHead>{m.tabs.agents}</TableHead>
+                <TableHead className="w-12" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((user) => {
+                const manageable = canManageTarget(user);
+                return (
                   <TableRow key={user.id}>
-                    <TableCell className="font-mono text-xs">{user.email}</TableCell>
-                    <TableCell>{user.displayName}</TableCell>
-                    <TableCell>
-                      <Badge variant={roleColors[user.role]}>{roleLabels[user.role]}</Badge>
+                    <TableCell className="text-sm font-medium">
+                      {user.displayName}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {user.email}
                     </TableCell>
                     <TableCell>
+                      <Badge variant={ROLE_BADGE[user.role]}>
+                        {roleLabels[user.role]}
+                      </Badge>
+                    </TableCell>
+                    {isSuperAdmin && (
+                      <TableCell className="text-sm text-muted-foreground">
+                        {tenantNames.get(user.tenantId) ?? user.tenantId}
+                      </TableCell>
+                    )}
+                    <TableCell>
                       {user.isAgent ? (
-                        <Badge variant={user.agentActive ? "success" : "secondary"}>
+                        <Badge
+                          variant={user.agentActive ? "outline" : "secondary"}
+                          className={
+                            user.agentActive
+                              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                              : undefined
+                          }
+                        >
                           Lv.{user.agentLevel}
                         </Badge>
                       ) : (
-                        <span className="text-muted-foreground">-</span>
+                        <span className="text-sm text-muted-foreground">-</span>
                       )}
                     </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="icon" onClick={() => handleEdit(user)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                    <TableCell className="text-right">
+                      {manageable && (
+                        <RowActions
+                          actions={[
+                            {
+                              label: t.common.edit,
+                              icon: Pencil,
+                              onSelect: () => openEdit(user),
+                            },
+                            {
+                              label: t.common.delete,
+                              icon: Trash2,
+                              destructive: true,
+                              separatorBefore: true,
+                              onSelect: () => setDeleting(user),
+                            },
+                          ]}
+                        />
+                      )}
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </ManagerPanel>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+      <Dialog open={dialogOpen} onOpenChange={(open) => !pending && setDialogOpen(open)}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{t.management.users.editRole}</DialogTitle>
+            <DialogTitle>{editing ? m.users.edit : m.users.create}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>{t.management.users.displayName}</Label>
+          <div className="space-y-4 py-2">
+            <FormField
+              label={m.users.email}
+              htmlFor="user-email"
+              required
+              error={formErrors.email}
+            >
               <Input
-                value={formData.displayName}
-                onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+                id="user-email"
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                disabled={!!editing}
+                className="h-8"
               />
-            </div>
+            </FormField>
 
-            <div className="space-y-2">
-              <Label>{t.management.users.role}</Label>
+            <FormField
+              label={m.users.displayName}
+              htmlFor="user-name"
+              required
+              error={formErrors.displayName}
+            >
+              <Input
+                id="user-name"
+                value={form.displayName}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, displayName: e.target.value }))
+                }
+                className="h-8"
+              />
+            </FormField>
+
+            <FormField label={m.users.role} required error={formErrors.role}>
               <Select
-                value={formData.role}
-                onValueChange={(value) => setFormData({ ...formData, role: value as Role })}
+                value={form.role}
+                onValueChange={(v) => setForm((f) => ({ ...f, role: v as Role }))}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder={t.management.users.selectRole} />
+                <SelectTrigger className="h-8">
+                  <SelectValue placeholder={m.users.selectRole} />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.values(Role).map((role) => (
+                  {assignableRoles.map((role) => (
                     <SelectItem key={role} value={role}>
                       {roleLabels[role]}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </FormField>
+
+            {isSuperAdmin && !editing && (
+              <FormField label={m.users.tenant}>
+                <Select
+                  value={form.tenantId}
+                  onValueChange={(v) => setForm((f) => ({ ...f, tenantId: v }))}
+                >
+                  <SelectTrigger className="h-8">
+                    <SelectValue placeholder={m.products.selectTenant} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(tenants ?? []).map((tenant) => (
+                      <SelectItem key={tenant.id} value={tenant.id}>
+                        {tenant.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormField>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setDialogOpen(false)}
+              disabled={pending}
+            >
               {t.common.cancel}
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? t.common.loading : t.common.save}
+            <Button size="sm" className="h-8" onClick={handleSubmit} disabled={pending}>
+              {pending ? t.common.loading : t.common.save}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        open={!!deleting}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        itemName={deleting?.displayName || deleting?.email || ""}
+        onConfirm={handleDelete}
+        requireNameConfirmation
+      />
     </>
   );
 }

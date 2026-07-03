@@ -1,105 +1,57 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { getAuth } from "@/lib/auth";
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { products } from "@/drizzle/schema";
-import { hasPermission, Role } from "@/lib/types";
-import { eq, inArray } from "drizzle-orm";
-import { resolveUserContext } from "@/lib/api-utils";
+import { ok, badRequest } from "@/lib/api/response";
+import { withAuth, parseBody } from "@/lib/api/handler";
+import { tenantCondition } from "@/lib/api/scope";
 
-export async function GET(request: NextRequest) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({ headers: request.headers });
+const slaMinutes = z.number().int().positive().optional();
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+const createProductSchema = z.object({
+  name: z.string().min(1),
+  tenantId: z.string().optional(),
+  slaHighAccept: slaMinutes,
+  slaHighReply: slaMinutes,
+  slaMediumAccept: slaMinutes,
+  slaMediumReply: slaMinutes,
+  slaLowAccept: slaMinutes,
+  slaLowReply: slaMinutes,
+  autoCloseMinutes: z.number().int().positive().nullable().optional(),
+});
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
+export const GET = withAuth({ permission: "product.manage" }, async (_req: NextRequest, ctx) => {
+  const productList = await ctx.db
+    .select()
+    .from(products)
+    .where(tenantCondition(ctx, products.tenantId));
+  return ok(productList);
+});
 
-    if (!ctx) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
+export const POST = withAuth({ permission: "product.manage" }, async (req: NextRequest, ctx) => {
+  const body = await parseBody(req, createProductSchema);
 
-    if (!hasPermission(ctx.user.role as Role, "product.manage")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const productList = await db
-      .select()
-      .from(products)
-      .where(inArray(products.tenantId, ctx.tenantIds));
-
-    return NextResponse.json({ ok: true, data: productList });
-  } catch (error) {
-    console.error("Error in GET /api/tob/admin/products:", error);
-    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
+  // SuperAdmin may create a product in any tenant; others only in their own.
+  const tenantId = body.tenantId ?? ctx.user.tenantId;
+  if (!ctx.isSuperAdmin && !ctx.tenantIds.includes(tenantId)) {
+    throw badRequest("Invalid tenantId");
   }
-}
 
-export async function POST(request: NextRequest) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({ headers: request.headers });
+  const id = crypto.randomUUID();
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+  await ctx.db.insert(products).values({
+    id,
+    tenantId,
+    name: body.name,
+    slaHighAccept: body.slaHighAccept,
+    slaHighReply: body.slaHighReply,
+    slaMediumAccept: body.slaMediumAccept,
+    slaMediumReply: body.slaMediumReply,
+    slaLowAccept: body.slaLowAccept,
+    slaLowReply: body.slaLowReply,
+    autoCloseMinutes: body.autoCloseMinutes,
+  });
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
-
-    if (!ctx) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
-
-    if (!hasPermission(ctx.user.role as Role, "product.manage")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const body = (await request.json()) as {
-      name: string;
-      tenantId?: string;
-      slaHighAccept?: number;
-      slaHighReply?: number;
-      slaMediumAccept?: number;
-      slaMediumReply?: number;
-      slaLowAccept?: number;
-      slaLowReply?: number;
-      autoCloseMinutes?: number;
-    };
-
-    if (!body.name) {
-      return NextResponse.json({ ok: false, error: "name is required" }, { status: 400 });
-    }
-
-    const tenantId = body.tenantId || ctx.tenantIds[0];
-
-    if (!ctx.tenantIds.includes(tenantId)) {
-      return NextResponse.json({ ok: false, error: "Invalid tenantId" }, { status: 400 });
-    }
-
-    const id = crypto.randomUUID();
-
-    await db.insert(products).values({
-      id,
-      tenantId,
-      name: body.name,
-      slaHighAccept: body.slaHighAccept,
-      slaHighReply: body.slaHighReply,
-      slaMediumAccept: body.slaMediumAccept,
-      slaMediumReply: body.slaMediumReply,
-      slaLowAccept: body.slaLowAccept,
-      slaLowReply: body.slaLowReply,
-      autoCloseMinutes: body.autoCloseMinutes,
-    });
-
-    const created = await db.query.products.findFirst({ where: eq(products.id, id) });
-
-    return NextResponse.json({ ok: true, data: created }, { status: 201 });
-  } catch (error) {
-    console.error("Error in POST /api/tob/admin/products:", error);
-    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
-  }
-}
+  const created = await ctx.db.query.products.findFirst({ where: eq(products.id, id) });
+  return ok(created, 201);
+});

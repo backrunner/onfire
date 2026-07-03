@@ -1,138 +1,84 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { getAuth } from "@/lib/auth";
-import { resolveUserContext } from "@/lib/api-utils";
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { and, desc, eq, or, sql, count } from "drizzle-orm";
 import { tickets } from "@/drizzle/schema";
-import {
-  TicketStatus,
-  TicketPriority,
-  type TicketFilter,
-  hasPermission,
-  Role,
-} from "@/lib/types";
-import { and, desc, eq, inArray, or } from "drizzle-orm";
+import { TicketStatus, TicketPriority } from "@/lib/types";
+import { ok } from "@/lib/api/response";
+import { withAuth, parseQuery } from "@/lib/api/handler";
+import { ticketScopeCondition } from "@/lib/api/scope";
+import { serializeTicket } from "@/lib/tickets/serialize";
 
-const parseJson = (val: string | null | undefined): unknown => {
-  if (val === null || val === undefined) return undefined;
-  if (typeof val !== "string") return val;
-  try {
-    return JSON.parse(val);
-  } catch {
-    return val;
-  }
-};
+const listQuerySchema = z.object({
+  productId: z.string().optional(),
+  teamId: z.string().optional(),
+  assigneeId: z.string().optional(),
+  status: z.enum(TicketStatus).optional(),
+  priority: z.enum(TicketPriority).optional(),
+  overdue: z
+    .enum(["true", "false", "1", "0"])
+    .optional()
+    .transform((v) => v === "true" || v === "1"),
+  q: z.string().max(200).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+});
 
-const enrichTicket = (row: typeof tickets.$inferSelect | null | undefined) => {
-  if (!row) return null;
-  const acceptDeadline = row.slaAcceptDeadline
-    ? Date.parse(row.slaAcceptDeadline)
-    : undefined;
-  const replyDeadline = row.slaReplyDeadline
-    ? Date.parse(row.slaReplyDeadline)
-    : undefined;
-  const now = Date.now();
-  const sla =
-    row.slaAcceptDeadline || row.slaReplyDeadline
-      ? {
-          acceptDeadline: row.slaAcceptDeadline ?? undefined,
-          replyDeadline: row.slaReplyDeadline ?? undefined,
-          acceptBreached: acceptDeadline ? acceptDeadline < now : false,
-          replyBreached: replyDeadline ? replyDeadline < now : false,
-        }
-      : undefined;
-  return {
-    ...row,
-    metadata: parseJson(row.metadata),
-    sla,
-  };
-};
+/** Priority-first ordering (high → medium → low), then most recently updated. */
+const priorityWeight = sql`CASE ${tickets.priority}
+  WHEN 'high' THEN 0
+  WHEN 'medium' THEN 1
+  ELSE 2 END`;
 
-const weightPriority: Record<string, number> = { high: 0, medium: 1, low: 2 };
+export const GET = withAuth({ permission: "ticket.read" }, async (req: NextRequest, ctx) => {
+  const query = parseQuery(req, listQuerySchema);
 
-export async function GET(request: NextRequest) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
-
-    if (!session?.user) {
-      return NextResponse.json(
-        { ok: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
-
-    if (!ctx) {
-      return NextResponse.json(
-        { ok: false, error: "User not found" },
-        { status: 404 }
-      );
-    }
-
-    if (!hasPermission(ctx.user.role as Role, "ticket.read")) {
-      return NextResponse.json(
-        { ok: false, error: "Forbidden" },
-        { status: 403 }
-      );
-    }
-
-    const { searchParams } = new URL(request.url);
-    const filter: TicketFilter = {
-      productId: searchParams.get("productId") ?? undefined,
-      teamId: searchParams.get("teamId") ?? undefined,
-      status: (searchParams.get("status") as TicketStatus) ?? undefined,
-      priority: (searchParams.get("priority") as TicketPriority) ?? undefined,
-      overdue:
-        searchParams.get("overdue") === "true" ||
-        searchParams.get("overdue") === "1",
-    };
-
-    const where = [];
-    if (ctx.tenantIds.length)
-      where.push(inArray(tickets.tenantId, ctx.tenantIds));
-    if (filter.productId) where.push(eq(tickets.productId, filter.productId));
-    if (filter.teamId) where.push(eq(tickets.teamId, filter.teamId));
-    if (filter.status) where.push(eq(tickets.status, filter.status));
-    if (filter.priority) where.push(eq(tickets.priority, filter.priority));
-    if (filter.overdue)
-      where.push(
-        or(
-          eq(tickets.slaAcceptBreached, true),
-          eq(tickets.slaReplyBreached, true)
-        )
-      );
-
-    const list = await db
-      .select()
-      .from(tickets)
-      .where(where.length ? and(...where) : undefined)
-      .orderBy(desc(tickets.createdAt))
-      .limit(100);
-
-    const enriched = list.map(enrichTicket).filter(Boolean);
-    enriched.sort((a, b) => {
-      if (!a || !b) return 0;
-      const wDiff =
-        (weightPriority[a.priority] ?? 3) - (weightPriority[b.priority] ?? 3);
-      if (wDiff !== 0) return wDiff;
-      return (b.updatedAt ?? b.createdAt).localeCompare(
-        a.updatedAt ?? a.createdAt
-      );
-    });
-
-    return NextResponse.json({
-      ok: true,
-      data: { data: enriched, total: enriched.length },
-    });
-  } catch (error) {
-    console.error("Error in GET /api/tob/tickets:", error);
-    return NextResponse.json(
-      { ok: false, error: "Internal server error" },
-      { status: 500 }
+  const conditions = [ticketScopeCondition(ctx)];
+  if (query.productId) conditions.push(eq(tickets.productId, query.productId));
+  if (query.teamId) conditions.push(eq(tickets.teamId, query.teamId));
+  if (query.assigneeId) conditions.push(eq(tickets.assigneeId, query.assigneeId));
+  if (query.status) conditions.push(eq(tickets.status, query.status));
+  if (query.priority) conditions.push(eq(tickets.priority, query.priority));
+  if (query.overdue) {
+    conditions.push(
+      or(
+        eq(tickets.slaAcceptBreached, true),
+        eq(tickets.slaReplyBreached, true),
+        sql`(${tickets.slaAcceptDeadline} IS NOT NULL AND ${tickets.slaAcceptDeadline} < ${new Date().toISOString()} AND ${tickets.status} = 'new')`,
+        sql`(${tickets.slaReplyDeadline} IS NOT NULL AND ${tickets.slaReplyDeadline} < ${new Date().toISOString()} AND ${tickets.status} IN ('new','processing','escalated'))`
+      )
     );
   }
-}
+  if (query.q) {
+    const term = `%${query.q.replace(/[%_]/g, "")}%`;
+    conditions.push(
+      or(
+        sql`${tickets.subject} LIKE ${term}`,
+        sql`${tickets.customerEmail} LIKE ${term}`,
+        eq(tickets.id, query.q)
+      )
+    );
+  }
+
+  const where = and(...conditions.filter(Boolean));
+
+  const [{ total }] = await ctx.db
+    .select({ total: count() })
+    .from(tickets)
+    .where(where);
+
+  const rows = await ctx.db
+    .select()
+    .from(tickets)
+    .where(where)
+    .orderBy(priorityWeight, desc(tickets.updatedAt))
+    .limit(query.pageSize)
+    .offset((query.page - 1) * query.pageSize);
+
+  return ok({
+    items: rows.map(serializeTicket),
+    total,
+    page: query.page,
+    pageSize: query.pageSize,
+    totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+  });
+});

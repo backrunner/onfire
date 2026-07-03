@@ -1,74 +1,87 @@
 "use client";
 
-import { useState } from "react";
-import { AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { AlertCircle, Clock } from "lucide-react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { useI18n } from "@/lib/i18n";
 import { featureFlags } from "@/lib/feature-flags";
 
 interface CredentialErrorProps {
-  missingFields: ("productId" | "token")[];
+  /** "missing" — no/partial credentials; "expired" — token rejected (401). */
+  variant?: "missing" | "expired";
+  missingFields?: ("productId" | "token")[];
 }
 
-export function CredentialError({ missingFields }: CredentialErrorProps) {
+export function CredentialError({
+  variant = "missing",
+  missingFields = [],
+}: CredentialErrorProps) {
   const { t } = useI18n();
-  const [showDetails, setShowDetails] = useState(false);
   const showDebugDetails = featureFlags.showDebugDetails();
+  const expired = variant === "expired";
+  const Icon = expired ? Clock : AlertCircle;
 
   return (
-    <div className="max-w-md mx-auto mt-20">
-      <Card className="border-destructive/50">
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-destructive" />
-            <CardTitle className="text-destructive">
-              {t.toc.errors.configurationError}
-            </CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-muted-foreground">
-            {t.toc.errors.missingCredentialsMessage}
+    <div className="mx-auto flex min-h-screen w-full max-w-lg items-start px-4 py-20 sm:py-24">
+      <Alert variant="destructive" className="border-destructive/50">
+        <Icon />
+        <AlertTitle>
+          {expired
+            ? t.toc.errors.sessionExpired
+            : t.toc.errors.configurationError}
+        </AlertTitle>
+        <AlertDescription className="gap-2">
+          <p>
+            {expired
+              ? t.toc.errors.sessionExpiredMessage
+              : t.toc.errors.missingCredentialsMessage}
           </p>
-          <p className="text-sm text-muted-foreground">
-            {t.toc.errors.contactProvider}
+          <p className="text-destructive/80">
+            {expired
+              ? t.toc.errors.sessionExpiredHint
+              : t.toc.errors.contactProvider}
           </p>
 
-          {showDebugDetails && (
-            <div className="pt-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-between text-muted-foreground"
-                onClick={() => setShowDetails(!showDetails)}
+          {showDebugDetails && !expired && missingFields.length > 0 && (
+            <Accordion
+              type="single"
+              collapsible
+              className="mt-1 w-full"
+            >
+              <AccordionItem
+                value="technical-details"
+                className="border-t border-b-0 border-destructive/20"
               >
-                {t.toc.errors.technicalDetails}
-                {showDetails ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-              </Button>
-              {showDetails && (
-                <div className="mt-2 p-3 bg-muted rounded-md text-sm font-mono">
-                  <p className="text-muted-foreground mb-1">Missing:</p>
-                  <ul className="list-disc list-inside">
-                    {missingFields.map((field) => (
-                      <li key={field} className="text-destructive">
-                        {field}
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="text-muted-foreground mt-2 text-xs">
-                    URL format: ?productId=xxx&token=yyy
-                  </p>
-                </div>
-              )}
-            </div>
+                <AccordionTrigger className="py-3 text-xs text-destructive/80">
+                  {t.toc.errors.technicalDetails}
+                </AccordionTrigger>
+                <AccordionContent className="space-y-2 pb-0 text-xs">
+                  <p className="font-medium">Missing:</p>
+                  <div className="font-mono">
+                    <ul className="list-inside list-disc">
+                      {missingFields.map((field) => (
+                        <li key={field}>{field}</li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-destructive/80">
+                      URL format: ?productId=xxx&token=yyy
+                    </p>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           )}
-        </CardContent>
-      </Card>
+        </AlertDescription>
+      </Alert>
     </div>
   );
 }

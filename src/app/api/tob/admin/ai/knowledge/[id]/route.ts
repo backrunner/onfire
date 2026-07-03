@@ -1,171 +1,70 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { getAuth } from "@/lib/auth";
-import { productKnowledge, products } from "@/drizzle/schema";
-import { hasPermission, Role } from "@/lib/types";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { eq } from "drizzle-orm";
+import { productKnowledge } from "@/drizzle/schema";
+import { ok, notFound } from "@/lib/api/response";
+import { withAuth, parseBody } from "@/lib/api/handler";
+import type { AuthedContext } from "@/lib/api/handler";
+import { assertProductAccess } from "@/lib/api/scope";
 import { embedKnowledge } from "@/services/ai/embedding";
-import { resolveUserContext, verifyProductOwnership } from "@/lib/api-utils";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
+const knowledgeTypeEnum = z.enum([
+  "description",
+  "faq",
+  "feature",
+  "policy",
+  "troubleshooting",
+]);
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+const updateKnowledgeSchema = z.object({
+  title: z.string().min(1).max(500).optional(),
+  content: z.string().min(1).optional(),
+  knowledgeType: knowledgeTypeEnum.optional(),
+  reembed: z.boolean().optional(),
+});
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
-
-    if (!ctx || !hasPermission(ctx.user.role as Role, "product.manage")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const { id } = await params;
-    const knowledge = await db.query.productKnowledge.findFirst({
-      where: eq(productKnowledge.id, id),
-    });
-
-    if (!knowledge) {
-      return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
-    }
-
-    // Verify product ownership
-    const hasAccess = await verifyProductOwnership(db, knowledge.productId, ctx.tenantIds);
-    if (!hasAccess) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    return NextResponse.json({ ok: true, data: knowledge });
-  } catch (error) {
-    console.error("Error in GET /api/tob/admin/ai/knowledge/[id]:", error);
-    return NextResponse.json(
-      { ok: false, error: "Internal server error" },
-      { status: 500 }
-    );
-  }
+async function findAccessibleKnowledge(ctx: AuthedContext) {
+  const knowledge = await ctx.db.query.productKnowledge.findFirst({
+    where: eq(productKnowledge.id, ctx.params.id),
+  });
+  if (!knowledge) throw notFound();
+  // Cross-tenant access yields 404
+  await assertProductAccess(ctx, knowledge.productId);
+  return knowledge;
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
+export const GET = withAuth({ permission: "product.manage" }, async (_req: NextRequest, ctx) => {
+  const knowledge = await findAccessibleKnowledge(ctx);
+  return ok(knowledge);
+});
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+export const PATCH = withAuth({ permission: "product.manage" }, async (req: NextRequest, ctx) => {
+  const existing = await findAccessibleKnowledge(ctx);
+  const body = await parseBody(req, updateKnowledgeSchema);
+
+  const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+  if (body.title) updates.title = body.title;
+  if (body.content) updates.content = body.content;
+  if (body.knowledgeType) updates.knowledgeType = body.knowledgeType;
+
+  await ctx.db.update(productKnowledge).set(updates).where(eq(productKnowledge.id, existing.id));
+
+  // Re-embed if content changed and requested
+  if (body.reembed && (body.title || body.content)) {
+    try {
+      await embedKnowledge(ctx.db, existing.id);
+    } catch (error) {
+      console.error("Failed to re-embed knowledge:", error);
     }
-
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
-
-    if (!ctx || !hasPermission(ctx.user.role as Role, "product.manage")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const { id } = await params;
-    const body = (await request.json()) as {
-      title?: string;
-      content?: string;
-      knowledgeType?: string;
-      reembed?: boolean;
-    };
-
-    const existing = await db.query.productKnowledge.findFirst({
-      where: eq(productKnowledge.id, id),
-    });
-
-    if (!existing) {
-      return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
-    }
-
-    // Verify product ownership
-    const hasAccess = await verifyProductOwnership(db, existing.productId, ctx.tenantIds);
-    if (!hasAccess) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
-    if (body.title) updates.title = body.title;
-    if (body.content) updates.content = body.content;
-    if (body.knowledgeType) updates.knowledgeType = body.knowledgeType;
-
-    await db.update(productKnowledge).set(updates).where(eq(productKnowledge.id, id));
-
-    // Re-embed if content changed and requested
-    if (body.reembed && (body.title || body.content)) {
-      try {
-        await embedKnowledge(db, id);
-      } catch (error) {
-        console.error("Failed to re-embed knowledge:", error);
-      }
-    }
-
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error("Error in PATCH /api/tob/admin/ai/knowledge/[id]:", error);
-    return NextResponse.json(
-      { ok: false, error: "Internal server error" },
-      { status: 500 }
-    );
   }
-}
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
+  return ok({ updated: true });
+});
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+export const DELETE = withAuth({ permission: "product.manage" }, async (_req: NextRequest, ctx) => {
+  const existing = await findAccessibleKnowledge(ctx);
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
+  await ctx.db.delete(productKnowledge).where(eq(productKnowledge.id, existing.id));
 
-    if (!ctx || !hasPermission(ctx.user.role as Role, "product.manage")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const { id } = await params;
-    const existing = await db.query.productKnowledge.findFirst({
-      where: eq(productKnowledge.id, id),
-    });
-
-    if (!existing) {
-      return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
-    }
-
-    // Verify product ownership
-    const hasAccess = await verifyProductOwnership(db, existing.productId, ctx.tenantIds);
-    if (!hasAccess) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    await db.delete(productKnowledge).where(eq(productKnowledge.id, id));
-
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error("Error in DELETE /api/tob/admin/ai/knowledge/[id]:", error);
-    return NextResponse.json(
-      { ok: false, error: "Internal server error" },
-      { status: 500 }
-    );
-  }
-}
+  return ok({ deleted: true });
+});

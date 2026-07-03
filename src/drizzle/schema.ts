@@ -1,4 +1,12 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import {
+  sqliteTable,
+  text,
+  integer,
+  real,
+  index,
+  uniqueIndex,
+  primaryKey,
+} from "drizzle-orm/sqlite-core";
 import { Role, TicketPriority, TicketStatus } from "@/lib/types";
 
 // ============================================
@@ -85,27 +93,39 @@ export const products = sqliteTable("products", {
   autoCloseMinutes: integer("auto_close_minutes"),
 });
 
-export const customers = sqliteTable("customers", {
-  id: text("id").primaryKey(),
-  tenantId: text("tenant_id").notNull(),
-  productId: text("product_id").notNull(),
-  email: text("email").notNull(),
-  externalId: text("external_id"),
-  level: integer("level"),
-  meta: text("meta"),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-});
+export const customers = sqliteTable(
+  "customers",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    productId: text("product_id").notNull(),
+    email: text("email").notNull(),
+    externalId: text("external_id"),
+    level: integer("level"),
+    meta: text("meta"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("customers_product_email_uq").on(t.productId, t.email),
+    index("customers_tenant_idx").on(t.tenantId),
+  ]
+);
 
-export const productKeys = sqliteTable("product_keys", {
-  id: text("id").primaryKey(),
-  productId: text("product_id").notNull(),
-  name: text("name"),
-  secret: text("secret").notNull(),
-  createdAt: text("created_at").notNull(),
-  lastUsedAt: text("last_used_at"),
-  revoked: integer("revoked", { mode: "boolean" }).default(false),
-});
+export const productKeys = sqliteTable(
+  "product_keys",
+  {
+    id: text("id").primaryKey(),
+    productId: text("product_id").notNull(),
+    name: text("name"),
+    // SHA-256 hex of the key secret; plaintext is never persisted
+    secretHash: text("secret").notNull(),
+    createdAt: text("created_at").notNull(),
+    lastUsedAt: text("last_used_at"),
+    revoked: integer("revoked", { mode: "boolean" }).default(false),
+  },
+  (t) => [index("product_keys_product_idx").on(t.productId)]
+);
 
 export const teams = sqliteTable("teams", {
   id: text("id").primaryKey(),
@@ -114,18 +134,26 @@ export const teams = sqliteTable("teams", {
   allowReassign: integer("allow_reassign", { mode: "boolean" }).default(true),
 });
 
-export const productTeams = sqliteTable("product_teams", {
-  productId: text("product_id").notNull(),
-  teamId: text("team_id").notNull(),
-});
+export const productTeams = sqliteTable(
+  "product_teams",
+  {
+    productId: text("product_id").notNull(),
+    teamId: text("team_id").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.productId, t.teamId] })]
+);
 
-export const users = sqliteTable("users", {
-  id: text("id").primaryKey(),
-  email: text("email").notNull(),
-  displayName: text("display_name").notNull(),
-  tenantId: text("tenant_id").notNull(),
-  role: text("role").$type<Role>().notNull(),
-});
+export const users = sqliteTable(
+  "users",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(),
+    displayName: text("display_name").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    role: text("role").$type<Role>().notNull(),
+  },
+  (t) => [index("users_tenant_idx").on(t.tenantId)]
+);
 
 export const agents = sqliteTable("agents", {
   userId: text("user_id").primaryKey(),
@@ -133,10 +161,17 @@ export const agents = sqliteTable("agents", {
   active: integer("active", { mode: "boolean" }).notNull().default(true),
 });
 
-export const agentTeams = sqliteTable("agent_teams", {
-  userId: text("user_id").notNull(),
-  teamId: text("team_id").notNull(),
-});
+export const agentTeams = sqliteTable(
+  "agent_teams",
+  {
+    userId: text("user_id").notNull(),
+    teamId: text("team_id").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.teamId] }),
+    index("agent_teams_team_idx").on(t.teamId),
+  ]
+);
 
 export const agentProfiles = sqliteTable("agent_profiles", {
   userId: text("user_id").primaryKey(),
@@ -145,82 +180,116 @@ export const agentProfiles = sqliteTable("agent_profiles", {
   avatarUrl: text("avatar_url"),
 });
 
-export const templates = sqliteTable("templates", {
-  id: text("id").primaryKey(),
-  productId: text("product_id").notNull(),
-  title: text("title").notNull(),
-  categories: text("categories").notNull(),
-  formSchema: text("form_schema").notNull(),
-});
+export const templates = sqliteTable(
+  "templates",
+  {
+    id: text("id").primaryKey(),
+    productId: text("product_id").notNull(),
+    title: text("title").notNull(),
+    categories: text("categories").notNull(),
+    formSchema: text("form_schema").notNull(),
+  },
+  (t) => [index("templates_product_idx").on(t.productId)]
+);
 
-export const categoryRoutes = sqliteTable("category_routes", {
-  id: text("id").primaryKey(),
-  productId: text("product_id").notNull(),
-  category: text("category").notNull(),
-  subcategory: text("subcategory"),
-  teamId: text("team_id").notNull(),
-});
+export const categoryRoutes = sqliteTable(
+  "category_routes",
+  {
+    id: text("id").primaryKey(),
+    productId: text("product_id").notNull(),
+    category: text("category").notNull(),
+    subcategory: text("subcategory"),
+    teamId: text("team_id").notNull(),
+  },
+  (t) => [index("category_routes_product_category_idx").on(t.productId, t.category)]
+);
 
-export const tickets = sqliteTable("tickets", {
-  id: text("id").primaryKey(),
-  tenantId: text("tenant_id").notNull(),
-  productId: text("product_id").notNull(),
-  teamId: text("team_id").notNull(),
-  assigneeId: text("assignee_id"),
-  status: text("status").$type<TicketStatus>().notNull(),
-  priority: text("priority").$type<TicketPriority>().notNull(),
-  subject: text("subject").notNull(),
-  content: text("content").notNull(),
-  customerEmail: text("customer_email").notNull(),
-  customerLevel: integer("customer_level"),
-  templateId: text("template_id"),
-  metadata: text("metadata"),
-  slaAcceptDeadline: text("sla_accept_deadline"),
-  slaReplyDeadline: text("sla_reply_deadline"),
-  slaAcceptBreached: integer("sla_accept_breached", { mode: "boolean" }).default(
-    false
-  ),
-  slaReplyBreached: integer("sla_reply_breached", { mode: "boolean" }).default(
-    false
-  ),
-  // AI-related fields
-  aiScreeningStatus: text("ai_screening_status").$type<
-    "pending" | "processing" | "completed" | "error"
-  >(),
-  aiScreeningResult: text("ai_screening_result"),
-  aiSuggestedReply: text("ai_suggested_reply"),
-  aiExtractedIssues: text("ai_extracted_issues"),
-  aiKeywords: text("ai_keywords"),
-  vectorizeId: text("vectorize_id"),
-  // Email-related fields
-  source: text("source").$type<"web" | "email" | "api">().default("web"),
-  sourceEmailId: text("source_email_id"),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-});
+export const tickets = sqliteTable(
+  "tickets",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    productId: text("product_id").notNull(),
+    teamId: text("team_id").notNull(),
+    assigneeId: text("assignee_id"),
+    status: text("status").$type<TicketStatus>().notNull(),
+    priority: text("priority").$type<TicketPriority>().notNull(),
+    subject: text("subject").notNull(),
+    content: text("content").notNull(),
+    customerEmail: text("customer_email").notNull(),
+    customerLevel: integer("customer_level"),
+    templateId: text("template_id"),
+    metadata: text("metadata"),
+    slaAcceptDeadline: text("sla_accept_deadline"),
+    slaReplyDeadline: text("sla_reply_deadline"),
+    slaAcceptBreached: integer("sla_accept_breached", { mode: "boolean" }).default(
+      false
+    ),
+    slaReplyBreached: integer("sla_reply_breached", { mode: "boolean" }).default(
+      false
+    ),
+    // Pre-breach warning sent flags (dedupe ticket_expiring notifications)
+    slaAcceptWarned: integer("sla_accept_warned", { mode: "boolean" }).default(
+      false
+    ),
+    slaReplyWarned: integer("sla_reply_warned", { mode: "boolean" }).default(
+      false
+    ),
+    // AI-related fields
+    aiScreeningStatus: text("ai_screening_status").$type<
+      "pending" | "processing" | "completed" | "error"
+    >(),
+    aiScreeningResult: text("ai_screening_result"),
+    aiSuggestedReply: text("ai_suggested_reply"),
+    aiExtractedIssues: text("ai_extracted_issues"),
+    aiKeywords: text("ai_keywords"),
+    vectorizeId: text("vectorize_id"),
+    // Email-related fields
+    source: text("source").$type<"web" | "email" | "api">().default("web"),
+    sourceEmailId: text("source_email_id"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    index("tickets_tenant_status_idx").on(t.tenantId, t.status),
+    index("tickets_team_status_idx").on(t.teamId, t.status),
+    index("tickets_product_status_idx").on(t.productId, t.status),
+    index("tickets_assignee_idx").on(t.assigneeId),
+    index("tickets_customer_idx").on(t.customerEmail, t.productId),
+    index("tickets_updated_idx").on(t.updatedAt),
+  ]
+);
 
-export const replies = sqliteTable("replies", {
-  id: text("id").primaryKey(),
-  ticketId: text("ticket_id").notNull(),
-  senderId: text("sender_id"),
-  senderEmail: text("sender_email"),
-  content: text("content").notNull(),
-  internal: integer("internal", { mode: "boolean" }).default(false),
-  // Email-related fields
-  source: text("source").$type<"web" | "email">().default("web"),
-  sourceEmailId: text("source_email_id"),
-  emailSent: integer("email_sent", { mode: "boolean" }).default(false),
-  createdAt: text("created_at").notNull(),
-});
+export const replies = sqliteTable(
+  "replies",
+  {
+    id: text("id").primaryKey(),
+    ticketId: text("ticket_id").notNull(),
+    senderId: text("sender_id"),
+    senderEmail: text("sender_email"),
+    content: text("content").notNull(),
+    internal: integer("internal", { mode: "boolean" }).default(false),
+    // Email-related fields
+    source: text("source").$type<"web" | "email">().default("web"),
+    sourceEmailId: text("source_email_id"),
+    emailSent: integer("email_sent", { mode: "boolean" }).default(false),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [index("replies_ticket_idx").on(t.ticketId)]
+);
 
-export const history = sqliteTable("history", {
-  id: text("id").primaryKey(),
-  ticketId: text("ticket_id").notNull(),
-  actorId: text("actor_id"),
-  action: text("action").notNull(),
-  snapshot: text("snapshot"),
-  createdAt: text("created_at").notNull(),
-});
+export const history = sqliteTable(
+  "history",
+  {
+    id: text("id").primaryKey(),
+    ticketId: text("ticket_id").notNull(),
+    actorId: text("actor_id"),
+    action: text("action").notNull(),
+    snapshot: text("snapshot"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [index("history_ticket_idx").on(t.ticketId)]
+);
 
 // ==================== AI Feature Tables ====================
 
@@ -362,21 +431,29 @@ export const emailConfigs = sqliteTable("email_configs", {
   updatedAt: text("updated_at").notNull(),
 });
 
-export const emailTemplates = sqliteTable("email_templates", {
-  id: text("id").primaryKey(),
-  productId: text("product_id").notNull(),
-  templateType: text("template_type").$type<EmailTemplateType>().notNull(),
-  subjectTemplate: text("subject_template").notNull(),
-  bodyTemplate: text("body_template").notNull(),
-  enabled: integer("enabled", { mode: "boolean" }).default(true),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-});
+export const emailTemplates = sqliteTable(
+  "email_templates",
+  {
+    id: text("id").primaryKey(),
+    productId: text("product_id").notNull(),
+    templateType: text("template_type").$type<EmailTemplateType>().notNull(),
+    subjectTemplate: text("subject_template").notNull(),
+    bodyTemplate: text("body_template").notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).default(true),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("email_templates_product_type_uq").on(t.productId, t.templateType),
+  ]
+);
 
-export const inboundEmails = sqliteTable("inbound_emails", {
-  id: text("id").primaryKey(),
-  productId: text("product_id").notNull(),
-  messageId: text("message_id").notNull(),
+export const inboundEmails = sqliteTable(
+  "inbound_emails",
+  {
+    id: text("id").primaryKey(),
+    productId: text("product_id").notNull(),
+    messageId: text("message_id").notNull(),
   provider: text("provider").$type<InboundEmailProvider>().notNull(),
   // Sender info
   fromEmail: text("from_email").notNull(),
@@ -403,29 +480,41 @@ export const inboundEmails = sqliteTable("inbound_emails", {
   rawPayload: text("raw_payload"),
   createdAt: text("created_at").notNull(),
   processedAt: text("processed_at"),
-});
+  },
+  (t) => [
+    uniqueIndex("inbound_emails_product_message_uq").on(t.productId, t.messageId),
+    index("inbound_emails_product_created_idx").on(t.productId, t.createdAt),
+  ]
+);
 
-export const outboundEmails = sqliteTable("outbound_emails", {
-  id: text("id").primaryKey(),
-  productId: text("product_id").notNull(),
-  ticketId: text("ticket_id"),
-  replyId: text("reply_id"),
-  // Email details
-  toEmail: text("to_email").notNull(),
-  toName: text("to_name"),
-  fromEmail: text("from_email").notNull(),
-  fromName: text("from_name"),
-  subject: text("subject").notNull(),
-  bodyHtml: text("body_html").notNull(),
-  bodyPlain: text("body_plain"),
-  // Delivery info
-  provider: text("provider").$type<EmailProvider>().notNull(),
-  providerMessageId: text("provider_message_id"),
-  status: text("status").$type<EmailDeliveryStatus>().notNull().default("pending"),
-  errorMessage: text("error_message"),
-  createdAt: text("created_at").notNull(),
-  sentAt: text("sent_at"),
-});
+export const outboundEmails = sqliteTable(
+  "outbound_emails",
+  {
+    id: text("id").primaryKey(),
+    productId: text("product_id").notNull(),
+    ticketId: text("ticket_id"),
+    replyId: text("reply_id"),
+    // Email details
+    toEmail: text("to_email").notNull(),
+    toName: text("to_name"),
+    fromEmail: text("from_email").notNull(),
+    fromName: text("from_name"),
+    subject: text("subject").notNull(),
+    bodyHtml: text("body_html").notNull(),
+    bodyPlain: text("body_plain"),
+    // Delivery info
+    provider: text("provider").$type<EmailProvider>().notNull(),
+    providerMessageId: text("provider_message_id"),
+    status: text("status").$type<EmailDeliveryStatus>().notNull().default("pending"),
+    errorMessage: text("error_message"),
+    createdAt: text("created_at").notNull(),
+    sentAt: text("sent_at"),
+  },
+  (t) => [
+    index("outbound_emails_product_created_idx").on(t.productId, t.createdAt),
+    index("outbound_emails_ticket_idx").on(t.ticketId),
+  ]
+);
 
 // ==================== Notification Feature Tables ====================
 
@@ -446,30 +535,53 @@ export type NotificationTriggerEvent =
   | "ticket_closed";
 export type NotificationStatus = "pending" | "sent" | "failed";
 
-export const notificationChannels = sqliteTable("notification_channels", {
-  id: text("id").primaryKey(),
-  productId: text("product_id").notNull(),
-  channelType: text("channel_type").$type<NotificationChannelType>().notNull(),
-  name: text("name").notNull(),
-  enabled: integer("enabled", { mode: "boolean" }).default(true),
-  config: text("config").notNull(),
-  triggerEvents: text("trigger_events").notNull(),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-});
+export const notificationChannels = sqliteTable(
+  "notification_channels",
+  {
+    id: text("id").primaryKey(),
+    productId: text("product_id").notNull(),
+    channelType: text("channel_type").$type<NotificationChannelType>().notNull(),
+    name: text("name").notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).default(true),
+    config: text("config").notNull(),
+    triggerEvents: text("trigger_events").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [index("notification_channels_product_idx").on(t.productId)]
+);
 
-export const notificationLogs = sqliteTable("notification_logs", {
-  id: text("id").primaryKey(),
-  productId: text("product_id").notNull(),
-  channelId: text("channel_id").notNull(),
-  channelType: text("channel_type").$type<NotificationChannelType>().notNull(),
-  ticketId: text("ticket_id").notNull(),
-  agentId: text("agent_id").notNull(),
-  triggerEvent: text("trigger_event").$type<NotificationTriggerEvent>().notNull(),
-  status: text("status").$type<NotificationStatus>().notNull().default("pending"),
-  errorMessage: text("error_message"),
-  createdAt: text("created_at").notNull(),
-  sentAt: text("sent_at"),
+export const notificationLogs = sqliteTable(
+  "notification_logs",
+  {
+    id: text("id").primaryKey(),
+    productId: text("product_id").notNull(),
+    channelId: text("channel_id").notNull(),
+    channelType: text("channel_type").$type<NotificationChannelType>().notNull(),
+    ticketId: text("ticket_id").notNull(),
+    agentId: text("agent_id").notNull(),
+    triggerEvent: text("trigger_event").$type<NotificationTriggerEvent>().notNull(),
+    status: text("status").$type<NotificationStatus>().notNull().default("pending"),
+    errorMessage: text("error_message"),
+    createdAt: text("created_at").notNull(),
+    sentAt: text("sent_at"),
+  },
+  (t) => [
+    index("notification_logs_product_created_idx").on(t.productId, t.createdAt),
+    index("notification_logs_ticket_idx").on(t.ticketId),
+  ]
+);
+
+// ==================== Rate Limiting ====================
+
+/**
+ * Fixed-window rate-limit counters for public endpoints.
+ * `resetAt` is epoch milliseconds; expired rows are reused in place.
+ */
+export const rateLimits = sqliteTable("rate_limits", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull().default(0),
+  resetAt: integer("reset_at").notNull(),
 });
 
 // ==================== Type Exports ====================

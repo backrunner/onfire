@@ -1,72 +1,50 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { getAuth } from "@/lib/auth";
-import { resolveUserContext } from "@/lib/api-utils";
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { eq, and, inArray } from "drizzle-orm";
 import { tickets, history } from "@/drizzle/schema";
-import { hasPermission, Role, TicketStatus } from "@/lib/types";
-import { eq, inArray } from "drizzle-orm";
+import { TicketStatus } from "@/lib/types";
+import { ok } from "@/lib/api/response";
+import { withAuth, parseBody } from "@/lib/api/handler";
+import { ticketScopeCondition } from "@/lib/api/scope";
+import { emitTicketEvent } from "@/services/ticket-events";
 
-export async function POST(request: NextRequest) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({ headers: request.headers });
+const bulkCloseSchema = z.object({
+  ticketIds: z.array(z.string().min(1)).min(1).max(100),
+  reason: z.string().max(2000).optional(),
+});
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+export const POST = withAuth({ permission: "ticket.close" }, async (req: NextRequest, ctx) => {
+  const body = await parseBody(req, bulkCloseSchema);
+
+  const rows = await ctx.db
+    .select()
+    .from(tickets)
+    .where(
+      and(inArray(tickets.id, body.ticketIds), ticketScopeCondition(ctx))
+    );
+
+  const now = new Date().toISOString();
+  const results: { id: string; success: boolean; error?: string }[] = [];
+  const foundIds = new Set(rows.map((r) => r.id));
+
+  for (const id of body.ticketIds) {
+    if (!foundIds.has(id)) {
+      results.push({ id, success: false, error: "Not found or not accessible" });
+    }
+  }
+
+  for (const ticket of rows) {
+    if (ticket.status === TicketStatus.Closed) {
+      results.push({ id: ticket.id, success: false, error: "Already closed" });
+      continue;
     }
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
-
-    if (!ctx) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
-
-    if (!hasPermission(ctx.user.role as Role, "ticket.close")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const body = (await request.json()) as { ticketIds: string[]; reason?: string };
-
-    if (!body.ticketIds || !Array.isArray(body.ticketIds) || body.ticketIds.length === 0) {
-      return NextResponse.json({ ok: false, error: "ticketIds array is required" }, { status: 400 });
-    }
-
-    // Get all tickets
-    const ticketRows = await db
-      .select()
-      .from(tickets)
-      .where(inArray(tickets.id, body.ticketIds));
-
-    if (ticketRows.length === 0) {
-      return NextResponse.json({ ok: false, error: "No tickets found" }, { status: 404 });
-    }
-
-    // Filter tickets by tenant access
-    const accessibleTickets = ticketRows.filter((t) => ctx.tenantIds.includes(t.tenantId));
-
-    if (accessibleTickets.length === 0) {
-      return NextResponse.json({ ok: false, error: "No accessible tickets" }, { status: 403 });
-    }
-
-    const now = new Date().toISOString();
-    const results: { id: string; success: boolean; error?: string }[] = [];
-
-    for (const ticket of accessibleTickets) {
-      if (ticket.status === TicketStatus.Closed) {
-        results.push({ id: ticket.id, success: false, error: "Already closed" });
-        continue;
-      }
-
-      await db
+    await ctx.db.batch([
+      ctx.db
         .update(tickets)
-        .set({
-          status: TicketStatus.Closed,
-          updatedAt: now,
-        })
-        .where(eq(tickets.id, ticket.id));
-
-      await db.insert(history).values({
+        .set({ status: TicketStatus.Closed, updatedAt: now })
+        .where(eq(tickets.id, ticket.id)),
+      ctx.db.insert(history).values({
         id: crypto.randomUUID(),
         ticketId: ticket.id,
         actorId: ctx.user.id,
@@ -77,23 +55,22 @@ export async function POST(request: NextRequest) {
           bulk: true,
         }),
         createdAt: now,
-      });
+      }),
+    ]);
 
-      results.push({ id: ticket.id, success: true });
-    }
-
-    return NextResponse.json({
-      ok: true,
-      data: {
-        total: body.ticketIds.length,
-        processed: results.length,
-        succeeded: results.filter((r) => r.success).length,
-        failed: results.filter((r) => !r.success).length,
-        results,
-      },
+    emitTicketEvent(ctx.db, {
+      type: "ticket_closed",
+      ticketId: ticket.id,
+      agentId: ticket.assigneeId ?? undefined,
     });
-  } catch (error) {
-    console.error("Error in POST /api/tob/tickets/bulk/close:", error);
-    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
+
+    results.push({ id: ticket.id, success: true });
   }
-}
+
+  return ok({
+    total: body.ticketIds.length,
+    succeeded: results.filter((r) => r.success).length,
+    failed: results.filter((r) => !r.success).length,
+    results,
+  });
+});

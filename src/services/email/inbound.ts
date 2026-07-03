@@ -4,13 +4,21 @@ import {
   inboundEmails,
   tickets,
   replies,
+  history,
   customers,
   products,
   tenants,
 } from "@/drizzle/schema";
 import { eq, and } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import { TicketStatus, TicketPriority } from "@/lib/types";
 import { pickAssignee } from "@/services/allocation";
+import { computeSlaDeadlines } from "@/lib/tickets/sla";
+import { emitTicketEvent } from "@/services/ticket-events";
+import {
+  classifyInboundEmail,
+  shouldRejectEmail,
+} from "@/services/ai/email-filter";
 
 export interface InboundEmailPayload {
   fromEmail: string;
@@ -27,7 +35,7 @@ export interface InboundEmailPayload {
 
 export interface ProcessResult {
   success: boolean;
-  action: "ticket_created" | "reply_added" | "rejected" | "error";
+  action: "ticket_created" | "reply_added" | "rejected" | "duplicate" | "error";
   ticketId?: string;
   replyId?: string;
   reason?: string;
@@ -50,7 +58,6 @@ export async function processInboundEmail(
     isSpam,
   } = payload;
 
-  // Find email config by inbound address
   const config = await db.query.emailConfigs.findFirst({
     where: eq(emailConfigs.inboundAddress, toEmail),
   });
@@ -71,10 +78,30 @@ export async function processInboundEmail(
     };
   }
 
+  // Deduplicate by provider message ID — email webhooks retry on timeouts,
+  // and a duplicate delivery must not create a second ticket.
+  if (messageId) {
+    const existing = await db.query.inboundEmails.findFirst({
+      where: and(
+        eq(inboundEmails.productId, config.productId),
+        eq(inboundEmails.messageId, messageId)
+      ),
+    });
+    if (existing) {
+      return {
+        success: true,
+        action: "duplicate",
+        ticketId: existing.ticketId ?? undefined,
+        replyId: existing.replyId ?? undefined,
+        reason: "Message already processed",
+      };
+    }
+  }
+
   const now = new Date().toISOString();
   const emailId = crypto.randomUUID();
+  const content = bodyPlain || stripHtml(bodyHtml || "");
 
-  // Log inbound email
   await db.insert(inboundEmails).values({
     id: emailId,
     productId: config.productId,
@@ -93,37 +120,29 @@ export async function processInboundEmail(
     createdAt: now,
   });
 
-  // Check for spam
-  if (isSpam) {
+  const markFiltered = async (filterResult: string, reason: string): Promise<ProcessResult> => {
     await db
       .update(inboundEmails)
-      .set({ processingStatus: "filtered", filterResult: "spam", processedAt: now })
+      .set({ processingStatus: "filtered", filterResult, processedAt: now })
       .where(eq(inboundEmails.id, emailId));
+    return { success: false, action: "rejected", reason };
+  };
 
-    return {
-      success: false,
-      action: "rejected",
-      reason: "Email marked as spam",
-    };
+  if (isSpam) {
+    return markFiltered("spam", "Email marked as spam by provider");
   }
 
-  // Check SPF/DKIM if strict mode
+  // Strict mode: require passing SPF / DKIM when results were provided
   if (config.aiFilterStrictness === "high") {
     if (spfResult && spfResult !== "pass") {
-      await db
-        .update(inboundEmails)
-        .set({ processingStatus: "filtered", filterResult: "spf_failed", processedAt: now })
-        .where(eq(inboundEmails.id, emailId));
-
-      return {
-        success: false,
-        action: "rejected",
-        reason: `SPF check failed: ${spfResult}`,
-      };
+      return markFiltered("spf_failed", `SPF check failed: ${spfResult}`);
+    }
+    if (dkimResult === false) {
+      return markFiltered("dkim_failed", "DKIM check failed");
     }
   }
 
-  // Check if this is a reply to an existing ticket
+  // Reply detection: "[Ticket #<id>]" in the subject appends to the thread
   const ticketIdMatch = subject.match(/\[Ticket #([a-zA-Z0-9-]+)\]/);
   if (ticketIdMatch) {
     const ticketId = ticketIdMatch[1];
@@ -131,101 +150,119 @@ export async function processInboundEmail(
       where: eq(tickets.id, ticketId),
     });
 
-    if (existingTicket && existingTicket.customerEmail === fromEmail) {
-      // Add reply to existing ticket
+    if (
+      existingTicket &&
+      existingTicket.productId === config.productId &&
+      existingTicket.customerEmail.toLowerCase() === fromEmail.toLowerCase()
+    ) {
       const replyId = crypto.randomUUID();
-      const content = bodyPlain || stripHtml(bodyHtml || "");
 
-      await db.insert(replies).values({
-        id: replyId,
-        ticketId,
-        senderEmail: fromEmail,
-        content,
-        source: "email",
-        sourceEmailId: emailId,
-        createdAt: now,
-      });
-
-      // Update ticket status if it was replied/closed
-      if (
-        existingTicket.status === TicketStatus.Replied ||
-        existingTicket.status === TicketStatus.Closed
-      ) {
-        await db
-          .update(tickets)
+      const statements: [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]] = [
+        db.insert(replies).values({
+          id: replyId,
+          ticketId,
+          senderEmail: fromEmail,
+          content,
+          source: "email" as const,
+          sourceEmailId: emailId,
+          createdAt: now,
+        }),
+        db.insert(history).values({
+          id: crypto.randomUUID(),
+          ticketId,
+          action: "customer_replied",
+          snapshot: JSON.stringify({ source: "email" }),
+          createdAt: now,
+        }),
+        db
+          .update(inboundEmails)
           .set({
-            status: TicketStatus.Processing,
-            updatedAt: now,
+            processingStatus: "processed",
+            ticketId,
+            replyId,
+            processedAt: now,
           })
-          .where(eq(tickets.id, ticketId));
+          .where(eq(inboundEmails.id, emailId)),
+      ];
+
+      // Customer reply reopens replied tickets; closed tickets stay closed
+      // per lifecycle, but we still record the reply for the thread.
+      if (existingTicket.status === TicketStatus.Replied) {
+        statements.push(
+          db
+            .update(tickets)
+            .set({ status: TicketStatus.Processing, updatedAt: now })
+            .where(eq(tickets.id, ticketId))
+        );
       }
 
-      await db
-        .update(inboundEmails)
-        .set({
-          processingStatus: "processed",
-          ticketId,
-          replyId,
-          processedAt: now,
-        })
-        .where(eq(inboundEmails.id, emailId));
+      await db.batch(statements);
 
-      return {
-        success: true,
-        action: "reply_added",
+      emitTicketEvent(db, {
+        type: "customer_replied",
         ticketId,
-        replyId,
-      };
+        agentId: existingTicket.assigneeId ?? undefined,
+        customerEmail: fromEmail,
+      });
+
+      return { success: true, action: "reply_added", ticketId, replyId };
     }
   }
 
-  // Create new ticket
+  // AI filter (best-effort): drop spam / non-support mail before ticket creation
+  if (config.aiFilterEnabled) {
+    const classification = await classifyInboundEmail(db, {
+      fromEmail,
+      subject,
+      content,
+    });
+    if (
+      classification &&
+      shouldRejectEmail(
+        classification,
+        config.aiFilterStrictness ?? "medium"
+      )
+    ) {
+      return markFiltered(
+        JSON.stringify(classification),
+        `Filtered by AI: ${classification.reason}`
+      );
+    }
+  }
+
+  const markError = async (reason: string): Promise<ProcessResult> => {
+    await db
+      .update(inboundEmails)
+      .set({ processingStatus: "error", errorMessage: reason, processedAt: now })
+      .where(eq(inboundEmails.id, emailId));
+    return { success: false, action: "error", reason };
+  };
+
   const product = await db.query.products.findFirst({
     where: eq(products.id, config.productId),
   });
-
-  if (!product) {
-    await db
-      .update(inboundEmails)
-      .set({ processingStatus: "error", errorMessage: "Product not found", processedAt: now })
-      .where(eq(inboundEmails.id, emailId));
-
-    return {
-      success: false,
-      action: "error",
-      reason: "Product not found",
-    };
-  }
+  if (!product) return markError("Product not found");
 
   const tenant = await db.query.tenants.findFirst({
     where: eq(tenants.id, product.tenantId),
   });
+  if (!tenant) return markError("Tenant not found");
 
-  if (!tenant) {
-    await db
-      .update(inboundEmails)
-      .set({ processingStatus: "error", errorMessage: "Tenant not found", processedAt: now })
-      .where(eq(inboundEmails.id, emailId));
-
-    return {
-      success: false,
-      action: "error",
-      reason: "Tenant not found",
-    };
+  const teamId = tenant.defaultTeamId;
+  if (!teamId) {
+    return markError("No default team configured for tenant — cannot route email ticket");
   }
 
   // Find or create customer
-  let customer = await db.query.customers.findFirst({
+  const customer = await db.query.customers.findFirst({
     where: and(
       eq(customers.email, fromEmail),
       eq(customers.productId, config.productId)
     ),
   });
-
   if (!customer) {
-    const customerId = crypto.randomUUID();
     await db.insert(customers).values({
-      id: customerId,
+      id: crypto.randomUUID(),
       tenantId: product.tenantId,
       productId: config.productId,
       email: fromEmail,
@@ -234,47 +271,58 @@ export async function processInboundEmail(
     });
   }
 
-  // Choose assignee
-  const teamId = tenant.defaultTeamId || "";
-  const assignee = teamId
-    ? await pickAssignee(db, teamId)
-    : null;
+  const assignee = await pickAssignee(db, teamId);
+  const priority = TicketPriority.Medium;
+  const sla = computeSlaDeadlines(product, priority, new Date(now));
 
-  // Create ticket
   const ticketId = crypto.randomUUID();
-  const content = bodyPlain || stripHtml(bodyHtml || "");
 
-  await db.insert(tickets).values({
-    id: ticketId,
-    tenantId: product.tenantId,
-    productId: config.productId,
-    teamId: teamId || "default",
-    assigneeId: assignee?.id || null,
-    status: TicketStatus.New,
-    priority: TicketPriority.Medium,
-    subject: subject || "No Subject",
-    content,
-    customerEmail: fromEmail,
-    source: "email",
-    sourceEmailId: emailId,
-    createdAt: now,
-    updatedAt: now,
-  });
-
-  await db
-    .update(inboundEmails)
-    .set({
-      processingStatus: "processed",
+  await db.batch([
+    db.insert(tickets).values({
+      id: ticketId,
+      tenantId: product.tenantId,
+      productId: config.productId,
+      teamId,
+      assigneeId: assignee?.id || null,
+      status: assignee ? TicketStatus.Processing : TicketStatus.New,
+      priority,
+      subject: subject || "No Subject",
+      content,
+      customerEmail: fromEmail,
+      customerLevel: customer?.level ?? null,
+      source: "email",
+      sourceEmailId: emailId,
+      ...sla,
+      createdAt: now,
+      updatedAt: now,
+    }),
+    db.insert(history).values({
+      id: crypto.randomUUID(),
       ticketId,
-      processedAt: now,
-    })
-    .where(eq(inboundEmails.id, emailId));
+      action: "created",
+      snapshot: JSON.stringify({ source: "email" }),
+      createdAt: now,
+    }),
+    db
+      .update(inboundEmails)
+      .set({ processingStatus: "processed", ticketId, processedAt: now })
+      .where(eq(inboundEmails.id, emailId)),
+  ]);
 
-  return {
-    success: true,
-    action: "ticket_created",
+  emitTicketEvent(db, {
+    type: "ticket_created",
     ticketId,
-  };
+    customerEmail: fromEmail,
+  });
+  if (assignee) {
+    emitTicketEvent(db, {
+      type: "ticket_assigned",
+      ticketId,
+      agentId: assignee.id,
+    });
+  }
+
+  return { success: true, action: "ticket_created", ticketId };
 }
 
 function stripHtml(html: string): string {

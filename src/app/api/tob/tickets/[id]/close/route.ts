@@ -1,63 +1,40 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { getAuth } from "@/lib/auth";
-import { resolveUserContext } from "@/lib/api-utils";
-import { tickets, history } from "@/drizzle/schema";
-import { hasPermission, Role, TicketStatus } from "@/lib/types";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { eq } from "drizzle-orm";
+import { tickets, history } from "@/drizzle/schema";
+import { TicketStatus } from "@/lib/types";
+import { ok, notFound, badRequest } from "@/lib/api/response";
+import { withAuth, parseBody } from "@/lib/api/handler";
+import { assertTicketVisible } from "@/lib/api/scope";
+import { serializeTicket } from "@/lib/tickets/serialize";
+import { emitTicketEvent } from "@/services/ticket-events";
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const auth = getAuth();
-    const session = await auth.api.getSession({ headers: request.headers });
+const closeSchema = z.object({
+  reason: z.string().max(2000).optional(),
+});
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+export const POST = withAuth({ permission: "ticket.close" }, async (req: NextRequest, ctx) => {
+  const ticket = await ctx.db.query.tickets.findFirst({
+    where: eq(tickets.id, ctx.params.id),
+  });
+  if (!ticket) throw notFound("Ticket not found");
+  assertTicketVisible(ctx, ticket);
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
+  if (ticket.status === TicketStatus.Closed) {
+    throw badRequest("Ticket is already closed");
+  }
 
-    if (!ctx) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
+  const body = await parseBody(req, closeSchema);
+  const now = new Date().toISOString();
 
-    if (!hasPermission(ctx.user.role as Role, "ticket.close")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const ticket = await db.query.tickets.findFirst({ where: eq(tickets.id, id) });
-
-    if (!ticket) {
-      return NextResponse.json({ ok: false, error: "Ticket not found" }, { status: 404 });
-    }
-
-    if (!ctx.tenantIds.includes(ticket.tenantId)) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    if (ticket.status === TicketStatus.Closed) {
-      return NextResponse.json({ ok: false, error: "Ticket already closed" }, { status: 400 });
-    }
-
-    const body = (await request.json()) as { reason?: string };
-    const now = new Date().toISOString();
-
-    await db
+  await ctx.db.batch([
+    ctx.db
       .update(tickets)
-      .set({
-        status: TicketStatus.Closed,
-        updatedAt: now,
-      })
-      .where(eq(tickets.id, id));
-
-    await db.insert(history).values({
+      .set({ status: TicketStatus.Closed, updatedAt: now })
+      .where(eq(tickets.id, ticket.id)),
+    ctx.db.insert(history).values({
       id: crypto.randomUUID(),
-      ticketId: id,
+      ticketId: ticket.id,
       actorId: ctx.user.id,
       action: "closed",
       snapshot: JSON.stringify({
@@ -65,13 +42,17 @@ export async function POST(
         reason: body.reason,
       }),
       createdAt: now,
-    });
+    }),
+  ]);
 
-    const updated = await db.query.tickets.findFirst({ where: eq(tickets.id, id) });
+  emitTicketEvent(ctx.db, {
+    type: "ticket_closed",
+    ticketId: ticket.id,
+    agentId: ticket.assigneeId ?? undefined,
+  });
 
-    return NextResponse.json({ ok: true, data: { ticket: updated } });
-  } catch (error) {
-    console.error("Error in POST /api/tob/tickets/[id]/close:", error);
-    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
-  }
-}
+  const updated = await ctx.db.query.tickets.findFirst({
+    where: eq(tickets.id, ticket.id),
+  });
+  return ok({ ticket: updated ? serializeTicket(updated) : null });
+});

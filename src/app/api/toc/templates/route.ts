@@ -1,44 +1,36 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { templates } from "@/drizzle/schema";
+import { NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
+import { templates } from "@/drizzle/schema";
+import { ok } from "@/lib/api/response";
+import { withCustomerAuth } from "@/lib/api/handler";
 
-// GET /api/toc/templates - Get templates for a product
-export async function GET(request: NextRequest) {
+/**
+ * GET /api/toc/templates — ticket templates for the customer's product.
+ * The product is taken from the verified token, never from the query, so
+ * templates cannot be enumerated across products.
+ */
+export const GET = withCustomerAuth(async (_req: NextRequest, { db, customer }) => {
+  const rows = await db
+    .select()
+    .from(templates)
+    .where(eq(templates.productId, customer.productId));
+
+  const parsed = rows.map((t) => ({
+    id: t.id,
+    productId: t.productId,
+    title: t.title,
+    categories: safeParse(t.categories, [] as string[]),
+    formSchema: safeParse(t.formSchema, {} as Record<string, unknown>),
+  }));
+
+  return ok(parsed);
+});
+
+function safeParse<T>(value: string | null, fallback: T): T {
+  if (!value) return fallback;
   try {
-    const { searchParams } = new URL(request.url);
-    const productId = searchParams.get("productId");
-
-    if (!productId) {
-      return NextResponse.json(
-        { ok: false, error: "productId is required" },
-        { status: 400 }
-      );
-    }
-
-    const db = getDb();
-
-    const templateList = await db
-      .select()
-      .from(templates)
-      .where(eq(templates.productId, productId));
-
-    // Parse JSON fields
-    const parsed = templateList.map((t) => ({
-      ...t,
-      categories: JSON.parse(t.categories || "[]"),
-      formSchema: JSON.parse(t.formSchema || "{}"),
-    }));
-
-    return NextResponse.json({
-      ok: true,
-      data: parsed,
-    });
-  } catch (error) {
-    console.error("Error in GET /api/toc/templates:", error);
-    return NextResponse.json(
-      { ok: false, error: "Internal server error" },
-      { status: 500 }
-    );
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
   }
 }

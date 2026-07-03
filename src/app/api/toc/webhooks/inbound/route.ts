@@ -1,129 +1,96 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { emailConfigs } from "@/drizzle/schema";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { processInboundEmail, type InboundEmailPayload } from "@/services/email/inbound";
+import { emailConfigs } from "@/drizzle/schema";
+import { ok, err } from "@/lib/api/response";
+import { withPublic } from "@/lib/api/handler";
+import { verifyWebhookAuth } from "@/lib/webhooks";
+import { enforceRateLimit } from "@/lib/rate-limit";
+import { processInboundEmail } from "@/services/email/inbound";
 
-export async function POST(request: NextRequest) {
-  const db = getDb();
+const inboundPayloadSchema = z
+  .object({
+    from_email: z.string().email(),
+    to_email: z.string().email(),
+    subject: z.string().min(1).max(998),
+    body_plain: z.string().max(500_000).optional(),
+    body_html: z.string().max(1_000_000).optional(),
+    from_name: z.string().max(256).optional(),
+    message_id: z.string().max(998).optional(),
+    spf_result: z.string().max(32).optional(),
+    dkim_result: z.boolean().optional(),
+    is_spam: z.boolean().optional(),
+  })
+  .refine((p) => p.body_plain || p.body_html, {
+    message: "At least one of body_plain or body_html is required",
+  });
 
-  // Get authorization
-  const authHeader = request.headers.get("Authorization");
-  const signatureHeader = request.headers.get("X-Webhook-Signature");
+/**
+ * POST /api/toc/webhooks/inbound — generic inbound email webhook.
+ *
+ * Authentication is mandatory: Bearer secret or HMAC signature over the raw
+ * body (X-Webhook-Signature: sha256=<hex>). The secret is configured per
+ * product via the admin email settings.
+ */
+export const POST = withPublic(async (req: NextRequest, { db }) => {
+  await enforceRateLimit(db, req, "webhook:inbound", {
+    limit: 120,
+    windowSeconds: 60,
+  });
 
-  let body: InboundEmailPayload;
+  // Read raw bytes first — the HMAC covers the body exactly as transmitted.
+  const rawBody = await req.text();
+
+  let parsedJson: unknown;
   try {
-    body = await request.json();
+    parsedJson = JSON.parse(rawBody);
   } catch {
-    return NextResponse.json(
-      { ok: false, error: "Invalid JSON body" },
-      { status: 400 }
-    );
+    return err("Invalid JSON body", 400);
   }
 
-  // Validate required fields
-  if (!body.fromEmail || !body.toEmail || !body.subject) {
-    return NextResponse.json(
-      { ok: false, error: "Missing required fields: fromEmail, toEmail, subject" },
-      { status: 400 }
-    );
+  const parsed = inboundPayloadSchema.safeParse(parsedJson);
+  if (!parsed.success) {
+    return err("Validation failed", 400, z.flattenError(parsed.error));
   }
+  const body = parsed.data;
 
-  if (!body.bodyPlain && !body.bodyHtml) {
-    return NextResponse.json(
-      { ok: false, error: "At least one of bodyPlain or bodyHtml is required" },
-      { status: 400 }
-    );
-  }
-
-  // Find config by inbound address to verify webhook secret
   const config = await db.query.emailConfigs.findFirst({
-    where: eq(emailConfigs.inboundAddress, body.toEmail),
+    where: eq(emailConfigs.inboundAddress, body.to_email),
   });
-
   if (!config) {
-    return NextResponse.json(
-      { ok: false, error: "Unknown inbound address" },
-      { status: 404 }
-    );
+    return err("Unknown inbound address", 404);
   }
 
-  // Verify authentication
-  const webhookSecret = config.inboundWebhookSecret;
-  if (webhookSecret) {
-    let authenticated = false;
-
-    // Method 1: Bearer token
-    if (authHeader?.startsWith("Bearer ")) {
-      const token = authHeader.slice(7);
-      if (token === webhookSecret) {
-        authenticated = true;
-      }
-    }
-
-    // Method 2: HMAC signature
-    if (!authenticated && signatureHeader?.startsWith("sha256=")) {
-      const signature = signatureHeader.slice(7);
-      const bodyText = JSON.stringify(body);
-      const expectedSignature = await computeHmac(bodyText, webhookSecret);
-      if (signature === expectedSignature) {
-        authenticated = true;
-      }
-    }
-
-    if (!authenticated) {
-      return NextResponse.json(
-        { ok: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-  }
-
-  // Process the email
-  const result = await processInboundEmail(db, {
-    fromEmail: body.fromEmail,
-    fromName: body.fromName,
-    toEmail: body.toEmail,
-    subject: body.subject,
-    bodyPlain: body.bodyPlain,
-    bodyHtml: body.bodyHtml,
-    messageId: body.messageId,
-    spfResult: body.spfResult,
-    dkimResult: body.dkimResult,
-    isSpam: body.isSpam,
-  });
-
-  if (!result.success) {
-    return NextResponse.json(
-      { ok: false, error: result.reason, action: result.action },
-      { status: result.action === "error" ? 500 : 200 }
-    );
-  }
-
-  return NextResponse.json({
-    ok: true,
-    data: {
-      action: result.action,
-      ticketId: result.ticketId,
-      replyId: result.replyId,
-    },
-  });
-}
-
-async function computeHmac(message: string, secret: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const keyData = encoder.encode(secret);
-  const messageData = encoder.encode(message);
-
-  const key = await crypto.subtle.importKey(
-    "raw",
-    keyData,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
+  const authenticated = await verifyWebhookAuth(
+    req,
+    rawBody,
+    config.inboundWebhookSecret
   );
+  if (!authenticated) {
+    return err("Unauthorized", 401);
+  }
 
-  const signature = await crypto.subtle.sign("HMAC", key, messageData);
-  const hashArray = Array.from(new Uint8Array(signature));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
+  const result = await processInboundEmail(db, {
+    fromEmail: body.from_email,
+    fromName: body.from_name,
+    toEmail: body.to_email,
+    subject: body.subject,
+    bodyPlain: body.body_plain,
+    bodyHtml: body.body_html,
+    messageId: body.message_id,
+    spfResult: body.spf_result,
+    dkimResult: body.dkim_result,
+    isSpam: body.is_spam,
+  });
+
+  if (!result.success && result.action === "error") {
+    return err(result.reason ?? "Processing failed", 500);
+  }
+
+  return ok({
+    action: result.action,
+    ticketId: result.ticketId,
+    replyId: result.replyId,
+    reason: result.reason,
+  });
+});

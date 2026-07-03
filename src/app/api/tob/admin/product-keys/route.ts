@@ -1,136 +1,83 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { getAuth } from "@/lib/auth";
-import { productKeys, products } from "@/drizzle/schema";
-import { hasPermission, Role } from "@/lib/types";
-import { resolveUserContext } from "@/lib/api-utils";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { eq, inArray } from "drizzle-orm";
+import { productKeys, products } from "@/drizzle/schema";
+import { ok } from "@/lib/api/response";
+import { withAuth, parseBody, parseQuery } from "@/lib/api/handler";
+import { assertProductAccess, tenantCondition } from "@/lib/api/scope";
+import { generateProductKeySecret } from "@/lib/auth/api-key";
 
-export async function GET(request: NextRequest) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({ headers: request.headers });
+const listQuerySchema = z.object({
+  productId: z.string().optional(),
+});
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+const createKeySchema = z.object({
+  productId: z.string().min(1),
+  name: z.string().max(100).optional(),
+});
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
-
-    if (!ctx) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
-
-    if (!hasPermission(ctx.user.role as Role, "product.manage")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const productId = searchParams.get("productId");
-
-    // Get accessible products
-    const accessibleProducts = await db
-      .select({ id: products.id })
-      .from(products)
-      .where(inArray(products.tenantId, ctx.tenantIds));
-    const accessibleProductIds = accessibleProducts.map((p) => p.id);
-
-    let keyList;
-    if (productId) {
-      if (!accessibleProductIds.includes(productId)) {
-        return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-      }
-      keyList = await db
-        .select()
-        .from(productKeys)
-        .where(eq(productKeys.productId, productId));
-    } else {
-      keyList = await db
-        .select()
-        .from(productKeys)
-        .where(inArray(productKeys.productId, accessibleProductIds));
-    }
-
-    // Mask secrets
-    const masked = keyList.map((k) => ({
-      ...k,
-      secret: k.secret.substring(0, 8) + "..." + k.secret.substring(k.secret.length - 4),
-    }));
-
-    return NextResponse.json({ ok: true, data: masked });
-  } catch (error) {
-    console.error("Error in GET /api/tob/admin/product-keys:", error);
-    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
-  }
+/** Public projection of a key row — the hash never leaves the server. */
+function toKeyView(row: typeof productKeys.$inferSelect) {
+  return {
+    id: row.id,
+    productId: row.productId,
+    name: row.name,
+    createdAt: row.createdAt,
+    lastUsedAt: row.lastUsedAt,
+    revoked: row.revoked,
+  };
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({ headers: request.headers });
+export const GET = withAuth({ permission: "product.manage" }, async (req: NextRequest, ctx) => {
+  const { productId } = parseQuery(req, listQuerySchema);
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+  if (productId) {
+    await assertProductAccess(ctx, productId);
+    const keys = await ctx.db
+      .select()
+      .from(productKeys)
+      .where(eq(productKeys.productId, productId));
+    return ok(keys.map(toKeyView));
+  }
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
+  const accessible = await ctx.db
+    .select({ id: products.id })
+    .from(products)
+    .where(tenantCondition(ctx, products.tenantId));
+  const productIds = accessible.map((p) => p.id);
+  if (productIds.length === 0) return ok([]);
 
-    if (!ctx) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
+  const keys = await ctx.db
+    .select()
+    .from(productKeys)
+    .where(inArray(productKeys.productId, productIds));
+  return ok(keys.map(toKeyView));
+});
 
-    if (!hasPermission(ctx.user.role as Role, "product.manage")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
+export const POST = withAuth({ permission: "product.manage" }, async (req: NextRequest, ctx) => {
+  const body = await parseBody(req, createKeySchema);
+  await assertProductAccess(ctx, body.productId);
 
-    const body = (await request.json()) as {
-      productId: string;
-      name?: string;
-    };
+  const generated = await generateProductKeySecret();
+  const now = new Date().toISOString();
 
-    if (!body.productId) {
-      return NextResponse.json({ ok: false, error: "productId is required" }, { status: 400 });
-    }
+  await ctx.db.insert(productKeys).values({
+    id: generated.id,
+    productId: body.productId,
+    name: body.name,
+    secretHash: generated.secretHash,
+    createdAt: now,
+  });
 
-    // Verify product access
-    const product = await db.query.products.findFirst({
-      where: eq(products.id, body.productId),
-    });
-
-    if (!product || !ctx.tenantIds.includes(product.tenantId)) {
-      return NextResponse.json({ ok: false, error: "Invalid productId" }, { status: 400 });
-    }
-
-    const id = crypto.randomUUID();
-    const secret = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
-    const now = new Date().toISOString();
-
-    await db.insert(productKeys).values({
-      id,
+  // The plaintext credential is returned exactly once.
+  return ok(
+    {
+      id: generated.id,
       productId: body.productId,
       name: body.name,
-      secret,
+      apiKey: generated.plaintext,
       createdAt: now,
-    });
-
-    // Return full secret only on creation
-    return NextResponse.json(
-      {
-        ok: true,
-        data: {
-          id,
-          productId: body.productId,
-          name: body.name,
-          secret: `${id}.${secret}`,
-          createdAt: now,
-        },
-      },
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error("Error in POST /api/tob/admin/product-keys:", error);
-    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
-  }
-}
+    },
+    201
+  );
+});

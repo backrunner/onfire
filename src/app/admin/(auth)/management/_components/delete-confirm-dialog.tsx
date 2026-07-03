@@ -18,7 +18,8 @@ interface DeleteConfirmDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   itemName: string;
-  onConfirm: () => void;
+  /** May be async; throwing keeps the dialog open so the user can retry. */
+  onConfirm: () => void | Promise<void>;
   requireNameConfirmation?: boolean;
 }
 
@@ -31,18 +32,34 @@ export function DeleteConfirmDialog({
 }: DeleteConfirmDialogProps) {
   const { t } = useI18n();
   const [confirmInput, setConfirmInput] = useState("");
+  const [pending, setPending] = useState(false);
 
-  const canConfirm = !requireNameConfirmation || confirmInput === itemName;
+  const canConfirm =
+    !pending && (!requireNameConfirmation || confirmInput === itemName);
 
-  const handleConfirm = () => {
-    if (canConfirm) {
-      onConfirm();
+  const handleOpenChange = (next: boolean) => {
+    if (pending) return;
+    if (!next) setConfirmInput("");
+    onOpenChange(next);
+  };
+
+  const handleConfirm = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!canConfirm) return;
+    setPending(true);
+    try {
+      await onConfirm();
       setConfirmInput("");
+      onOpenChange(false);
+    } catch {
+      // Caller surfaces the error (toast); keep the dialog open.
+    } finally {
+      setPending(false);
     }
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{t.management.deleteConfirm.title}</AlertDialogTitle>
@@ -51,27 +68,29 @@ export function DeleteConfirmDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         {requireNameConfirmation && (
-          <div className="py-4">
-            <p className="text-sm text-muted-foreground mb-2">
+          <div className="py-2">
+            <p className="mb-2 text-sm text-muted-foreground">
               {t.management.deleteConfirm.inputHint}
             </p>
             <Input
               value={confirmInput}
               onChange={(e) => setConfirmInput(e.target.value)}
               placeholder={itemName}
+              className="h-8"
+              disabled={pending}
             />
           </div>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={() => setConfirmInput("")}>
+          <AlertDialogCancel disabled={pending}>
             {t.common.cancel}
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
             disabled={!canConfirm}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            className="bg-red-600 text-white hover:bg-red-600/90 dark:bg-red-500 dark:hover:bg-red-500/90"
           >
-            {t.common.delete}
+            {pending ? t.common.loading : t.common.delete}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

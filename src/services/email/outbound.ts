@@ -9,7 +9,7 @@ import {
   agentProfiles,
   users,
 } from "@/drizzle/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { createProvider, type ProviderConfig } from "./providers";
 
 export interface SendEmailOptions {
@@ -43,9 +43,13 @@ export async function sendTicketNotification(
     return { success: false, error: "Outbound email not enabled" };
   }
 
-  // Get template
+  // Get template for this event type (fall back to built-in defaults)
   const template = await db.query.emailTemplates.findFirst({
-    where: eq(emailTemplates.productId, ticket.productId),
+    where: and(
+      eq(emailTemplates.productId, ticket.productId),
+      eq(emailTemplates.templateType, templateType),
+      eq(emailTemplates.enabled, true)
+    ),
   });
 
   // Get product name
@@ -94,8 +98,8 @@ export async function sendTicketNotification(
   const bodyTemplate =
     template?.bodyTemplate || getDefaultBodyTemplate(templateType);
 
-  const subject = replaceVariables(subjectTemplate, variables);
-  const bodyHtml = replaceVariables(bodyTemplate, variables);
+  const subject = replaceVariables(subjectTemplate, variables, { html: false });
+  const bodyHtml = replaceVariables(bodyTemplate, variables, { html: true });
 
   const now = new Date().toISOString();
   const emailId = crypto.randomUUID();
@@ -164,11 +168,26 @@ export async function sendTicketNotification(
   }
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function replaceVariables(
   template: string,
-  variables: Record<string, string>
+  variables: Record<string, string>,
+  opts: { html: boolean }
 ): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] || "");
+  // Values are user-controlled (subject, reply content) — escape them in HTML
+  // bodies so they can't inject markup. Subjects are plain text.
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    const value = variables[key] || "";
+    return opts.html ? escapeHtml(value).replace(/\n/g, "<br>") : value;
+  });
 }
 
 function getDefaultSubjectTemplate(

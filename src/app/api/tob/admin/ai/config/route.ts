@@ -1,123 +1,79 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { getAuth } from "@/lib/auth";
-import { aiConfigs } from "@/drizzle/schema";
-import { Role } from "@/lib/types";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { resolveUserContext, isSuperAdmin } from "@/lib/api-utils";
+import { aiConfigs } from "@/drizzle/schema";
+import { ok, forbidden } from "@/lib/api/response";
+import { withAuth, parseBody } from "@/lib/api/handler";
 
-export async function GET(request: NextRequest) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
+const taskTypeEnum = z.enum(["agent", "prescreening", "prereply", "embedding"]);
+const providerEnum = z.enum(["openai", "anthropic", "google", "xai", "deepseek"]);
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
-
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
-
-    // Only SuperAdmin can manage AI configs
-    if (!ctx || !isSuperAdmin(ctx.user.role as Role)) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const configs = await db.select().from(aiConfigs);
-
-    // Mask API keys
-    const maskedConfigs = configs.map((c) => ({
-      ...c,
-      apiKey: c.apiKey ? "***" + c.apiKey.slice(-4) : "",
-    }));
-
-    return NextResponse.json({ ok: true, data: maskedConfigs });
-  } catch (error) {
-    console.error("Error in GET /api/tob/admin/ai/config:", error);
-    return NextResponse.json(
-      { ok: false, error: "Internal server error" },
-      { status: 500 }
-    );
-  }
+/** Never return the stored API key; expose only a short masked prefix. */
+function maskAiConfig<T extends { apiKey: string | null }>(config: T) {
+  return {
+    ...config,
+    apiKey: config.apiKey ? `${config.apiKey.slice(0, 6)}...` : "",
+    hasKey: Boolean(config.apiKey),
+  };
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
+const createConfigSchema = z.object({
+  taskType: taskTypeEnum,
+  provider: providerEnum,
+  model: z.string().min(1).max(200),
+  apiKey: z.string().min(1).max(500),
+  baseUrl: z.url().optional(),
+  enabled: z.boolean().optional(),
+});
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+export const GET = withAuth({ permission: "product.manage" }, async (_req: NextRequest, ctx) => {
+  // AI configs are global — only SuperAdmin may manage them
+  if (!ctx.isSuperAdmin) throw forbidden();
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
+  const configs = await ctx.db.select().from(aiConfigs);
 
-    // Only SuperAdmin can manage AI configs
-    if (!ctx || !isSuperAdmin(ctx.user.role as Role)) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
+  return ok(configs.map(maskAiConfig));
+});
 
-    const body = (await request.json()) as {
-      taskType: string;
-      provider: string;
-      model: string;
-      apiKey: string;
-      baseUrl?: string;
-      enabled?: boolean;
-    };
+export const POST = withAuth({ permission: "product.manage" }, async (req: NextRequest, ctx) => {
+  // AI configs are global — only SuperAdmin may manage them
+  if (!ctx.isSuperAdmin) throw forbidden();
 
-    if (!body.taskType || !body.provider || !body.model || !body.apiKey) {
-      return NextResponse.json(
-        { ok: false, error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
+  const body = await parseBody(req, createConfigSchema);
 
-    const now = new Date().toISOString();
-    const existing = await db.query.aiConfigs.findFirst({
-      where: eq(aiConfigs.taskType, body.taskType as "agent" | "prescreening" | "prereply" | "embedding"),
-    });
+  const now = new Date().toISOString();
+  const existing = await ctx.db.query.aiConfigs.findFirst({
+    where: eq(aiConfigs.taskType, body.taskType),
+  });
 
-    if (existing) {
-      await db
-        .update(aiConfigs)
-        .set({
-          provider: body.provider as "openai" | "anthropic" | "google" | "xai" | "deepseek",
-          model: body.model,
-          apiKey: body.apiKey,
-          baseUrl: body.baseUrl || null,
-          enabled: body.enabled ?? true,
-          updatedAt: now,
-        })
-        .where(eq(aiConfigs.id, existing.id));
+  if (existing) {
+    await ctx.db
+      .update(aiConfigs)
+      .set({
+        provider: body.provider,
+        model: body.model,
+        apiKey: body.apiKey,
+        baseUrl: body.baseUrl || null,
+        enabled: body.enabled ?? true,
+        updatedAt: now,
+      })
+      .where(eq(aiConfigs.id, existing.id));
 
-      return NextResponse.json({ ok: true, data: { id: existing.id } });
-    }
-
-    const id = crypto.randomUUID();
-    await db.insert(aiConfigs).values({
-      id,
-      taskType: body.taskType as "agent" | "prescreening" | "prereply" | "embedding",
-      provider: body.provider as "openai" | "anthropic" | "google" | "xai" | "deepseek",
-      model: body.model,
-      apiKey: body.apiKey,
-      baseUrl: body.baseUrl || null,
-      enabled: body.enabled ?? true,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    return NextResponse.json({ ok: true, data: { id } }, { status: 201 });
-  } catch (error) {
-    console.error("Error in POST /api/tob/admin/ai/config:", error);
-    return NextResponse.json(
-      { ok: false, error: "Internal server error" },
-      { status: 500 }
-    );
+    return ok({ id: existing.id });
   }
-}
+
+  const id = crypto.randomUUID();
+  await ctx.db.insert(aiConfigs).values({
+    id,
+    taskType: body.taskType,
+    provider: body.provider,
+    model: body.model,
+    apiKey: body.apiKey,
+    baseUrl: body.baseUrl || null,
+    enabled: body.enabled ?? true,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  return ok({ id }, 201);
+});

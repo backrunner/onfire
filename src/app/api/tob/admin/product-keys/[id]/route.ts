@@ -1,180 +1,62 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { getAuth } from "@/lib/auth";
-import { productKeys, products } from "@/drizzle/schema";
-import { hasPermission, Role } from "@/lib/types";
-import { resolveUserContext } from "@/lib/api-utils";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { eq } from "drizzle-orm";
+import { productKeys } from "@/drizzle/schema";
+import { ok } from "@/lib/api/response";
+import { notFound } from "@/lib/api/response";
+import { withAuth, parseBody, type AuthedContext } from "@/lib/api/handler";
+import { assertProductAccess } from "@/lib/api/scope";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const auth = getAuth();
-    const session = await auth.api.getSession({ headers: request.headers });
+const updateKeySchema = z.object({
+  name: z.string().max(100).optional(),
+  revoked: z.boolean().optional(),
+});
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
-
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
-
-    if (!ctx) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
-
-    if (!hasPermission(ctx.user.role as Role, "product.manage")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const key = await db.query.productKeys.findFirst({ where: eq(productKeys.id, id) });
-
-    if (!key) {
-      return NextResponse.json({ ok: false, error: "Key not found" }, { status: 404 });
-    }
-
-    // Verify product access
-    const product = await db.query.products.findFirst({
-      where: eq(products.id, key.productId),
-    });
-
-    if (!product || !ctx.tenantIds.includes(product.tenantId)) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    // Mask secret
-    return NextResponse.json({
-      ok: true,
-      data: {
-        ...key,
-        secret: key.secret.substring(0, 8) + "..." + key.secret.substring(key.secret.length - 4),
-      },
-    });
-  } catch (error) {
-    console.error("Error in GET /api/tob/admin/product-keys/[id]:", error);
-    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
-  }
+function toKeyView(row: typeof productKeys.$inferSelect) {
+  return {
+    id: row.id,
+    productId: row.productId,
+    name: row.name,
+    createdAt: row.createdAt,
+    lastUsedAt: row.lastUsedAt,
+    revoked: row.revoked,
+  };
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const auth = getAuth();
-    const session = await auth.api.getSession({ headers: request.headers });
-
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
-
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
-
-    if (!ctx) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
-
-    if (!hasPermission(ctx.user.role as Role, "product.manage")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const key = await db.query.productKeys.findFirst({ where: eq(productKeys.id, id) });
-
-    if (!key) {
-      return NextResponse.json({ ok: false, error: "Key not found" }, { status: 404 });
-    }
-
-    // Verify product access
-    const product = await db.query.products.findFirst({
-      where: eq(products.id, key.productId),
-    });
-
-    if (!product || !ctx.tenantIds.includes(product.tenantId)) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const body = (await request.json()) as {
-      name?: string;
-      revoked?: boolean;
-    };
-
-    await db
-      .update(productKeys)
-      .set({
-        ...(body.name !== undefined && { name: body.name }),
-        ...(body.revoked !== undefined && { revoked: body.revoked }),
-      })
-      .where(eq(productKeys.id, id));
-
-    const updated = await db.query.productKeys.findFirst({ where: eq(productKeys.id, id) });
-
-    return NextResponse.json({
-      ok: true,
-      data: updated
-        ? {
-            ...updated,
-            secret:
-              updated.secret.substring(0, 8) +
-              "..." +
-              updated.secret.substring(updated.secret.length - 4),
-          }
-        : null,
-    });
-  } catch (error) {
-    console.error("Error in PATCH /api/tob/admin/product-keys/[id]:", error);
-    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
-  }
+async function loadAccessibleKey(ctx: AuthedContext, id: string) {
+  const key = await ctx.db.query.productKeys.findFirst({
+    where: eq(productKeys.id, id),
+  });
+  if (!key) throw notFound("Key not found");
+  await assertProductAccess(ctx, key.productId);
+  return key;
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const auth = getAuth();
-    const session = await auth.api.getSession({ headers: request.headers });
+export const GET = withAuth({ permission: "product.manage" }, async (_req: NextRequest, ctx) => {
+  const key = await loadAccessibleKey(ctx, ctx.params.id);
+  return ok(toKeyView(key));
+});
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+export const PATCH = withAuth({ permission: "product.manage" }, async (req: NextRequest, ctx) => {
+  const key = await loadAccessibleKey(ctx, ctx.params.id);
+  const body = await parseBody(req, updateKeySchema);
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
+  await ctx.db
+    .update(productKeys)
+    .set({
+      ...(body.name !== undefined && { name: body.name }),
+      ...(body.revoked !== undefined && { revoked: body.revoked }),
+    })
+    .where(eq(productKeys.id, key.id));
 
-    if (!ctx) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
+  const updated = await ctx.db.query.productKeys.findFirst({
+    where: eq(productKeys.id, key.id),
+  });
+  return ok(updated ? toKeyView(updated) : null);
+});
 
-    if (!hasPermission(ctx.user.role as Role, "product.manage")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const key = await db.query.productKeys.findFirst({ where: eq(productKeys.id, id) });
-
-    if (!key) {
-      return NextResponse.json({ ok: false, error: "Key not found" }, { status: 404 });
-    }
-
-    // Verify product access
-    const product = await db.query.products.findFirst({
-      where: eq(products.id, key.productId),
-    });
-
-    if (!product || !ctx.tenantIds.includes(product.tenantId)) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    await db.delete(productKeys).where(eq(productKeys.id, id));
-
-    return NextResponse.json({ ok: true, data: { deleted: true } });
-  } catch (error) {
-    console.error("Error in DELETE /api/tob/admin/product-keys/[id]:", error);
-    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
-  }
-}
+export const DELETE = withAuth({ permission: "product.manage" }, async (_req: NextRequest, ctx) => {
+  const key = await loadAccessibleKey(ctx, ctx.params.id);
+  await ctx.db.delete(productKeys).where(eq(productKeys.id, key.id));
+  return ok({ deleted: true });
+});

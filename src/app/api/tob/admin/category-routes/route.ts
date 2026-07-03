@@ -1,124 +1,64 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { getAuth } from "@/lib/auth";
-import { categoryRoutes, products } from "@/drizzle/schema";
-import { hasPermission, Role } from "@/lib/types";
-import { resolveUserContext } from "@/lib/api-utils";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { eq, inArray } from "drizzle-orm";
+import { categoryRoutes, products } from "@/drizzle/schema";
+import { ok } from "@/lib/api/response";
+import { withAuth, parseBody, parseQuery } from "@/lib/api/handler";
+import { assertProductAccess, tenantCondition } from "@/lib/api/scope";
 
-export async function GET(request: NextRequest) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({ headers: request.headers });
+const listQuerySchema = z.object({
+  productId: z.string().optional(),
+});
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+const createRouteSchema = z.object({
+  productId: z.string().min(1),
+  category: z.string().min(1),
+  subcategory: z.string().optional(),
+  teamId: z.string().min(1),
+});
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
+export const GET = withAuth({ permission: "category.map" }, async (req: NextRequest, ctx) => {
+  const { productId } = parseQuery(req, listQuerySchema);
 
-    if (!ctx) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
-
-    if (!hasPermission(ctx.user.role as Role, "category.map")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const productId = searchParams.get("productId");
-
-    // Get accessible products
-    const accessibleProducts = await db
-      .select({ id: products.id })
-      .from(products)
-      .where(inArray(products.tenantId, ctx.tenantIds));
-    const accessibleProductIds = accessibleProducts.map((p) => p.id);
-
-    let routeList;
-    if (productId) {
-      if (!accessibleProductIds.includes(productId)) {
-        return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-      }
-      routeList = await db
-        .select()
-        .from(categoryRoutes)
-        .where(eq(categoryRoutes.productId, productId));
-    } else {
-      routeList = await db
-        .select()
-        .from(categoryRoutes)
-        .where(inArray(categoryRoutes.productId, accessibleProductIds));
-    }
-
-    return NextResponse.json({ ok: true, data: routeList });
-  } catch (error) {
-    console.error("Error in GET /api/tob/admin/category-routes:", error);
-    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
+  if (productId) {
+    await assertProductAccess(ctx, productId);
+    const routeList = await ctx.db
+      .select()
+      .from(categoryRoutes)
+      .where(eq(categoryRoutes.productId, productId));
+    return ok(routeList);
   }
-}
 
-export async function POST(request: NextRequest) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({ headers: request.headers });
+  const accessible = await ctx.db
+    .select({ id: products.id })
+    .from(products)
+    .where(tenantCondition(ctx, products.tenantId));
+  const productIds = accessible.map((p) => p.id);
+  if (productIds.length === 0) return ok([]);
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+  const routeList = await ctx.db
+    .select()
+    .from(categoryRoutes)
+    .where(inArray(categoryRoutes.productId, productIds));
+  return ok(routeList);
+});
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
+export const POST = withAuth({ permission: "category.map" }, async (req: NextRequest, ctx) => {
+  const body = await parseBody(req, createRouteSchema);
+  await assertProductAccess(ctx, body.productId);
 
-    if (!ctx) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
+  const id = crypto.randomUUID();
 
-    if (!hasPermission(ctx.user.role as Role, "category.map")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
+  await ctx.db.insert(categoryRoutes).values({
+    id,
+    productId: body.productId,
+    category: body.category,
+    subcategory: body.subcategory,
+    teamId: body.teamId,
+  });
 
-    const body = (await request.json()) as {
-      productId: string;
-      category: string;
-      subcategory?: string;
-      teamId: string;
-    };
-
-    if (!body.productId || !body.category || !body.teamId) {
-      return NextResponse.json(
-        { ok: false, error: "productId, category, and teamId are required" },
-        { status: 400 }
-      );
-    }
-
-    // Verify product access
-    const product = await db.query.products.findFirst({
-      where: eq(products.id, body.productId),
-    });
-
-    if (!product || !ctx.tenantIds.includes(product.tenantId)) {
-      return NextResponse.json({ ok: false, error: "Invalid productId" }, { status: 400 });
-    }
-
-    const id = crypto.randomUUID();
-
-    await db.insert(categoryRoutes).values({
-      id,
-      productId: body.productId,
-      category: body.category,
-      subcategory: body.subcategory,
-      teamId: body.teamId,
-    });
-
-    const created = await db.query.categoryRoutes.findFirst({
-      where: eq(categoryRoutes.id, id),
-    });
-
-    return NextResponse.json({ ok: true, data: created }, { status: 201 });
-  } catch (error) {
-    console.error("Error in POST /api/tob/admin/category-routes:", error);
-    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
-  }
-}
+  const created = await ctx.db.query.categoryRoutes.findFirst({
+    where: eq(categoryRoutes.id, id),
+  });
+  return ok(created, 201);
+});

@@ -1,10 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useMemo, useState } from "react";
+import useSWR from "swr";
+import { toast } from "sonner";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { api, swrFetcher } from "@/lib/api/client";
+import { useMe } from "@/lib/hooks/use-me";
+import type { ProductView } from "@/lib/api/types";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -16,333 +23,448 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { DeleteConfirmDialog } from "./delete-confirm-dialog";
+import {
+  EmptyState,
+  ErrorState,
+  FormField,
+  ManagerPanel,
+  RowActions,
+  TableSkeleton,
+  errorMessage,
+} from "./manager-ui";
 
-interface Product {
+interface Tenant {
   id: string;
-  tenantId: string;
   name: string;
-  slaHighAccept?: number | null;
-  slaHighReply?: number | null;
-  slaMediumAccept?: number | null;
-  slaMediumReply?: number | null;
-  slaLowAccept?: number | null;
-  slaLowReply?: number | null;
-  teamIds?: string[];
+}
+
+type SlaField =
+  | "slaHighAccept"
+  | "slaHighReply"
+  | "slaMediumAccept"
+  | "slaMediumReply"
+  | "slaLowAccept"
+  | "slaLowReply";
+
+const SLA_FIELDS: SlaField[] = [
+  "slaHighAccept",
+  "slaHighReply",
+  "slaMediumAccept",
+  "slaMediumReply",
+  "slaLowAccept",
+  "slaLowReply",
+];
+
+interface ProductForm {
+  name: string;
+  tenantId: string;
+  slaHighAccept: string;
+  slaHighReply: string;
+  slaMediumAccept: string;
+  slaMediumReply: string;
+  slaLowAccept: string;
+  slaLowReply: string;
+  autoCloseMinutes: string;
+}
+
+const emptyForm = (): ProductForm => ({
+  name: "",
+  tenantId: "",
+  slaHighAccept: "",
+  slaHighReply: "",
+  slaMediumAccept: "",
+  slaMediumReply: "",
+  slaLowAccept: "",
+  slaLowReply: "",
+  autoCloseMinutes: "",
+});
+
+/** "" → undefined; otherwise a validated positive integer (or NaN). */
+function parsePositiveInt(value: string): number | undefined {
+  if (value.trim() === "") return undefined;
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : Number.NaN;
 }
 
 export function ProductManagement() {
   const { t } = useI18n();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const m = t.management;
+  const { can } = useMe();
+  const isSuperAdmin = can("tenant.manage");
+
+  const {
+    data: products,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR<ProductView[]>("/api/tob/admin/products", swrFetcher);
+  const { data: tenants } = useSWR<Tenant[]>(
+    isSuperAdmin ? "/api/tob/admin/tenants" : null,
+    swrFetcher
+  );
+
+  const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    slaHighAccept: "",
-    slaHighReply: "",
-    slaMediumAccept: "",
-    slaMediumReply: "",
-    slaLowAccept: "",
-    slaLowReply: "",
-    teamIds: "",
-  });
-  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<ProductView | null>(null);
+  const [deleting, setDeleting] = useState<ProductView | null>(null);
+  const [form, setForm] = useState<ProductForm>(emptyForm());
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [pending, setPending] = useState(false);
 
-  const fetchProducts = useCallback(async () => {
-    try {
-      const res = await fetch("/api/tob/admin/products");
-      const data = (await res.json()) as { ok: boolean; data: Product[] };
-      if (data.ok) {
-        setProducts(data.data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch products:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const tenantNames = useMemo(
+    () => new Map((tenants ?? []).map((tenant) => [tenant.id, tenant.name])),
+    [tenants]
+  );
 
-  useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
+  const filtered = useMemo(() => {
+    const list = products ?? [];
+    const q = search.trim().toLowerCase();
+    return q ? list.filter((p) => p.name.toLowerCase().includes(q)) : list;
+  }, [products, search]);
 
-  const handleCreate = () => {
-    setEditingProduct(null);
-    setFormData({
-      name: "",
-      slaHighAccept: "",
-      slaHighReply: "",
-      slaMediumAccept: "",
-      slaMediumReply: "",
-      slaLowAccept: "",
-      slaLowReply: "",
-      teamIds: "",
-    });
+  const openCreate = () => {
+    setEditing(null);
+    setForm(emptyForm());
+    setFormErrors({});
     setDialogOpen(true);
   };
 
-  const handleEdit = async (product: Product) => {
-    // Fetch full product details including teamIds
-    try {
-      const res = await fetch(`/api/tob/admin/products/${product.id}`);
-      const data = (await res.json()) as { ok: boolean; data: Product };
-      if (data.ok) {
-        const p = data.data;
-        setEditingProduct(p);
-        setFormData({
-          name: p.name,
-          slaHighAccept: p.slaHighAccept?.toString() || "",
-          slaHighReply: p.slaHighReply?.toString() || "",
-          slaMediumAccept: p.slaMediumAccept?.toString() || "",
-          slaMediumReply: p.slaMediumReply?.toString() || "",
-          slaLowAccept: p.slaLowAccept?.toString() || "",
-          slaLowReply: p.slaLowReply?.toString() || "",
-          teamIds: p.teamIds?.join(",") || "",
-        });
-        setDialogOpen(true);
+  const openEdit = (product: ProductView) => {
+    setEditing(product);
+    setForm({
+      name: product.name,
+      tenantId: product.tenantId,
+      slaHighAccept: product.slaHighAccept?.toString() ?? "",
+      slaHighReply: product.slaHighReply?.toString() ?? "",
+      slaMediumAccept: product.slaMediumAccept?.toString() ?? "",
+      slaMediumReply: product.slaMediumReply?.toString() ?? "",
+      slaLowAccept: product.slaLowAccept?.toString() ?? "",
+      slaLowReply: product.slaLowReply?.toString() ?? "",
+      autoCloseMinutes: product.autoCloseMinutes?.toString() ?? "",
+    });
+    setFormErrors({});
+    setDialogOpen(true);
+  };
+
+  const handleSubmit = async () => {
+    const errors: Record<string, string> = {};
+    if (!form.name.trim()) errors.name = m.products.nameRequired;
+    for (const field of [...SLA_FIELDS, "autoCloseMinutes"] as const) {
+      const parsed = parsePositiveInt(form[field]);
+      if (parsed !== undefined && Number.isNaN(parsed)) {
+        errors[field] = m.invalidNumber;
       }
-    } catch (error) {
-      console.error("Failed to fetch product:", error);
     }
-  };
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
 
-  const handleDelete = (product: Product) => {
-    setDeletingProduct(product);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleSave = async () => {
-    if (!formData.name.trim()) return;
-
-    setSaving(true);
+    setPending(true);
     try {
-      const url = editingProduct
-        ? `/api/tob/admin/products/${editingProduct.id}`
-        : "/api/tob/admin/products";
-      const method = editingProduct ? "PATCH" : "POST";
-
-      const payload: Record<string, unknown> = {
-        name: formData.name,
-      };
-
-      // Add SLA values if provided
-      if (formData.slaHighAccept) payload.slaHighAccept = parseInt(formData.slaHighAccept);
-      if (formData.slaHighReply) payload.slaHighReply = parseInt(formData.slaHighReply);
-      if (formData.slaMediumAccept) payload.slaMediumAccept = parseInt(formData.slaMediumAccept);
-      if (formData.slaMediumReply) payload.slaMediumReply = parseInt(formData.slaMediumReply);
-      if (formData.slaLowAccept) payload.slaLowAccept = parseInt(formData.slaLowAccept);
-      if (formData.slaLowReply) payload.slaLowReply = parseInt(formData.slaLowReply);
-
-      // Add team IDs if editing
-      if (editingProduct && formData.teamIds) {
-        payload.teamIds = formData.teamIds.split(",").map((id) => id.trim()).filter(Boolean);
+      if (editing) {
+        const payload: Record<string, unknown> = { name: form.name.trim() };
+        for (const field of SLA_FIELDS) {
+          payload[field] = parsePositiveInt(form[field]) ?? null;
+        }
+        payload.autoCloseMinutes =
+          parsePositiveInt(form.autoCloseMinutes) ?? null;
+        await api.patch(`/api/tob/admin/products/${editing.id}`, payload);
+        toast.success(m.toastUpdated);
+      } else {
+        const payload: Record<string, unknown> = { name: form.name.trim() };
+        if (isSuperAdmin && form.tenantId) payload.tenantId = form.tenantId;
+        for (const field of SLA_FIELDS) {
+          const value = parsePositiveInt(form[field]);
+          if (value !== undefined) payload[field] = value;
+        }
+        const autoClose = parsePositiveInt(form.autoCloseMinutes);
+        if (autoClose !== undefined) payload.autoCloseMinutes = autoClose;
+        await api.post("/api/tob/admin/products", payload);
+        toast.success(m.toastCreated);
       }
-
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
-        setDialogOpen(false);
-        fetchProducts();
-      }
-    } catch (error) {
-      console.error("Failed to save product:", error);
+      setDialogOpen(false);
+      await mutate();
+    } catch (err) {
+      toast.error(errorMessage(err, m.loadFailed));
     } finally {
-      setSaving(false);
+      setPending(false);
     }
   };
 
-  const handleConfirmDelete = async () => {
-    if (!deletingProduct) return;
-
+  const handleDelete = async () => {
+    if (!deleting) return;
     try {
-      const res = await fetch(`/api/tob/admin/products/${deletingProduct.id}`, {
-        method: "DELETE",
-      });
-
-      if (res.ok) {
-        setDeleteDialogOpen(false);
-        setDeletingProduct(null);
-        fetchProducts();
-      }
-    } catch (error) {
-      console.error("Failed to delete product:", error);
+      await api.delete(`/api/tob/admin/products/${deleting.id}`);
+      toast.success(m.toastDeleted);
+      setDeleting(null);
+      await mutate();
+    } catch (err) {
+      toast.error(errorMessage(err, m.loadFailed));
+      throw err;
     }
   };
 
-  if (loading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{t.management.tabs.products}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const slaSummary = (product: ProductView): string | null => {
+    const parts: string[] = [];
+    const row = (label: string, accept: number | null, reply: number | null) => {
+      if (accept == null && reply == null) return;
+      parts.push(`${label} ${accept ?? "—"}/${reply ?? "—"}`);
+    };
+    row(t.tickets.priority.high, product.slaHighAccept, product.slaHighReply);
+    row(t.tickets.priority.medium, product.slaMediumAccept, product.slaMediumReply);
+    row(t.tickets.priority.low, product.slaLowAccept, product.slaLowReply);
+    return parts.length > 0 ? parts.join(" · ") : null;
+  };
+
+  const slaRow = (
+    label: string,
+    acceptField: SlaField,
+    replyField: SlaField
+  ) => (
+    <div className="grid grid-cols-[72px_1fr_1fr] items-center gap-2">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <div>
+        <Input
+          type="number"
+          min={1}
+          value={form[acceptField]}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, [acceptField]: e.target.value }))
+          }
+          className="h-8"
+        />
+        {formErrors[acceptField] && (
+          <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+            {formErrors[acceptField]}
+          </p>
+        )}
+      </div>
+      <div>
+        <Input
+          type="number"
+          min={1}
+          value={form[replyField]}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, [replyField]: e.target.value }))
+          }
+          className="h-8"
+        />
+        {formErrors[replyField] && (
+          <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+            {formErrors[replyField]}
+          </p>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>{t.management.tabs.products}</CardTitle>
-          <Button size="sm" onClick={handleCreate}>
-            <Plus className="h-4 w-4 mr-1" />
-            {t.management.products.create}
+      <ManagerPanel
+        title={m.tabs.products}
+        description={m.products.description}
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder={t.common.search}
+        actions={
+          <Button size="sm" className="h-8" onClick={openCreate}>
+            <Plus className="mr-1.5 size-3.5" />
+            {m.products.create}
           </Button>
-        </CardHeader>
-        <CardContent>
-          {products.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
-              {t.management.noData.replace("{{type}}", t.management.tabs.products)}
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>{t.management.products.namePlaceholder}</TableHead>
-                  <TableHead>Tenant</TableHead>
-                  <TableHead className="w-24">{t.common.actions}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {products.map((product) => (
+        }
+      >
+        {isLoading ? (
+          <TableSkeleton />
+        ) : error ? (
+          <ErrorState onRetry={() => void mutate()} />
+        ) : filtered.length === 0 ? (
+          <EmptyState message={m.noData.replace("{{type}}", m.tabs.products)} />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{m.products.name}</TableHead>
+                {isSuperAdmin && <TableHead>{m.products.tenant}</TableHead>}
+                <TableHead>{m.products.slaPolicy}</TableHead>
+                <TableHead>{m.products.autoClose}</TableHead>
+                <TableHead className="w-12" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((product) => {
+                const summary = slaSummary(product);
+                return (
                   <TableRow key={product.id}>
-                    <TableCell className="font-mono text-xs">{product.id}</TableCell>
-                    <TableCell>{product.name}</TableCell>
-                    <TableCell className="font-mono text-xs">{product.tenantId}</TableCell>
+                    <TableCell className="text-sm font-medium">
+                      {product.name}
+                    </TableCell>
+                    {isSuperAdmin && (
+                      <TableCell className="text-sm text-muted-foreground">
+                        {tenantNames.get(product.tenantId) ?? product.tenantId}
+                      </TableCell>
+                    )}
                     <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEdit(product)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(product)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      {summary ? (
+                        <span className="text-sm tabular-nums text-muted-foreground">
+                          {summary}
+                        </span>
+                      ) : (
+                        <Badge variant="secondary">{m.products.slaNone}</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {product.autoCloseMinutes != null ? (
+                        <span className="text-sm tabular-nums">
+                          {product.autoCloseMinutes} min
+                        </span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">
+                          {m.products.autoCloseOff}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <RowActions
+                        actions={[
+                          {
+                            label: t.common.edit,
+                            icon: Pencil,
+                            onSelect: () => openEdit(product),
+                          },
+                          {
+                            label: t.common.delete,
+                            icon: Trash2,
+                            destructive: true,
+                            separatorBefore: true,
+                            onSelect: () => setDeleting(product),
+                          },
+                        ]}
+                      />
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </ManagerPanel>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+      <Dialog open={dialogOpen} onOpenChange={(open) => !pending && setDialogOpen(open)}>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {editingProduct ? t.management.products.edit : t.management.products.create}
+              {editing ? m.products.edit : m.products.create}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-            <div className="space-y-2">
-              <Label>{t.management.products.namePlaceholder}</Label>
+          <div className="max-h-[65vh] space-y-4 overflow-y-auto py-2 pr-1">
+            <FormField
+              label={m.products.name}
+              htmlFor="product-name"
+              required
+              error={formErrors.name}
+            >
               <Input
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder={t.management.products.namePlaceholder}
+                id="product-name"
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder={m.products.namePlaceholder}
+                className="h-8"
               />
-            </div>
+            </FormField>
+
+            {isSuperAdmin && !editing && (
+              <FormField label={m.products.tenant}>
+                <Select
+                  value={form.tenantId}
+                  onValueChange={(v) => setForm((f) => ({ ...f, tenantId: v }))}
+                >
+                  <SelectTrigger className="h-8">
+                    <SelectValue placeholder={m.products.selectTenant} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(tenants ?? []).map((tenant) => (
+                      <SelectItem key={tenant.id} value={tenant.id}>
+                        {tenant.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormField>
+            )}
+
+            <Separator />
 
             <div className="space-y-2">
-              <Label>{t.management.products.sla}</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  type="number"
-                  value={formData.slaHighAccept}
-                  onChange={(e) => setFormData({ ...formData, slaHighAccept: e.target.value })}
-                  placeholder={t.management.products.slaHighAccept}
-                />
-                <Input
-                  type="number"
-                  value={formData.slaHighReply}
-                  onChange={(e) => setFormData({ ...formData, slaHighReply: e.target.value })}
-                  placeholder={t.management.products.slaHighReply}
-                />
-                <Input
-                  type="number"
-                  value={formData.slaMediumAccept}
-                  onChange={(e) => setFormData({ ...formData, slaMediumAccept: e.target.value })}
-                  placeholder={t.management.products.slaMediumAccept}
-                />
-                <Input
-                  type="number"
-                  value={formData.slaMediumReply}
-                  onChange={(e) => setFormData({ ...formData, slaMediumReply: e.target.value })}
-                  placeholder={t.management.products.slaMediumReply}
-                />
-                <Input
-                  type="number"
-                  value={formData.slaLowAccept}
-                  onChange={(e) => setFormData({ ...formData, slaLowAccept: e.target.value })}
-                  placeholder={t.management.products.slaLowAccept}
-                />
-                <Input
-                  type="number"
-                  value={formData.slaLowReply}
-                  onChange={(e) => setFormData({ ...formData, slaLowReply: e.target.value })}
-                  placeholder={t.management.products.slaLowReply}
-                />
+              <Label className="text-sm">{m.products.slaPolicy}</Label>
+              <p className="text-xs text-muted-foreground">{m.products.slaHint}</p>
+              <div className="grid grid-cols-[72px_1fr_1fr] gap-2">
+                <span />
+                <span className="text-xs font-medium text-muted-foreground">
+                  {m.products.accept}
+                </span>
+                <span className="text-xs font-medium text-muted-foreground">
+                  {m.products.reply}
+                </span>
               </div>
+              {slaRow(t.tickets.priority.high, "slaHighAccept", "slaHighReply")}
+              {slaRow(t.tickets.priority.medium, "slaMediumAccept", "slaMediumReply")}
+              {slaRow(t.tickets.priority.low, "slaLowAccept", "slaLowReply")}
             </div>
 
-            {editingProduct && (
-              <div className="space-y-2">
-                <Label>{t.management.products.bindTeams}</Label>
-                <Input
-                  value={formData.teamIds}
-                  onChange={(e) => setFormData({ ...formData, teamIds: e.target.value })}
-                  placeholder={t.management.products.bindTeamsPlaceholder}
-                />
-              </div>
-            )}
+            <Separator />
+
+            <FormField
+              label={m.products.autoClose}
+              htmlFor="product-autoclose"
+              hint={m.products.autoCloseHint}
+              error={formErrors.autoCloseMinutes}
+            >
+              <Input
+                id="product-autoclose"
+                type="number"
+                min={1}
+                value={form.autoCloseMinutes}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, autoCloseMinutes: e.target.value }))
+                }
+                className="h-8"
+              />
+            </FormField>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setDialogOpen(false)}
+              disabled={pending}
+            >
               {t.common.cancel}
             </Button>
-            <Button onClick={handleSave} disabled={saving || !formData.name.trim()}>
-              {saving ? t.common.loading : t.common.save}
+            <Button size="sm" className="h-8" onClick={handleSubmit} disabled={pending}>
+              {pending ? t.common.loading : t.common.save}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <DeleteConfirmDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        itemName={deletingProduct?.name || ""}
-        onConfirm={handleConfirmDelete}
+        open={!!deleting}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        itemName={deleting?.name || ""}
+        onConfirm={handleDelete}
       />
     </>
   );

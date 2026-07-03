@@ -1,42 +1,74 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { eq } from "drizzle-orm";
+import { emailConfigs } from "@/drizzle/schema";
+import { ok, err } from "@/lib/api/response";
+import { withPublic } from "@/lib/api/handler";
+import { verifyWebhookAuth } from "@/lib/webhooks";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { processInboundEmail } from "@/services/email/inbound";
 
-interface MailerooWebhookPayload {
-  from: string;
-  from_name?: string;
-  to: string;
-  subject: string;
-  text?: string;
-  html?: string;
-  message_id?: string;
-  spam_score?: number;
-  spf?: string;
-  dkim?: string;
-}
+const mailerooPayloadSchema = z
+  .object({
+    from: z.string().email(),
+    from_name: z.string().max(256).optional(),
+    to: z.string().email(),
+    subject: z.string().min(1).max(998),
+    text: z.string().max(500_000).optional(),
+    html: z.string().max(1_000_000).optional(),
+    message_id: z.string().max(998).optional(),
+    spam_score: z.number().optional(),
+    spf: z.string().max(32).optional(),
+    dkim: z.string().max(32).optional(),
+  })
+  .refine((p) => p.text || p.html, {
+    message: "At least one of text or html is required",
+  });
 
-export async function POST(request: NextRequest) {
-  const db = getDb();
+/**
+ * POST /api/toc/webhooks/maileroo — Maileroo inbound email webhook.
+ *
+ * Authenticated with the same per-product webhook secret as the generic
+ * endpoint (Bearer token or HMAC over the raw body). Configure the secret in
+ * Maileroo's webhook settings.
+ */
+export const POST = withPublic(async (req: NextRequest, { db }) => {
+  await enforceRateLimit(db, req, "webhook:maileroo", {
+    limit: 120,
+    windowSeconds: 60,
+  });
 
-  let payload: MailerooWebhookPayload;
+  const rawBody = await req.text();
+
+  let parsedJson: unknown;
   try {
-    payload = await request.json();
+    parsedJson = JSON.parse(rawBody);
   } catch {
-    return NextResponse.json(
-      { ok: false, error: "Invalid JSON body" },
-      { status: 400 }
-    );
+    return err("Invalid JSON body", 400);
   }
 
-  // Validate required fields
-  if (!payload.from || !payload.to || !payload.subject) {
-    return NextResponse.json(
-      { ok: false, error: "Missing required fields" },
-      { status: 400 }
-    );
+  const parsed = mailerooPayloadSchema.safeParse(parsedJson);
+  if (!parsed.success) {
+    return err("Validation failed", 400, z.flattenError(parsed.error));
+  }
+  const payload = parsed.data;
+
+  const config = await db.query.emailConfigs.findFirst({
+    where: eq(emailConfigs.inboundAddress, payload.to),
+  });
+  if (!config) {
+    return err("Unknown inbound address", 404);
   }
 
-  // Convert Maileroo format to our standard format
+  const authenticated = await verifyWebhookAuth(
+    req,
+    rawBody,
+    config.inboundWebhookSecret
+  );
+  if (!authenticated) {
+    return err("Unauthorized", 401);
+  }
+
   const result = await processInboundEmail(db, {
     fromEmail: payload.from,
     fromName: payload.from_name,
@@ -50,19 +82,14 @@ export async function POST(request: NextRequest) {
     isSpam: payload.spam_score !== undefined && payload.spam_score > 5,
   });
 
-  if (!result.success) {
-    return NextResponse.json(
-      { ok: false, error: result.reason, action: result.action },
-      { status: result.action === "error" ? 500 : 200 }
-    );
+  if (!result.success && result.action === "error") {
+    return err(result.reason ?? "Processing failed", 500);
   }
 
-  return NextResponse.json({
-    ok: true,
-    data: {
-      action: result.action,
-      ticketId: result.ticketId,
-      replyId: result.replyId,
-    },
+  return ok({
+    action: result.action,
+    ticketId: result.ticketId,
+    replyId: result.replyId,
+    reason: result.reason,
   });
-}
+});

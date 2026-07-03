@@ -37,8 +37,16 @@ export const zh = {
   nav: {
     dashboard: 'Dashboard',
     tickets: '工单列表',
+    customers: '客户',
     account: '账户',
-    admin: '管理'
+    admin: '管理',
+    email: '邮件',
+    notifications: '通知',
+    ai: 'AI 配置',
+    configuration: '配置',
+    workspace: '工作区',
+    collapse: '收起侧边栏',
+    expand: '展开侧边栏'
   },
 
   // Topbar
@@ -69,7 +77,283 @@ export const zh = {
     viewOverdue: '查看超时工单',
     recentTickets: '最近工单',
     noTickets: '暂无工单',
-    noTicketsHint: '新工单将出现在这里'
+    noTicketsHint: '新工单将出现在这里',
+    slaAlert: '有 {{count}} 个工单已超出 SLA，请尽快处理',
+    slaAlertCta: '查看超时工单',
+    loadFailed: '数据加载失败',
+    retry: '重试',
+    table: {
+      subject: '主题',
+      status: '状态',
+      priority: '优先级',
+      created: '创建时间'
+    },
+    time: {
+      justNow: '刚刚',
+      minutesAgo: '{{n}} 分钟前',
+      hoursAgo: '{{n}} 小时前',
+      daysAgo: '{{n}} 天前'
+    }
+  },
+
+  // Customers page
+  customersPage: {
+    title: '客户',
+    subtitle: '查看与搜索当前范围内的客户',
+    searchPlaceholder: '搜索邮箱或外部 ID...',
+    allProducts: '全部产品',
+    columns: {
+      email: '邮箱',
+      externalId: '外部 ID',
+      level: '等级',
+      product: '产品',
+      createdAt: '创建时间'
+    },
+    total: '共 {{count}} 位客户',
+    empty: '暂无客户',
+    emptyHint: '客户提交工单后会出现在这里',
+    noResults: '没有匹配的客户',
+    noResultsHint: '请尝试调整搜索条件',
+    loadFailed: '客户数据加载失败',
+    retry: '重试',
+    detail: {
+      title: '客户详情',
+      email: '邮箱',
+      externalId: '外部 ID',
+      level: '客户等级',
+      product: '产品',
+      createdAt: '创建时间',
+      updatedAt: '更新时间',
+      viewTickets: '查看该客户的工单'
+    }
+  },
+
+  // Email configuration page
+  emailConfig: {
+    title: '邮件配置',
+    subtitle: '按产品配置邮件收发、模板与日志',
+    selectProduct: '选择产品',
+    noProducts: '暂无产品',
+    noProductsHint: '请先在系统管理中创建产品',
+    loadFailed: '邮件配置加载失败',
+    retry: '重试',
+    save: '保存设置',
+    saved: '邮件设置已保存',
+    saveFailed: '保存失败',
+    tabs: {
+      settings: '设置',
+      templates: '模板',
+      logs: '日志'
+    },
+    inbound: {
+      title: '接收邮件',
+      description: '通过 Webhook 接收客户邮件并自动创建工单',
+      enabled: '启用接收',
+      provider: '接收服务商',
+      providerGeneric: '通用 Webhook',
+      address: '接收邮箱地址',
+      addressPlaceholder: 'support@yourcompany.com',
+      webhookSecret: 'Webhook 密钥',
+      secretConfigured: '密钥已配置',
+      secretNotConfigured: '尚未生成密钥',
+      regenerate: '重新生成',
+      generate: '生成密钥',
+      saveFirst: '请先保存配置后再生成密钥',
+      secretDialogTitle: '新的 Webhook 密钥',
+      secretDialogWarning: '此密钥仅显示一次，请立即复制并妥善保存。旧密钥已失效。',
+      copySecret: '复制密钥',
+      copied: '已复制到剪贴板',
+      regenerateFailed: '密钥生成失败'
+    },
+    outbound: {
+      title: '发送邮件',
+      description: '客服回复时自动向客户发送邮件通知',
+      enabled: '启用发送',
+      provider: '发送服务商',
+      apiKey: 'API 密钥',
+      apiKeyPlaceholder: '输入 API 密钥',
+      apiKeyConfigured: '已配置 — 留空保持不变',
+      smtpHost: 'SMTP 主机',
+      smtpHostPlaceholder: 'smtp.example.com',
+      smtpPort: 'SMTP 端口',
+      smtpUser: 'SMTP 用户名',
+      smtpPass: 'SMTP 密码',
+      smtpPassPlaceholder: '输入 SMTP 密码',
+      smtpPassConfigured: '已配置 — 留空保持不变',
+      senderName: '发件人名称',
+      senderNamePlaceholder: '客服团队',
+      senderEmail: '发件人邮箱',
+      senderEmailPlaceholder: 'support@yourcompany.com',
+      replyTo: '回复地址（可选）',
+      replyToPlaceholder: 'replies@yourcompany.com',
+      testSend: '发送测试邮件',
+      testDialogTitle: '发送测试邮件',
+      testDialogDesc: '向指定邮箱发送一封测试邮件以验证发送配置。',
+      testRecipient: '收件邮箱',
+      testRecipientPlaceholder: 'your-email@example.com',
+      testSent: '测试邮件已发送',
+      testFailed: '测试邮件发送失败',
+      testSaveFirst: '请先保存并启用发送配置'
+    },
+    aiFilter: {
+      title: 'AI 过滤',
+      description: '使用 AI 过滤垃圾邮件和非工单邮件',
+      enabled: '启用 AI 过滤',
+      strictness: '过滤严格度',
+      low: '低 - 更宽松',
+      medium: '中 - 平衡',
+      high: '高 - 更严格'
+    },
+    templates: {
+      heading: '邮件模板',
+      hint: '未创建的类型将使用系统默认模板',
+      enabled: '已启用',
+      disabled: '已禁用',
+      notCreated: '未创建',
+      edit: '编辑',
+      create: '创建',
+      editTitle: '编辑邮件模板',
+      createTitle: '创建邮件模板',
+      subject: '主题模板',
+      subjectPlaceholder: '[Ticket #{{ticket_id}}] {{subject}}',
+      body: '正文模板（HTML）',
+      bodyPlaceholder: '输入 HTML 模板内容...',
+      enabledLabel: '启用此模板',
+      variablesHint: '可用变量（使用 {{variable}} 语法）：',
+      saved: '模板已保存',
+      saveFailed: '模板保存失败',
+      required: '请填写主题和正文'
+    },
+    logs: {
+      inbound: '接收记录',
+      outbound: '发送记录',
+      from: '发件人',
+      to: '收件人',
+      subject: '主题',
+      status: '状态',
+      time: '时间',
+      provider: '服务商',
+      empty: '暂无日志',
+      emptyHint: '邮件收发记录将显示在这里',
+      loadFailed: '日志加载失败',
+      showError: '查看错误',
+      hideError: '收起错误',
+      statuses: {
+        pending: '待处理',
+        processed: '已处理',
+        filtered: '已过滤',
+        error: '错误',
+        sent: '已发送',
+        delivered: '已送达',
+        bounced: '已退回',
+        failed: '失败'
+      }
+    },
+    templateTypes: {
+      ticket_created: '工单已创建',
+      ticket_replied: '工单已回复',
+      ticket_closed: '工单已关闭',
+      ticket_escalated: '工单已升级'
+    }
+  },
+
+  // Notification channels page
+  notifChannels: {
+    title: '通知渠道',
+    subtitle: '按产品配置工单事件的通知推送',
+    selectProduct: '选择产品',
+    noProducts: '暂无产品',
+    noProductsHint: '请先在系统管理中创建产品',
+    loadFailed: '通知渠道加载失败',
+    retry: '重试',
+    empty: '暂无通知渠道',
+    emptyHint: '创建渠道以接收工单事件通知',
+    addChannel: '新建渠道',
+    editChannel: '编辑渠道',
+    name: '渠道名称',
+    namePlaceholder: '例如：值班通知',
+    type: '渠道类型',
+    enabled: '启用',
+    triggerEvents: '触发事件',
+    eventsRequired: '请至少选择一个触发事件',
+    nameRequired: '请填写渠道名称',
+    configRequired: '请填写必填配置项',
+    created: '渠道已创建',
+    updated: '渠道已更新',
+    deleted: '渠道已删除',
+    actionFailed: '操作失败',
+    deleteTitle: '删除渠道',
+    deleteMessage: '确定删除渠道"{{name}}"？此操作不可撤销。',
+    types: {
+      email: '邮件',
+      pushdeer: 'PushDeer',
+      bark: 'Bark',
+      ntfy: 'ntfy',
+      telegram: 'Telegram',
+      discord: 'Discord'
+    },
+    events: {
+      ticket_created: '工单创建',
+      ticket_assigned: '工单分配',
+      ticket_reassigned: '工单重新分配',
+      ticket_escalated: '工单升级',
+      ticket_expiring: 'SLA 即将超时',
+      customer_replied: '客户回复',
+      ticket_closed: '工单关闭'
+    },
+    fields: {
+      email: '通知邮箱',
+      pushkey: 'PushKey',
+      deviceKey: 'Device Key',
+      topic: 'Topic',
+      botToken: 'Bot Token',
+      chatId: 'Chat ID',
+      webhookUrl: 'Webhook URL',
+      serverUrl: '服务器地址（可选）'
+    }
+  },
+
+  // AI task configuration page
+  aiConfig: {
+    title: 'AI 配置',
+    subtitle: '为各 AI 任务配置模型服务商与密钥',
+    noAccess: '无访问权限',
+    noAccessHint: '只有超级管理员可以管理 AI 配置',
+    loadFailed: 'AI 配置加载失败',
+    retry: '重试',
+    notConfigured: '未配置',
+    configured: '已配置',
+    enabled: '启用',
+    provider: '服务商',
+    model: '模型',
+    modelPlaceholder: '例如：gpt-4o-mini',
+    apiKey: 'API 密钥',
+    apiKeyPlaceholder: '输入 API 密钥',
+    apiKeyConfigured: '已配置 — 留空保持不变',
+    baseUrl: '自定义 API 地址（可选）',
+    baseUrlPlaceholder: 'https://api.example.com/v1',
+    save: '保存',
+    saved: '配置已保存',
+    saveFailed: '保存失败',
+    apiKeyRequired: '首次配置需填写 API 密钥',
+    modelRequired: '请填写模型名称',
+    tasks: {
+      agent: 'AI 助手',
+      agentHint: '管理后台的 AI 对话助手',
+      prescreening: '工单预审',
+      prescreeningHint: '自动审查新工单内容',
+      prereply: '预回复生成',
+      prereplyHint: '为客服生成建议回复',
+      embedding: '向量嵌入',
+      embeddingHint: '知识库向量化检索'
+    },
+    providers: {
+      openai: 'OpenAI',
+      anthropic: 'Anthropic',
+      google: 'Google AI',
+      xai: 'xAI (Grok)',
+      deepseek: 'DeepSeek'
+    }
   },
 
   // Tickets
@@ -104,7 +388,13 @@ export const zh = {
       total: '共 {{count}} 条',
       selected: '已选 {{count}} 条',
       noTickets: '暂无工单',
-      noTicketsHint: '当前筛选条件下没有工单'
+      noTicketsHint: '当前筛选条件下没有工单',
+      pageOf: '第 {{page}} / {{total}} 页',
+      searchPlaceholder: '搜索主题、邮箱或工单号...',
+      loadError: '工单加载失败',
+      retry: '重试',
+      clearSelection: '取消选择',
+      unassigned: '未分配'
     },
     detail: {
       title: '工单详情',
@@ -123,7 +413,18 @@ export const zh = {
       replies: '回复记录',
       history: '操作历史',
       noReplies: '暂无回复',
-      internalNote: '内部备注'
+      internalNote: '内部备注',
+      notFound: '工单不存在或无权访问',
+      openFull: '全页打开',
+      backToList: '返回列表',
+      acceptDeadline: '接单截止',
+      replyDeadline: '回复截止',
+      slaRemaining: '剩余 {{time}}',
+      slaOverdue: '已超时',
+      selectTicket: '选择一个工单',
+      selectTicketHint: '从左侧列表选择工单查看详情',
+      agentReply: '客服',
+      customerReply: '客户'
     },
     actions: {
       reply: '回复',
@@ -141,7 +442,22 @@ export const zh = {
       closePlaceholder: '请说明关闭原因',
       changePriority: '修改优先级',
       priorityReason: '修改原因',
-      priorityPlaceholder: '请说明修改原因'
+      priorityPlaceholder: '请说明修改原因',
+      changeStatus: '修改状态',
+      selectTeam: '选择团队',
+      selectAgent: '选择坐席',
+      noAgents: '该团队暂无可用坐席',
+      agentsLoadError: '坐席列表加载失败',
+      replyHint: 'Cmd+Enter 发送',
+      replySent: '回复已发送',
+      noteSaved: '内部备注已保存',
+      assignSuccess: '分配成功',
+      escalateSuccess: '工单已升级',
+      closeSuccess: '工单已关闭',
+      statusUpdated: '状态已更新',
+      priorityUpdated: '优先级已更新',
+      closeConfirmTitle: '关闭工单',
+      closeConfirmMessage: '确定要关闭该工单吗？关闭后客户将无法继续回复。'
     },
     bulk: {
       assign: '批量分配',
@@ -150,7 +466,12 @@ export const zh = {
       closeTitle: '批量关闭工单',
       assignHint: '将选中的 {{count}} 个工单分配给指定坐席',
       closeHint: '关闭选中的 {{count}} 个工单',
-      defaultCloseReason: '批量关闭'
+      defaultCloseReason: '批量关闭',
+      setStatus: '批量状态',
+      statusTitle: '批量修改状态',
+      statusHint: '修改选中的 {{count}} 个工单的状态',
+      result: '成功 {{ok}} 个，失败 {{fail}} 个',
+      failedItem: '工单 {{id}}：{{error}}'
     },
     historyActions: {
       created: '创建工单',
@@ -163,7 +484,12 @@ export const zh = {
       closed: '关闭工单',
       auto_closed: '自动关闭',
       agent_replied: '客服回复',
-      customer_replied: '客户回复'
+      customer_replied: '客户回复',
+      assigned: '已分配',
+      reassigned: '重新分配',
+      status_changed: '状态变更',
+      priority_changed: '优先级变更',
+      internal_note: '内部备注'
     }
   },
 
@@ -189,7 +515,7 @@ export const zh = {
     password: '密码',
     passwordPlaceholder: '••••••••',
     securityVerify: '安全验证',
-    noTurnstile: '未配置 Turnstile（VITE_TURNSTILE_SITE_KEY），将跳过验证码',
+    noTurnstile: '未配置 Turnstile（NEXT_PUBLIC_TURNSTILE_SITE_KEY），将跳过验证码',
     loginFailed: '登录失败，请检查账号或稍后重试',
     turnstileError: '验证码加载失败，请刷新页面重试',
     footer: 'OnFire · 现代化客服工单系统'
@@ -229,24 +555,40 @@ export const zh = {
   // Management
   management: {
     title: '系统管理',
-    subtitle: '管理租户、产品、团队、模板和用户',
+    subtitle: '管理租户、产品、团队、模板、用户、坐席、类目路由与 API Key',
     perPage: '条/页',
     noAccess: '无{{type}}管理权限',
     noData: '暂无{{type}}数据',
+    noPermission: '您没有权限访问系统管理功能',
+    loadFailed: '数据加载失败',
+    retry: '重试',
+    fieldRequired: '该字段必填',
+    invalidNumber: '请输入正整数',
+    toastCreated: '创建成功',
+    toastUpdated: '保存成功',
+    toastDeleted: '删除成功',
+    toastCopied: '已复制到剪贴板',
 
     tabs: {
       tenants: '租户',
       products: '产品',
       teams: '团队',
       templates: '模板',
-      users: '用户'
+      users: '用户',
+      agents: '坐席',
+      categoryRoutes: '类目路由',
+      apiKeys: 'API Key'
     },
 
     tenants: {
       create: '新建租户',
       namePlaceholder: '租户名称',
       nameRequired: '请输入租户名称',
-      edit: '编辑租户'
+      edit: '编辑租户',
+      description: '管理顶级租户及其默认兜底团队',
+      name: '名称',
+      defaultTeam: '默认团队',
+      noDefaultTeam: '无'
     },
 
     products: {
@@ -262,7 +604,19 @@ export const zh = {
       slaLowAccept: '低-接单',
       slaLowReply: '低-回复',
       bindTeams: '绑定团队（逗号分隔ID）',
-      bindTeamsPlaceholder: 'team-a,team-b'
+      bindTeamsPlaceholder: 'team-a,team-b',
+      description: '管理产品、SLA 策略与自动关闭行为',
+      name: '名称',
+      tenant: '租户',
+      selectTenant: '选择租户',
+      slaPolicy: 'SLA 策略（分钟）',
+      slaHint: '留空表示禁用对应的 SLA 计时',
+      accept: '接单',
+      reply: '回复',
+      autoClose: '自动关闭（分钟）',
+      autoCloseHint: '客户在指定分钟内未回复时自动关闭已回复的工单，留空禁用',
+      slaNone: '未配置 SLA',
+      autoCloseOff: '关闭'
     },
 
     teams: {
@@ -270,7 +624,12 @@ export const zh = {
       namePlaceholder: '团队名称',
       nameRequired: '请输入团队名称',
       edit: '编辑团队',
-      allowReassign: '允许重分配'
+      allowReassign: '允许重分配',
+      description: '管理团队、重派策略与产品关联',
+      name: '名称',
+      members: '成员数',
+      bindProducts: '关联产品',
+      noProducts: '暂无可关联产品'
     },
 
     templates: {
@@ -295,6 +654,13 @@ export const zh = {
       saveChanges: '保存修改',
       cancelEdit: '取消编辑',
       schemaPreview: 'Schema 预览',
+      description: '管理产品的工单模板与表单结构',
+      product: '产品',
+      selectProduct: '选择产品',
+      categories: '分类',
+      categoriesHint: '使用英文逗号分隔多个分类',
+      fields: '字段数',
+      editSchema: '编辑表单 Schema',
       types: {
         text: '文本',
         textarea: '多行文本',
@@ -314,7 +680,22 @@ export const zh = {
       noKeys: '暂无 Key',
       revoked: '已吊销',
       rotate: '重置',
-      revoke: '吊销'
+      revoke: '吊销',
+      description: '管理客户门户与 SDK 访问的 API Key',
+      create: '新建 API Key',
+      name: '名称',
+      product: '产品',
+      selectProduct: '选择产品',
+      allProducts: '全部产品',
+      createdAt: '创建时间',
+      lastUsed: '最近使用',
+      neverUsed: '从未使用',
+      active: '可用',
+      secretTitle: 'API Key 已创建',
+      rotatedTitle: 'API Key 已重置',
+      secretWarning: '请立即复制保存，该密钥不会再次显示。',
+      rotateConfirm: '重置后当前密钥立即失效，正在使用它的客户端将无法访问。确认继续？',
+      unrevoke: '恢复'
     },
 
     categoryRoutes: {
@@ -328,7 +709,17 @@ export const zh = {
       edit: '编辑类目路由',
       targetTeam: '目标团队ID',
       change: '改',
-      delete: '删'
+      delete: '删',
+      description: '将工单类目路由到处理团队',
+      hint: '路由规则驱动自动分配：命中类目（及可选子类目）的工单将分配给目标团队，未命中时回落到租户默认团队。',
+      create: '新增路由',
+      product: '产品',
+      selectProduct: '选择产品',
+      allProducts: '全部产品',
+      category: '类目',
+      subcategory: '子类目',
+      team: '目标团队',
+      selectTeam: '选择团队'
     },
 
     users: {
@@ -337,7 +728,20 @@ export const zh = {
       editRole: '编辑用户角色',
       role: '角色',
       selectRole: '选择角色',
-      displayName: '显示名'
+      displayName: '显示名',
+      description: '管理用户账号与角色',
+      create: '新建用户',
+      edit: '编辑用户',
+      email: '邮箱',
+      emailInvalid: '请输入有效邮箱',
+      tenant: '租户',
+      roles: {
+        superAdmin: '超级管理员',
+        tenantAdmin: '租户管理员',
+        productAdmin: '产品管理员',
+        teamAdmin: '团队管理员',
+        agent: '客服'
+      }
     },
 
     agents: {
@@ -351,7 +755,17 @@ export const zh = {
       teamIdsPlaceholder: 'team-a,team-b',
       displayName: '显示名',
       email: '邮箱',
-      avatarUrl: '头像 URL'
+      avatarUrl: '头像 URL',
+      description: '管理坐席、等级与团队归属',
+      create: '提升为坐席',
+      user: '用户',
+      selectUser: '选择用户',
+      noEligibleUsers: '所有用户均已是坐席',
+      teams: '所属团队',
+      noTeams: '暂无可选团队',
+      levelHint: '1（初级）– 10（高级）',
+      levelInvalid: '等级须在 1-10 之间',
+      remove: '移除坐席身份'
     },
 
     customers: {
@@ -505,7 +919,19 @@ export const zh = {
       configurationError: '配置错误',
       missingCredentialsMessage: '访问此支持门户需要有效的凭证。请确保您的链接包含正确的产品 ID 和访问令牌。',
       contactProvider: '请联系您的服务提供商获取正确的访问链接。',
-      technicalDetails: '技术详情'
+      technicalDetails: '技术详情',
+      sessionExpired: '会话已过期',
+      sessionExpiredMessage: '您的访问会话已过期或不再有效。',
+      sessionExpiredHint: '请从原始链接或应用程序重新打开支持门户以继续。',
+      loadFailed: '出错了',
+      loadFailedMessage: '内容加载失败，请检查网络连接后重试。',
+      retry: '重试',
+      ticketNotFound: '未找到该工单'
+    },
+    header: {
+      support: '客户支持',
+      switchLanguage: '切换语言',
+      toggleTheme: '切换主题'
     },
     tabs: {
       submit: '提交工单',
@@ -513,6 +939,7 @@ export const zh = {
     },
     submit: {
       title: '提交工单',
+      description: '告诉我们您遇到的问题，我们的团队会尽快回复您。',
       template: '模板',
       selectTemplate: '选择模板',
       category: '分类',
@@ -520,16 +947,52 @@ export const zh = {
       subject: '主题',
       subjectPlaceholder: '简要描述您的问题',
       content: '详细描述',
-      contentPlaceholder: '请详细描述您遇到的问题'
+      contentPlaceholder: '请详细描述您遇到的问题',
+      priority: '优先级',
+      submitting: '提交中...',
+      successTitle: '工单已提交！',
+      successMessage: '我们已收到您的工单，团队会尽快与您联系。',
+      ticketIdLabel: '工单编号',
+      viewTicket: '查看工单',
+      submitAnother: '再提交一个工单',
+      requiredField: '此项为必填项',
+      invalidFormat: '格式不正确',
+      fillRequired: '请填写所有必填项',
+      submitFailed: '工单提交失败',
+      captchaRequired: '请完成安全验证'
     },
     list: {
       noTickets: '暂无工单',
-      noTicketsHint: '提交工单后将显示在这里'
+      noTicketsHint: '提交工单后将显示在这里',
+      noTicketsFiltered: '当前状态下暂无工单',
+      filterAll: '全部',
+      refresh: '刷新',
+      loadMore: '加载更多',
+      updated: '更新于'
     },
     detail: {
       agentReply: '客服回复',
       replyPlaceholder: '输入您的回复...',
-      ticketClosed: '此工单已关闭，无法继续回复。'
+      ticketClosed: '此工单已关闭，无法继续回复。',
+      back: '返回我的工单',
+      you: '我',
+      support: '客服',
+      created: '创建于',
+      conversation: '对话记录',
+      sendReply: '发送回复',
+      sending: '发送中...',
+      replyShortcutHint: '按 ⌘/Ctrl + Enter 发送',
+      replySent: '回复已发送',
+      replyFailed: '回复发送失败',
+      backInProcessing: '您的工单已重新进入处理中',
+      escalate: '升级工单',
+      escalateTitle: '确认升级此工单？',
+      escalateDescription: '工单将转交给更高级别的客服人员处理。如果您认为问题未得到有效解决，可以使用此功能。',
+      escalateReasonLabel: '原因（可选）',
+      escalateReasonPlaceholder: '简要说明您希望升级的原因...',
+      escalateConfirm: '确认升级',
+      escalateSuccess: '工单已升级',
+      escalateFailed: '工单升级失败'
     }
   },
 

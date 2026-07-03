@@ -227,7 +227,9 @@ export type Permission =
   | "customer.read"
   | "customer.write"
   | "category.map"
-  | "agent.profile";
+  | "agent.profile"
+  | "email.config"
+  | "notification.manage";
 
 export const rolePermissions: Record<Role, Permission[]> = {
   [Role.SuperAdmin]: [
@@ -248,6 +250,8 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "customer.write",
     "category.map",
     "agent.profile",
+    "email.config",
+    "notification.manage",
   ],
   [Role.TenantAdmin]: [
     "ticket.read",
@@ -266,6 +270,8 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "customer.write",
     "category.map",
     "agent.profile",
+    "email.config",
+    "notification.manage",
   ],
   [Role.ProductAdmin]: [
     "ticket.read",
@@ -281,6 +287,8 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "customer.write",
     "category.map",
     "agent.profile",
+    "email.config",
+    "notification.manage",
   ],
   [Role.TeamAdmin]: [
     "ticket.read",

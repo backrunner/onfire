@@ -1,73 +1,58 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { getAuth } from "@/lib/auth";
-import { resolveUserContext } from "@/lib/api-utils";
-import { tickets, history } from "@/drizzle/schema";
-import { hasPermission, Role, TicketPriority } from "@/lib/types";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { eq } from "drizzle-orm";
+import { tickets, history, products } from "@/drizzle/schema";
+import { TicketPriority } from "@/lib/types";
+import { ok, notFound, badRequest } from "@/lib/api/response";
+import { withAuth, parseBody } from "@/lib/api/handler";
+import { assertTicketVisible } from "@/lib/api/scope";
+import { serializeTicket } from "@/lib/tickets/serialize";
+import { isOpen } from "@/lib/tickets/state-machine";
+import { computeSlaDeadlines } from "@/lib/tickets/sla";
 
-const validPriorities = Object.values(TicketPriority);
+const prioritySchema = z.object({
+  priority: z.enum(TicketPriority),
+});
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const auth = getAuth();
-    const session = await auth.api.getSession({ headers: request.headers });
+/**
+ * POST /api/tob/tickets/:id/priority — change priority.
+ * SLA deadlines are recomputed from the new priority's policy, anchored at
+ * the original creation time so changing priority never extends deadlines
+ * for an old ticket.
+ */
+export const POST = withAuth({ permission: "ticket.write" }, async (req: NextRequest, ctx) => {
+  const ticket = await ctx.db.query.tickets.findFirst({
+    where: eq(tickets.id, ctx.params.id),
+  });
+  if (!ticket) throw notFound("Ticket not found");
+  assertTicketVisible(ctx, ticket);
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+  if (!isOpen(ticket.status)) {
+    throw badRequest("Cannot change priority of a closed ticket");
+  }
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
+  const body = await parseBody(req, prioritySchema);
+  if (ticket.priority === body.priority) {
+    throw badRequest("Priority unchanged");
+  }
 
-    if (!ctx) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
+  const product = await ctx.db.query.products.findFirst({
+    where: eq(products.id, ticket.productId),
+  });
+  const slaUpdate = product
+    ? computeSlaDeadlines(product, body.priority, new Date(ticket.createdAt))
+    : {};
 
-    if (!hasPermission(ctx.user.role as Role, "ticket.write")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
+  const now = new Date().toISOString();
 
-    const ticket = await db.query.tickets.findFirst({ where: eq(tickets.id, id) });
-
-    if (!ticket) {
-      return NextResponse.json({ ok: false, error: "Ticket not found" }, { status: 404 });
-    }
-
-    if (!ctx.tenantIds.includes(ticket.tenantId)) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const body = (await request.json()) as { priority: TicketPriority };
-
-    if (!body.priority || !validPriorities.includes(body.priority)) {
-      return NextResponse.json(
-        { ok: false, error: `Invalid priority. Must be one of: ${validPriorities.join(", ")}` },
-        { status: 400 }
-      );
-    }
-
-    if (ticket.priority === body.priority) {
-      return NextResponse.json({ ok: false, error: "Priority unchanged" }, { status: 400 });
-    }
-
-    const now = new Date().toISOString();
-
-    await db
+  await ctx.db.batch([
+    ctx.db
       .update(tickets)
-      .set({
-        priority: body.priority,
-        updatedAt: now,
-      })
-      .where(eq(tickets.id, id));
-
-    await db.insert(history).values({
+      .set({ priority: body.priority, updatedAt: now, ...slaUpdate })
+      .where(eq(tickets.id, ticket.id)),
+    ctx.db.insert(history).values({
       id: crypto.randomUUID(),
-      ticketId: id,
+      ticketId: ticket.id,
       actorId: ctx.user.id,
       action: "priority_changed",
       snapshot: JSON.stringify({
@@ -75,13 +60,11 @@ export async function POST(
         newPriority: body.priority,
       }),
       createdAt: now,
-    });
+    }),
+  ]);
 
-    const updated = await db.query.tickets.findFirst({ where: eq(tickets.id, id) });
-
-    return NextResponse.json({ ok: true, data: { ticket: updated } });
-  } catch (error) {
-    console.error("Error in POST /api/tob/tickets/[id]/priority:", error);
-    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
-  }
-}
+  const updated = await ctx.db.query.tickets.findFirst({
+    where: eq(tickets.id, ticket.id),
+  });
+  return ok({ ticket: updated ? serializeTicket(updated) : null });
+});

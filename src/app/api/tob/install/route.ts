@@ -1,136 +1,98 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { getAuth } from "@/lib/auth";
 import { users, tenants, teams } from "@/drizzle/schema";
 import { Role } from "@/lib/types";
+import { ok, ApiError, badRequest } from "@/lib/api/response";
+import { withPublic, parseBody } from "@/lib/api/handler";
 
-// GET /api/tob/install/status - Check if installation is needed
-export async function GET() {
+// GET /api/tob/install - Check if installation is needed
+export const GET = withPublic(async (_req: NextRequest, ctx) => {
+  let needsInstall: boolean;
   try {
-    const db = getDb();
-
-    // Check if any users exist
-    const existingUsers = await db.select().from(users).limit(1);
-
-    return NextResponse.json({
-      ok: true,
-      data: {
-        needsInstall: existingUsers.length === 0,
-      },
-    });
+    const existingUsers = await ctx.db.select().from(users).limit(1);
+    needsInstall = existingUsers.length === 0;
   } catch (error) {
-    // If table doesn't exist, installation is needed
+    // If the table doesn't exist yet, installation is needed
     const errorMessage = String(error);
     if (errorMessage.includes("no such table") || errorMessage.includes("SQLITE_ERROR")) {
-      return NextResponse.json({
-        ok: true,
-        data: {
-          needsInstall: true,
-        },
-      });
+      needsInstall = true;
+    } else {
+      throw error;
     }
-
-    console.error("Error in GET /api/tob/install:", error);
-    return NextResponse.json(
-      { ok: false, error: "Internal server error" },
-      { status: 500 }
-    );
   }
-}
 
-// POST /api/tob/install/finalize - Complete installation
-export async function POST(request: NextRequest) {
-  try {
-    const db = getDb();
-    const auth = getAuth();
+  return ok({ needsInstall });
+});
 
-    // Check if already installed
-    const existingUsers = await db.select().from(users).limit(1);
-    if (existingUsers.length > 0) {
-      return NextResponse.json(
-        { ok: false, error: "Already installed" },
-        { status: 400 }
-      );
-    }
+const installSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8).max(128),
+  displayName: z.string().min(1).max(100).optional(),
+  tenantName: z.string().min(1).max(100),
+});
 
-    const body = (await request.json()) as {
-      email?: string;
-      password?: string;
-      displayName?: string;
-      tenantName?: string;
-    };
-    const { email, password, displayName, tenantName } = body;
+// POST /api/tob/install - Complete installation
+export const POST = withPublic(async (req: NextRequest, ctx) => {
+  const db = ctx.db;
+  const auth = getAuth();
 
-    if (!email || !password || !tenantName) {
-      return NextResponse.json(
-        { ok: false, error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
+  // Check if already installed
+  const existingUsers = await db.select().from(users).limit(1);
+  if (existingUsers.length > 0) {
+    throw badRequest("Already installed");
+  }
 
-    // Create tenant
-    const tenantId = crypto.randomUUID();
-    await db.insert(tenants).values({
-      id: tenantId,
-      name: tenantName,
-    });
+  const { email, password, displayName, tenantName } = await parseBody(req, installSchema);
 
-    // Create default team
-    const teamId = crypto.randomUUID();
-    await db.insert(teams).values({
-      id: teamId,
-      tenantId,
-      name: "Default Team",
-      allowReassign: true,
-    });
+  // Create tenant
+  const tenantId = crypto.randomUUID();
+  await db.insert(tenants).values({
+    id: tenantId,
+    name: tenantName,
+  });
 
-    // Update tenant with default team
-    await db
-      .update(tenants)
-      .set({ defaultTeamId: teamId })
-      .where(eq(tenants.id, tenantId));
+  // Create default team
+  const teamId = crypto.randomUUID();
+  await db.insert(teams).values({
+    id: teamId,
+    tenantId,
+    name: "Default Team",
+    allowReassign: true,
+  });
 
-    // Create user via Better Auth
-    const signUpResult = await auth.api.signUpEmail({
-      body: {
-        email,
-        password,
-        name: displayName || email.split("@")[0],
-      },
-    });
+  // Update tenant with default team
+  await db
+    .update(tenants)
+    .set({ defaultTeamId: teamId })
+    .where(eq(tenants.id, tenantId));
 
-    if (!signUpResult?.user) {
-      return NextResponse.json(
-        { ok: false, error: "Failed to create user" },
-        { status: 500 }
-      );
-    }
-
-    // Create user profile with SuperAdmin role
-    await db.insert(users).values({
-      id: signUpResult.user.id,
+  // Create user via Better Auth
+  const signUpResult = await auth.api.signUpEmail({
+    body: {
       email,
-      displayName: displayName || email.split("@")[0],
-      tenantId,
-      role: Role.SuperAdmin,
-    });
+      password,
+      name: displayName || email.split("@")[0],
+    },
+  });
 
-    return NextResponse.json({
-      ok: true,
-      data: {
-        userId: signUpResult.user.id,
-        tenantId,
-        teamId,
-      },
-    });
-  } catch (error) {
-    console.error("Error in POST /api/tob/install:", error);
-    return NextResponse.json(
-      { ok: false, error: "Internal server error" },
-      { status: 500 }
-    );
+  if (!signUpResult?.user) {
+    throw new ApiError(500, "Failed to create user");
   }
-}
 
-// Need to import eq for the update query
-import { eq } from "drizzle-orm";
+  // Create user profile with SuperAdmin role
+  await db.insert(users).values({
+    id: signUpResult.user.id,
+    email,
+    displayName: displayName || email.split("@")[0],
+    tenantId,
+    role: Role.SuperAdmin,
+  });
+
+  return ok({
+    userId: signUpResult.user.id,
+    tenantId,
+    teamId,
+  });
+});

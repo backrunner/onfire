@@ -1,135 +1,77 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { getAuth } from "@/lib/auth";
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { users, agents, agentTeams } from "@/drizzle/schema";
-import { hasPermission, Role } from "@/lib/types";
-import { eq, inArray } from "drizzle-orm";
-import { resolveUserContext, canManageRole } from "@/lib/api-utils";
+import { ok, badRequest, forbidden } from "@/lib/api/response";
+import { withAuth, parseBody } from "@/lib/api/handler";
+import { tenantCondition } from "@/lib/api/scope";
+import { canManageRole } from "@/lib/api-utils";
+import { Role } from "@/lib/types";
 
-export async function GET(request: NextRequest) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({ headers: request.headers });
+const createUserSchema = z.object({
+  email: z.string().min(1),
+  displayName: z.string().min(1),
+  role: z.enum(Role),
+  tenantId: z.string().optional(),
+});
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+export const GET = withAuth({ permission: "user.manage" }, async (_req: NextRequest, ctx) => {
+  const userList = await ctx.db
+    .select()
+    .from(users)
+    .where(tenantCondition(ctx, users.tenantId));
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
+  const enrichedUsers = await Promise.all(
+    userList.map(async (u) => {
+      const agent = await ctx.db.query.agents.findFirst({
+        where: eq(agents.userId, u.id),
+      });
+      const teamRows = await ctx.db
+        .select({ teamId: agentTeams.teamId })
+        .from(agentTeams)
+        .where(eq(agentTeams.userId, u.id));
+      return {
+        ...u,
+        isAgent: !!agent,
+        agentLevel: agent?.level,
+        agentActive: agent?.active,
+        teamIds: teamRows.map((r) => r.teamId),
+      };
+    })
+  );
 
-    if (!ctx) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
+  return ok(enrichedUsers);
+});
 
-    if (!hasPermission(ctx.user.role as Role, "user.manage")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
+export const POST = withAuth({ permission: "user.manage" }, async (req: NextRequest, ctx) => {
+  const body = await parseBody(req, createUserSchema);
 
-    const userList = await db
-      .select()
-      .from(users)
-      .where(inArray(users.tenantId, ctx.tenantIds));
-
-    // Get agent info for each user
-    const enrichedUsers = await Promise.all(
-      userList.map(async (u) => {
-        const agent = await db.query.agents.findFirst({
-          where: eq(agents.userId, u.id),
-        });
-        const teamRows = await db
-          .select({ teamId: agentTeams.teamId })
-          .from(agentTeams)
-          .where(eq(agentTeams.userId, u.id));
-        return {
-          ...u,
-          isAgent: !!agent,
-          agentLevel: agent?.level,
-          agentActive: agent?.active,
-          teamIds: teamRows.map((r) => r.teamId),
-        };
-      })
-    );
-
-    return NextResponse.json({ ok: true, data: enrichedUsers });
-  } catch (error) {
-    console.error("Error in GET /api/tob/admin/users:", error);
-    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
+  // SuperAdmin may create a user in any tenant; others only in their own.
+  const tenantId = body.tenantId ?? ctx.user.tenantId;
+  if (!ctx.isSuperAdmin && !ctx.tenantIds.includes(tenantId)) {
+    throw badRequest("Invalid tenantId");
   }
-}
 
-export async function POST(request: NextRequest) {
-  try {
-    const auth = getAuth();
-    const session = await auth.api.getSession({ headers: request.headers });
-
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
-
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
-
-    if (!ctx) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
-
-    if (!hasPermission(ctx.user.role as Role, "user.manage")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const body = (await request.json()) as {
-      email: string;
-      displayName: string;
-      role: Role;
-      tenantId?: string;
-    };
-
-    if (!body.email || !body.displayName || !body.role) {
-      return NextResponse.json(
-        { ok: false, error: "email, displayName, and role are required" },
-        { status: 400 }
-      );
-    }
-
-    const tenantId = body.tenantId || ctx.tenantIds[0];
-
-    if (!ctx.tenantIds.includes(tenantId)) {
-      return NextResponse.json({ ok: false, error: "Invalid tenantId" }, { status: 400 });
-    }
-
-    // Prevent privilege escalation: users can only create users with lower roles
-    if (!canManageRole(ctx.user.role as Role, body.role)) {
-      return NextResponse.json(
-        { ok: false, error: "Cannot create user with equal or higher role" },
-        { status: 403 }
-      );
-    }
-
-    // Check if email already exists
-    const existing = await db.query.users.findFirst({
-      where: eq(users.email, body.email),
-    });
-
-    if (existing) {
-      return NextResponse.json({ ok: false, error: "Email already exists" }, { status: 400 });
-    }
-
-    const id = crypto.randomUUID();
-
-    await db.insert(users).values({
-      id,
-      email: body.email,
-      displayName: body.displayName,
-      role: body.role,
-      tenantId,
-    });
-
-    const created = await db.query.users.findFirst({ where: eq(users.id, id) });
-
-    return NextResponse.json({ ok: true, data: created }, { status: 201 });
-  } catch (error) {
-    console.error("Error in POST /api/tob/admin/users:", error);
-    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
+  // Prevent privilege escalation: users can only create users with lower roles.
+  if (!canManageRole(ctx.role, body.role)) {
+    throw forbidden("Cannot create user with equal or higher role");
   }
-}
+
+  const existing = await ctx.db.query.users.findFirst({
+    where: eq(users.email, body.email),
+  });
+  if (existing) throw badRequest("Email already exists");
+
+  const id = crypto.randomUUID();
+
+  await ctx.db.insert(users).values({
+    id,
+    email: body.email,
+    displayName: body.displayName,
+    role: body.role,
+    tenantId,
+  });
+
+  const created = await ctx.db.query.users.findFirst({ where: eq(users.id, id) });
+  return ok(created, 201);
+});

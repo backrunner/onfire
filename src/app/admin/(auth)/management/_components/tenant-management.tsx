@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useMemo, useState } from "react";
+import useSWR from "swr";
+import { toast } from "sonner";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { api, swrFetcher } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -16,14 +19,27 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DeleteConfirmDialog } from "./delete-confirm-dialog";
+import {
+  EmptyState,
+  ErrorState,
+  FormField,
+  ManagerPanel,
+  RowActions,
+  TableSkeleton,
+  errorMessage,
+} from "./manager-ui";
 
 interface Tenant {
   id: string;
@@ -31,222 +47,223 @@ interface Tenant {
   defaultTeamId?: string | null;
 }
 
+interface Team {
+  id: string;
+  tenantId: string;
+  name: string;
+}
+
+const NONE = "__none__";
+
 export function TenantManagement() {
   const { t } = useI18n();
-  const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [loading, setLoading] = useState(true);
+  const m = t.management;
+
+  const {
+    data: tenants,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR<Tenant[]>("/api/tob/admin/tenants", swrFetcher);
+  const { data: teams } = useSWR<Team[]>("/api/tob/admin/teams", swrFetcher);
+
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
-  const [deletingTenant, setDeletingTenant] = useState<Tenant | null>(null);
-  const [formData, setFormData] = useState({ name: "", defaultTeamId: "" });
-  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<Tenant | null>(null);
+  const [deleting, setDeleting] = useState<Tenant | null>(null);
+  const [form, setForm] = useState({ name: "", defaultTeamId: NONE });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [pending, setPending] = useState(false);
 
-  const fetchTenants = useCallback(async () => {
-    try {
-      const res = await fetch("/api/tob/admin/tenants");
-      const data = (await res.json()) as { ok: boolean; data: Tenant[] };
-      if (data.ok) {
-        setTenants(data.data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch tenants:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const teamNames = useMemo(
+    () => new Map((teams ?? []).map((team) => [team.id, team.name])),
+    [teams]
+  );
 
-  useEffect(() => {
-    fetchTenants();
-  }, [fetchTenants]);
-
-  const handleCreate = () => {
-    setEditingTenant(null);
-    setFormData({ name: "", defaultTeamId: "" });
+  const openCreate = () => {
+    setEditing(null);
+    setForm({ name: "", defaultTeamId: NONE });
+    setFormErrors({});
     setDialogOpen(true);
   };
 
-  const handleEdit = (tenant: Tenant) => {
-    setEditingTenant(tenant);
-    setFormData({
-      name: tenant.name,
-      defaultTeamId: tenant.defaultTeamId || "",
-    });
+  const openEdit = (tenant: Tenant) => {
+    setEditing(tenant);
+    setForm({ name: tenant.name, defaultTeamId: tenant.defaultTeamId || NONE });
+    setFormErrors({});
     setDialogOpen(true);
   };
 
-  const handleDelete = (tenant: Tenant) => {
-    setDeletingTenant(tenant);
-    setDeleteDialogOpen(true);
-  };
+  const handleSubmit = async () => {
+    const errors: Record<string, string> = {};
+    if (!form.name.trim()) errors.name = m.tenants.nameRequired;
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
 
-  const handleSave = async () => {
-    if (!formData.name.trim()) return;
-
-    setSaving(true);
+    setPending(true);
     try {
-      const url = editingTenant
-        ? `/api/tob/admin/tenants/${editingTenant.id}`
-        : "/api/tob/admin/tenants";
-      const method = editingTenant ? "PATCH" : "POST";
-
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: formData.name,
-          defaultTeamId: formData.defaultTeamId || null,
-        }),
-      });
-
-      if (res.ok) {
-        setDialogOpen(false);
-        fetchTenants();
+      if (editing) {
+        await api.patch(`/api/tob/admin/tenants/${editing.id}`, {
+          name: form.name.trim(),
+          defaultTeamId: form.defaultTeamId === NONE ? null : form.defaultTeamId,
+        });
+        toast.success(m.toastUpdated);
+      } else {
+        await api.post("/api/tob/admin/tenants", {
+          name: form.name.trim(),
+          ...(form.defaultTeamId !== NONE
+            ? { defaultTeamId: form.defaultTeamId }
+            : {}),
+        });
+        toast.success(m.toastCreated);
       }
-    } catch (error) {
-      console.error("Failed to save tenant:", error);
+      setDialogOpen(false);
+      await mutate();
+    } catch (err) {
+      toast.error(errorMessage(err, m.loadFailed));
     } finally {
-      setSaving(false);
+      setPending(false);
     }
   };
 
-  const handleConfirmDelete = async () => {
-    if (!deletingTenant) return;
-
+  const handleDelete = async () => {
+    if (!deleting) return;
     try {
-      const res = await fetch(`/api/tob/admin/tenants/${deletingTenant.id}`, {
-        method: "DELETE",
-      });
-
-      if (res.ok) {
-        setDeleteDialogOpen(false);
-        setDeletingTenant(null);
-        fetchTenants();
-      }
-    } catch (error) {
-      console.error("Failed to delete tenant:", error);
+      await api.delete(`/api/tob/admin/tenants/${deleting.id}`);
+      toast.success(m.toastDeleted);
+      setDeleting(null);
+      await mutate();
+    } catch (err) {
+      toast.error(errorMessage(err, m.loadFailed));
+      throw err;
     }
   };
-
-  if (loading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{t.management.tabs.tenants}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>{t.management.tabs.tenants}</CardTitle>
-          <Button size="sm" onClick={handleCreate}>
-            <Plus className="h-4 w-4 mr-1" />
-            {t.management.tenants.create}
+      <ManagerPanel
+        title={m.tabs.tenants}
+        description={m.tenants.description}
+        actions={
+          <Button size="sm" className="h-8" onClick={openCreate}>
+            <Plus className="mr-1.5 size-3.5" />
+            {m.tenants.create}
           </Button>
-        </CardHeader>
-        <CardContent>
-          {tenants.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
-              {t.management.noData.replace("{{type}}", t.management.tabs.tenants)}
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>{t.management.tenants.namePlaceholder}</TableHead>
-                  <TableHead>Default Team</TableHead>
-                  <TableHead className="w-24">{t.common.actions}</TableHead>
+        }
+      >
+        {isLoading ? (
+          <TableSkeleton />
+        ) : error ? (
+          <ErrorState onRetry={() => void mutate()} />
+        ) : !tenants || tenants.length === 0 ? (
+          <EmptyState message={m.noData.replace("{{type}}", m.tabs.tenants)} />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{m.tenants.name}</TableHead>
+                <TableHead>{m.tenants.defaultTeam}</TableHead>
+                <TableHead className="w-12" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {tenants.map((tenant) => (
+                <TableRow key={tenant.id}>
+                  <TableCell className="text-sm font-medium">
+                    {tenant.name}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {tenant.defaultTeamId
+                      ? teamNames.get(tenant.defaultTeamId) ?? tenant.defaultTeamId
+                      : m.tenants.noDefaultTeam}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <RowActions
+                      actions={[
+                        {
+                          label: t.common.edit,
+                          icon: Pencil,
+                          onSelect: () => openEdit(tenant),
+                        },
+                        {
+                          label: t.common.delete,
+                          icon: Trash2,
+                          destructive: true,
+                          separatorBefore: true,
+                          onSelect: () => setDeleting(tenant),
+                        },
+                      ]}
+                    />
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {tenants.map((tenant) => (
-                  <TableRow key={tenant.id}>
-                    <TableCell className="font-mono text-xs">{tenant.id}</TableCell>
-                    <TableCell>{tenant.name}</TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {tenant.defaultTeamId || "-"}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEdit(tenant)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(tenant)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </ManagerPanel>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+      <Dialog open={dialogOpen} onOpenChange={(open) => !pending && setDialogOpen(open)}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {editingTenant ? t.management.tenants.edit : t.management.tenants.create}
+              {editing ? m.tenants.edit : m.tenants.create}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>{t.management.tenants.namePlaceholder}</Label>
+          <div className="space-y-4 py-2">
+            <FormField
+              label={m.tenants.name}
+              htmlFor="tenant-name"
+              required
+              error={formErrors.name}
+            >
               <Input
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder={t.management.tenants.namePlaceholder}
+                id="tenant-name"
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder={m.tenants.namePlaceholder}
+                className="h-8"
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Default Team ID</Label>
-              <Input
-                value={formData.defaultTeamId}
-                onChange={(e) =>
-                  setFormData({ ...formData, defaultTeamId: e.target.value })
-                }
-                placeholder="team-xxx"
-              />
-            </div>
+            </FormField>
+            <FormField label={m.tenants.defaultTeam}>
+              <Select
+                value={form.defaultTeamId}
+                onValueChange={(v) => setForm((f) => ({ ...f, defaultTeamId: v }))}
+              >
+                <SelectTrigger className="h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>{m.tenants.noDefaultTeam}</SelectItem>
+                  {(teams ?? []).map((team) => (
+                    <SelectItem key={team.id} value={team.id}>
+                      {team.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setDialogOpen(false)}
+              disabled={pending}
+            >
               {t.common.cancel}
             </Button>
-            <Button onClick={handleSave} disabled={saving || !formData.name.trim()}>
-              {saving ? t.common.loading : t.common.save}
+            <Button size="sm" className="h-8" onClick={handleSubmit} disabled={pending}>
+              {pending ? t.common.loading : t.common.save}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <DeleteConfirmDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        itemName={deletingTenant?.name || ""}
-        onConfirm={handleConfirmDelete}
+        open={!!deleting}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        itemName={deleting?.name || ""}
+        onConfirm={handleDelete}
       />
     </>
   );

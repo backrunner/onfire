@@ -1,183 +1,80 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { getAuth } from "@/lib/auth";
-import { users, agents, agentTeams } from "@/drizzle/schema";
-import { hasPermission, Role } from "@/lib/types";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { resolveUserContext, canManageRole } from "@/lib/api-utils";
+import { users, agents, agentTeams } from "@/drizzle/schema";
+import { ok, notFound, forbidden } from "@/lib/api/response";
+import { withAuth, parseBody, type AuthedContext } from "@/lib/api/handler";
+import { canManageRole } from "@/lib/api-utils";
+import { Role } from "@/lib/types";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const auth = getAuth();
-    const session = await auth.api.getSession({ headers: request.headers });
+const updateUserSchema = z.object({
+  displayName: z.string().min(1).optional(),
+  role: z.enum(Role).optional(),
+});
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
-
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
-
-    if (!ctx) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
-
-    if (!hasPermission(ctx.user.role as Role, "user.manage")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const user = await db.query.users.findFirst({ where: eq(users.id, id) });
-
-    if (!user) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
-
-    if (!ctx.tenantIds.includes(user.tenantId)) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const agent = await db.query.agents.findFirst({ where: eq(agents.userId, id) });
-    const teamRows = await db
-      .select({ teamId: agentTeams.teamId })
-      .from(agentTeams)
-      .where(eq(agentTeams.userId, id));
-
-    return NextResponse.json({
-      ok: true,
-      data: {
-        ...user,
-        isAgent: !!agent,
-        agentLevel: agent?.level,
-        agentActive: agent?.active,
-        teamIds: teamRows.map((r) => r.teamId),
-      },
-    });
-  } catch (error) {
-    console.error("Error in GET /api/tob/admin/users/[id]:", error);
-    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
+async function loadAccessibleUser(ctx: AuthedContext, id: string) {
+  const user = await ctx.db.query.users.findFirst({ where: eq(users.id, id) });
+  // 404 for cross-tenant access to avoid leaking user existence.
+  if (!user || (!ctx.isSuperAdmin && !ctx.tenantIds.includes(user.tenantId))) {
+    throw notFound("User not found");
   }
+  return user;
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const auth = getAuth();
-    const session = await auth.api.getSession({ headers: request.headers });
+export const GET = withAuth({ permission: "user.manage" }, async (_req: NextRequest, ctx) => {
+  const user = await loadAccessibleUser(ctx, ctx.params.id);
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  const agent = await ctx.db.query.agents.findFirst({
+    where: eq(agents.userId, user.id),
+  });
+  const teamRows = await ctx.db
+    .select({ teamId: agentTeams.teamId })
+    .from(agentTeams)
+    .where(eq(agentTeams.userId, user.id));
+
+  return ok({
+    ...user,
+    isAgent: !!agent,
+    agentLevel: agent?.level,
+    agentActive: agent?.active,
+    teamIds: teamRows.map((r) => r.teamId),
+  });
+});
+
+export const PATCH = withAuth({ permission: "user.manage" }, async (req: NextRequest, ctx) => {
+  const user = await loadAccessibleUser(ctx, ctx.params.id);
+  const body = await parseBody(req, updateUserSchema);
+
+  // Prevent privilege escalation when changing roles.
+  if (body.role !== undefined) {
+    if (!canManageRole(ctx.role, body.role)) {
+      throw forbidden("Cannot assign equal or higher role");
     }
-
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
-
-    if (!ctx) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
+    if (!canManageRole(ctx.role, user.role)) {
+      throw forbidden("Cannot modify user with equal or higher role");
     }
-
-    if (!hasPermission(ctx.user.role as Role, "user.manage")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const user = await db.query.users.findFirst({ where: eq(users.id, id) });
-
-    if (!user) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
-
-    if (!ctx.tenantIds.includes(user.tenantId)) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const body = (await request.json()) as {
-      displayName?: string;
-      role?: Role;
-    };
-
-    // Prevent privilege escalation when changing roles
-    if (body.role !== undefined) {
-      // Cannot change to a role equal or higher than your own
-      if (!canManageRole(ctx.user.role as Role, body.role)) {
-        return NextResponse.json(
-          { ok: false, error: "Cannot assign equal or higher role" },
-          { status: 403 }
-        );
-      }
-      // Cannot modify users with equal or higher roles
-      if (!canManageRole(ctx.user.role as Role, user.role as Role)) {
-        return NextResponse.json(
-          { ok: false, error: "Cannot modify user with equal or higher role" },
-          { status: 403 }
-        );
-      }
-    }
-
-    await db
-      .update(users)
-      .set({
-        ...(body.displayName !== undefined && { displayName: body.displayName }),
-        ...(body.role !== undefined && { role: body.role }),
-      })
-      .where(eq(users.id, id));
-
-    const updated = await db.query.users.findFirst({ where: eq(users.id, id) });
-
-    return NextResponse.json({ ok: true, data: updated });
-  } catch (error) {
-    console.error("Error in PATCH /api/tob/admin/users/[id]:", error);
-    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
   }
-}
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const auth = getAuth();
-    const session = await auth.api.getSession({ headers: request.headers });
+  await ctx.db
+    .update(users)
+    .set({
+      ...(body.displayName !== undefined && { displayName: body.displayName }),
+      ...(body.role !== undefined && { role: body.role }),
+    })
+    .where(eq(users.id, user.id));
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+  const updated = await ctx.db.query.users.findFirst({ where: eq(users.id, user.id) });
+  return ok(updated);
+});
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
+export const DELETE = withAuth({ permission: "user.manage" }, async (_req: NextRequest, ctx) => {
+  const user = await loadAccessibleUser(ctx, ctx.params.id);
 
-    if (!ctx) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
+  await ctx.db.batch([
+    ctx.db.delete(agentTeams).where(eq(agentTeams.userId, user.id)),
+    ctx.db.delete(agents).where(eq(agents.userId, user.id)),
+    ctx.db.delete(users).where(eq(users.id, user.id)),
+  ]);
 
-    if (!hasPermission(ctx.user.role as Role, "user.manage")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const user = await db.query.users.findFirst({ where: eq(users.id, id) });
-
-    if (!user) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
-
-    if (!ctx.tenantIds.includes(user.tenantId)) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    // Delete associated records
-    await db.delete(agentTeams).where(eq(agentTeams.userId, id));
-    await db.delete(agents).where(eq(agents.userId, id));
-    await db.delete(users).where(eq(users.id, id));
-
-    return NextResponse.json({ ok: true, data: { deleted: true } });
-  } catch (error) {
-    console.error("Error in DELETE /api/tob/admin/users/[id]:", error);
-    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
-  }
-}
+  return ok({ deleted: true });
+});

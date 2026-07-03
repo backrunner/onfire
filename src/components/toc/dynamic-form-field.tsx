@@ -12,13 +12,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// Legacy schema format (for backwards compatibility)
+// Form field schema — supports both the template editor format
+// (src/lib/form-schema.ts, with `id` + option objects) and the legacy
+// format (string options, no id).
 export interface FormFieldSchema {
+  id?: string;
   key: string;
   label: string;
   type: "text" | "textarea" | "number" | "email" | "select" | "radio" | "checkbox" | "date";
   required?: boolean;
   placeholder?: string;
+  description?: string;
   options?: string[] | Array<{ label: string; value: string }>;
   helpText?: string;
   validation?: {
@@ -27,11 +31,18 @@ export interface FormFieldSchema {
     min?: number;
     max?: number;
     pattern?: string;
+    patternMessage?: string;
+  };
+  condition?: {
+    fieldId: string;
+    operator: "equals" | "notEquals" | "contains" | "isEmpty" | "isNotEmpty";
+    value?: unknown;
   };
   config?: {
     rows?: number;
     step?: number;
   };
+  defaultValue?: string | number | boolean | string[];
 }
 
 interface DynamicFormFieldProps {
@@ -201,8 +212,10 @@ export function DynamicFormField({ field, value, onChange, error }: DynamicFormF
         </Label>
       )}
       {renderField()}
-      {field.helpText && (
-        <p className="text-xs text-muted-foreground">{field.helpText}</p>
+      {(field.helpText || field.description) && (
+        <p className="text-xs text-muted-foreground">
+          {field.helpText || field.description}
+        </p>
       )}
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>

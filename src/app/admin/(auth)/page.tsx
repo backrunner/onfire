@@ -1,178 +1,252 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useI18n } from "@/lib/i18n";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import useSWR from "swr";
 import {
-  Clock,
   AlertTriangle,
   ArrowUpRight,
+  Clock,
   Package,
-  Ticket,
+  Ticket as TicketIcon,
 } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
+import { swrFetcher } from "@/lib/api/client";
+import type { DashboardResponse } from "@/lib/api/types";
+import type { Translations } from "@/locales/zh";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { StatusBadge, PriorityBadge } from "@/components/admin/status-badges";
 
-interface DashboardStats {
-  pending: number;
-  escalated: number;
-  overdue: number;
-  products: number;
-}
-
-interface RecentTicket {
-  id: string;
-  subject: string;
-  status: string;
-  priority: string;
-  createdAt: string;
+function formatRelativeTime(
+  time: Translations["dashboard"]["time"],
+  iso: string
+): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 1) return time.justNow;
+  if (minutes < 60) return time.minutesAgo.replace("{{n}}", String(minutes));
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return time.hoursAgo.replace("{{n}}", String(hours));
+  return time.daysAgo.replace("{{n}}", String(Math.floor(hours / 24)));
 }
 
 export default function AdminDashboardPage() {
   const { t } = useI18n();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [recentTickets, setRecentTickets] = useState<RecentTicket[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, error, isLoading, mutate } = useSWR<DashboardResponse>(
+    "/api/tob/dashboard",
+    swrFetcher
+  );
 
-  useEffect(() => {
-    async function fetchDashboard() {
-      try {
-        const res = await fetch("/api/tob/dashboard", {
-          credentials: "include",
-        });
-        const data = (await res.json()) as { ok: boolean; data: { stats: DashboardStats; recentTickets: RecentTicket[] } };
-        if (data.ok) {
-          setStats(data.data.stats);
-          setRecentTickets(data.data.recentTickets || []);
-        }
-      } catch (error) {
-        console.error("Failed to fetch dashboard:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchDashboard();
-  }, []);
+  const stats = data?.stats;
 
-  if (loading) {
+  const statCards = [
+    {
+      key: "pending",
+      title: t.dashboard.stats.pending,
+      hint: t.dashboard.stats.pendingHint,
+      value: stats?.pending ?? 0,
+      icon: Clock,
+      iconClass: "text-amber-600 dark:text-amber-400",
+      iconBg: "bg-amber-500/10",
+      href: "/admin/tickets?status=new",
+    },
+    {
+      key: "escalated",
+      title: t.dashboard.stats.escalated,
+      hint: t.dashboard.stats.escalatedHint,
+      value: stats?.escalated ?? 0,
+      icon: ArrowUpRight,
+      iconClass: "text-orange-600 dark:text-orange-400",
+      iconBg: "bg-orange-500/10",
+      href: "/admin/tickets?status=escalated",
+    },
+    {
+      key: "overdue",
+      title: t.dashboard.stats.overdue,
+      hint: t.dashboard.stats.overdueHint,
+      value: stats?.overdue ?? 0,
+      icon: AlertTriangle,
+      iconClass: "text-red-600 dark:text-red-400",
+      iconBg: "bg-red-500/10",
+      href: "/admin/tickets?overdue=true",
+    },
+    {
+      key: "products",
+      title: t.dashboard.stats.products,
+      hint: t.dashboard.stats.productsHint,
+      value: stats?.products ?? 0,
+      icon: Package,
+      iconClass: "text-sky-600 dark:text-sky-400",
+      iconBg: "bg-sky-500/10",
+      href: "/admin/management",
+    },
+  ];
+
+  if (error) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-muted-foreground">{t.common.loading}</div>
+      <div className="space-y-6">
+        <PageHeading t={t} />
+        <Card>
+          <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+            <AlertTriangle className="size-8 text-red-600 dark:text-red-400" />
+            <p className="text-sm text-muted-foreground">
+              {t.dashboard.loadFailed}
+            </p>
+            <Button size="sm" variant="outline" onClick={() => mutate()}>
+              {t.dashboard.retry}
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  const statCards = [
-    {
-      title: t.dashboard.stats.pending,
-      value: stats?.pending ?? 0,
-      hint: t.dashboard.stats.pendingHint,
-      icon: Clock,
-      color: "text-amber-500",
-    },
-    {
-      title: t.dashboard.stats.escalated,
-      value: stats?.escalated ?? 0,
-      hint: t.dashboard.stats.escalatedHint,
-      icon: ArrowUpRight,
-      color: "text-orange-500",
-    },
-    {
-      title: t.dashboard.stats.overdue,
-      value: stats?.overdue ?? 0,
-      hint: t.dashboard.stats.overdueHint,
-      icon: AlertTriangle,
-      color: "text-red-500",
-    },
-    {
-      title: t.dashboard.stats.products,
-      value: stats?.products ?? 0,
-      hint: t.dashboard.stats.productsHint,
-      icon: Package,
-      color: "text-blue-500",
-    },
-  ];
-
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold">{t.dashboard.title}</h1>
-        <p className="text-muted-foreground">{t.dashboard.subtitle}</p>
-      </div>
+    <div className="space-y-6">
+      <PageHeading t={t} />
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((stat) => (
-          <Card key={stat.title}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-              <stat.icon className={`h-4 w-4 ${stat.color}`} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground">{stat.hint}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t.dashboard.quickActions}</CardTitle>
-        </CardHeader>
-        <CardContent className="flex gap-4">
-          <Button asChild>
-            <Link href="/admin/tickets">{t.dashboard.viewAllTickets}</Link>
-          </Button>
-          <Button variant="outline" asChild>
+      {/* SLA alert banner */}
+      {!isLoading && (stats?.overdue ?? 0) > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
+          <AlertTriangle className="size-4 shrink-0 text-red-600 dark:text-red-400" />
+          <p className="flex-1 text-sm text-red-700 dark:text-red-400">
+            {t.dashboard.slaAlert.replace(
+              "{{count}}",
+              String(stats?.overdue ?? 0)
+            )}
+          </p>
+          <Button asChild size="sm" variant="outline" className="h-8">
             <Link href="/admin/tickets?overdue=true">
-              {t.dashboard.viewOverdue}
+              {t.dashboard.slaAlertCta}
             </Link>
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      )}
 
-      {/* Recent Tickets */}
+      {/* Stat cards */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {isLoading
+          ? Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-28 w-full rounded-xl" />
+            ))
+          : statCards.map((stat) => (
+              <Link key={stat.key} href={stat.href} className="group">
+                <Card className="transition-colors group-hover:border-foreground/20 group-hover:bg-accent/40">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      {stat.title}
+                    </CardTitle>
+                    <span
+                      className={cn(
+                        "flex size-8 items-center justify-center rounded-md",
+                        stat.iconBg
+                      )}
+                    >
+                      <stat.icon className={cn("size-4", stat.iconClass)} />
+                    </span>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-semibold tabular-nums">
+                      {stat.value}
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {stat.hint}
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+      </div>
+
+      {/* Recent tickets */}
       <Card>
-        <CardHeader>
-          <CardTitle>{t.dashboard.recentTickets}</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-base">
+            {t.dashboard.recentTickets}
+          </CardTitle>
+          <Button asChild variant="ghost" size="sm" className="h-8 text-xs">
+            <Link href="/admin/tickets">{t.dashboard.viewAllTickets}</Link>
+          </Button>
         </CardHeader>
         <CardContent>
-          {recentTickets.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Ticket className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>{t.dashboard.noTickets}</p>
-              <p className="text-sm">{t.dashboard.noTicketsHint}</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {recentTickets.map((ticket) => (
-                <Link
-                  key={ticket.id}
-                  href={`/admin/tickets/${ticket.id}`}
-                  className="block p-4 rounded-lg border hover:bg-accent transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium">{ticket.subject}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {ticket.id}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm capitalize">{ticket.status}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {new Date(ticket.createdAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-                </Link>
+          {isLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-9 w-full" />
               ))}
             </div>
+          ) : !data || data.recentTickets.length === 0 ? (
+            <div className="flex flex-col items-center gap-1.5 py-10 text-center">
+              <TicketIcon className="size-8 text-muted-foreground/40" />
+              <p className="text-sm font-medium">{t.dashboard.noTickets}</p>
+              <p className="text-xs text-muted-foreground">
+                {t.dashboard.noTicketsHint}
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t.dashboard.table.subject}</TableHead>
+                  <TableHead className="w-28">
+                    {t.dashboard.table.status}
+                  </TableHead>
+                  <TableHead className="w-24">
+                    {t.dashboard.table.priority}
+                  </TableHead>
+                  <TableHead className="w-28 text-right">
+                    {t.dashboard.table.created}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.recentTickets.map((ticket) => (
+                  <TableRow key={ticket.id}>
+                    <TableCell className="max-w-0 truncate text-sm">
+                      <Link
+                        href={`/admin/tickets?ticket=${ticket.id}`}
+                        className="hover:underline"
+                      >
+                        {ticket.subject}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={ticket.status} />
+                    </TableCell>
+                    <TableCell>
+                      <PriorityBadge priority={ticket.priority} />
+                    </TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground">
+                      {formatRelativeTime(t.dashboard.time, ticket.createdAt)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function PageHeading({ t }: { t: Translations }) {
+  return (
+    <div>
+      <h1 className="text-xl font-semibold tracking-tight">
+        {t.dashboard.title}
+      </h1>
+      <p className="text-sm text-muted-foreground">{t.dashboard.subtitle}</p>
     </div>
   );
 }

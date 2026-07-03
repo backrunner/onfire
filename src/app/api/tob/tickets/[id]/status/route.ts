@@ -1,78 +1,39 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { getAuth } from "@/lib/auth";
-import { resolveUserContext } from "@/lib/api-utils";
-import { tickets, history } from "@/drizzle/schema";
-import { hasPermission, Role, TicketStatus } from "@/lib/types";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { eq } from "drizzle-orm";
+import { tickets, history } from "@/drizzle/schema";
+import { TicketStatus } from "@/lib/types";
+import { ok, notFound } from "@/lib/api/response";
+import { withAuth, parseBody } from "@/lib/api/handler";
+import { assertTicketVisible } from "@/lib/api/scope";
+import { serializeTicket } from "@/lib/tickets/serialize";
+import { assertTransition } from "@/lib/tickets/state-machine";
+import { emitTicketEvent } from "@/services/ticket-events";
 
-const validStatuses = Object.values(TicketStatus);
+const statusSchema = z.object({
+  status: z.enum(TicketStatus),
+});
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const auth = getAuth();
-    const session = await auth.api.getSession({ headers: request.headers });
+export const POST = withAuth({ permission: "ticket.write" }, async (req: NextRequest, ctx) => {
+  const ticket = await ctx.db.query.tickets.findFirst({
+    where: eq(tickets.id, ctx.params.id),
+  });
+  if (!ticket) throw notFound("Ticket not found");
+  assertTicketVisible(ctx, ticket);
 
-    if (!session?.user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+  const body = await parseBody(req, statusSchema);
+  assertTransition(ticket.status, body.status);
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
+  const now = new Date().toISOString();
 
-    if (!ctx) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
-    }
-
-    if (!hasPermission(ctx.user.role as Role, "ticket.write")) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const ticket = await db.query.tickets.findFirst({ where: eq(tickets.id, id) });
-
-    if (!ticket) {
-      return NextResponse.json({ ok: false, error: "Ticket not found" }, { status: 404 });
-    }
-
-    if (!ctx.tenantIds.includes(ticket.tenantId)) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const body = (await request.json()) as { status: TicketStatus };
-
-    if (!body.status || !validStatuses.includes(body.status)) {
-      return NextResponse.json(
-        { ok: false, error: `Invalid status. Must be one of: ${validStatuses.join(", ")}` },
-        { status: 400 }
-      );
-    }
-
-    if (ticket.status === body.status) {
-      return NextResponse.json({ ok: false, error: "Status unchanged" }, { status: 400 });
-    }
-
-    // Validate status transitions
-    if (ticket.status === TicketStatus.Closed && body.status !== TicketStatus.Closed) {
-      return NextResponse.json({ ok: false, error: "Cannot reopen closed ticket" }, { status: 400 });
-    }
-
-    const now = new Date().toISOString();
-
-    await db
+  await ctx.db.batch([
+    ctx.db
       .update(tickets)
-      .set({
-        status: body.status,
-        updatedAt: now,
-      })
-      .where(eq(tickets.id, id));
-
-    await db.insert(history).values({
+      .set({ status: body.status, updatedAt: now })
+      .where(eq(tickets.id, ticket.id)),
+    ctx.db.insert(history).values({
       id: crypto.randomUUID(),
-      ticketId: id,
+      ticketId: ticket.id,
       actorId: ctx.user.id,
       action: "status_changed",
       snapshot: JSON.stringify({
@@ -80,13 +41,19 @@ export async function POST(
         newStatus: body.status,
       }),
       createdAt: now,
+    }),
+  ]);
+
+  if (body.status === TicketStatus.Closed) {
+    emitTicketEvent(ctx.db, {
+      type: "ticket_closed",
+      ticketId: ticket.id,
+      agentId: ticket.assigneeId ?? undefined,
     });
-
-    const updated = await db.query.tickets.findFirst({ where: eq(tickets.id, id) });
-
-    return NextResponse.json({ ok: true, data: { ticket: updated } });
-  } catch (error) {
-    console.error("Error in POST /api/tob/tickets/[id]/status:", error);
-    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
   }
-}
+
+  const updated = await ctx.db.query.tickets.findFirst({
+    where: eq(tickets.id, ticket.id),
+  });
+  return ok({ ticket: updated ? serializeTicket(updated) : null });
+});

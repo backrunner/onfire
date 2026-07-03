@@ -1,6 +1,6 @@
 {
   "name": "onfire",
-  "main": ".open-next/worker.js",
+  "main": "worker.ts",
   "compatibility_date": "2024-09-23",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
@@ -27,11 +27,17 @@
       "bucket_name": "onfire-storage"
     }
   ],
+  // Cron: SLA breach scan + auto-close, every 5 minutes
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
+  // Secrets (AUTH_SECRET, TURNSTILE_SECRET) must be set via
+  //   wrangler secret put AUTH_SECRET
+  //   wrangler secret put TURNSTILE_SECRET
+  // and locally via .dev.vars — never commit them as plaintext vars.
   "vars": {
-    "AUTH_SECRET": "",
-    "TURNSTILE_SECRET": "",
     "JWT_ISSUER": "onfire",
-    "JWT_AUDIENCE": "onfire"
+    "JWT_AUDIENCE": "onfire-toc"
   },
   "services": [
     {

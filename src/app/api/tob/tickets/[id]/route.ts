@@ -1,246 +1,115 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
-import { getAuth } from "@/lib/auth";
-import { resolveUserContext } from "@/lib/api-utils";
-import {
-  tickets,
-  replies,
-  history,
-} from "@/drizzle/schema";
-import { TicketStatus, hasPermission, Role } from "@/lib/types";
+import { NextRequest } from "next/server";
+import { z } from "zod";
 import { eq } from "drizzle-orm";
+import { tickets, replies, history } from "@/drizzle/schema";
+import { TicketStatus } from "@/lib/types";
+import { ok, notFound, badRequest } from "@/lib/api/response";
+import { withAuth, parseBody } from "@/lib/api/handler";
+import { assertTicketVisible } from "@/lib/api/scope";
+import { serializeTicket, serializeHistory } from "@/lib/tickets/serialize";
+import { isOpen } from "@/lib/tickets/state-machine";
+import { emitTicketEvent } from "@/services/ticket-events";
 
-const parseJson = (val: string | null | undefined): unknown => {
-  if (val === null || val === undefined) return undefined;
-  if (typeof val !== "string") return val;
-  try {
-    return JSON.parse(val);
-  } catch {
-    return val;
-  }
-};
+const replySchema = z.object({
+  content: z.string().min(1).max(20_000),
+  internal: z.boolean().default(false),
+});
 
-const enrichTicket = (row: typeof tickets.$inferSelect | null | undefined) => {
-  if (!row) return null;
-  const acceptDeadline = row.slaAcceptDeadline
-    ? Date.parse(row.slaAcceptDeadline)
-    : undefined;
-  const replyDeadline = row.slaReplyDeadline
-    ? Date.parse(row.slaReplyDeadline)
-    : undefined;
-  const now = Date.now();
-  const sla =
-    row.slaAcceptDeadline || row.slaReplyDeadline
-      ? {
-          acceptDeadline: row.slaAcceptDeadline ?? undefined,
-          replyDeadline: row.slaReplyDeadline ?? undefined,
-          acceptBreached: acceptDeadline ? acceptDeadline < now : false,
-          replyBreached: replyDeadline ? replyDeadline < now : false,
-        }
-      : undefined;
-  return {
-    ...row,
-    metadata: parseJson(row.metadata),
-    sla,
-  };
-};
+export const GET = withAuth({ permission: "ticket.read" }, async (_req: NextRequest, ctx) => {
+  const ticket = await ctx.db.query.tickets.findFirst({
+    where: eq(tickets.id, ctx.params.id),
+  });
+  if (!ticket) throw notFound("Ticket not found");
+  assertTicketVisible(ctx, ticket);
 
-const enrichHistory = (rows: (typeof history.$inferSelect)[]) =>
-  (rows ?? []).map((h) => ({
-    ...h,
-    snapshot: parseJson(h.snapshot),
-  }));
-
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const auth = getAuth();
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
-
-    if (!session?.user) {
-      return NextResponse.json(
-        { ok: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
-
-    if (!ctx) {
-      return NextResponse.json(
-        { ok: false, error: "User not found" },
-        { status: 404 }
-      );
-    }
-
-    if (!hasPermission(ctx.user.role as Role, "ticket.read")) {
-      return NextResponse.json(
-        { ok: false, error: "Forbidden" },
-        { status: 403 }
-      );
-    }
-
-    const ticket = await db.query.tickets.findFirst({
-      where: eq(tickets.id, id),
-    });
-
-    if (!ticket) {
-      return NextResponse.json(
-        { ok: false, error: "Ticket not found" },
-        { status: 404 }
-      );
-    }
-
-    if (!ctx.tenantIds.includes(ticket.tenantId)) {
-      return NextResponse.json(
-        { ok: false, error: "Forbidden" },
-        { status: 403 }
-      );
-    }
-
-    const replyRows = await db
+  const [replyRows, historyRows] = await Promise.all([
+    ctx.db
       .select()
       .from(replies)
-      .where(eq(replies.ticketId, id))
-      .orderBy(replies.createdAt);
-
-    const historyRows = await db
+      .where(eq(replies.ticketId, ticket.id))
+      .orderBy(replies.createdAt),
+    ctx.db
       .select()
       .from(history)
-      .where(eq(history.ticketId, id))
-      .orderBy(history.createdAt);
+      .where(eq(history.ticketId, ticket.id))
+      .orderBy(history.createdAt),
+  ]);
 
-    const timeline = [
-      ...enrichHistory(historyRows).map((h) => ({ type: "history", ...h })),
-      ...(replyRows ?? []).map((r) => ({ type: "reply", ...r })),
-    ].sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
+  const timeline = [
+    ...serializeHistory(historyRows).map((h) => ({ type: "history" as const, ...h })),
+    ...replyRows.map((r) => ({ type: "reply" as const, ...r })),
+  ].sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
 
-    return NextResponse.json({
-      ok: true,
-      data: {
-        ticket: enrichTicket(ticket),
-        replies: replyRows,
-        history: enrichHistory(historyRows),
-        timeline,
-      },
-    });
-  } catch (error) {
-    console.error("Error in GET /api/tob/tickets/[id]:", error);
-    return NextResponse.json(
-      { ok: false, error: "Internal server error" },
-      { status: 500 }
-    );
+  return ok({
+    ticket: serializeTicket(ticket),
+    replies: replyRows,
+    history: serializeHistory(historyRows),
+    timeline,
+  });
+});
+
+/**
+ * POST /api/tob/tickets/:id — agent reply (or internal note).
+ * Internal notes never change ticket status and are invisible to customers.
+ */
+export const POST = withAuth({ permission: "ticket.write" }, async (req: NextRequest, ctx) => {
+  const ticket = await ctx.db.query.tickets.findFirst({
+    where: eq(tickets.id, ctx.params.id),
+  });
+  if (!ticket) throw notFound("Ticket not found");
+  assertTicketVisible(ctx, ticket);
+
+  const body = await parseBody(req, replySchema);
+
+  if (!isOpen(ticket.status) && !body.internal) {
+    throw badRequest("Cannot reply to a closed ticket");
   }
-}
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const auth = getAuth();
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
+  const now = new Date().toISOString();
+  const replyId = crypto.randomUUID();
 
-    if (!session?.user) {
-      return NextResponse.json(
-        { ok: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+  const statements = [
+    ctx.db.insert(replies).values({
+      id: replyId,
+      ticketId: ticket.id,
+      senderId: ctx.user.id,
+      content: body.content,
+      internal: body.internal,
+      createdAt: now,
+    }),
+    ctx.db.insert(history).values({
+      id: crypto.randomUUID(),
+      ticketId: ticket.id,
+      actorId: ctx.user.id,
+      action: body.internal ? "internal_note" : "agent_replied",
+      createdAt: now,
+    }),
+  ] as const;
 
-    const db = getDb();
-    const ctx = await resolveUserContext(db, session.user.id);
-
-    if (!ctx) {
-      return NextResponse.json(
-        { ok: false, error: "User not found" },
-        { status: 404 }
-      );
-    }
-
-    if (!hasPermission(ctx.user.role as Role, "ticket.write")) {
-      return NextResponse.json(
-        { ok: false, error: "Forbidden" },
-        { status: 403 }
-      );
-    }
-
-    const ticket = await db.query.tickets.findFirst({
-      where: eq(tickets.id, id),
-    });
-
-    if (!ticket) {
-      return NextResponse.json(
-        { ok: false, error: "Ticket not found" },
-        { status: 404 }
-      );
-    }
-
-    const body = (await request.json()) as {
-      content?: string;
-      internal?: boolean;
-    };
-    const now = new Date().toISOString();
-
-    // Handle reply
-    if (body.content) {
-      const replyId = crypto.randomUUID();
-      await db.insert(replies).values({
-        id: replyId,
-        ticketId: ticket.id,
-        senderId: ctx.user.id,
-        content: body.content,
-        internal: body.internal ?? false,
-        createdAt: now,
-      });
-
-      await db
+  if (body.internal) {
+    await ctx.db.batch([...statements]);
+  } else {
+    await ctx.db.batch([
+      ...statements,
+      ctx.db
         .update(tickets)
-        .set({
-          status: TicketStatus.Replied,
-          updatedAt: now,
-        })
-        .where(eq(tickets.id, ticket.id));
-
-      await db.insert(history).values({
-        id: crypto.randomUUID(),
-        ticketId: ticket.id,
-        actorId: ctx.user.id,
-        action: "agent_replied",
-        createdAt: now,
-      });
-
-      const updated = await db.query.tickets.findFirst({
-        where: eq(tickets.id, ticket.id),
-      });
-
-      return NextResponse.json({
-        ok: true,
-        data: {
-          ticket: enrichTicket(updated),
-          reply: { id: replyId, content: body.content, createdAt: now },
-        },
-      });
-    }
-
-    return NextResponse.json(
-      { ok: false, error: "Invalid request body" },
-      { status: 400 }
-    );
-  } catch (error) {
-    console.error("Error in POST /api/tob/tickets/[id]:", error);
-    return NextResponse.json(
-      { ok: false, error: "Internal server error" },
-      { status: 500 }
-    );
+        .set({ status: TicketStatus.Replied, updatedAt: now })
+        .where(eq(tickets.id, ticket.id)),
+    ]);
+    emitTicketEvent(ctx.db, {
+      type: "agent_replied",
+      ticketId: ticket.id,
+      agentId: ctx.user.id,
+      replyId,
+    });
   }
-}
+
+  const updated = await ctx.db.query.tickets.findFirst({
+    where: eq(tickets.id, ticket.id),
+  });
+
+  return ok({
+    ticket: updated ? serializeTicket(updated) : null,
+    reply: { id: replyId, content: body.content, internal: body.internal, createdAt: now },
+  });
+});

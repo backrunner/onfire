@@ -1,5 +1,6 @@
 node_modules
 .turbo
+.codegraph/
 .wrangler
 .wrangler-state
 .wrangler-site
@@ -10,6 +11,8 @@ node_modules
 dist
 build
 coverage
+output/playwright/
+.playwright-cli/
 .DS_Store
 .env
 .env.*

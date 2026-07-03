@@ -1,10 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useMemo, useState } from "react";
+import useSWR from "swr";
+import { toast } from "sonner";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { api, swrFetcher } from "@/lib/api/client";
+import { useMe } from "@/lib/hooks/use-me";
+import type { AgentView, TeamView } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -16,275 +24,344 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { DeleteConfirmDialog } from "./delete-confirm-dialog";
+import {
+  EmptyState,
+  ErrorState,
+  FormField,
+  ManagerPanel,
+  RowActions,
+  TableSkeleton,
+  errorMessage,
+} from "./manager-ui";
 
-interface Team {
+interface Product {
   id: string;
-  tenantId: string;
   name: string;
-  allowReassign?: boolean | null;
-  memberIds?: string[];
-  productIds?: string[];
+}
+
+interface TeamDetail extends TeamView {
+  memberIds: string[];
+  productIds: string[];
+}
+
+interface ProductDetail extends Product {
+  teamIds: string[];
 }
 
 export function TeamManagement() {
   const { t } = useI18n();
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [loading, setLoading] = useState(true);
+  const m = t.management;
+  const { can } = useMe();
+  const canManageProducts = can("product.manage");
+  const canSeeMembers = can("user.manage");
+
+  const {
+    data: teams,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR<TeamView[]>("/api/tob/admin/teams", swrFetcher);
+  const { data: products } = useSWR<Product[]>(
+    canManageProducts ? "/api/tob/admin/products" : null,
+    swrFetcher
+  );
+  const { data: agents } = useSWR<AgentView[]>(
+    canSeeMembers ? "/api/tob/admin/agents" : null,
+    swrFetcher
+  );
+
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
-  const [deletingTeam, setDeletingTeam] = useState<Team | null>(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    allowReassign: true,
-    memberIds: "",
-  });
-  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<TeamView | null>(null);
+  const [deleting, setDeleting] = useState<TeamView | null>(null);
+  const [form, setForm] = useState({ name: "", allowReassign: true });
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [originalProductIds, setOriginalProductIds] = useState<string[]>([]);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [pending, setPending] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
-  const fetchTeams = useCallback(async () => {
-    try {
-      const res = await fetch("/api/tob/admin/teams");
-      const data = (await res.json()) as { ok: boolean; data: Team[] };
-      if (data.ok) {
-        setTeams(data.data);
+  const memberCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const agent of agents ?? []) {
+      for (const teamId of agent.teamIds ?? []) {
+        counts.set(teamId, (counts.get(teamId) ?? 0) + 1);
       }
-    } catch (error) {
-      console.error("Failed to fetch teams:", error);
-    } finally {
-      setLoading(false);
     }
-  }, []);
+    return counts;
+  }, [agents]);
 
-  useEffect(() => {
-    fetchTeams();
-  }, [fetchTeams]);
-
-  const handleCreate = () => {
-    setEditingTeam(null);
-    setFormData({ name: "", allowReassign: true, memberIds: "" });
+  const openCreate = () => {
+    setEditing(null);
+    setForm({ name: "", allowReassign: true });
+    setSelectedProductIds([]);
+    setOriginalProductIds([]);
+    setFormErrors({});
     setDialogOpen(true);
   };
 
-  const handleEdit = async (team: Team) => {
+  const openEdit = async (team: TeamView) => {
     try {
-      const res = await fetch(`/api/tob/admin/teams/${team.id}`);
-      const data = (await res.json()) as { ok: boolean; data: Team };
-      if (data.ok) {
-        const t = data.data;
-        setEditingTeam(t);
-        setFormData({
-          name: t.name,
-          allowReassign: t.allowReassign ?? true,
-          memberIds: t.memberIds?.join(",") || "",
+      const detail = await api.get<TeamDetail>(`/api/tob/admin/teams/${team.id}`);
+      setEditing(team);
+      setForm({ name: detail.name, allowReassign: detail.allowReassign ?? true });
+      setSelectedProductIds(detail.productIds);
+      setOriginalProductIds(detail.productIds);
+      setFormErrors({});
+      setDialogOpen(true);
+    } catch (err) {
+      toast.error(errorMessage(err, m.loadFailed));
+    }
+  };
+
+  /** Sync product↔team associations through the product PATCH endpoint. */
+  const syncProductAssociations = async (teamId: string) => {
+    if (!canManageProducts) return;
+    const before = new Set(originalProductIds);
+    const after = new Set(selectedProductIds);
+    const changed = [
+      ...selectedProductIds.filter((id) => !before.has(id)),
+      ...originalProductIds.filter((id) => !after.has(id)),
+    ];
+    for (const productId of changed) {
+      const detail = await api.get<ProductDetail>(
+        `/api/tob/admin/products/${productId}`
+      );
+      const teamIds = new Set(detail.teamIds);
+      if (after.has(productId)) teamIds.add(teamId);
+      else teamIds.delete(teamId);
+      await api.patch(`/api/tob/admin/products/${productId}`, {
+        teamIds: [...teamIds],
+      });
+    }
+  };
+
+  const handleSubmit = async () => {
+    const errors: Record<string, string> = {};
+    if (!form.name.trim()) errors.name = m.teams.nameRequired;
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    setPending(true);
+    try {
+      if (editing) {
+        await api.patch(`/api/tob/admin/teams/${editing.id}`, {
+          name: form.name.trim(),
+          allowReassign: form.allowReassign,
         });
-        setDialogOpen(true);
+        await syncProductAssociations(editing.id);
+        toast.success(m.toastUpdated);
+      } else {
+        const created = await api.post<TeamView>("/api/tob/admin/teams", {
+          name: form.name.trim(),
+          allowReassign: form.allowReassign,
+        });
+        await syncProductAssociations(created.id);
+        toast.success(m.toastCreated);
       }
-    } catch (error) {
-      console.error("Failed to fetch team:", error);
-    }
-  };
-
-  const handleDelete = (team: Team) => {
-    setDeletingTeam(team);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleSave = async () => {
-    if (!formData.name.trim()) return;
-
-    setSaving(true);
-    try {
-      const url = editingTeam
-        ? `/api/tob/admin/teams/${editingTeam.id}`
-        : "/api/tob/admin/teams";
-      const method = editingTeam ? "PATCH" : "POST";
-
-      const payload: Record<string, unknown> = {
-        name: formData.name,
-        allowReassign: formData.allowReassign,
-      };
-
-      if (editingTeam && formData.memberIds) {
-        payload.memberIds = formData.memberIds.split(",").map((id) => id.trim()).filter(Boolean);
-      }
-
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
-        setDialogOpen(false);
-        fetchTeams();
-      }
-    } catch (error) {
-      console.error("Failed to save team:", error);
+      setDialogOpen(false);
+      await mutate();
+    } catch (err) {
+      toast.error(errorMessage(err, m.loadFailed));
     } finally {
-      setSaving(false);
+      setPending(false);
     }
   };
 
-  const handleConfirmDelete = async () => {
-    if (!deletingTeam) return;
-
+  const handleToggleReassign = async (team: TeamView, allowReassign: boolean) => {
+    setTogglingId(team.id);
     try {
-      const res = await fetch(`/api/tob/admin/teams/${deletingTeam.id}`, {
-        method: "DELETE",
-      });
-
-      if (res.ok) {
-        setDeleteDialogOpen(false);
-        setDeletingTeam(null);
-        fetchTeams();
-      }
-    } catch (error) {
-      console.error("Failed to delete team:", error);
+      await api.patch(`/api/tob/admin/teams/${team.id}`, { allowReassign });
+      toast.success(m.toastUpdated);
+      await mutate();
+    } catch (err) {
+      toast.error(errorMessage(err, m.loadFailed));
+    } finally {
+      setTogglingId(null);
     }
   };
 
-  if (loading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{t.management.tabs.teams}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        </CardContent>
-      </Card>
+  const handleDelete = async () => {
+    if (!deleting) return;
+    try {
+      await api.delete(`/api/tob/admin/teams/${deleting.id}`);
+      toast.success(m.toastDeleted);
+      setDeleting(null);
+      await mutate();
+    } catch (err) {
+      toast.error(errorMessage(err, m.loadFailed));
+      throw err;
+    }
+  };
+
+  const toggleProduct = (productId: string, checked: boolean) => {
+    setSelectedProductIds((ids) =>
+      checked ? [...ids, productId] : ids.filter((id) => id !== productId)
     );
-  }
+  };
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>{t.management.tabs.teams}</CardTitle>
-          <Button size="sm" onClick={handleCreate}>
-            <Plus className="h-4 w-4 mr-1" />
-            {t.management.teams.create}
+      <ManagerPanel
+        title={m.tabs.teams}
+        description={m.teams.description}
+        actions={
+          <Button size="sm" className="h-8" onClick={openCreate}>
+            <Plus className="mr-1.5 size-3.5" />
+            {m.teams.create}
           </Button>
-        </CardHeader>
-        <CardContent>
-          {teams.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
-              {t.management.noData.replace("{{type}}", t.management.tabs.teams)}
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>{t.management.teams.namePlaceholder}</TableHead>
-                  <TableHead>{t.management.teams.allowReassign}</TableHead>
-                  <TableHead className="w-24">{t.common.actions}</TableHead>
+        }
+      >
+        {isLoading ? (
+          <TableSkeleton />
+        ) : error ? (
+          <ErrorState onRetry={() => void mutate()} />
+        ) : !teams || teams.length === 0 ? (
+          <EmptyState message={m.noData.replace("{{type}}", m.tabs.teams)} />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{m.teams.name}</TableHead>
+                {canSeeMembers && <TableHead>{m.teams.members}</TableHead>}
+                <TableHead>{m.teams.allowReassign}</TableHead>
+                <TableHead className="w-12" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {teams.map((team) => (
+                <TableRow key={team.id}>
+                  <TableCell className="text-sm font-medium">{team.name}</TableCell>
+                  {canSeeMembers && (
+                    <TableCell className="text-sm tabular-nums text-muted-foreground">
+                      {memberCounts.get(team.id) ?? 0}
+                    </TableCell>
+                  )}
+                  <TableCell>
+                    <Switch
+                      checked={team.allowReassign ?? true}
+                      disabled={togglingId === team.id}
+                      onCheckedChange={(checked) =>
+                        void handleToggleReassign(team, checked)
+                      }
+                      aria-label={m.teams.allowReassign}
+                    />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <RowActions
+                      actions={[
+                        {
+                          label: t.common.edit,
+                          icon: Pencil,
+                          onSelect: () => void openEdit(team),
+                        },
+                        {
+                          label: t.common.delete,
+                          icon: Trash2,
+                          destructive: true,
+                          separatorBefore: true,
+                          onSelect: () => setDeleting(team),
+                        },
+                      ]}
+                    />
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {teams.map((team) => (
-                  <TableRow key={team.id}>
-                    <TableCell className="font-mono text-xs">{team.id}</TableCell>
-                    <TableCell>{team.name}</TableCell>
-                    <TableCell>
-                      <Badge variant={team.allowReassign ? "success" : "secondary"}>
-                        {team.allowReassign ? t.common.yes : t.common.no}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEdit(team)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(team)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </ManagerPanel>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+      <Dialog open={dialogOpen} onOpenChange={(open) => !pending && setDialogOpen(open)}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {editingTeam ? t.management.teams.edit : t.management.teams.create}
-            </DialogTitle>
+            <DialogTitle>{editing ? m.teams.edit : m.teams.create}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>{t.management.teams.namePlaceholder}</Label>
+          <div className="space-y-4 py-2">
+            <FormField
+              label={m.teams.name}
+              htmlFor="team-name"
+              required
+              error={formErrors.name}
+            >
               <Input
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder={t.management.teams.namePlaceholder}
+                id="team-name"
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder={m.teams.namePlaceholder}
+                className="h-8"
               />
-            </div>
+            </FormField>
 
-            <div className="flex items-center justify-between">
-              <Label>{t.management.teams.allowReassign}</Label>
+            <div className="flex items-center justify-between rounded-md border px-3 py-2">
+              <Label htmlFor="team-reassign" className="text-sm">
+                {m.teams.allowReassign}
+              </Label>
               <Switch
-                checked={formData.allowReassign}
+                id="team-reassign"
+                checked={form.allowReassign}
                 onCheckedChange={(checked) =>
-                  setFormData({ ...formData, allowReassign: checked })
+                  setForm((f) => ({ ...f, allowReassign: checked }))
                 }
               />
             </div>
 
-            {editingTeam && (
-              <div className="space-y-2">
-                <Label>Member IDs (comma separated)</Label>
-                <Input
-                  value={formData.memberIds}
-                  onChange={(e) => setFormData({ ...formData, memberIds: e.target.value })}
-                  placeholder="user-a,user-b"
-                />
-              </div>
+            {canManageProducts && (
+              <FormField label={m.teams.bindProducts}>
+                {!products || products.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {m.teams.noProducts}
+                  </p>
+                ) : (
+                  <ScrollArea className="max-h-44 rounded-md border">
+                    <div className="space-y-1 p-2">
+                      {products.map((product) => (
+                        <label
+                          key={product.id}
+                          className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                        >
+                          <Checkbox
+                            checked={selectedProductIds.includes(product.id)}
+                            onCheckedChange={(checked) =>
+                              toggleProduct(product.id, checked === true)
+                            }
+                          />
+                          {product.name}
+                        </label>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </FormField>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setDialogOpen(false)}
+              disabled={pending}
+            >
               {t.common.cancel}
             </Button>
-            <Button onClick={handleSave} disabled={saving || !formData.name.trim()}>
-              {saving ? t.common.loading : t.common.save}
+            <Button size="sm" className="h-8" onClick={handleSubmit} disabled={pending}>
+              {pending ? t.common.loading : t.common.save}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <DeleteConfirmDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        itemName={deletingTeam?.name || ""}
-        onConfirm={handleConfirmDelete}
+        open={!!deleting}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        itemName={deleting?.name || ""}
+        onConfirm={handleDelete}
       />
     </>
   );

@@ -39,8 +39,16 @@ export const en: Translations = {
   nav: {
     dashboard: 'Dashboard',
     tickets: 'Tickets',
+    customers: 'Customers',
     account: 'Account',
-    admin: 'Admin'
+    admin: 'Admin',
+    email: 'Email',
+    notifications: 'Notifications',
+    ai: 'AI Settings',
+    configuration: 'Configuration',
+    workspace: 'Workspace',
+    collapse: 'Collapse sidebar',
+    expand: 'Expand sidebar'
   },
 
   // Topbar
@@ -71,7 +79,283 @@ export const en: Translations = {
     viewOverdue: 'View Overdue',
     recentTickets: 'Recent Tickets',
     noTickets: 'No tickets',
-    noTicketsHint: 'New tickets will appear here'
+    noTicketsHint: 'New tickets will appear here',
+    slaAlert: '{{count}} tickets have breached SLA and need attention',
+    slaAlertCta: 'View overdue tickets',
+    loadFailed: 'Failed to load dashboard data',
+    retry: 'Retry',
+    table: {
+      subject: 'Subject',
+      status: 'Status',
+      priority: 'Priority',
+      created: 'Created'
+    },
+    time: {
+      justNow: 'just now',
+      minutesAgo: '{{n}}m ago',
+      hoursAgo: '{{n}}h ago',
+      daysAgo: '{{n}}d ago'
+    }
+  },
+
+  // Customers page
+  customersPage: {
+    title: 'Customers',
+    subtitle: 'Browse and search customers in your scope',
+    searchPlaceholder: 'Search email or external ID...',
+    allProducts: 'All products',
+    columns: {
+      email: 'Email',
+      externalId: 'External ID',
+      level: 'Level',
+      product: 'Product',
+      createdAt: 'Created'
+    },
+    total: '{{count}} customers',
+    empty: 'No customers',
+    emptyHint: 'Customers will appear here once they submit tickets',
+    noResults: 'No matching customers',
+    noResultsHint: 'Try adjusting your search',
+    loadFailed: 'Failed to load customers',
+    retry: 'Retry',
+    detail: {
+      title: 'Customer Details',
+      email: 'Email',
+      externalId: 'External ID',
+      level: 'Customer Level',
+      product: 'Product',
+      createdAt: 'Created',
+      updatedAt: 'Updated',
+      viewTickets: "View this customer's tickets"
+    }
+  },
+
+  // Email configuration page
+  emailConfig: {
+    title: 'Email Configuration',
+    subtitle: 'Configure inbound/outbound email, templates and logs per product',
+    selectProduct: 'Select product',
+    noProducts: 'No products',
+    noProductsHint: 'Create a product in System Management first',
+    loadFailed: 'Failed to load email configuration',
+    retry: 'Retry',
+    save: 'Save Settings',
+    saved: 'Email settings saved',
+    saveFailed: 'Failed to save',
+    tabs: {
+      settings: 'Settings',
+      templates: 'Templates',
+      logs: 'Logs'
+    },
+    inbound: {
+      title: 'Inbound Email',
+      description: 'Receive customer emails via webhook and create tickets automatically',
+      enabled: 'Enable inbound',
+      provider: 'Inbound Provider',
+      providerGeneric: 'Generic Webhook',
+      address: 'Inbound Address',
+      addressPlaceholder: 'support@yourcompany.com',
+      webhookSecret: 'Webhook Secret',
+      secretConfigured: 'Secret configured',
+      secretNotConfigured: 'No secret generated yet',
+      regenerate: 'Regenerate',
+      generate: 'Generate Secret',
+      saveFirst: 'Save the configuration before generating a secret',
+      secretDialogTitle: 'New Webhook Secret',
+      secretDialogWarning: 'This secret is shown only once. Copy and store it securely now. The old secret has been invalidated.',
+      copySecret: 'Copy Secret',
+      copied: 'Copied to clipboard',
+      regenerateFailed: 'Failed to generate secret'
+    },
+    outbound: {
+      title: 'Outbound Email',
+      description: 'Automatically email customers when agents reply',
+      enabled: 'Enable outbound',
+      provider: 'Outbound Provider',
+      apiKey: 'API Key',
+      apiKeyPlaceholder: 'Enter API key',
+      apiKeyConfigured: 'Configured — leave blank to keep',
+      smtpHost: 'SMTP Host',
+      smtpHostPlaceholder: 'smtp.example.com',
+      smtpPort: 'SMTP Port',
+      smtpUser: 'SMTP User',
+      smtpPass: 'SMTP Password',
+      smtpPassPlaceholder: 'Enter SMTP password',
+      smtpPassConfigured: 'Configured — leave blank to keep',
+      senderName: 'Sender Name',
+      senderNamePlaceholder: 'Support Team',
+      senderEmail: 'Sender Email',
+      senderEmailPlaceholder: 'support@yourcompany.com',
+      replyTo: 'Reply-To (optional)',
+      replyToPlaceholder: 'replies@yourcompany.com',
+      testSend: 'Send Test Email',
+      testDialogTitle: 'Send Test Email',
+      testDialogDesc: 'Send a test email to verify the outbound configuration.',
+      testRecipient: 'Recipient',
+      testRecipientPlaceholder: 'your-email@example.com',
+      testSent: 'Test email sent',
+      testFailed: 'Failed to send test email',
+      testSaveFirst: 'Save and enable outbound configuration first'
+    },
+    aiFilter: {
+      title: 'AI Filter',
+      description: 'Use AI to filter spam and non-support emails',
+      enabled: 'Enable AI filter',
+      strictness: 'Filter Strictness',
+      low: 'Low - More permissive',
+      medium: 'Medium - Balanced',
+      high: 'High - More strict'
+    },
+    templates: {
+      heading: 'Email Templates',
+      hint: 'Types without a custom template use the system default',
+      enabled: 'Enabled',
+      disabled: 'Disabled',
+      notCreated: 'Not created',
+      edit: 'Edit',
+      create: 'Create',
+      editTitle: 'Edit Email Template',
+      createTitle: 'Create Email Template',
+      subject: 'Subject Template',
+      subjectPlaceholder: '[Ticket #{{ticket_id}}] {{subject}}',
+      body: 'Body Template (HTML)',
+      bodyPlaceholder: 'Enter HTML template...',
+      enabledLabel: 'Enable this template',
+      variablesHint: 'Available variables (use {{variable}} syntax):',
+      saved: 'Template saved',
+      saveFailed: 'Failed to save template',
+      required: 'Subject and body are required'
+    },
+    logs: {
+      inbound: 'Inbound',
+      outbound: 'Outbound',
+      from: 'From',
+      to: 'To',
+      subject: 'Subject',
+      status: 'Status',
+      time: 'Time',
+      provider: 'Provider',
+      empty: 'No logs',
+      emptyHint: 'Email activity will appear here',
+      loadFailed: 'Failed to load logs',
+      showError: 'Show error',
+      hideError: 'Hide error',
+      statuses: {
+        pending: 'Pending',
+        processed: 'Processed',
+        filtered: 'Filtered',
+        error: 'Error',
+        sent: 'Sent',
+        delivered: 'Delivered',
+        bounced: 'Bounced',
+        failed: 'Failed'
+      }
+    },
+    templateTypes: {
+      ticket_created: 'Ticket Created',
+      ticket_replied: 'Ticket Replied',
+      ticket_closed: 'Ticket Closed',
+      ticket_escalated: 'Ticket Escalated'
+    }
+  },
+
+  // Notification channels page
+  notifChannels: {
+    title: 'Notification Channels',
+    subtitle: 'Configure ticket event notifications per product',
+    selectProduct: 'Select product',
+    noProducts: 'No products',
+    noProductsHint: 'Create a product in System Management first',
+    loadFailed: 'Failed to load notification channels',
+    retry: 'Retry',
+    empty: 'No notification channels',
+    emptyHint: 'Create a channel to receive ticket event notifications',
+    addChannel: 'New Channel',
+    editChannel: 'Edit Channel',
+    name: 'Channel Name',
+    namePlaceholder: 'e.g. On-call alerts',
+    type: 'Channel Type',
+    enabled: 'Enabled',
+    triggerEvents: 'Trigger Events',
+    eventsRequired: 'Select at least one trigger event',
+    nameRequired: 'Channel name is required',
+    configRequired: 'Fill in the required configuration fields',
+    created: 'Channel created',
+    updated: 'Channel updated',
+    deleted: 'Channel deleted',
+    actionFailed: 'Operation failed',
+    deleteTitle: 'Delete Channel',
+    deleteMessage: 'Delete channel "{{name}}"? This action cannot be undone.',
+    types: {
+      email: 'Email',
+      pushdeer: 'PushDeer',
+      bark: 'Bark',
+      ntfy: 'ntfy',
+      telegram: 'Telegram',
+      discord: 'Discord'
+    },
+    events: {
+      ticket_created: 'Ticket created',
+      ticket_assigned: 'Ticket assigned',
+      ticket_reassigned: 'Ticket reassigned',
+      ticket_escalated: 'Ticket escalated',
+      ticket_expiring: 'SLA expiring',
+      customer_replied: 'Customer replied',
+      ticket_closed: 'Ticket closed'
+    },
+    fields: {
+      email: 'Notification Email',
+      pushkey: 'PushKey',
+      deviceKey: 'Device Key',
+      topic: 'Topic',
+      botToken: 'Bot Token',
+      chatId: 'Chat ID',
+      webhookUrl: 'Webhook URL',
+      serverUrl: 'Server URL (optional)'
+    }
+  },
+
+  // AI task configuration page
+  aiConfig: {
+    title: 'AI Configuration',
+    subtitle: 'Configure model providers and keys for each AI task',
+    noAccess: 'No access',
+    noAccessHint: 'Only Super Admins can manage AI configuration',
+    loadFailed: 'Failed to load AI configuration',
+    retry: 'Retry',
+    notConfigured: 'Not configured',
+    configured: 'Configured',
+    enabled: 'Enabled',
+    provider: 'Provider',
+    model: 'Model',
+    modelPlaceholder: 'e.g. gpt-4o-mini',
+    apiKey: 'API Key',
+    apiKeyPlaceholder: 'Enter API key',
+    apiKeyConfigured: 'Configured — leave blank to keep',
+    baseUrl: 'Custom API URL (optional)',
+    baseUrlPlaceholder: 'https://api.example.com/v1',
+    save: 'Save',
+    saved: 'Configuration saved',
+    saveFailed: 'Failed to save',
+    apiKeyRequired: 'API key is required for initial configuration',
+    modelRequired: 'Model is required',
+    tasks: {
+      agent: 'AI Assistant',
+      agentHint: 'Conversational assistant in the admin dashboard',
+      prescreening: 'Ticket Prescreening',
+      prescreeningHint: 'Automatically screen new ticket content',
+      prereply: 'Pre-reply Generation',
+      prereplyHint: 'Generate suggested replies for agents',
+      embedding: 'Vector Embedding',
+      embeddingHint: 'Knowledge base vector retrieval'
+    },
+    providers: {
+      openai: 'OpenAI',
+      anthropic: 'Anthropic',
+      google: 'Google AI',
+      xai: 'xAI (Grok)',
+      deepseek: 'DeepSeek'
+    }
   },
 
   // Tickets
@@ -106,7 +390,13 @@ export const en: Translations = {
       total: '{{count}} total',
       selected: '{{count}} selected',
       noTickets: 'No tickets',
-      noTicketsHint: 'No tickets match the current filters'
+      noTicketsHint: 'No tickets match the current filters',
+      pageOf: 'Page {{page}} of {{total}}',
+      searchPlaceholder: 'Search subject, email, or ticket ID...',
+      loadError: 'Failed to load tickets',
+      retry: 'Retry',
+      clearSelection: 'Clear selection',
+      unassigned: 'Unassigned'
     },
     detail: {
       title: 'Ticket Details',
@@ -125,7 +415,18 @@ export const en: Translations = {
       replies: 'Replies',
       history: 'History',
       noReplies: 'No replies yet',
-      internalNote: 'Internal Note'
+      internalNote: 'Internal Note',
+      notFound: 'Ticket not found or not accessible',
+      openFull: 'Open full page',
+      backToList: 'Back to list',
+      acceptDeadline: 'Accept by',
+      replyDeadline: 'Reply by',
+      slaRemaining: '{{time}} left',
+      slaOverdue: 'Overdue',
+      selectTicket: 'Select a ticket',
+      selectTicketHint: 'Choose a ticket from the list to view details',
+      agentReply: 'Agent',
+      customerReply: 'Customer'
     },
     actions: {
       reply: 'Reply',
@@ -143,7 +444,22 @@ export const en: Translations = {
       closePlaceholder: 'Please explain the reason for closing',
       changePriority: 'Change Priority',
       priorityReason: 'Change Reason',
-      priorityPlaceholder: 'Please explain the reason for change'
+      priorityPlaceholder: 'Please explain the reason for change',
+      changeStatus: 'Change Status',
+      selectTeam: 'Select team',
+      selectAgent: 'Select agent',
+      noAgents: 'No available agents in this team',
+      agentsLoadError: 'Failed to load agents',
+      replyHint: 'Cmd+Enter to send',
+      replySent: 'Reply sent',
+      noteSaved: 'Internal note saved',
+      assignSuccess: 'Ticket assigned',
+      escalateSuccess: 'Ticket escalated',
+      closeSuccess: 'Ticket closed',
+      statusUpdated: 'Status updated',
+      priorityUpdated: 'Priority updated',
+      closeConfirmTitle: 'Close Ticket',
+      closeConfirmMessage: 'Are you sure you want to close this ticket? The customer will no longer be able to reply.'
     },
     bulk: {
       assign: 'Bulk Assign',
@@ -152,7 +468,12 @@ export const en: Translations = {
       closeTitle: 'Bulk Close Tickets',
       assignHint: 'Assign {{count}} selected tickets to an agent',
       closeHint: 'Close {{count}} selected tickets',
-      defaultCloseReason: 'Bulk closure'
+      defaultCloseReason: 'Bulk closure',
+      setStatus: 'Set Status',
+      statusTitle: 'Bulk Change Status',
+      statusHint: 'Change status of {{count}} selected tickets',
+      result: '{{ok}} succeeded, {{fail}} failed',
+      failedItem: 'Ticket {{id}}: {{error}}'
     },
     historyActions: {
       created: 'Ticket Created',
@@ -165,7 +486,12 @@ export const en: Translations = {
       closed: 'Closed',
       auto_closed: 'Auto Closed',
       agent_replied: 'Agent Replied',
-      customer_replied: 'Customer Replied'
+      customer_replied: 'Customer Replied',
+      assigned: 'Assigned',
+      reassigned: 'Reassigned',
+      status_changed: 'Status Changed',
+      priority_changed: 'Priority Changed',
+      internal_note: 'Internal Note'
     }
   },
 
@@ -191,7 +517,7 @@ export const en: Translations = {
     password: 'Password',
     passwordPlaceholder: '••••••••',
     securityVerify: 'Security Verification',
-    noTurnstile: 'Turnstile not configured (VITE_TURNSTILE_SITE_KEY), skipping verification',
+    noTurnstile: 'Turnstile not configured (NEXT_PUBLIC_TURNSTILE_SITE_KEY), skipping verification',
     loginFailed: 'Login failed, please check your credentials or try again later',
     turnstileError: 'Verification failed to load, please refresh the page',
     footer: 'OnFire · Modern Ticket System'
@@ -231,24 +557,40 @@ export const en: Translations = {
   // Management
   management: {
     title: 'System Management',
-    subtitle: 'Manage tenants, products, teams, templates and users',
+    subtitle: 'Manage tenants, products, teams, templates, users, agents, routing and API keys',
     perPage: 'per page',
     noAccess: 'No {{type}} management access',
     noData: 'No {{type}} data',
+    noPermission: 'You do not have permission to access system management',
+    loadFailed: 'Failed to load data',
+    retry: 'Retry',
+    fieldRequired: 'This field is required',
+    invalidNumber: 'Enter a positive whole number',
+    toastCreated: 'Created successfully',
+    toastUpdated: 'Saved successfully',
+    toastDeleted: 'Deleted successfully',
+    toastCopied: 'Copied to clipboard',
 
     tabs: {
       tenants: 'Tenants',
       products: 'Products',
       teams: 'Teams',
       templates: 'Templates',
-      users: 'Users'
+      users: 'Users',
+      agents: 'Agents',
+      categoryRoutes: 'Category Routes',
+      apiKeys: 'API Keys'
     },
 
     tenants: {
       create: 'New Tenant',
       namePlaceholder: 'Tenant name',
       nameRequired: 'Please enter tenant name',
-      edit: 'Edit Tenant'
+      edit: 'Edit Tenant',
+      description: 'Top-level tenants and their default fallback teams',
+      name: 'Name',
+      defaultTeam: 'Default Team',
+      noDefaultTeam: 'None'
     },
 
     products: {
@@ -264,7 +606,19 @@ export const en: Translations = {
       slaLowAccept: 'Low-Accept',
       slaLowReply: 'Low-Reply',
       bindTeams: 'Bind Teams (comma-separated IDs)',
-      bindTeamsPlaceholder: 'team-a,team-b'
+      bindTeamsPlaceholder: 'team-a,team-b',
+      description: 'Products, SLA policies and auto-close behavior',
+      name: 'Name',
+      tenant: 'Tenant',
+      selectTenant: 'Select tenant',
+      slaPolicy: 'SLA Policy (minutes)',
+      slaHint: 'Leave a field empty to disable that SLA timer',
+      accept: 'Accept',
+      reply: 'Reply',
+      autoClose: 'Auto-close (minutes)',
+      autoCloseHint: 'Close replied tickets after this many minutes of customer inactivity. Empty disables auto-close.',
+      slaNone: 'No SLA',
+      autoCloseOff: 'Off'
     },
 
     teams: {
@@ -272,7 +626,12 @@ export const en: Translations = {
       namePlaceholder: 'Team name',
       nameRequired: 'Please enter team name',
       edit: 'Edit Team',
-      allowReassign: 'Allow Reassign'
+      allowReassign: 'Allow Reassign',
+      description: 'Teams, reassignment policy and product associations',
+      name: 'Name',
+      members: 'Members',
+      bindProducts: 'Associated Products',
+      noProducts: 'No products available'
     },
 
     templates: {
@@ -297,6 +656,13 @@ export const en: Translations = {
       saveChanges: 'Save Changes',
       cancelEdit: 'Cancel Edit',
       schemaPreview: 'Schema Preview',
+      description: 'Ticket templates and form schemas per product',
+      product: 'Product',
+      selectProduct: 'Select product',
+      categories: 'Categories',
+      categoriesHint: 'Separate multiple categories with commas',
+      fields: 'Fields',
+      editSchema: 'Edit Form Schema',
       types: {
         text: 'Text',
         textarea: 'Textarea',
@@ -316,7 +682,22 @@ export const en: Translations = {
       noKeys: 'No keys',
       revoked: 'Revoked',
       rotate: 'Rotate',
-      revoke: 'Revoke'
+      revoke: 'Revoke',
+      description: 'API keys for customer portal and SDK access',
+      create: 'New API Key',
+      name: 'Name',
+      product: 'Product',
+      selectProduct: 'Select product',
+      allProducts: 'All products',
+      createdAt: 'Created',
+      lastUsed: 'Last Used',
+      neverUsed: 'Never',
+      active: 'Active',
+      secretTitle: 'API Key created',
+      rotatedTitle: 'API Key rotated',
+      secretWarning: 'Copy this key now — it will not be shown again.',
+      rotateConfirm: 'Rotating immediately invalidates the current secret. Clients using it will stop working. Continue?',
+      unrevoke: 'Restore'
     },
 
     categoryRoutes: {
@@ -330,7 +711,17 @@ export const en: Translations = {
       edit: 'Edit Category Route',
       targetTeam: 'Target Team ID',
       change: 'Edit',
-      delete: 'Delete'
+      delete: 'Delete',
+      description: 'Route ticket categories to handling teams',
+      hint: 'Routes drive auto-assignment: tickets matching a category (and optional subcategory) are assigned to the target team; unmatched tickets fall back to the tenant default team.',
+      create: 'New Route',
+      product: 'Product',
+      selectProduct: 'Select product',
+      allProducts: 'All products',
+      category: 'Category',
+      subcategory: 'Subcategory',
+      team: 'Target Team',
+      selectTeam: 'Select team'
     },
 
     users: {
@@ -339,7 +730,20 @@ export const en: Translations = {
       editRole: 'Edit User Role',
       role: 'Role',
       selectRole: 'Select role',
-      displayName: 'Display Name'
+      displayName: 'Display Name',
+      description: 'User accounts and role assignment',
+      create: 'New User',
+      edit: 'Edit User',
+      email: 'Email',
+      emailInvalid: 'Enter a valid email address',
+      tenant: 'Tenant',
+      roles: {
+        superAdmin: 'Super Admin',
+        tenantAdmin: 'Tenant Admin',
+        productAdmin: 'Product Admin',
+        teamAdmin: 'Team Admin',
+        agent: 'Agent'
+      }
     },
 
     agents: {
@@ -353,7 +757,17 @@ export const en: Translations = {
       teamIdsPlaceholder: 'team-a,team-b',
       displayName: 'Display Name',
       email: 'Email',
-      avatarUrl: 'Avatar URL'
+      avatarUrl: 'Avatar URL',
+      description: 'Support agents, levels and team memberships',
+      create: 'Promote to Agent',
+      user: 'User',
+      selectUser: 'Select user',
+      noEligibleUsers: 'All users are already agents',
+      teams: 'Teams',
+      noTeams: 'No teams available',
+      levelHint: '1 (junior) – 10 (senior)',
+      levelInvalid: 'Level must be between 1 and 10',
+      remove: 'Remove agent role'
     },
 
     customers: {
@@ -507,7 +921,19 @@ export const en: Translations = {
       configurationError: 'Configuration Error',
       missingCredentialsMessage: 'Valid credentials are required to access this support portal. Please ensure your link includes the correct product ID and access token.',
       contactProvider: 'Please contact your service provider to obtain the correct access link.',
-      technicalDetails: 'Technical Details'
+      technicalDetails: 'Technical Details',
+      sessionExpired: 'Session Expired',
+      sessionExpiredMessage: 'Your access session has expired or is no longer valid.',
+      sessionExpiredHint: 'Please re-open the support portal from the original link or application to continue.',
+      loadFailed: 'Something went wrong',
+      loadFailedMessage: 'We could not load this content. Please check your connection and try again.',
+      retry: 'Try again',
+      ticketNotFound: 'Ticket not found'
+    },
+    header: {
+      support: 'Support',
+      switchLanguage: 'Switch language',
+      toggleTheme: 'Toggle theme'
     },
     tabs: {
       submit: 'Submit Ticket',
@@ -515,6 +941,7 @@ export const en: Translations = {
     },
     submit: {
       title: 'Submit a Ticket',
+      description: 'Tell us about your issue and our team will get back to you.',
       template: 'Template',
       selectTemplate: 'Select a template',
       category: 'Category',
@@ -522,16 +949,52 @@ export const en: Translations = {
       subject: 'Subject',
       subjectPlaceholder: 'Brief description of your issue',
       content: 'Description',
-      contentPlaceholder: 'Please describe your issue in detail'
+      contentPlaceholder: 'Please describe your issue in detail',
+      priority: 'Priority',
+      submitting: 'Submitting...',
+      successTitle: 'Ticket submitted!',
+      successMessage: 'We have received your ticket and our team will get back to you as soon as possible.',
+      ticketIdLabel: 'Ticket ID',
+      viewTicket: 'View ticket',
+      submitAnother: 'Submit another ticket',
+      requiredField: 'This field is required',
+      invalidFormat: 'Invalid format',
+      fillRequired: 'Please complete all required fields',
+      submitFailed: 'Failed to submit ticket',
+      captchaRequired: 'Please complete the security verification'
     },
     list: {
       noTickets: 'No tickets found',
-      noTicketsHint: 'Submit a ticket to get started'
+      noTicketsHint: 'Submit a ticket to get started',
+      noTicketsFiltered: 'No tickets with this status',
+      filterAll: 'All',
+      refresh: 'Refresh',
+      loadMore: 'Load more',
+      updated: 'Updated'
     },
     detail: {
       agentReply: 'Support Agent',
       replyPlaceholder: 'Enter your reply...',
-      ticketClosed: 'This ticket is closed and no longer accepts replies.'
+      ticketClosed: 'This ticket is closed and no longer accepts replies.',
+      back: 'Back to my tickets',
+      you: 'You',
+      support: 'Support',
+      created: 'Created',
+      conversation: 'Conversation',
+      sendReply: 'Send reply',
+      sending: 'Sending...',
+      replyShortcutHint: 'Press ⌘/Ctrl + Enter to send',
+      replySent: 'Reply sent',
+      replyFailed: 'Failed to send reply',
+      backInProcessing: 'Your ticket is being processed again',
+      escalate: 'Escalate',
+      escalateTitle: 'Escalate this ticket?',
+      escalateDescription: 'This will hand your ticket to a more senior support member. Use this if you feel your issue is not being resolved.',
+      escalateReasonLabel: 'Reason (optional)',
+      escalateReasonPlaceholder: 'Briefly describe why you want to escalate...',
+      escalateConfirm: 'Escalate ticket',
+      escalateSuccess: 'Ticket escalated',
+      escalateFailed: 'Failed to escalate ticket'
     }
   },
 
