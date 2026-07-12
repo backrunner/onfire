@@ -1,12 +1,24 @@
 {
   "name": "onfire",
+  "account_id": "b6754402d59fc29ee8b62119014fec89",
   "main": "worker.ts",
-  "compatibility_date": "2024-09-23",
+  "workers_dev": false,
+  "compatibility_date": "2026-07-12",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  "routes": [
+    {
+      "pattern": "support.alkinum.io",
+      "custom_domain": true
+    },
+    {
+      "pattern": "onfire.alkinum.com",
+      "custom_domain": true
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -15,16 +27,24 @@
       "migrations_dir": "drizzle/migrations"
     }
   ],
-  "kv_namespaces": [
-    {
-      "binding": "CACHE",
-      "id": "your-kv-namespace-id"
-    }
-  ],
   "r2_buckets": [
     {
       "binding": "R2",
       "bucket_name": "onfire-storage"
+    }
+  ],
+  "vectorize": [
+    {
+      "binding": "VECTORIZE",
+      "index_name": "onfire-knowledge"
+    }
+  ],
+  // Cloudflare Email Service — outbound provider "cloudflare".
+  // The sender domain must be onboarded first:
+  //   npx wrangler email sending enable yourdomain.com
+  "send_email": [
+    {
+      "name": "SEND_EMAIL"
     }
   ],
   // Cron: SLA breach scan + auto-close, every 5 minutes
@@ -36,13 +56,21 @@
   //   wrangler secret put TURNSTILE_SECRET
   // and locally via .dev.vars — never commit them as plaintext vars.
   "vars": {
+    "BETTER_AUTH_URL": "https://onfire.alkinum.com",
     "JWT_ISSUER": "onfire",
-    "JWT_AUDIENCE": "onfire-toc"
+    "JWT_AUDIENCE": "onfire-toc",
+    "ADMIN_DOMAINS": "onfire.alkinum.com",
+    "TOC_DOMAINS": "support.alkinum.io"
   },
   "services": [
     {
       "binding": "WORKER_SELF_REFERENCE",
       "service": "onfire"
     }
-  ]
+  ],
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.05 }
+  }
 }

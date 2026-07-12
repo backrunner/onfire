@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.9.0+sha512.bd682d5d03fe525ef7c9fd6780c6884d1e756ac4c9c9fe00c538782824310dcf90e3ddc4f53835f06dfaebd5085e41855e0bcbb3b60de2ac5bbab89e5036f03b",
+  "packageManager": "pnpm@11.10.0+sha512.0b7f8b98060031904c017e3a41eb187a16d40eeb829b95c4f8cb03681761fc4ab53dd219115b9b447f4dce1a05a214764461e7d3703392a9f32f9511ce8c86c8",
   "engines": {
     "node": ">=22.0.0"
   },
@@ -15,6 +15,7 @@
     "dev:tob": "NEXT_DIST_DIR=.next-tob next dev --turbopack -p 3001",
     "build": "next build",
     "build:worker": "opennextjs-cloudflare build",
+    "cf-typegen": "wrangler types worker-configuration.d.ts --env-interface CloudflareEnv --env-file wrangler.types.env",
     "start": "next start",
     "lint": "tsc --noEmit",
     "test": "vitest run",
@@ -28,21 +29,16 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.7",
-    "@ai-sdk/google": "^4.0.8",
-    "@ai-sdk/openai": "^4.0.7",
     "@marsidev/react-turnstile": "^1.5.3",
     "@opennextjs/cloudflare": "^1.20.1",
-    "ai": "^7.0.14",
     "better-auth": "^1.6.23",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
     "jose": "^6.2.3",
     "lucide-react": "^1.23.0",
-    "nanoid": "^5.1.16",
     "next": "^16.2.10",
-    "next-themes": "^0.4.6",
+    "postal-mime": "^2.7.5",
     "radix-ui": "^1.6.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
@@ -54,7 +50,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260702.1",
     "@libsql/client": "^0.17.4",
     "@tailwindcss/postcss": "^4.3.2",
     "@types/node": "^26.1.0",
@@ -64,7 +59,8 @@
     "drizzle-kit": "^0.31.10",
     "tailwindcss": "^4.3.2",
     "typescript": "^6.0.3",
+    "vite": "^7.3.5",
     "vitest": "^4.1.9",
-    "wrangler": "^4.107.0"
+    "wrangler": "^4.110.0"
   }
 }

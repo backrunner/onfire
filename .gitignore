@@ -19,7 +19,6 @@ output/playwright/
 .dev.vars
 *.log
 *.lock
-pnpm-lock.yaml
 yarn.lock
 package-lock.json
 .history
