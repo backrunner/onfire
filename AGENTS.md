@@ -768,8 +768,10 @@ On 2026-07-13, the APAC `onfire-d1` D1 database, APAC Standard
 `onfire-storage` R2 bucket, and 1024-dimension cosine `onfire-knowledge`
 Vectorize index were provisioned in the Alkinum account. The D1 ID is recorded
 in `wrangler.jsonc`, and migrations through `0009_freezing_slayback.sql` have
-been applied remotely. Before the first Worker deployment, enable Cloudflare
-Email Sending/routing, configure secrets, and attach the two Custom Domains.
+been applied remotely. The initial `onfire` Worker release is deployed on both
+Custom Domains with the SLA cron and runtime secrets configured. Remaining
+external rollout steps are Cloudflare Email Sending/routing onboarding,
+Cloudflare Access for ToB, and the first `/admin/install` SuperAdmin setup.
 
 ---
 

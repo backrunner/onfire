@@ -14,6 +14,8 @@ Updated: 2026-07-13
 - Worker edge routing now rejects `/api/tob/*` on ToC/unknown hosts and `/api/toc/*` on ToB hosts; domain-level Zero Trust policies can therefore be applied without leaving the opposite API surface public.
 - Current deployment target is one OpenNext Worker attached to `onfire.alkinum.com` (ToB) and `support.alkinum.io` (ToC) as Custom Domains. Two physically independent Workers are intentionally not enabled yet; they require separate Wrangler environments/build entries and single-owner coordination for cron/email.
 - The fallback `workers.dev` hostname is disabled in production; traffic enters through the two configured Custom Domains only.
+- The initial `onfire` Worker release is deployed with both Custom Domains, the `*/5 * * * *` SLA cron, and all configured D1/R2/Vectorize/Email/service bindings. Both same-surface health endpoints return 200 and cross-surface API probes return 404.
+- Production `AUTH_SECRET` and `TURNSTILE_SECRET` are set as Worker secrets. The database remains intentionally uninitialized at the application level (`needsInstall: true`) until the first SuperAdmin completes `/admin/install`.
 - RBAC combines role permissions with tenant, product, and team scope. ProductAdmin scope comes from `user_products`; support-agent membership remains separate.
 - Product lifecycle and product settings are separate permissions. ProductAdmin can update scoped SLA, auto-close, and team associations without creating or deleting products.
 - Tenant/product/team writes reject cross-tenant associations, including SuperAdmin requests, and dependency-protected deletes return HTTP 409.
@@ -62,7 +64,7 @@ A fresh local D1 successfully applied migrations `0000` through `0009`. Remote m
 - Enable Cloudflare Email Sending for the sender domain and route inbound email to the Worker. The current Wrangler OAuth token lacks `email_sending:write` and `email_routing:write`, so this remains pending a refreshed login.
 - Configure `AUTH_SECRET`. Configure `TURNSTILE_SECRET` and `NEXT_PUBLIC_TURNSTILE_SITE_KEY` together; if either is intentionally disabled, leave both unset. Never commit `.dev.vars`.
 - Run `pnpm cf-typegen` after any Wrangler binding or variable change and keep the generated `worker-configuration.d.ts` plus `wrangler.types.env` in the checkout.
-- Attach `onfire.alkinum.com` and `support.alkinum.io` as Custom Domains to the same Worker, then verify Cloudflare Access on ToB and the Worker surface guard on both hostnames.
+- `onfire.alkinum.com` and `support.alkinum.io` are attached to the same Worker and the Worker surface guard is verified. Create and enforce the Cloudflare Access application/policy for the ToB hostname before inviting operational users.
 
 ## Known Follow-up
 
