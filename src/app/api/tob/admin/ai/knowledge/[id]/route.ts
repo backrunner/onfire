@@ -6,7 +6,7 @@ import { ok, notFound } from "@/lib/api/response";
 import { withAuth, parseBody } from "@/lib/api/handler";
 import type { AuthedContext } from "@/lib/api/handler";
 import { assertProductAccess } from "@/lib/api/scope";
-import { embedKnowledge } from "@/services/ai/embedding";
+import { deleteEmbeddings, embedKnowledge } from "@/services/ai/embedding";
 
 const knowledgeTypeEnum = z.enum([
   "description",
@@ -20,7 +20,6 @@ const updateKnowledgeSchema = z.object({
   title: z.string().min(1).max(500).optional(),
   content: z.string().min(1).optional(),
   knowledgeType: knowledgeTypeEnum.optional(),
-  reembed: z.boolean().optional(),
 });
 
 async function findAccessibleKnowledge(ctx: AuthedContext) {
@@ -33,12 +32,12 @@ async function findAccessibleKnowledge(ctx: AuthedContext) {
   return knowledge;
 }
 
-export const GET = withAuth({ permission: "product.manage" }, async (_req: NextRequest, ctx) => {
+export const GET = withAuth({ permission: "ai.knowledge" }, async (_req: NextRequest, ctx) => {
   const knowledge = await findAccessibleKnowledge(ctx);
   return ok(knowledge);
 });
 
-export const PATCH = withAuth({ permission: "product.manage" }, async (req: NextRequest, ctx) => {
+export const PATCH = withAuth({ permission: "ai.knowledge" }, async (req: NextRequest, ctx) => {
   const existing = await findAccessibleKnowledge(ctx);
   const body = await parseBody(req, updateKnowledgeSchema);
 
@@ -49,21 +48,44 @@ export const PATCH = withAuth({ permission: "product.manage" }, async (req: Next
 
   await ctx.db.update(productKnowledge).set(updates).where(eq(productKnowledge.id, existing.id));
 
-  // Re-embed if content changed and requested
-  if (body.reembed && (body.title || body.content)) {
+  // Keep Vectorize synchronized whenever embedded content changes.
+  if (body.title || body.content) {
     try {
-      await embedKnowledge(ctx.db, existing.id);
+      const embedded = await embedKnowledge(ctx.db, existing.id);
+      if (!embedded && existing.vectorizeIds) {
+        await deleteEmbeddings(existing.vectorizeIds);
+        await ctx.db
+          .update(productKnowledge)
+          .set({ vectorizeIds: null, updatedAt: new Date().toISOString() })
+          .where(eq(productKnowledge.id, existing.id));
+      }
     } catch (error) {
       console.error("Failed to re-embed knowledge:", error);
+      if (existing.vectorizeIds) {
+        try {
+          await deleteEmbeddings(existing.vectorizeIds);
+          await ctx.db
+            .update(productKnowledge)
+            .set({ vectorizeIds: null, updatedAt: new Date().toISOString() })
+            .where(eq(productKnowledge.id, existing.id));
+        } catch (cleanupError) {
+          console.error("Failed to clear stale knowledge vector:", cleanupError);
+        }
+      }
     }
   }
 
   return ok({ updated: true });
 });
 
-export const DELETE = withAuth({ permission: "product.manage" }, async (_req: NextRequest, ctx) => {
+export const DELETE = withAuth({ permission: "ai.knowledge" }, async (_req: NextRequest, ctx) => {
   const existing = await findAccessibleKnowledge(ctx);
 
+  try {
+    await deleteEmbeddings(existing.vectorizeIds);
+  } catch (error) {
+    console.error("Failed to delete knowledge vectors:", error);
+  }
   await ctx.db.delete(productKnowledge).where(eq(productKnowledge.id, existing.id));
 
   return ok({ deleted: true });

@@ -32,10 +32,14 @@ export interface AIEmbeddingResult {
   };
 }
 
+export interface AIEmbeddingOptions {
+  inputType?: "document" | "query";
+}
+
 export interface AIProvider {
   name: string;
   complete(options: AICompletionOptions): Promise<AICompletionResult>;
-  embed(text: string): Promise<AIEmbeddingResult>;
+  embed(text: string, options?: AIEmbeddingOptions): Promise<AIEmbeddingResult>;
 }
 
 export interface ProviderConfig {
@@ -43,6 +47,18 @@ export interface ProviderConfig {
   model: string;
   apiKey: string;
   baseUrl?: string | null;
+  apiMode?: "responses" | "chat";
+}
+
+/** Language tasks must never persist or present an empty model response. */
+export function requireCompletionContent(
+  content: string | null | undefined,
+  provider: string
+): string {
+  if (typeof content !== "string" || content.trim().length === 0) {
+    throw new Error(`${provider} returned an empty completion`);
+  }
+  return content;
 }
 
 export async function createProvider(config: ProviderConfig): Promise<AIProvider> {
@@ -66,6 +82,18 @@ export async function createProvider(config: ProviderConfig): Promise<AIProvider
     case "deepseek": {
       const { DeepSeekProvider } = await import("./deepseek");
       return new DeepSeekProvider(config);
+    }
+    case "qwen": {
+      const { QwenEmbeddingProvider } = await import("./qwen");
+      return new QwenEmbeddingProvider(config);
+    }
+    case "jina": {
+      const { JinaEmbeddingProvider } = await import("./jina");
+      return new JinaEmbeddingProvider(config);
+    }
+    case "cohere": {
+      const { CohereEmbeddingProvider } = await import("./cohere");
+      return new CohereEmbeddingProvider(config);
     }
     default:
       throw new Error(`Unknown AI provider: ${config.provider}`);

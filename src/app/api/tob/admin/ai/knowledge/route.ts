@@ -4,7 +4,8 @@ import { eq, inArray, desc } from "drizzle-orm";
 import { productKnowledge, products } from "@/drizzle/schema";
 import { ok } from "@/lib/api/response";
 import { withAuth, parseBody } from "@/lib/api/handler";
-import { assertProductAccess, tenantCondition } from "@/lib/api/scope";
+import { assertProductAccess, productScopeCondition } from "@/lib/api/scope";
+import { embedKnowledge } from "@/services/ai/embedding";
 
 const knowledgeTypeEnum = z.enum([
   "description",
@@ -21,7 +22,7 @@ const createKnowledgeSchema = z.object({
   knowledgeType: knowledgeTypeEnum,
 });
 
-export const GET = withAuth({ permission: "product.manage" }, async (req: NextRequest, ctx) => {
+export const GET = withAuth({ permission: "ai.knowledge" }, async (req: NextRequest, ctx) => {
   const productId = new URL(req.url).searchParams.get("productId");
 
   // Verify product access if productId is specified
@@ -39,7 +40,7 @@ export const GET = withAuth({ permission: "product.manage" }, async (req: NextRe
   const accessibleProducts = await ctx.db
     .select({ id: products.id })
     .from(products)
-    .where(tenantCondition(ctx, products.tenantId));
+    .where(productScopeCondition(ctx));
   const accessibleProductIds = accessibleProducts.map((p) => p.id);
   if (accessibleProductIds.length === 0) {
     return ok([]);
@@ -54,7 +55,7 @@ export const GET = withAuth({ permission: "product.manage" }, async (req: NextRe
   return ok(knowledge);
 });
 
-export const POST = withAuth({ permission: "product.manage" }, async (req: NextRequest, ctx) => {
+export const POST = withAuth({ permission: "ai.knowledge" }, async (req: NextRequest, ctx) => {
   const body = await parseBody(req, createKnowledgeSchema);
 
   // Verify product access
@@ -73,5 +74,12 @@ export const POST = withAuth({ permission: "product.manage" }, async (req: NextR
     updatedAt: now,
   });
 
-  return ok({ id }, 201);
+  let embedded = false;
+  try {
+    embedded = await embedKnowledge(ctx.db, id);
+  } catch (error) {
+    console.error("Failed to embed new knowledge:", error);
+  }
+
+  return ok({ id, embedded }, 201);
 });

@@ -6,9 +6,14 @@ import type {
   AIProvider,
   AICompletionOptions,
   AICompletionResult,
+  AIEmbeddingOptions,
   AIEmbeddingResult,
   ProviderConfig,
 } from "./index";
+import { requireCompletionContent } from "./index";
+import { EMBEDDING_DIMENSIONS } from "@/lib/ai-config";
+import { readResponseJson, readResponseText } from "@/lib/response-body";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 export class GoogleProvider implements AIProvider {
   name = "google";
@@ -29,7 +34,7 @@ export class GoogleProvider implements AIProvider {
         parts: [{ text: m.content }],
       }));
 
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${this.baseUrl}/models/${this.config.model}:generateContent?key=${this.config.apiKey}`,
       {
         method: "POST",
@@ -46,15 +51,16 @@ export class GoogleProvider implements AIProvider {
             maxOutputTokens: options.maxTokens ?? 2048,
           },
         }),
-      }
+      },
+      30_000
     );
 
     if (!response.ok) {
-      const error = await response.text();
+      const error = await readResponseText(response);
       throw new Error(`Google AI API error: ${error}`);
     }
 
-    const data = (await response.json()) as {
+    const data = await readResponseJson<{
       candidates: Array<{
         content: { parts: Array<{ text: string }> };
       }>;
@@ -63,9 +69,15 @@ export class GoogleProvider implements AIProvider {
         candidatesTokenCount: number;
         totalTokenCount: number;
       };
-    };
+    }>(response);
 
-    const text = data.candidates[0]?.content?.parts[0]?.text || "";
+    const text = requireCompletionContent(
+      data.candidates[0]?.content?.parts
+        ?.filter((part) => typeof part.text === "string")
+        .map((part) => part.text)
+        .join(""),
+      "Google AI API"
+    );
 
     return {
       content: text,
@@ -79,9 +91,12 @@ export class GoogleProvider implements AIProvider {
     };
   }
 
-  async embed(text: string): Promise<AIEmbeddingResult> {
-    const response = await fetch(
-      `${this.baseUrl}/models/text-embedding-004:embedContent?key=${this.config.apiKey}`,
+  async embed(
+    text: string,
+    options?: AIEmbeddingOptions
+  ): Promise<AIEmbeddingResult> {
+    const response = await fetchWithTimeout(
+      `${this.baseUrl}/models/${this.config.model}:embedContent?key=${this.config.apiKey}`,
       {
         method: "POST",
         headers: {
@@ -89,18 +104,24 @@ export class GoogleProvider implements AIProvider {
         },
         body: JSON.stringify({
           content: { parts: [{ text }] },
+          taskType:
+            options?.inputType === "query"
+              ? "RETRIEVAL_QUERY"
+              : "RETRIEVAL_DOCUMENT",
+          outputDimensionality: EMBEDDING_DIMENSIONS,
         }),
-      }
+      },
+      30_000
     );
 
     if (!response.ok) {
-      const error = await response.text();
+      const error = await readResponseText(response);
       throw new Error(`Google Embedding API error: ${error}`);
     }
 
-    const data = (await response.json()) as {
+    const data = await readResponseJson<{
       embedding: { values: number[] };
-    };
+    }>(response);
 
     return {
       embedding: data.embedding?.values || [],

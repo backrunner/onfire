@@ -4,9 +4,10 @@
  */
 
 import type { Database } from "@/lib/db";
-import { aiChatMessages, tickets, productKnowledge, replies } from "@/drizzle/schema";
+import { aiChatMessages, tickets, replies } from "@/drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { getAIProvider } from "./config";
+import { findRelevantKnowledge } from "./embedding";
 import type { AIMessage } from "./providers";
 
 export interface AgentChatOptions {
@@ -92,11 +93,12 @@ export async function chatWithAgent(
       }
 
       // Get relevant knowledge
-      const knowledge = await db
-        .select()
-        .from(productKnowledge)
-        .where(eq(productKnowledge.productId, ticket.productId))
-        .limit(3);
+      const knowledge = await findRelevantKnowledge(
+        db,
+        ticket.productId,
+        `${options.message}\n\n${ticket.subject}\n${ticket.content}`,
+        3
+      );
 
       if (knowledge.length > 0) {
         contextInfo += "\n\nRelevant Knowledge:\n" +
@@ -186,7 +188,12 @@ export async function clearChatSession(
   userId: string,
   sessionId: string
 ): Promise<void> {
-  // Note: In production, you might want to soft delete or archive
-  // For now, we'll just mark the session as cleared by not deleting
-  console.log(`Chat session ${sessionId} for user ${userId} cleared`);
+  await db
+    .delete(aiChatMessages)
+    .where(
+      and(
+        eq(aiChatMessages.userId, userId),
+        eq(aiChatMessages.sessionId, sessionId)
+      )
+    );
 }

@@ -9,6 +9,9 @@ import type {
   AIEmbeddingResult,
   ProviderConfig,
 } from "./index";
+import { requireCompletionContent } from "./index";
+import { readResponseJson, readResponseText } from "@/lib/response-body";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 export class DeepSeekProvider implements AIProvider {
   name = "deepseek";
@@ -21,7 +24,7 @@ export class DeepSeekProvider implements AIProvider {
   }
 
   async complete(options: AICompletionOptions): Promise<AICompletionResult> {
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+    const response = await fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -33,24 +36,27 @@ export class DeepSeekProvider implements AIProvider {
         temperature: options.temperature ?? 0.7,
         max_tokens: options.maxTokens ?? 2048,
       }),
-    });
+    }, 30_000);
 
     if (!response.ok) {
-      const error = await response.text();
+      const error = await readResponseText(response);
       throw new Error(`DeepSeek API error: ${error}`);
     }
 
-    const data = (await response.json()) as {
+    const data = await readResponseJson<{
       choices: Array<{ message: { content: string } }>;
       usage?: {
         prompt_tokens: number;
         completion_tokens: number;
         total_tokens: number;
       };
-    };
+    }>(response);
 
     return {
-      content: data.choices[0]?.message?.content || "",
+      content: requireCompletionContent(
+        data.choices[0]?.message?.content,
+        "DeepSeek API"
+      ),
       usage: data.usage
         ? {
             promptTokens: data.usage.prompt_tokens,

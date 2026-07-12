@@ -4,9 +4,16 @@
 
 import type { Database } from "@/lib/db";
 import { aiConfigs } from "@/drizzle/schema";
-import type { AITaskType, AIProvider as AIProviderType } from "@/drizzle/schema";
+import type {
+  AITaskType,
+  AIProvider as AIProviderType,
+  OpenAIApiMode,
+} from "@/drizzle/schema";
 import { eq } from "drizzle-orm";
 import { createProvider, type AIProvider, type ProviderConfig } from "./providers";
+import { openStoredSecret, sealSecret } from "@/lib/secret-storage";
+import { getEnv } from "@/lib/db";
+import { safeAIBaseUrl } from "@/lib/ai-config";
 
 export interface AIConfig {
   taskType: AITaskType;
@@ -14,21 +21,22 @@ export interface AIConfig {
   model: string;
   apiKey: string;
   baseUrl?: string | null;
+  apiMode: OpenAIApiMode;
   enabled: boolean;
 }
 
-const configCache = new Map<AITaskType, AIConfig>();
+export const AI_CONFIG_SECRET_PURPOSE = (taskType: AITaskType) =>
+  `ai-config:${taskType}`;
+
+function normalizeAIBaseUrl(value: string | null | undefined): string | null {
+  if (value === undefined || value === null || value.trim() === "") return null;
+  return safeAIBaseUrl(value);
+}
 
 export async function getAIConfig(
   db: Database,
   taskType: AITaskType
 ): Promise<AIConfig | null> {
-  // Check cache first
-  const cached = configCache.get(taskType);
-  if (cached) {
-    return cached;
-  }
-
   const config = await db.query.aiConfigs.findFirst({
     where: eq(aiConfigs.taskType, taskType),
   });
@@ -37,17 +45,33 @@ export async function getAIConfig(
     return null;
   }
 
-  const result: AIConfig = {
+  let apiKey: string;
+  try {
+    apiKey = await openStoredSecret(
+      config.apiKey,
+      getEnv().AUTH_SECRET,
+      AI_CONFIG_SECRET_PURPOSE(taskType)
+    );
+  } catch (error) {
+    console.error(`Failed to open AI credential for ${taskType}:`, error);
+    return null;
+  }
+
+  const baseUrl = normalizeAIBaseUrl(config.baseUrl);
+  if (config.baseUrl && !baseUrl) {
+    console.error(`Rejected unsafe AI base URL for ${taskType}`);
+    return null;
+  }
+
+  return {
     taskType: config.taskType,
     provider: config.provider,
     model: config.model,
-    apiKey: config.apiKey,
-    baseUrl: config.baseUrl,
+    apiKey,
+    baseUrl,
+    apiMode: config.apiMode,
     enabled: config.enabled ?? true,
   };
-
-  configCache.set(taskType, result);
-  return result;
 }
 
 export async function getAIProvider(
@@ -64,27 +88,36 @@ export async function getAIProvider(
     model: config.model,
     apiKey: config.apiKey,
     baseUrl: config.baseUrl,
+    apiMode: config.apiMode,
   };
 
   return createProvider(providerConfig);
 }
 
 export function clearConfigCache(taskType?: AITaskType): void {
-  if (taskType) {
-    configCache.delete(taskType);
-  } else {
-    configCache.clear();
-  }
+  // Kept as a compatibility no-op for callers. Configuration is read from
+  // D1 on each request so one isolate cannot retain stale credentials after
+  // an admin update made on another isolate.
+  void taskType;
 }
 
 export async function saveAIConfig(
   db: Database,
   config: Omit<AIConfig, "enabled"> & { enabled?: boolean }
 ): Promise<void> {
+  const baseUrl = normalizeAIBaseUrl(config.baseUrl);
+  if (config.baseUrl && !baseUrl) {
+    throw new Error("AI base URL must be a public HTTPS URL on port 443");
+  }
   const now = new Date().toISOString();
   const existing = await db.query.aiConfigs.findFirst({
     where: eq(aiConfigs.taskType, config.taskType),
   });
+  const sealedApiKey = await sealSecret(
+    config.apiKey,
+    getEnv().AUTH_SECRET,
+    AI_CONFIG_SECRET_PURPOSE(config.taskType)
+  );
 
   if (existing) {
     await db
@@ -92,8 +125,9 @@ export async function saveAIConfig(
       .set({
         provider: config.provider,
         model: config.model,
-        apiKey: config.apiKey,
-        baseUrl: config.baseUrl,
+        apiKey: sealedApiKey,
+        baseUrl,
+        apiMode: config.apiMode,
         enabled: config.enabled ?? true,
         updatedAt: now,
       })
@@ -104,8 +138,9 @@ export async function saveAIConfig(
       taskType: config.taskType,
       provider: config.provider,
       model: config.model,
-      apiKey: config.apiKey,
-      baseUrl: config.baseUrl,
+      apiKey: sealedApiKey,
+      baseUrl,
+      apiMode: config.apiMode,
       enabled: config.enabled ?? true,
       createdAt: now,
       updatedAt: now,

@@ -9,6 +9,9 @@ import type {
   AIEmbeddingResult,
   ProviderConfig,
 } from "./index";
+import { requireCompletionContent } from "./index";
+import { readResponseJson, readResponseText } from "@/lib/response-body";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 export class AnthropicProvider implements AIProvider {
   name = "anthropic";
@@ -24,7 +27,7 @@ export class AnthropicProvider implements AIProvider {
     const systemMessage = options.messages.find((m) => m.role === "system");
     const otherMessages = options.messages.filter((m) => m.role !== "system");
 
-    const response = await fetch(`${this.baseUrl}/messages`, {
+    const response = await fetchWithTimeout(`${this.baseUrl}/messages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -40,25 +43,25 @@ export class AnthropicProvider implements AIProvider {
           content: m.content,
         })),
       }),
-    });
+    }, 30_000);
 
     if (!response.ok) {
-      const error = await response.text();
+      const error = await readResponseText(response);
       throw new Error(`Anthropic API error: ${error}`);
     }
 
-    const data = (await response.json()) as {
+    const data = await readResponseJson<{
       content: Array<{ type: string; text: string }>;
       usage?: {
         input_tokens: number;
         output_tokens: number;
       };
-    };
+    }>(response);
 
     const textContent = data.content.find((c) => c.type === "text");
 
     return {
-      content: textContent?.text || "",
+      content: requireCompletionContent(textContent?.text, "Anthropic API"),
       usage: data.usage
         ? {
             promptTokens: data.usage.input_tokens,

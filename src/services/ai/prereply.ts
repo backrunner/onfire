@@ -4,9 +4,10 @@
  */
 
 import type { Database } from "@/lib/db";
-import { tickets, replies, productKnowledge } from "@/drizzle/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { tickets, replies } from "@/drizzle/schema";
+import { eq, desc } from "drizzle-orm";
 import { getAIProvider } from "./config";
+import { findRelevantKnowledge } from "./embedding";
 
 export interface PrereplyOptions {
   ticketId: string;
@@ -68,11 +69,12 @@ export async function generatePrereply(
   const sources: string[] = [];
 
   if (options.includeKnowledge) {
-    const knowledge = await db
-      .select()
-      .from(productKnowledge)
-      .where(eq(productKnowledge.productId, ticket.productId))
-      .limit(5);
+    const knowledge = await findRelevantKnowledge(
+      db,
+      ticket.productId,
+      `${ticket.subject}\n\n${ticket.content}`,
+      5
+    );
 
     if (knowledge.length > 0) {
       knowledgeContext = "\n\nRelevant Knowledge Base:\n" +
