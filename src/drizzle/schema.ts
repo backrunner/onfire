@@ -83,6 +83,10 @@ export const products = sqliteTable("products", {
   id: text("id").primaryKey(),
   tenantId: text("tenant_id").notNull(),
   name: text("name").notNull(),
+  /** Product homepage used as the customer portal fallback destination. */
+  homepageUrl: text("homepage_url"),
+  /** Optional deep link preferred when a customer session expires. */
+  portalReturnUrl: text("portal_return_url"),
   slaHighAccept: integer("sla_high_accept"),
   slaHighReply: integer("sla_high_reply"),
   slaMediumAccept: integer("sla_medium_accept"),
@@ -93,13 +97,32 @@ export const products = sqliteTable("products", {
   autoCloseMinutes: integer("auto_close_minutes"),
 });
 
+/**
+ * Server-to-server customer identity resolution for a product. The browser
+ * presents only a short-lived opaque credential; OnFire exchanges it with
+ * this endpoint and never exposes the configured resolver secret.
+ */
+export const productIdentityConfigs = sqliteTable("product_identity_configs", {
+  productId: text("product_id").primaryKey(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
+  endpointUrl: text("endpoint_url"),
+  /** AES-GCM sealed with AUTH_SECRET; plaintext is never persisted. */
+  authSecret: text("auth_secret"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const customers = sqliteTable(
   "customers",
   {
     id: text("id").primaryKey(),
     tenantId: text("tenant_id").notNull(),
     productId: text("product_id").notNull(),
-    email: text("email").notNull(),
+    /**
+     * Optional — OnFire can operate without knowing the business product's
+     * user PII; `externalId` is then the correlation key.
+     */
+    email: text("email"),
     externalId: text("external_id"),
     level: integer("level"),
     meta: text("meta"),
@@ -108,6 +131,7 @@ export const customers = sqliteTable(
   },
   (t) => [
     uniqueIndex("customers_product_email_uq").on(t.productId, t.email),
+    uniqueIndex("customers_product_external_uq").on(t.productId, t.externalId),
     index("customers_tenant_idx").on(t.tenantId),
   ]
 );
@@ -173,6 +197,19 @@ export const agentTeams = sqliteTable(
   ]
 );
 
+/** Product administration scope, independent from support-agent membership. */
+export const userProducts = sqliteTable(
+  "user_products",
+  {
+    userId: text("user_id").notNull(),
+    productId: text("product_id").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.productId] }),
+    index("user_products_product_idx").on(t.productId),
+  ]
+);
+
 export const agentProfiles = sqliteTable("agent_profiles", {
   userId: text("user_id").primaryKey(),
   displayName: text("display_name").notNull(),
@@ -201,7 +238,14 @@ export const categoryRoutes = sqliteTable(
     subcategory: text("subcategory"),
     teamId: text("team_id").notNull(),
   },
-  (t) => [index("category_routes_product_category_idx").on(t.productId, t.category)]
+  (t) => [
+    index("category_routes_product_category_idx").on(t.productId, t.category),
+    uniqueIndex("category_routes_product_category_subcategory_uq").on(
+      t.productId,
+      t.category,
+      t.subcategory
+    ),
+  ]
 );
 
 export const tickets = sqliteTable(
@@ -216,7 +260,9 @@ export const tickets = sqliteTable(
     priority: text("priority").$type<TicketPriority>().notNull(),
     subject: text("subject").notNull(),
     content: text("content").notNull(),
-    customerEmail: text("customer_email").notNull(),
+    /** Canonical owner link (customers.id); email is display/mail-channel only. */
+    customerId: text("customer_id"),
+    customerEmail: text("customer_email"),
     customerLevel: integer("customer_level"),
     templateId: text("template_id"),
     metadata: text("metadata"),
@@ -256,6 +302,7 @@ export const tickets = sqliteTable(
     index("tickets_product_status_idx").on(t.productId, t.status),
     index("tickets_assignee_idx").on(t.assigneeId),
     index("tickets_customer_idx").on(t.customerEmail, t.productId),
+    index("tickets_customer_id_idx").on(t.customerId),
     index("tickets_updated_idx").on(t.updatedAt),
   ]
 );
@@ -294,12 +341,25 @@ export const history = sqliteTable(
 // ==================== AI Feature Tables ====================
 
 export type AITaskType = "agent" | "prescreening" | "prereply" | "embedding";
-export type AIProvider = "openai" | "anthropic" | "google" | "xai" | "deepseek";
+export type AIProvider =
+  | "openai"
+  | "anthropic"
+  | "google"
+  | "xai"
+  | "deepseek"
+  | "qwen"
+  | "jina"
+  | "cohere";
+export type OpenAIApiMode = "responses" | "chat";
 
 export const aiConfigs = sqliteTable("ai_configs", {
   id: text("id").primaryKey(),
   taskType: text("task_type").$type<AITaskType>().notNull().unique(),
   provider: text("provider").$type<AIProvider>().notNull(),
+  apiMode: text("api_mode")
+    .$type<OpenAIApiMode>()
+    .notNull()
+    .default("responses"),
   model: text("model").notNull(),
   apiKey: text("api_key").notNull(),
   baseUrl: text("base_url"),
@@ -373,11 +433,13 @@ export type EmailProvider =
   | "sendgrid"
   | "mailgun"
   | "maileroo"
+  | "cloudflare"
   | "smtp";
 export type InboundEmailProvider =
   | "maileroo"
   | "sendgrid"
   | "mailgun"
+  | "cloudflare"
   | "generic";
 export type EmailTemplateType =
   | "ticket_created"
@@ -397,39 +459,45 @@ export type EmailDeliveryStatus =
   | "failed";
 export type AIFilterStrictness = "low" | "medium" | "high";
 
-export const emailConfigs = sqliteTable("email_configs", {
-  id: text("id").primaryKey(),
-  productId: text("product_id").notNull().unique(),
-  // Inbound settings
-  inboundEnabled: integer("inbound_enabled", { mode: "boolean" }).default(
-    false
-  ),
-  inboundProvider: text("inbound_provider").$type<InboundEmailProvider>(),
-  inboundAddress: text("inbound_address"),
-  inboundWebhookSecret: text("inbound_webhook_secret"),
-  // Outbound settings
-  outboundEnabled: integer("outbound_enabled", { mode: "boolean" }).default(
-    false
-  ),
-  outboundProvider: text("outbound_provider").$type<EmailProvider>(),
-  outboundApiKey: text("outbound_api_key"),
-  outboundSmtpHost: text("outbound_smtp_host"),
-  outboundSmtpPort: integer("outbound_smtp_port"),
-  outboundSmtpUser: text("outbound_smtp_user"),
-  outboundSmtpPass: text("outbound_smtp_pass"),
-  outboundSenderName: text("outbound_sender_name"),
-  outboundSenderEmail: text("outbound_sender_email"),
-  outboundReplyTo: text("outbound_reply_to"),
-  // AI filtering settings
-  aiFilterEnabled: integer("ai_filter_enabled", { mode: "boolean" }).default(
-    true
-  ),
-  aiFilterStrictness: text("ai_filter_strictness")
-    .$type<AIFilterStrictness>()
-    .default("medium"),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-});
+export const emailConfigs = sqliteTable(
+  "email_configs",
+  {
+    id: text("id").primaryKey(),
+    productId: text("product_id").notNull().unique(),
+    // Inbound settings
+    inboundEnabled: integer("inbound_enabled", { mode: "boolean" }).default(
+      false
+    ),
+    inboundProvider: text("inbound_provider").$type<InboundEmailProvider>(),
+    inboundAddress: text("inbound_address"),
+    inboundWebhookSecret: text("inbound_webhook_secret"),
+    // Outbound settings
+    outboundEnabled: integer("outbound_enabled", { mode: "boolean" }).default(
+      false
+    ),
+    outboundProvider: text("outbound_provider").$type<EmailProvider>(),
+    outboundApiKey: text("outbound_api_key"),
+    outboundSmtpHost: text("outbound_smtp_host"),
+    outboundSmtpPort: integer("outbound_smtp_port"),
+    outboundSmtpUser: text("outbound_smtp_user"),
+    outboundSmtpPass: text("outbound_smtp_pass"),
+    outboundSenderName: text("outbound_sender_name"),
+    outboundSenderEmail: text("outbound_sender_email"),
+    outboundReplyTo: text("outbound_reply_to"),
+    // AI filtering settings
+    aiFilterEnabled: integer("ai_filter_enabled", { mode: "boolean" }).default(
+      true
+    ),
+    aiFilterStrictness: text("ai_filter_strictness")
+      .$type<AIFilterStrictness>()
+      .default("medium"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("email_configs_inbound_address_uq").on(t.inboundAddress),
+  ]
+);
 
 export const emailTemplates = sqliteTable(
   "email_templates",
@@ -454,6 +522,8 @@ export const inboundEmails = sqliteTable(
     id: text("id").primaryKey(),
     productId: text("product_id").notNull(),
     messageId: text("message_id").notNull(),
+    inReplyTo: text("in_reply_to"),
+    references: text("references_header"),
   provider: text("provider").$type<InboundEmailProvider>().notNull(),
   // Sender info
   fromEmail: text("from_email").notNull(),
