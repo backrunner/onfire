@@ -22,11 +22,16 @@ export interface TicketView {
   productId: string;
   teamId: string;
   assigneeId: string | null;
+  /** Resolved display name of the assignee, when one is set. */
+  assigneeName?: string | null;
   status: TicketStatus;
   priority: TicketPriority;
   subject: string;
   content: string;
-  customerEmail: string;
+  customerId?: string | null;
+  customerEmail: string | null;
+  /** Display identity: email, else the product's external id, else a label. */
+  customerLabel?: string | null;
   customerLevel: number | null;
   templateId: string | null;
   metadata?: unknown;
@@ -35,6 +40,8 @@ export interface TicketView {
   createdAt: string;
   updatedAt: string;
   aiScreeningStatus?: string | null;
+  /** Parsed prescreening result when status is "completed". */
+  aiScreeningResult?: unknown;
   aiSuggestedReply?: string | null;
 }
 
@@ -43,6 +50,8 @@ export interface ReplyView {
   ticketId: string;
   senderId: string | null;
   senderEmail: string | null;
+  /** Resolved display name for agent replies. */
+  senderName?: string | null;
   content: string;
   internal: boolean | null;
   source: "web" | "email" | null;
@@ -53,6 +62,8 @@ export interface HistoryView {
   id: string;
   ticketId: string;
   actorId: string | null;
+  /** Resolved display name of the acting user. */
+  actorName?: string | null;
   action: string;
   snapshot?: unknown;
   createdAt: string;
@@ -67,6 +78,8 @@ export interface TicketDetailResponse {
   replies: ReplyView[];
   history: HistoryView[];
   timeline: TimelineEntry[];
+  /** userId → display name for every user referenced by the timeline. */
+  actors?: Record<string, string>;
 }
 
 export interface MeResponse {
@@ -90,6 +103,11 @@ export interface ProductView {
   id: string;
   tenantId: string;
   name: string;
+  homepageUrl: string | null;
+  portalReturnUrl: string | null;
+  identityEnabled: boolean;
+  identityEndpointUrl: string | null;
+  identitySecretConfigured: boolean;
   slaHighAccept: number | null;
   slaHighReply: number | null;
   slaMediumAccept: number | null;
@@ -112,7 +130,7 @@ export interface CustomerView {
   id: string;
   tenantId: string;
   productId: string;
-  email: string;
+  email: string | null;
   externalId: string | null;
   level: number | null;
   createdAt: string;

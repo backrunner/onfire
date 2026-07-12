@@ -27,10 +27,13 @@ describe("RBAC permission matrix", () => {
     expect(hasPermission(Role.ProductAdmin, "tenant.manage")).toBe(false);
   });
 
-  it("agents cannot assign, escalate or reassign", () => {
+  it("agents cannot assign or freely reassign", () => {
     expect(hasPermission(Role.Agent, "ticket.assign")).toBe(false);
-    expect(hasPermission(Role.Agent, "ticket.escalate")).toBe(false);
     expect(hasPermission(Role.Agent, "ticket.reassign")).toBe(false);
+  });
+
+  it("agents can escalate to a higher-level teammate", () => {
+    expect(hasPermission(Role.Agent, "ticket.escalate")).toBe(true);
   });
 
   it("agents can read, write and close tickets", () => {
@@ -44,8 +47,29 @@ describe("RBAC permission matrix", () => {
     expect(hasPermission(Role.TeamAdmin, "product.manage")).toBe(false);
   });
 
+  it("ProductAdmin can edit product settings without managing product lifecycle", () => {
+    expect(hasPermission(Role.SuperAdmin, "product.settings")).toBe(true);
+    expect(hasPermission(Role.TenantAdmin, "product.settings")).toBe(true);
+    expect(hasPermission(Role.ProductAdmin, "product.settings")).toBe(true);
+    expect(hasPermission(Role.ProductAdmin, "product.manage")).toBe(false);
+    expect(hasPermission(Role.TeamAdmin, "product.settings")).toBe(false);
+  });
+
   it("user management stops at TenantAdmin", () => {
     expect(hasPermission(Role.TenantAdmin, "user.manage")).toBe(true);
     expect(hasPermission(Role.ProductAdmin, "user.manage")).toBe(false);
+  });
+
+  it("global AI credentials are SuperAdmin-only", () => {
+    expect(hasPermission(Role.SuperAdmin, "ai.config")).toBe(true);
+    expect(hasPermission(Role.TenantAdmin, "ai.config")).toBe(false);
+    expect(hasPermission(Role.ProductAdmin, "ai.config")).toBe(false);
+  });
+
+  it("product AI knowledge is available to product administrators", () => {
+    expect(hasPermission(Role.SuperAdmin, "ai.knowledge")).toBe(true);
+    expect(hasPermission(Role.TenantAdmin, "ai.knowledge")).toBe(true);
+    expect(hasPermission(Role.ProductAdmin, "ai.knowledge")).toBe(true);
+    expect(hasPermission(Role.TeamAdmin, "ai.knowledge")).toBe(false);
   });
 });

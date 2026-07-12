@@ -3,9 +3,17 @@ import { z } from "zod";
 import { eq, inArray } from "drizzle-orm";
 import { getDb, type Database } from "@/lib/db";
 import { getAuth } from "@/lib/auth";
-import { agentTeams, productTeams, users } from "@/drizzle/schema";
+import {
+  agentTeams,
+  customers,
+  productTeams,
+  products,
+  userProducts,
+  users,
+} from "@/drizzle/schema";
 import { hasPermission, Role, type Permission } from "@/lib/types";
 import { ApiError, err } from "./response";
+import { readBodyBytes } from "@/lib/request-body";
 import {
   authenticateCustomer,
   type CustomerTokenPayload,
@@ -31,7 +39,11 @@ export interface AuthedContext {
 
 export interface CustomerContext {
   db: Database;
-  customer: CustomerTokenPayload;
+  customer: CustomerTokenPayload & {
+    email?: string;
+    externalId?: string;
+    level?: number;
+  };
   params: RouteParams;
 }
 
@@ -53,7 +65,13 @@ async function resolveAuthedContext(
   const teamIds = teamRows.map((r) => r.teamId);
 
   let productIds: string[] = [];
-  if (teamIds.length > 0) {
+  if (role === Role.ProductAdmin) {
+    const productRows = await db
+      .select({ productId: userProducts.productId })
+      .from(userProducts)
+      .where(eq(userProducts.userId, userId));
+    productIds = productRows.map((row) => row.productId);
+  } else if (teamIds.length > 0) {
     const productRows = await db
       .select({ productId: productTeams.productId })
       .from(productTeams)
@@ -128,10 +146,34 @@ export function withCustomerAuth(
     route?: NextRouteContext
   ): Promise<NextResponse> => {
     try {
-      const customer = await authenticateCustomer(req);
-      if (!customer) return err("Unauthorized", 401);
+      const token = await authenticateCustomer(req);
+      if (!token) return err("Unauthorized", 401);
+      const db = getDb();
+      const [record, product] = await Promise.all([
+        db.query.customers.findFirst({
+          where: eq(customers.id, token.sub),
+        }),
+        db.query.products.findFirst({
+          where: eq(products.id, token.productId),
+        }),
+      ]);
+      if (
+        !record ||
+        !product ||
+        record.productId !== token.productId ||
+        record.tenantId !== token.tenantId ||
+        product.tenantId !== token.tenantId
+      ) {
+        return err("Unauthorized", 401);
+      }
+      const customer = {
+        ...token,
+        email: record.email ?? undefined,
+        externalId: record.externalId ?? undefined,
+        level: record.level ?? undefined,
+      };
       const params = route?.params ? await route.params : {};
-      return await handler(req, { db: getDb(), customer, params });
+      return await handler(req, { db, customer, params });
     } catch (error) {
       return toResponse(error, new URL(req.url).pathname);
     }
@@ -166,12 +208,15 @@ export function withPublic(
  */
 export async function parseBody<T extends z.ZodTypeAny>(
   req: NextRequest,
-  schema: T
+  schema: T,
+  maxBytes = 2 * 1024 * 1024
 ): Promise<z.infer<T>> {
   let raw: unknown;
   try {
-    raw = await req.json();
-  } catch {
+    const bytes = await readBodyBytes(req, maxBytes);
+    raw = JSON.parse(new TextDecoder().decode(bytes));
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
     throw new ApiError(400, "Invalid JSON body");
   }
   const result = schema.safeParse(raw);

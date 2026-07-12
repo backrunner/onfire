@@ -6,7 +6,7 @@ export async function sha256Hex(input: string): Promise<string> {
 }
 
 export async function hmacSha256Hex(
-  message: string,
+  message: string | Uint8Array<ArrayBuffer>,
   secret: string
 ): Promise<string> {
   const key = await crypto.subtle.importKey(
@@ -19,19 +19,19 @@ export async function hmacSha256Hex(
   const signature = await crypto.subtle.sign(
     "HMAC",
     key,
-    encoder.encode(message)
+    typeof message === "string" ? encoder.encode(message) : message
   );
   return bufferToHex(signature);
 }
 
-/**
- * Constant-time string comparison. Comparing hex digests of equal length, so
- * a simple XOR accumulator over char codes is sufficient.
- */
-export function timingSafeEqual(a: string, b: string): boolean {
-  const aBytes = encoder.encode(a);
-  const bBytes = encoder.encode(b);
-  if (aBytes.length !== bBytes.length) return false;
+/** Hash both inputs to a fixed length before comparing to avoid length leaks. */
+export async function timingSafeEqual(a: string, b: string): Promise<boolean> {
+  const [aDigest, bDigest] = await Promise.all([
+    crypto.subtle.digest("SHA-256", encoder.encode(a)),
+    crypto.subtle.digest("SHA-256", encoder.encode(b)),
+  ]);
+  const aBytes = new Uint8Array(aDigest);
+  const bBytes = new Uint8Array(bDigest);
   let diff = 0;
   for (let i = 0; i < aBytes.length; i++) {
     diff |= aBytes[i] ^ bBytes[i];

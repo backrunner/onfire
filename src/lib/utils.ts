@@ -43,6 +43,6 @@ export function formatRelativeTime(date: string | Date): string {
 
 export function generateId(prefix: string = ""): string {
   const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).substring(2, 8);
+  const random = crypto.randomUUID().replace(/-/g, "").substring(0, 12);
   return prefix ? `${prefix}_${timestamp}${random}` : `${timestamp}${random}`;
 }

@@ -59,6 +59,9 @@ export const api = {
   get: <T>(url: string) => request<T>(url),
   post: <T>(url: string, json?: unknown) =>
     request<T>(url, { method: "POST", json }),
+  /** Multipart upload — the browser sets the Content-Type boundary. */
+  postForm: <T>(url: string, form: FormData) =>
+    request<T>(url, { method: "POST", body: form }),
   patch: <T>(url: string, json?: unknown) =>
     request<T>(url, { method: "PATCH", json }),
   delete: <T>(url: string) => request<T>(url, { method: "DELETE" }),

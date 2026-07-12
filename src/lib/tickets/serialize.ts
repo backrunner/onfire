@@ -13,8 +13,11 @@ export function parseJsonField(val: string | null | undefined): unknown {
   }
 }
 
-export interface SerializedTicket extends Omit<TicketRow, "metadata"> {
+export interface SerializedTicket
+  extends Omit<TicketRow, "metadata" | "aiScreeningResult"> {
   metadata: unknown;
+  /** Parsed prescreening result ({ issues, keywords, summary, ... }). */
+  aiScreeningResult: unknown;
   sla?: SlaView;
 }
 
@@ -22,6 +25,7 @@ export function serializeTicket(row: TicketRow): SerializedTicket {
   return {
     ...row,
     metadata: parseJsonField(row.metadata),
+    aiScreeningResult: parseJsonField(row.aiScreeningResult),
     sla: slaViewOf(row),
   };
 }

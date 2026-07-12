@@ -1,6 +1,12 @@
 import { and, inArray, type SQL, type AnyColumn } from "drizzle-orm";
 import { eq } from "drizzle-orm";
-import { products, tickets, type TicketRow } from "@/drizzle/schema";
+import {
+  productTeams,
+  products,
+  teams,
+  tickets,
+  type TicketRow,
+} from "@/drizzle/schema";
 import { Role } from "@/lib/types";
 import { forbidden, notFound } from "./response";
 import type { AuthedContext } from "./handler";
@@ -16,9 +22,18 @@ import type { AuthedContext } from "./handler";
  */
 
 const TEAM_SCOPED_ROLES = new Set([Role.TeamAdmin, Role.Agent]);
+const PRODUCT_SCOPED_ROLES = new Set([
+  Role.ProductAdmin,
+  Role.TeamAdmin,
+  Role.Agent,
+]);
 
 export function isTeamScoped(ctx: AuthedContext): boolean {
   return TEAM_SCOPED_ROLES.has(ctx.role);
+}
+
+export function isProductScoped(ctx: AuthedContext): boolean {
+  return PRODUCT_SCOPED_ROLES.has(ctx.role);
 }
 
 /**
@@ -37,6 +52,12 @@ export function ticketScopeCondition(ctx: AuthedContext): SQL | undefined {
     }
     return and(tenantCond, inArray(tickets.teamId, ctx.teamIds));
   }
+  if (isProductScoped(ctx)) {
+    return and(
+      tenantCond,
+      inArray(tickets.productId, ctx.productIds.length ? ctx.productIds : ["__none__"])
+    );
+  }
   return tenantCond;
 }
 
@@ -51,6 +72,9 @@ export function assertTicketVisible(ctx: AuthedContext, ticket: TicketRow): void
   }
   if (isTeamScoped(ctx) && !ctx.teamIds.includes(ticket.teamId)) {
     throw forbidden("Ticket belongs to another team");
+  }
+  if (ctx.role === Role.ProductAdmin && !ctx.productIds.includes(ticket.productId)) {
+    throw forbidden("Ticket belongs to another product");
   }
 }
 
@@ -69,7 +93,53 @@ export async function assertProductAccess(
   if (!ctx.isSuperAdmin && !ctx.tenantIds.includes(product.tenantId)) {
     throw notFound("Product not found");
   }
+  if (isProductScoped(ctx) && !ctx.productIds.includes(product.id)) {
+    throw notFound("Product not found");
+  }
   return product;
+}
+
+/** SQL condition for listing products within the current role's scope. */
+export function productScopeCondition(ctx: AuthedContext): SQL | undefined {
+  if (ctx.isSuperAdmin) return undefined;
+  const tenantCond = inArray(products.tenantId, ctx.tenantIds);
+  if (!isProductScoped(ctx)) return tenantCond;
+  return and(
+    tenantCond,
+    inArray(products.id, ctx.productIds.length ? ctx.productIds : ["__none__"])
+  );
+}
+
+/**
+ * ProductAdmin can manage teams attached to one of their products. Tenant and
+ * super admins can manage every team in their tenant scope.
+ */
+export async function assertTeamAccess(
+  ctx: AuthedContext,
+  teamId: string
+): Promise<typeof teams.$inferSelect> {
+  const team = await ctx.db.query.teams.findFirst({ where: eq(teams.id, teamId) });
+  if (!team || (!ctx.isSuperAdmin && !ctx.tenantIds.includes(team.tenantId))) {
+    throw notFound("Team not found");
+  }
+  if (ctx.role === Role.ProductAdmin) {
+    if (ctx.productIds.length === 0) throw notFound("Team not found");
+    const association = await ctx.db
+      .select({ teamId: productTeams.teamId })
+      .from(productTeams)
+      .where(
+        and(
+          eq(productTeams.teamId, teamId),
+          inArray(productTeams.productId, ctx.productIds)
+        )
+      )
+      .get();
+    if (!association) throw notFound("Team not found");
+  }
+  if (isTeamScoped(ctx) && !ctx.teamIds.includes(teamId)) {
+    throw notFound("Team not found");
+  }
+  return team;
 }
 
 /**

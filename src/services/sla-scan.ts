@@ -58,10 +58,19 @@ export async function runScheduledScan(db: Database): Promise<ScanReport> {
     .limit(200);
 
   for (const ticket of acceptExpiring) {
-    await db
+    const claimed = await db
       .update(tickets)
       .set({ slaAcceptWarned: true })
-      .where(eq(tickets.id, ticket.id));
+      .where(
+        and(
+          eq(tickets.id, ticket.id),
+          eq(tickets.status, TicketStatus.New),
+          eq(tickets.slaAcceptWarned, false),
+          eq(tickets.slaAcceptBreached, false)
+        )
+      )
+      .returning({ id: tickets.id });
+    if (claimed.length === 0) continue;
     await emitTicketEventSync(db, {
       type: "ticket_expiring",
       ticketId: ticket.id,
@@ -86,10 +95,19 @@ export async function runScheduledScan(db: Database): Promise<ScanReport> {
     .limit(200);
 
   for (const ticket of replyExpiring) {
-    await db
+    const claimed = await db
       .update(tickets)
       .set({ slaReplyWarned: true })
-      .where(eq(tickets.id, ticket.id));
+      .where(
+        and(
+          eq(tickets.id, ticket.id),
+          inArray(tickets.status, [...REPLY_PENDING_STATUSES]),
+          eq(tickets.slaReplyWarned, false),
+          eq(tickets.slaReplyBreached, false)
+        )
+      )
+      .returning({ id: tickets.id });
+    if (claimed.length === 0) continue;
     await emitTicketEventSync(db, {
       type: "ticket_expiring",
       ticketId: ticket.id,
@@ -113,10 +131,18 @@ export async function runScheduledScan(db: Database): Promise<ScanReport> {
     .limit(200);
 
   for (const ticket of acceptBreached) {
-    await db
+    const claimed = await db
       .update(tickets)
       .set({ slaAcceptBreached: true, slaAcceptWarned: true, updatedAt: now })
-      .where(eq(tickets.id, ticket.id));
+      .where(
+        and(
+          eq(tickets.id, ticket.id),
+          eq(tickets.status, TicketStatus.New),
+          eq(tickets.slaAcceptBreached, false)
+        )
+      )
+      .returning({ id: tickets.id });
+    if (claimed.length === 0) continue;
     // Short-SLA tickets can breach between scans without ever being
     // warned — make sure they get exactly one notification.
     if (!ticket.slaAcceptWarned) {
@@ -143,10 +169,18 @@ export async function runScheduledScan(db: Database): Promise<ScanReport> {
     .limit(200);
 
   for (const ticket of replyBreached) {
-    await db
+    const claimed = await db
       .update(tickets)
       .set({ slaReplyBreached: true, slaReplyWarned: true, updatedAt: now })
-      .where(eq(tickets.id, ticket.id));
+      .where(
+        and(
+          eq(tickets.id, ticket.id),
+          inArray(tickets.status, [...REPLY_PENDING_STATUSES]),
+          eq(tickets.slaReplyBreached, false)
+        )
+      )
+      .returning({ id: tickets.id });
+    if (claimed.length === 0) continue;
     if (!ticket.slaReplyWarned) {
       await emitTicketEventSync(db, {
         type: "ticket_expiring",
@@ -182,12 +216,19 @@ export async function runScheduledScan(db: Database): Promise<ScanReport> {
       .limit(200);
 
     for (const ticket of stale) {
-      await db.batch([
-        db
-          .update(tickets)
-          .set({ status: TicketStatus.Closed, updatedAt: now })
-          .where(eq(tickets.id, ticket.id)),
-        db.insert(history).values({
+      const claimed = await db
+        .update(tickets)
+        .set({ status: TicketStatus.Closed, updatedAt: now })
+        .where(
+          and(
+            eq(tickets.id, ticket.id),
+            eq(tickets.status, TicketStatus.Replied),
+            lt(tickets.updatedAt, cutoff)
+          )
+        )
+        .returning({ id: tickets.id });
+      if (claimed.length === 0) continue;
+      await db.insert(history).values({
           id: crypto.randomUUID(),
           ticketId: ticket.id,
           action: "auto_closed",
@@ -195,8 +236,7 @@ export async function runScheduledScan(db: Database): Promise<ScanReport> {
             reason: `No customer activity for ${product.autoCloseMinutes} minutes`,
           }),
           createdAt: now,
-        }),
-      ]);
+        });
       await emitTicketEventSync(db, {
         type: "ticket_closed",
         ticketId: ticket.id,

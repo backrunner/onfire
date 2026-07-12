@@ -61,7 +61,7 @@ export async function verifyProductApiKey(
   if (!key || key.revoked) return null;
 
   const candidateHash = await sha256Hex(secret);
-  if (!timingSafeEqual(candidateHash, key.secretHash)) return null;
+  if (!(await timingSafeEqual(candidateHash, key.secretHash))) return null;
 
   return { id: key.id, productId: key.productId };
 }

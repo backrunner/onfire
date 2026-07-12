@@ -4,6 +4,7 @@ import {
   assertTransition,
   isOpen,
   OPEN_STATUSES,
+  assertManualStatusTarget,
 } from "@/lib/tickets/state-machine";
 import { TicketStatus } from "@/lib/types";
 import { ApiError } from "@/lib/api/response";
@@ -48,5 +49,17 @@ describe("ticket state machine", () => {
     expect(() =>
       assertTransition(TicketStatus.New, TicketStatus.New)
     ).toThrowError(/already/);
+  });
+
+  it("requires dedicated actions for close and escalation", () => {
+    expect(() => assertManualStatusTarget(TicketStatus.Closed)).toThrowError(
+      /dedicated closed action/
+    );
+    expect(() =>
+      assertManualStatusTarget(TicketStatus.Escalated)
+    ).toThrowError(/dedicated escalated action/);
+    expect(() =>
+      assertManualStatusTarget(TicketStatus.Processing)
+    ).not.toThrow();
   });
 });

@@ -1,4 +1,6 @@
 import { getEnv } from "@/lib/db";
+import { readResponseJson } from "@/lib/response-body";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 const VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
@@ -33,14 +35,14 @@ export async function verifyTurnstileToken(
     form.set("response", token);
     if (remoteIp) form.set("remoteip", remoteIp);
 
-    const res = await fetch(VERIFY_URL, { method: "POST", body: form });
+    const res = await fetchWithTimeout(VERIFY_URL, { method: "POST", body: form }, 5_000);
     if (!res.ok) {
       return { success: false, errorCodes: [`http-${res.status}`] };
     }
-    const data = (await res.json()) as {
+    const data = await readResponseJson<{
       success: boolean;
       "error-codes"?: string[];
-    };
+    }>(res);
     return { success: data.success, errorCodes: data["error-codes"] };
   } catch {
     // Network failure verifying CAPTCHA: fail closed for write protection.

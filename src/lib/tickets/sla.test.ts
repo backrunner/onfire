@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { computeSlaDeadlines, slaViewOf } from "@/lib/tickets/sla";
-import { TicketPriority } from "@/lib/types";
+import {
+  computeInitialSlaDeadlines,
+  computeSlaDeadlines,
+  isTicketSlaOverdue,
+  restartReplySla,
+  slaViewOf,
+} from "@/lib/tickets/sla";
+import { TicketPriority, TicketStatus } from "@/lib/types";
 import type { products } from "@/drizzle/schema";
 
 type ProductRow = typeof products.$inferSelect;
@@ -9,6 +15,8 @@ const product = (overrides: Partial<ProductRow> = {}): ProductRow => ({
   id: "p1",
   tenantId: "t1",
   name: "Product",
+  homepageUrl: null,
+  portalReturnUrl: null,
   slaHighAccept: 30,
   slaHighReply: 60,
   slaMediumAccept: 120,
@@ -35,6 +43,33 @@ describe("computeSlaDeadlines", () => {
     const low = computeSlaDeadlines(product(), TicketPriority.Low, from);
     expect(low.slaAcceptDeadline).toBeNull();
     expect(low.slaReplyDeadline).toBeNull();
+  });
+
+  it("does not start a reply SLA before an unassigned ticket is accepted", () => {
+    const pending = computeInitialSlaDeadlines(
+      product(),
+      TicketPriority.Medium,
+      false,
+      from
+    );
+    const accepted = computeInitialSlaDeadlines(
+      product(),
+      TicketPriority.Medium,
+      true,
+      from
+    );
+
+    expect(pending.slaAcceptDeadline).toBe("2026-01-01T02:00:00.000Z");
+    expect(pending.slaReplyDeadline).toBeNull();
+    expect(accepted.slaReplyDeadline).toBe("2026-01-01T04:00:00.000Z");
+  });
+
+  it("restarts reply timing with clean warning and breach flags", () => {
+    expect(restartReplySla(product(), TicketPriority.High, from)).toEqual({
+      slaReplyDeadline: "2026-01-01T01:00:00.000Z",
+      slaReplyBreached: false,
+      slaReplyWarned: false,
+    });
   });
 });
 
@@ -71,5 +106,28 @@ describe("slaViewOf", () => {
       slaReplyBreached: false,
     });
     expect(view?.acceptBreached).toBe(true);
+  });
+});
+
+describe("isTicketSlaOverdue", () => {
+  it("only treats the SLA applicable to the current status as overdue", () => {
+    const now = Date.now();
+    const old = new Date(now - 60_000).toISOString();
+    const fresh = new Date(now + 60_000).toISOString();
+    const base = {
+      slaAcceptDeadline: old,
+      slaReplyDeadline: old,
+      slaAcceptBreached: false,
+      slaReplyBreached: false,
+    };
+
+    expect(isTicketSlaOverdue({ ...base, status: TicketStatus.New }, now)).toBe(true);
+    expect(
+      isTicketSlaOverdue(
+        { ...base, status: TicketStatus.Processing, slaReplyDeadline: fresh },
+        now
+      )
+    ).toBe(false);
+    expect(isTicketSlaOverdue({ ...base, status: TicketStatus.Replied }, now)).toBe(false);
   });
 });

@@ -3,16 +3,6 @@ import type { Database } from "@/lib/db";
 import { agents, agentTeams, tickets, users } from "@/drizzle/schema";
 import { and, eq, inArray } from "drizzle-orm";
 
-const CACHE_TTL_MS = 30_000;
-type LoadEntry = { counts: Map<string, number>; ts: number };
-const loadCache = new Map<string, LoadEntry>();
-
-const cacheKey = (teamId: string) => `team:${teamId}`;
-const isFresh = (entry?: LoadEntry): entry is LoadEntry => {
-  if (!entry) return false;
-  return Date.now() - entry.ts < CACHE_TTL_MS;
-};
-
 export const openStatuses = [
   TicketStatus.New,
   TicketStatus.Processing,
@@ -35,10 +25,6 @@ export const getTeamAgents = async (db: Database, teamId: string) => {
 };
 
 export const getLoad = async (db: Database, teamId: string) => {
-  const key = cacheKey(teamId);
-  const cached = loadCache.get(key);
-  if (isFresh(cached)) return cached.counts;
-
   const rows = await db
     .select({ assigneeId: tickets.assigneeId })
     .from(tickets)
@@ -49,15 +35,7 @@ export const getLoad = async (db: Database, teamId: string) => {
     if (row.assigneeId)
       map.set(row.assigneeId, (map.get(row.assigneeId) ?? 0) + 1);
   });
-  loadCache.set(key, { counts: map, ts: Date.now() });
   return map;
-};
-
-export const bumpLoadCache = (teamId: string, assigneeId: string | null) => {
-  const cached = loadCache.get(cacheKey(teamId));
-  if (!cached || !isFresh(cached) || !assigneeId) return;
-  cached.counts.set(assigneeId, (cached.counts.get(assigneeId) ?? 0) + 1);
-  cached.ts = Date.now();
 };
 
 export const pickAssignee = async (

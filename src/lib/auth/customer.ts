@@ -3,18 +3,14 @@ import type { NextRequest } from "next/server";
 import { getEnv } from "@/lib/db";
 
 /**
- * Claims carried by a ToC customer token. Issued via POST /api/toc/tokens
- * (server-to-server, authenticated by product API key) and presented by the
- * customer portal as a Bearer token.
+ * Minimal routing claims carried by a ToC customer token. Mutable customer
+ * profile fields are intentionally hydrated from D1 by withCustomerAuth.
  */
 export interface CustomerTokenPayload {
   /** Customer ID (customers.id) */
   sub: string;
-  email: string;
   productId: string;
   tenantId: string;
-  externalId?: string;
-  level?: number;
 }
 
 const TOKEN_TTL_SECONDS = 24 * 60 * 60;
@@ -44,11 +40,8 @@ export async function signCustomerToken(
 ): Promise<{ token: string; expiresIn: number }> {
   const { issuer, audience } = getIssuerAudience();
   const token = await new SignJWT({
-    email: payload.email,
     productId: payload.productId,
     tenantId: payload.tenantId,
-    ...(payload.externalId !== undefined && { externalId: payload.externalId }),
-    ...(payload.level !== undefined && { level: payload.level }),
   })
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setSubject(payload.sub)
@@ -73,7 +66,6 @@ export async function verifyCustomerToken(
     });
     if (
       typeof payload.sub !== "string" ||
-      typeof payload.email !== "string" ||
       typeof payload.productId !== "string" ||
       typeof payload.tenantId !== "string"
     ) {
@@ -81,12 +73,8 @@ export async function verifyCustomerToken(
     }
     return {
       sub: payload.sub,
-      email: payload.email,
       productId: payload.productId,
       tenantId: payload.tenantId,
-      externalId:
-        typeof payload.externalId === "string" ? payload.externalId : undefined,
-      level: typeof payload.level === "number" ? payload.level : undefined,
     };
   } catch {
     return null;

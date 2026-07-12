@@ -19,11 +19,18 @@ describe("crypto helpers", () => {
     );
   });
 
-  it("timingSafeEqual compares correctly", () => {
-    expect(timingSafeEqual("same", "same")).toBe(true);
-    expect(timingSafeEqual("same", "diff")).toBe(false);
-    expect(timingSafeEqual("short", "longer-string")).toBe(false);
-    expect(timingSafeEqual("", "")).toBe(true);
+  it("signs raw webhook bytes without a UTF-8 decode round trip", async () => {
+    const raw = new Uint8Array([0xff, 0x00, 0x7f]);
+    expect(await hmacSha256Hex(raw, "secret")).not.toBe(
+      await hmacSha256Hex(new TextDecoder().decode(raw), "secret")
+    );
+  });
+
+  it("timingSafeEqual compares correctly", async () => {
+    expect(await timingSafeEqual("same", "same")).toBe(true);
+    expect(await timingSafeEqual("same", "diff")).toBe(false);
+    expect(await timingSafeEqual("short", "longer-string")).toBe(false);
+    expect(await timingSafeEqual("", "")).toBe(true);
   });
 
   it("randomHex returns the requested number of bytes as hex", () => {

@@ -12,21 +12,21 @@ import { hmacSha256Hex, timingSafeEqual } from "@/lib/crypto";
  */
 export async function verifyWebhookAuth(
   request: NextRequest,
-  rawBody: string,
+  rawBody: string | Uint8Array<ArrayBuffer>,
   secret: string | null | undefined
 ): Promise<boolean> {
   if (!secret) return false;
 
   const authHeader = request.headers.get("authorization");
   if (authHeader?.startsWith("Bearer ")) {
-    if (timingSafeEqual(authHeader.slice(7), secret)) return true;
+    if (await timingSafeEqual(authHeader.slice(7), secret)) return true;
   }
 
   const signatureHeader = request.headers.get("x-webhook-signature");
   if (signatureHeader?.startsWith("sha256=")) {
     const provided = signatureHeader.slice(7).toLowerCase();
     const expected = await hmacSha256Hex(rawBody, secret);
-    if (timingSafeEqual(provided, expected)) return true;
+    if (await timingSafeEqual(provided, expected)) return true;
   }
 
   return false;

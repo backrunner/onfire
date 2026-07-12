@@ -104,7 +104,7 @@ export interface Customer {
   id: string;
   tenantId: TenantID;
   productId: ProductID;
-  email: string;
+  email?: string | null;
   externalId?: string;
   level?: number;
   meta?: Record<string, unknown>;
@@ -220,6 +220,7 @@ export type Permission =
   | "template.read"
   | "template.write"
   | "team.manage"
+  | "product.settings"
   | "product.manage"
   | "tenant.manage"
   | "user.manage"
@@ -229,7 +230,9 @@ export type Permission =
   | "category.map"
   | "agent.profile"
   | "email.config"
-  | "notification.manage";
+  | "notification.manage"
+  | "ai.config"
+  | "ai.knowledge";
 
 export const rolePermissions: Record<Role, Permission[]> = {
   [Role.SuperAdmin]: [
@@ -242,6 +245,7 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "template.read",
     "template.write",
     "team.manage",
+    "product.settings",
     "product.manage",
     "tenant.manage",
     "user.manage",
@@ -252,6 +256,8 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "agent.profile",
     "email.config",
     "notification.manage",
+    "ai.config",
+    "ai.knowledge",
   ],
   [Role.TenantAdmin]: [
     "ticket.read",
@@ -263,6 +269,7 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "template.read",
     "template.write",
     "team.manage",
+    "product.settings",
     "product.manage",
     "user.manage",
     "role.manage",
@@ -272,6 +279,7 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "agent.profile",
     "email.config",
     "notification.manage",
+    "ai.knowledge",
   ],
   [Role.ProductAdmin]: [
     "ticket.read",
@@ -283,12 +291,14 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "template.read",
     "template.write",
     "team.manage",
+    "product.settings",
     "customer.read",
     "customer.write",
     "category.map",
     "agent.profile",
     "email.config",
     "notification.manage",
+    "ai.knowledge",
   ],
   [Role.TeamAdmin]: [
     "ticket.read",
@@ -301,7 +311,13 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "category.map",
     "agent.profile",
   ],
-  [Role.Agent]: ["ticket.read", "ticket.write", "ticket.close", "agent.profile"],
+  [Role.Agent]: [
+    "ticket.read",
+    "ticket.write",
+    "ticket.escalate",
+    "ticket.close",
+    "agent.profile",
+  ],
 };
 
 export const hasPermission = (role: Role, perm: Permission) =>

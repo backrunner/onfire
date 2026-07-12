@@ -58,3 +58,10 @@ export function assertTransition(from: TicketStatus, to: TicketStatus): void {
     throw badRequest(`Invalid status transition: ${from} → ${to}`);
   }
 }
+
+/** Closed and escalated have dedicated endpoints with stronger permissions. */
+export function assertManualStatusTarget(status: TicketStatus): void {
+  if (status === TicketStatus.Closed || status === TicketStatus.Escalated) {
+    throw badRequest(`Use the dedicated ${status} action`);
+  }
+}

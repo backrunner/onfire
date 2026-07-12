@@ -1,0 +1,1 @@
+ALTER TABLE `ai_configs` ADD `api_mode` text DEFAULT 'responses' NOT NULL;

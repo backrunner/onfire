@@ -56,11 +56,10 @@ export async function checkRateLimit(
 }
 
 export function clientIp(request: NextRequest): string {
-  return (
-    request.headers.get("cf-connecting-ip") ||
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    "unknown"
-  );
+  // Cloudflare overwrites this header at the public edge. X-Forwarded-For is
+  // intentionally ignored because a direct caller or reverse proxy client
+  // can forge it and bypass the fixed-window limit.
+  return request.headers.get("cf-connecting-ip") || "unknown";
 }
 
 /**
