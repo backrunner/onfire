@@ -305,9 +305,9 @@ AI Classification → Support request → Create ticket
 |----------|------|-------------|
 | Resend | API | Modern email API |
 | SendGrid | API | Enterprise email service |
-| Mailgun | API | Developer-friendly |
+| Mailgun | API | Developer-friendly (API key format: `key:yourdomain.com`) |
 | Maileroo | API | Simple and easy to use |
-| SMTP | Protocol | Generic SMTP server |
+| SMTP | Protocol | Direct SMTP over Workers TCP sockets (465 implicit TLS / 587 STARTTLS) |
 
 ### Email Configuration
 
@@ -338,6 +338,23 @@ Each product can be independently configured:
 {{reply_content}}  - Reply content
 {{product_name}}   - Product name
 ```
+
+### Cloudflare Email Routing (Inbound)
+
+The worker exports an `email()` handler, so inbound support mail can be
+received natively without any third-party webhook service:
+
+1. In the Cloudflare dashboard, enable **Email Routing** for your domain.
+2. Create a route (or catch-all) for the support address (e.g.
+   `support@yourdomain.com`) with the action **Send to Worker → onfire**.
+3. In OnFire, set the product's inbound provider to
+   **Cloudflare Email Routing** and the inbound address to the same address.
+
+The handler parses the raw MIME message (postal-mime), extracts SPF/DKIM
+verdicts from `Authentication-Results`, and pushes the message through the
+same pipeline as the webhooks (spam check → reply detection → AI filter) via
+the internal `/api/toc/tasks/inbound-email` endpoint. Failures reject the
+message so the sender's provider retries instead of dropping mail.
 
 ### Generic Inbound Webhook
 
@@ -393,8 +410,8 @@ POST /auth/email/sign-up  - Email registration
 POST /auth/change-password - Change password
 
 # Installation
-GET  /install/status      - Check if initialization is needed
-POST /install/finalize    - Complete initialization setup
+GET  /install             - Check if initialization is needed
+POST /install             - Complete initialization setup
 
 # Dashboard
 GET  /dashboard           - Get dashboard statistics
@@ -408,9 +425,14 @@ POST   /tickets/:id/assign    - Assign/reassign
 POST   /tickets/:id/priority  - Change priority
 POST   /tickets/:id/close     - Close ticket
 POST   /tickets/:id/escalate  - Escalate ticket
+POST   /tickets/:id/prereply  - Generate AI-suggested reply
 POST   /tickets/bulk/status   - Bulk update status
 POST   /tickets/bulk/assign   - Bulk assign
 POST   /tickets/bulk/close    - Bulk close
+
+# Search
+GET    /search                - Advanced ticket search (filters + date range)
+GET    /search/suggest        - Search-box autocomplete (subjects, customer emails)
 
 # Admin
 GET/POST/PATCH/DELETE /admin/tenants      - Tenant management
@@ -436,6 +458,15 @@ POST                  /admin/email-config/:productId/webhook-secret - Generate w
 GET/POST              /admin/notification-channels      - Channel management
 GET/PATCH/DELETE      /admin/notification-channels/:id  - Channel detail
 
+# AI
+GET/POST              /admin/ai/config           - AI task model configs (per task type)
+GET/PATCH/DELETE      /admin/ai/config/:taskType - Per-task config detail
+GET/POST              /admin/ai/knowledge        - Product knowledge entries
+GET/PATCH/DELETE      /admin/ai/knowledge/:id    - Knowledge entry detail
+GET/POST              /admin/ai/documents        - Knowledge documents (stored in R2)
+GET/DELETE            /admin/ai/documents/:id    - Document detail / delete
+GET/POST              /ai/assistant              - Support-agent AI chat (history / send)
+
 # Metadata
 GET  /meta/teams          - Get accessible teams
 GET  /meta/products       - Get accessible products
@@ -452,7 +483,10 @@ GET  /health              - Health check
 GET  /whoami              - Verify current identity
 
 # Token
-POST /tokens              - Issue customer JWT using a product API key (server-to-server)
+POST /tokens              - Issue customer JWT using a product API key (server-to-server).
+                            Identity: email and/or externalId (at least one).
+                            externalId is the canonical correlation key — pass it alone
+                            to keep business-user PII out of OnFire entirely.
 
 # Templates
 GET  /templates           - Get product template list
@@ -466,6 +500,7 @@ POST   /tickets/:id/escalate  - Escalate ticket
 
 # Background Tasks
 POST /tasks/sla-scan      - SLA breach scan + auto-close (cron-invoked; Bearer AUTH_SECRET)
+POST /tasks/inbound-email - Email Routing ingestion (worker email handler; Bearer AUTH_SECRET)
 
 # Webhooks
 POST /webhooks/maileroo   - Maileroo inbound email webhook
@@ -706,3 +741,18 @@ pnpm db:migrate:remote  # Apply migrations (remote)
 # Deploy (single Worker serving ToB + ToC)
 pnpm deploy
 ```
+
+### First-Deployment Checklist
+
+1. `wrangler d1 create onfire-d1` → put the returned id into `wrangler.jsonc` `database_id`
+2. `wrangler r2 bucket create onfire-storage`
+3. `pnpm db:migrate:remote` — apply migrations to the remote D1
+4. `wrangler secret put AUTH_SECRET` (and `TURNSTILE_SECRET` if using CAPTCHA)
+5. Build-time env for the CAPTCHA widget: `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
+6. `pnpm deploy` (runs `build:worker` + `wrangler deploy`)
+7. Optional — inbound email: enable **Email Routing** on your domain and route
+   the support address to the `onfire` worker (see Email System section)
+8. Open `/admin/install` to create the first admin account
+
+Note: the bundle is ~3.7 MB gzipped — deploys need the Workers paid plan
+(free plan caps at 3 MB).

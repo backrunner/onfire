@@ -1,0 +1,4 @@
+interface:
+  display_name: "OnFire Development"
+  short_description: "Build and review OnFire with project conventions"
+  default_prompt: "Use $onfire-development to implement and verify this OnFire change."

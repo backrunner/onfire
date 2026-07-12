@@ -1,0 +1,31 @@
+# Engineering Reference
+
+- Runtime: Node.js 22+, Next.js 16 App Router, OpenNext Cloudflare, React 19, TypeScript strict.
+- OpenNext 1.20.1 supports Next 16.2 but not Node `proxy.ts`. Keep `src/middleware.ts` Web API-only and cover routing behavior with `src/middleware.test.ts` until upstream support lands.
+- Storage: D1/Drizzle, R2 documents, Vectorize 1024-dimension cosine index.
+- Authentication: Better Auth for ToB; minimal-claim JWT/API key and Product Identity Resolver v1 for ToC.
+- RBAC: combine `withAuth` permission gates with `src/lib/api/scope.ts`.
+- ProductAdmin scope is `user_products`; agent work scope is `agent_teams` through product/team relations.
+- Use `product.manage` for product lifecycle and `product.settings` for scoped SLA, auto-close, and team-association reads/updates.
+- SuperAdmin bypasses visibility scope only. Tenant/product/team IDs must still satisfy same-tenant integrity on every mutation.
+- Ticket state changes use `src/lib/tickets/state-machine.ts`; close and escalate use dedicated endpoints.
+- Email preview and sending share `src/lib/email-templates.ts`. Never interpolate unescaped user text into HTML.
+- Preserve reply threading through `In-Reply-To` and `References` across all outbound providers. Maileroo uses `/api/v2/emails` with structured sender/recipient objects.
+- OpenAI language calls honor `apiMode`; embedding providers return 1024 values before Vectorize mutation.
+- Treat empty successful language-provider completions as protocol errors.
+- Blank MIME plain text falls back to usable HTML-derived text; never let an empty alternative erase content.
+- Preserve D1 integrity manually because most business relations have no foreign keys.
+- External-ID-only customers are valid; every label, search predicate, and mail action must handle nullable email explicitly.
+- Start reply SLA on assignment/reassignment/escalation, clear it after the first public agent reply, and count only deadlines valid for the current ticket state.
+- Public endpoints require schema validation, rate limiting, and scoped identity checks.
+- ToC reverse proxying uses the fixed `/support` prefix. Preserve it at the upstream, map static files through the Worker `ASSETS` binding, and keep `/admin` plus `/api/tob` outside the allowed path set.
+- Worker edge surface routing must reject `/api/tob/*` on ToC/unknown hosts and `/api/toc/*` on ToB hosts before OpenNext. Middleware's `/api` bypass is not an authorization boundary.
+- Do not solve same-origin reverse proxying with broad CORS. Keep direct cross-origin browser access denied by default.
+- Remote identity credentials belong in the URL fragment. Resolver URLs are SSRF-sensitive outbound fetches: public HTTPS/443 only, no redirects, bounded time/body, strict JSON schema, and encrypted-at-rest server credentials.
+- Customer JWTs contain immutable routing claims only. Hydrate mutable customer fields from D1 and validate the customer/product/tenant tuple on every authenticated request.
+- A service worker mounted behind a product path must use that path as both script URL and maximum scope.
+- Theme state is a rendering contract: validate `onfire-theme` on the server, emit the matching `html` class and `color-scheme`, and use the same cookie → localStorage → system preference order on the client.
+- Customer JWTs use a 24-hour TTL. Expired-session return URLs are public product metadata, rate-limited and restricted to HTTP(S); never expose or retain the expired token while resolving them.
+- Turnstile secret and site key are a deployment pair. When the secret exists, public protected actions fail closed if no client token can be produced.
+- Generate Worker bindings with Wrangler using the value-free `wrangler.types.env`; require the generated-file check in CI.
+- Gates: TypeScript, Vitest, OpenNext Worker build, then browser QA for visible changes.

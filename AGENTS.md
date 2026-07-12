@@ -11,7 +11,9 @@ OnFire is a minimalist modern ticket system designed to enable users to quickly 
 - **Frontend**: React 19 + TypeScript
 - **UI Components**: shadcn/ui (zinc theme)
 - **Styling**: Tailwind CSS 4
-- **AI**: Vercel AI SDK v6 (支持 OpenAI/Anthropic/Google/xAI/DeepSeek)
+- **AI**: OpenAI/Anthropic/Google/xAI/DeepSeek language models + OpenAI/Qwen/Jina/Cohere/Google embeddings + Cloudflare Vectorize
+
+Current status and task requirements live in `.agents/STATUS.md` and `.agents/REQUIREMENTS.md`. Development and visual rules live in `.agents/DEVELOPMENT.md` and `.agents/DESIGN.md`.
 
 ## Project Structure
 
@@ -96,6 +98,18 @@ Ticket submission and query system for end users, including:
 
 Both systems are served by a single Cloudflare Worker via OpenNext, with multi-domain routing handled by Next.js middleware.
 
+For this deployment, ToC is `support.alkinum.io` and ToB is `onfire.alkinum.com`.
+Attach the Worker to both hostnames as Custom Domains and configure the matching
+`ADMIN_DOMAINS` and `TOC_DOMAINS` values. Cloudflare Access can protect the admin hostname;
+the Worker edge guard independently rejects `/api/tob/*` on ToC/unknown hosts
+and `/api/toc/*` on ToB hosts. The application still uses Better Auth/RBAC;
+Zero Trust is an additional network boundary, not a replacement for either.
+This is one Worker with two hostnames. Two physically independent Workers are
+possible but require separate Wrangler/OpenNext environments and an explicit
+single owner for the cron trigger and Cloudflare Email handler. The production
+config disables the fallback `workers.dev` hostname so the two Custom Domains
+are the public entry points.
+
 ---
 
 ## RBAC Role Permission System
@@ -130,13 +144,14 @@ Tenant
 | ticket.read | ✓ | ✓ | ✓ | ✓ | ✓ |
 | ticket.write | ✓ | ✓ | ✓ | ✓ | ✓ |
 | ticket.assign | ✓ | ✓ | ✓ | ✓ | - |
-| ticket.escalate | ✓ | ✓ | ✓ | ✓ | - |
+| ticket.escalate | ✓ | ✓ | ✓ | ✓ | ✓ |
 | ticket.close | ✓ | ✓ | ✓ | ✓ | ✓ |
 | ticket.reassign | ✓ | ✓ | ✓ | ✓ | - |
 | template.read | ✓ | ✓ | ✓ | - | - |
 | template.write | ✓ | ✓ | ✓ | - | - |
 | team.manage | ✓ | ✓ | ✓ | - | - |
 | product.manage | ✓ | ✓ | - | - | - |
+| product.settings | ✓ | ✓ | ✓ | - | - |
 | tenant.manage | ✓ | - | - | - | - |
 | user.manage | ✓ | ✓ | - | - | - |
 | role.manage | ✓ | ✓ | - | - | - |
@@ -146,12 +161,16 @@ Tenant
 | agent.profile | ✓ | ✓ | ✓ | ✓ | ✓ |
 | email.config | ✓ | ✓ | ✓ | - | - |
 | notification.manage | ✓ | ✓ | ✓ | - | - |
+| ai.config | ✓ | - | - | - | - |
+| ai.knowledge | ✓ | ✓ | ✓ | - | - |
 
 ### Key Concepts
 
 - **Agent**: The lowest permission user role in the system
 - **Support Agent**: The assignment target for tickets, separate from system user accounts
 - Administrators can also become support agents; the ability to reply to tickets is independent of RBAC permissions
+- `product.manage` controls product lifecycle operations such as creation and deletion. `product.settings` controls scoped product configuration such as SLA, auto-close, and team associations.
+- ProductAdmin access is limited by `user_products`; IDs submitted for tenant, product, or team associations must belong to the same tenant even for SuperAdmin requests.
 
 ---
 
@@ -198,6 +217,7 @@ Product administrators can configure different SLA timeframes for each priority:
 - **Reply SLA** (slaReplyMinutes): Time allowed for first reply after acceptance
 
 Overdue tickets are marked as breached in the system and displayed with alerts on the Dashboard.
+Unassigned tickets do not start reply SLA. Assignment, reassignment, and escalation start or reset it; the first public agent reply clears it. A later customer reply does not reactivate that completed first-reply deadline, and read-side overdue queries count only deadlines valid for the current ticket state.
 
 ### Auto-Close Configuration
 
@@ -308,6 +328,9 @@ AI Classification → Support request → Create ticket
 | Mailgun | API | Developer-friendly |
 | Maileroo | API | Simple and easy to use |
 | SMTP | Protocol | Generic SMTP server |
+| Cloudflare Email | Worker binding | Native Cloudflare Email Sending, no API key |
+
+Outbound replies preserve email threading with `In-Reply-To` and `References` headers. Maileroo sending uses its v2 structured email endpoint (`/api/v2/emails`).
 
 ### Email Configuration
 
@@ -317,6 +340,22 @@ Each product can be independently configured:
 - **Sender Info**: Sender name and email
 - **Email Templates**: Customize notification email content
 - **AI Filtering**: Enable/disable smart filtering and strictness level
+
+### Customer Portal Return URLs
+
+Each product may configure:
+- **Product Homepage URL** (`homepageUrl`): fallback destination when a customer session expires
+- **Expired-session Return URL** (`portalReturnUrl`): optional deep link used before the homepage
+
+Customer JWTs are valid for 24 hours (`expiresIn: 86400`). After a 401, the ToC portal clears the token, retains only the product ID, loads the safe public return configuration, and guides the customer back to the product. Only `http://` and `https://` URLs are accepted; if neither URL is configured, the portal falls back to its own root.
+
+### Customer Portal Reverse Proxy And Identity
+
+- A product may proxy `/support` and all descendants to this Worker without stripping the prefix. Next assets remain isolated under `/support/_next`; ToB routes below `/support` are denied.
+- Reverse-proxied browser requests are same-origin. CORS is intentionally not enabled for unrelated origins.
+- Product Identity Resolver v1 accepts a short-lived opaque credential from `#credential=...`, calls the configured product HTTPS endpoint from the server, and then signs an internal customer JWT.
+- Internal customer JWTs contain only `sub`, `productId`, and `tenantId`; email, external ID, and level are hydrated from D1 for every request.
+- The complete proxy contract, nginx/Worker examples, and identity protocol are documented in `.agents/TOC_INTEGRATION.md`.
 
 ### Email Template Types
 
@@ -374,6 +413,30 @@ POST /admin/email-config/:productId/webhook-secret
 ```
 Returns a newly generated webhook secret. Store it securely.
 
+### Cloudflare Email Routing
+
+Cloudflare Email Routing delivers inbound mail directly to the Worker's
+`email()` handler. The handler parses MIME once, trusts the SMTP envelope for
+sender identity, and forwards normalized content through the same inbound
+pipeline as webhooks. Cloudflare-routed inbound mail does not use a webhook
+secret.
+
+A blank plain-text MIME alternative falls back to usable HTML-derived text; it never overwrites valid content with an empty body.
+
+Custom product templates use the same escaped variable renderer for preview and delivery. Preview runs in a sandboxed iframe with scripts and external requests disabled.
+
+---
+
+## AI System
+
+- Language tasks (`agent`, `prescreening`, `prereply`) support OpenAI, Anthropic, Google, xAI, and DeepSeek.
+- OpenAI explicitly selects `responses` or `chat`; new configurations default to Responses API.
+- Embedding is separate and supports OpenAI, Qwen/DashScope, Jina AI, Cohere, and Google.
+- All adapters request 1024 dimensions. Vectorize uses a 1024-dimension cosine index with product namespaces.
+- Knowledge mutations synchronize Vectorize. AI assistant and pre-reply use semantic retrieval with scoped D1 fallback.
+- AI credentials require `ai.config`; product knowledge requires `ai.knowledge` plus product scope.
+- Successful HTTP responses with empty provider completions are treated as protocol failures across all language adapters.
+
 ---
 
 ## API Structure
@@ -398,6 +461,8 @@ POST /install/finalize    - Complete initialization setup
 
 # Dashboard
 GET  /dashboard           - Get dashboard statistics
+GET  /search              - Advanced scoped ticket search
+GET  /search/suggest      - Scoped ticket suggestions for quick navigation
 
 # Ticket Management
 GET    /tickets           - Ticket list (filters + pagination)
@@ -423,6 +488,11 @@ GET                   /admin/customers    - Customer query
 GET/POST/PATCH/DELETE /admin/category-routes - Category routing
 GET/POST              /admin/product-keys     - API key management
 POST                  /admin/product-keys/:id/rotate - Rotate key
+
+# AI Configuration (Admin)
+GET/POST/PATCH/DELETE /admin/ai/config       - Per-task model configuration
+GET/POST/PATCH/DELETE /admin/ai/knowledge    - Product knowledge entries
+GET/POST/DELETE       /admin/ai/documents    - Product knowledge documents
 
 # Email Configuration (Admin)
 GET/POST/PATCH        /admin/email-config     - Email config management
@@ -450,9 +520,11 @@ Authentication: JWT (Bearer Token) or API Key
 # System
 GET  /health              - Health check
 GET  /whoami              - Verify current identity
+GET  /portal-config       - Get safe product return URLs for expired-session guidance
 
 # Token
 POST /tokens              - Issue customer JWT using a product API key (server-to-server)
+POST /identity/exchange   - Exchange a product-issued opaque credential server-side
 
 # Templates
 GET  /templates           - Get product template list
@@ -486,9 +558,9 @@ import { OnfireClient } from '@onfire/sdk';
 
 ```typescript
 const client = new OnfireClient({
-  baseUrl: 'https://your-toc-worker.workers.dev/api/toc',
+  baseUrl: 'https://support.alkinum.io/api/toc',
   token: 'jwt-token',  // Optional, for logged-in users
-  tocBaseUrl: 'https://your-toc-web.pages.dev'  // ToC frontend URL
+  tocBaseUrl: 'https://support.alkinum.io'  // ToC frontend URL
 });
 ```
 
@@ -539,6 +611,11 @@ const url = await client.buildTocUrlWithSigning(productId, {
   apiKey: 'key-id.secret',
   email: 'user@example.com'
 });
+
+// Remote identity mode: credential stays in the URL fragment
+const portalUrl =
+  `https://product.example.com/support?productId=${encodeURIComponent(productId)}` +
+  `#credential=${encodeURIComponent(opaqueCredential)}`;
 ```
 
 ---
@@ -556,8 +633,10 @@ const url = await client.buildTocUrlWithSigning(productId, {
 | users | System users |
 | agents | Support agents |
 | agent_teams | Agent-Team association (many-to-many) |
+| user_products | ProductAdmin-Product scope association (many-to-many) |
 | templates | Ticket templates |
 | product_keys | API keys |
+| product_identity_configs | Encrypted per-product remote identity resolver configuration |
 | tickets | Tickets |
 | replies | Ticket replies |
 | history | Operation history |
@@ -572,6 +651,8 @@ const url = await client.buildTocUrlWithSigning(productId, {
 | notification_logs | Notification delivery logs |
 | rate_limits | Fixed-window rate-limit counters for public endpoints |
 
+Customers may be email-backed or `externalId`-only. Ticket lists, search, labels, and notification actions must handle nullable email explicitly.
+
 ---
 
 ## UI/UX Design Guidelines
@@ -580,6 +661,7 @@ const url = await client.buildTocUrlWithSigning(productId, {
 
 - **Color System**: zinc (neutral gray tones)
 - **Supported Modes**: Light mode + Dark mode
+- **SSR Theme Contract**: `onfire-theme=light|dark` is read by the server and emitted on `<html>` before hydration. First visits use a pre-paint system-preference fallback; client toggles persist cookie and localStorage together to prevent theme flashing.
 
 ### Color Specifications
 
@@ -633,6 +715,7 @@ Using shadcn/ui as the base component library, including:
    - All credentials set via environment variables
    - Strict API permission checks to prevent unauthorized access
    - Turnstile CAPTCHA protection for public endpoints
+   - `TURNSTILE_SECRET` and `NEXT_PUBLIC_TURNSTILE_SITE_KEY` configured together; a secret without a site key fails closed
    - D1-backed fixed-window rate limiting on public ToC endpoints (token issuance, ticket create/reply/escalate, inbound webhooks)
 
 2. **Code Standards**
@@ -670,14 +753,20 @@ JWT_AUDIENCE=onfire-toc  # Customer JWT audience
 ### Frontend (build-time)
 
 ```env
-NEXT_PUBLIC_TURNSTILE_SITE_KEY=xxx  # Turnstile site key (unset = widget hidden)
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=xxx  # Pair with TURNSTILE_SECRET; leave both unset to disable
 ```
 
 ### Bindings (wrangler.jsonc)
 
 - `DB` — D1 database
 - `R2` — R2 bucket (AI document storage)
+- `VECTORIZE` — `onfire-knowledge` index, 1024 dimensions, cosine metric
+- `SEND_EMAIL` — Cloudflare Email Sending binding for the native outbound provider
 - `WORKER_SELF_REFERENCE` — service binding used by the cron trigger to invoke `/api/toc/tasks/sla-scan`
+
+Before the first production deployment, provision the D1 database `onfire-d1`,
+R2 bucket `onfire-storage`, and Vectorize index `onfire-knowledge` in the
+Alkinum account, enable Cloudflare Email Sending/routing, then replace the placeholder D1 ID in `wrangler.jsonc`. Apply migrations through `0009_freezing_slayback.sql` only after explicit remote-migration approval.
 
 ---
 
@@ -695,6 +784,7 @@ pnpm build
 pnpm build:worker
 
 # Type check / tests
+pnpm cf-typegen --check
 pnpm lint
 pnpm test
 
@@ -703,6 +793,23 @@ pnpm db:generate        # Generate migration from schema
 pnpm db:migrate:local   # Apply migrations (local)
 pnpm db:migrate:remote  # Apply migrations (remote)
 
+# First-deploy local validation (no remote mutation)
+pnpm exec drizzle-kit check
+pnpm exec wrangler deploy --dry-run
+pnpm exec wrangler check startup
+pnpm audit --prod
+
 # Deploy (single Worker serving ToB + ToC)
 pnpm deploy
 ```
+
+## Current Predeployment Verification
+
+As of 2026-07-12, frozen install, generated binding check, TypeScript, Drizzle metadata, 32 test files / 150 tests, OpenNext Worker build, Wrangler deploy dry-run, startup profiling, fresh local application of migrations `0000`-`0009`, and production dependency audit all pass. The remaining build warnings are expected: Vectorize has no local simulator, and OpenNext 1.20.1 still requires `src/middleware.ts` instead of Next 16 `proxy.ts`.
+
+## Contribution Convention
+
+- Use `xxx(comp): desc`, for example `feat(ai): add qwen embeddings` or `fix(rbac): scope assistant tickets`.
+- Do not commit, deploy, apply remote migrations, or create remote Cloudflare resources unless explicitly requested.
+- OpenNext Cloudflare 1.20.1 supports Next 16.2 but not Next 16 Node `proxy.ts`. Keep `src/middleware.ts` Web API-only until upstream support lands; its domain routing is covered by `src/middleware.test.ts`.
+- Track `pnpm-lock.yaml`, `wrangler.types.env`, and generated `worker-configuration.d.ts`; regenerate types after Wrangler config changes. pnpm 11 overrides belong in `pnpm-workspace.yaml`.
