@@ -764,9 +764,12 @@ NEXT_PUBLIC_TURNSTILE_SITE_KEY=xxx  # Pair with TURNSTILE_SECRET; leave both uns
 - `SEND_EMAIL` — Cloudflare Email Sending binding for the native outbound provider
 - `WORKER_SELF_REFERENCE` — service binding used by the cron trigger to invoke `/api/toc/tasks/sla-scan`
 
-Before the first production deployment, provision the D1 database `onfire-d1`,
-R2 bucket `onfire-storage`, and Vectorize index `onfire-knowledge` in the
-Alkinum account, enable Cloudflare Email Sending/routing, then replace the placeholder D1 ID in `wrangler.jsonc`. Apply migrations through `0009_freezing_slayback.sql` only after explicit remote-migration approval.
+On 2026-07-13, the APAC `onfire-d1` D1 database, APAC Standard
+`onfire-storage` R2 bucket, and 1024-dimension cosine `onfire-knowledge`
+Vectorize index were provisioned in the Alkinum account. The D1 ID is recorded
+in `wrangler.jsonc`, and migrations through `0009_freezing_slayback.sql` have
+been applied remotely. Before the first Worker deployment, enable Cloudflare
+Email Sending/routing, configure secrets, and attach the two Custom Domains.
 
 ---
 

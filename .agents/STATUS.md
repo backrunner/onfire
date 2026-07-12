@@ -1,6 +1,6 @@
 # OnFire Project Status
 
-Updated: 2026-07-12
+Updated: 2026-07-13
 
 ## Current State
 
@@ -55,12 +55,11 @@ A fresh local D1 successfully applied migrations `0000` through `0009`. Remote m
 
 ## Deployment Prerequisites
 
-- Target Cloudflare account is `Alkinum` (`b6754402d59fc29ee8b62119014fec89`). The account currently has no `onfire` Worker, `onfire-d1` D1 database, `onfire-storage` R2 bucket, or `onfire-knowledge` Vectorize index. These must be provisioned before the first production deployment; no remote resources were created during this review.
-- Replace the `your-database-id` placeholder in `wrangler.jsonc` with the production D1 ID after creating `onfire-d1`.
-- Create Vectorize: `wrangler vectorize create onfire-knowledge --dimensions=1024 --metric=cosine`.
-- Create the R2 bucket: `wrangler r2 bucket create onfire-storage`.
+- Target Cloudflare account is `Alkinum` (`b6754402d59fc29ee8b62119014fec89`). On 2026-07-13, the APAC `onfire-d1` D1 database (`3f3294ab-8c05-4935-93c0-677ee18641dd`), APAC Standard `onfire-storage` R2 bucket, and 1024-dimension cosine `onfire-knowledge` Vectorize index were created.
+- `wrangler.jsonc` now contains the production D1 ID. All migrations `0000` through `0009` have been applied remotely; D1 reports 34 application tables and no pending migration.
+- `wrangler deploy --dry-run` resolves all DB, R2, Vectorize, Email, service, and asset bindings against the production configuration.
 - Vectorize has no local simulator. Use a selected Cloudflare account and temporary remote binding only when remote development is intended; do not commit an account ID.
-- Enable Cloudflare Email Sending for the sender domain and route inbound email to the Worker.
+- Enable Cloudflare Email Sending for the sender domain and route inbound email to the Worker. The current Wrangler OAuth token lacks `email_sending:write` and `email_routing:write`, so this remains pending a refreshed login.
 - Configure `AUTH_SECRET`. Configure `TURNSTILE_SECRET` and `NEXT_PUBLIC_TURNSTILE_SITE_KEY` together; if either is intentionally disabled, leave both unset. Never commit `.dev.vars`.
 - Run `pnpm cf-typegen` after any Wrangler binding or variable change and keep the generated `worker-configuration.d.ts` plus `wrangler.types.env` in the checkout.
 - Attach `onfire.alkinum.com` and `support.alkinum.io` as Custom Domains to the same Worker, then verify Cloudflare Access on ToB and the Worker surface guard on both hostnames.
