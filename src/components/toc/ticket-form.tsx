@@ -7,6 +7,7 @@ import { useI18n } from "@/lib/i18n";
 import { tocApi, ApiClientError } from "@/lib/api/toc-client";
 import type { TocCreateTicketResult, TocTemplate } from "@/lib/toc/portal";
 import { TicketPriority } from "@/lib/types";
+import { isFieldVisible, isEmptyFieldValue } from "@/lib/form-schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,34 +40,17 @@ function templateFields(template: TocTemplate | null): FormFieldSchema[] {
   return Array.isArray(schema?.fields) ? schema.fields : [];
 }
 
-function isFieldVisible(
-  field: FormFieldSchema,
-  valuesById: Record<string, FieldValue | undefined>
-): boolean {
-  if (!field.condition) return true;
-  const { fieldId, operator, value } = field.condition;
-  const current = valuesById[fieldId];
-  switch (operator) {
-    case "equals":
-      return current === value;
-    case "notEquals":
-      return current !== value;
-    case "contains":
-      return typeof current === "string" && current.includes(String(value));
-    case "isEmpty":
-      return current === undefined || current === null || current === "";
-    case "isNotEmpty":
-      return current !== undefined && current !== null && current !== "";
-    default:
-      return true;
+function templateDefaults(template: TocTemplate | null): Record<string, FieldValue> {
+  const values: Record<string, FieldValue> = {};
+  for (const field of templateFields(template)) {
+    if (field.defaultValue === undefined) continue;
+    values[field.key] = Array.isArray(field.defaultValue)
+      ? field.defaultValue
+      : typeof field.defaultValue === "number"
+        ? String(field.defaultValue)
+        : field.defaultValue;
   }
-}
-
-function isEmptyValue(value: FieldValue | undefined): boolean {
-  if (value === undefined || value === null) return true;
-  if (typeof value === "string") return value.trim() === "";
-  if (Array.isArray(value)) return value.length === 0;
-  return false; // booleans count as filled
+  return values;
 }
 
 export function TicketForm({ onSuccess }: TicketFormProps) {
@@ -97,7 +81,10 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
     try {
       const data = await tocApi.get<TocTemplate[]>("/api/toc/templates");
       setTemplates(data);
-      if (data.length === 1) setSelectedTemplateId(data[0].id);
+      if (data.length === 1) {
+        setSelectedTemplateId(data[0].id);
+        setCustomFields(templateDefaults(data[0]));
+      }
     } catch (error) {
       if (error instanceof ApiClientError && error.status === 401) return;
       setTemplatesError(true);
@@ -133,18 +120,8 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
     setCategory("");
     setFieldErrors({});
     // Seed defaults from the newly selected template's schema.
-    const next: Record<string, FieldValue> = {};
     const tpl = templates?.find((item) => item.id === templateId) ?? null;
-    for (const field of templateFields(tpl)) {
-      if (field.defaultValue !== undefined) {
-        next[field.key] = Array.isArray(field.defaultValue)
-          ? field.defaultValue
-          : typeof field.defaultValue === "number"
-            ? String(field.defaultValue)
-            : field.defaultValue;
-      }
-    }
-    setCustomFields(next);
+    setCustomFields(templateDefaults(tpl));
   };
 
   const setFieldValue = (key: string, value: FieldValue) => {
@@ -159,21 +136,58 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
 
   const validate = (): boolean => {
     const errors: Record<string, string> = {};
+    const s = t.toc.submit;
+    const withN = (msg: string, n: number) => msg.replace("{{n}}", String(n));
+
     for (const field of visibleFields) {
       const value = customFields[field.key];
-      if (field.required && isEmptyValue(value)) {
-        errors[field.key] = t.toc.submit.requiredField;
+      const rules = field.validation;
+
+      if (field.required && isEmptyFieldValue(value)) {
+        errors[field.key] = s.requiredField;
         continue;
       }
-      const pattern = field.validation?.pattern;
-      if (pattern && typeof value === "string" && value !== "") {
-        try {
-          if (!new RegExp(pattern).test(value)) {
-            errors[field.key] =
-              field.validation?.patternMessage || t.toc.submit.invalidFormat;
+      if (isEmptyFieldValue(value)) continue; // optional & empty — skip rules
+
+      if (typeof value === "string") {
+        if (field.type === "number") {
+          const num = Number(value);
+          if (Number.isNaN(num)) {
+            errors[field.key] = s.invalidNumber;
+            continue;
           }
-        } catch {
-          // invalid regex in the template — don't block the customer
+          if (rules?.min !== undefined && num < rules.min) {
+            errors[field.key] = withN(s.minValueError, rules.min);
+            continue;
+          }
+          if (rules?.max !== undefined && num > rules.max) {
+            errors[field.key] = withN(s.maxValueError, rules.max);
+            continue;
+          }
+        } else {
+          if (rules?.minLength !== undefined && value.length < rules.minLength) {
+            errors[field.key] = withN(s.minLengthError, rules.minLength);
+            continue;
+          }
+          if (rules?.maxLength !== undefined && value.length > rules.maxLength) {
+            errors[field.key] = withN(s.maxLengthError, rules.maxLength);
+            continue;
+          }
+          if (field.type === "email" && !/^\S+@\S+\.\S+$/.test(value)) {
+            errors[field.key] = s.invalidFormat;
+            continue;
+          }
+        }
+
+        const pattern = rules?.pattern;
+        if (pattern && value !== "") {
+          try {
+            if (!new RegExp(pattern).test(value)) {
+              errors[field.key] = rules?.patternMessage || s.invalidFormat;
+            }
+          } catch {
+            // invalid regex in the template — don't block the customer
+          }
         }
       }
     }
@@ -193,7 +207,13 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
 
   const handleSubmit = async () => {
     setFormError("");
-    if (!subject.trim() || !content.trim() || !validate()) {
+    const categoryRequired = Boolean(selectedTemplate?.categories.length);
+    if (
+      !subject.trim() ||
+      !content.trim() ||
+      (categoryRequired && !category) ||
+      !validate()
+    ) {
       setFormError(t.toc.submit.fillRequired);
       return;
     }
@@ -204,7 +224,17 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
 
     setSubmitting(true);
     try {
-      const metadata: Record<string, unknown> = { ...customFields };
+      // Only visible fields are submitted (values typed into fields that a
+      // condition later hid must not leak in), numbers as real numbers.
+      const metadata: Record<string, unknown> = {};
+      for (const field of visibleFields) {
+        const value = customFields[field.key];
+        if (value === undefined || isEmptyFieldValue(value)) continue;
+        metadata[field.key] =
+          field.type === "number" && typeof value === "string"
+            ? Number(value)
+            : value;
+      }
       if (category) metadata.category = category;
 
       const result = await tocApi.post<TocCreateTicketResult>("/api/toc/tickets", {
@@ -272,6 +302,7 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
     submitting ||
     !subject.trim() ||
     !content.trim() ||
+    (Boolean(selectedTemplate?.categories.length) && !category) ||
     (turnstileEnabled && !turnstileToken);
 
   return (
@@ -301,7 +332,10 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
 
         {selectedTemplate && selectedTemplate.categories.length > 0 && (
           <div className="space-y-2">
-            <Label>{t.toc.submit.category}</Label>
+            <Label>
+              {t.toc.submit.category}
+              <span className="text-destructive">*</span>
+            </Label>
             <Select value={category} onValueChange={setCategory}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder={t.toc.submit.selectCategory} />

@@ -1,19 +1,26 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
-import { customers, productKeys, products } from "@/drizzle/schema";
+import { eq } from "drizzle-orm";
+import { productKeys, products } from "@/drizzle/schema";
 import { ok, err } from "@/lib/api/response";
 import { withPublic, parseBody } from "@/lib/api/handler";
 import { verifyProductApiKey } from "@/lib/auth/api-key";
 import { signCustomerToken } from "@/lib/auth/customer";
+import { upsertCustomerIdentity } from "@/lib/auth/customer-record";
 import { enforceRateLimit } from "@/lib/rate-limit";
 
-const issueTokenSchema = z.object({
-  apiKey: z.string().min(10).max(256),
-  email: z.string().email().max(320),
-  externalId: z.string().max(256).optional(),
-  level: z.number().int().min(0).max(100).optional(),
-});
+const issueTokenSchema = z
+  .object({
+    apiKey: z.string().min(10).max(256),
+    /** Optional — omit to keep business-user PII out of OnFire entirely. */
+    email: z.string().email().max(320).optional(),
+    /** Business product's user identifier; the correlation key. */
+    externalId: z.string().min(1).max(256).optional(),
+    level: z.number().int().min(0).max(100).optional(),
+  })
+  .refine((data) => data.email || data.externalId, {
+    message: "Either email or externalId is required",
+  });
 
 /**
  * POST /api/toc/tokens — issue a customer JWT.
@@ -39,59 +46,25 @@ export const POST = withPublic(async (req: NextRequest, { db }) => {
     return err("Product not found", 404);
   }
 
-  const now = new Date().toISOString();
-
   await db
     .update(productKeys)
-    .set({ lastUsedAt: now })
+    .set({ lastUsedAt: new Date().toISOString() })
     .where(eq(productKeys.id, key.id));
 
-  // Upsert customer identity for this product
-  const existing = await db.query.customers.findFirst({
-    where: and(
-      eq(customers.productId, key.productId),
-      eq(customers.email, body.email)
-    ),
-  });
-
-  let customerId: string;
-  if (existing) {
-    customerId = existing.id;
-    await db
-      .update(customers)
-      .set({
-        externalId: body.externalId ?? existing.externalId,
-        level: body.level ?? existing.level,
-        updatedAt: now,
-      })
-      .where(eq(customers.id, customerId));
-  } else {
-    customerId = crypto.randomUUID();
-    await db.insert(customers).values({
-      id: customerId,
-      tenantId: product.tenantId,
-      productId: key.productId,
-      email: body.email,
-      externalId: body.externalId,
-      level: body.level,
-      createdAt: now,
-      updatedAt: now,
-    });
-  }
+  const customer = await upsertCustomerIdentity(db, product, body);
 
   const { token, expiresIn } = await signCustomerToken({
-    sub: customerId,
-    email: body.email,
+    sub: customer.id,
     productId: key.productId,
     tenantId: product.tenantId,
-    externalId: body.externalId,
-    level: body.level,
   });
 
-  return ok({
+  const response = ok({
     token,
-    customerId,
+    customerId: customer.id,
     productId: key.productId,
     expiresIn,
   });
+  response.headers.set("Cache-Control", "no-store");
+  return response;
 });

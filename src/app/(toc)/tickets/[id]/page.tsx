@@ -12,6 +12,7 @@ import { TicketDetail } from "@/components/toc/ticket-detail";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { tocPath } from "@/lib/toc-path";
 
 function DetailSkeleton() {
   return (
@@ -78,7 +79,7 @@ function TicketDetailBody({ ticketId }: { ticketId: string }) {
     if (isValid && ticketId) void fetchDetail();
   }, [isValid, ticketId, fetchDetail]);
 
-  const goBack = () => router.push("/");
+  const goBack = () => router.push(tocPath("/"));
 
   if (loading) return <DetailSkeleton />;
 

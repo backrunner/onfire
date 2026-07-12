@@ -14,7 +14,15 @@ import { Skeleton } from "@/components/ui/skeleton";
  * and renders children inside the centered max-w-2xl column.
  */
 export function TocPortalShell({ children }: { children: ReactNode }) {
-  const { isLoading, isValid, isExpired, missingFields } = useTocCredentials();
+  const {
+    isLoading,
+    isValid,
+    isExpired,
+    isIdentityError,
+    productId,
+    missingFields,
+  } =
+    useTocCredentials();
   const [whoami, setWhoami] = useState<TocWhoAmI | null>(null);
   const [whoamiLoading, setWhoamiLoading] = useState(true);
 
@@ -41,7 +49,7 @@ export function TocPortalShell({ children }: { children: ReactNode }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-muted/40 dark:bg-background">
         <div className="mx-auto max-w-2xl space-y-4 px-4 py-6">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-48 w-full" />
@@ -51,7 +59,11 @@ export function TocPortalShell({ children }: { children: ReactNode }) {
   }
 
   if (isExpired) {
-    return <CredentialError variant="expired" />;
+    return <CredentialError variant="expired" productId={productId} />;
+  }
+
+  if (isIdentityError) {
+    return <CredentialError variant="identity" productId={productId} />;
   }
 
   if (!isValid) {
@@ -59,15 +71,18 @@ export function TocPortalShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-screen flex-col bg-muted/40 dark:bg-background">
       <TocHeader
         productName={whoami?.productName}
-        customerEmail={whoami?.email}
+        customerEmail={whoami?.displayName ?? whoami?.email}
         loading={whoamiLoading && !whoami}
       />
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-6">
         {children}
       </main>
+      <footer className="pb-6 pt-2 text-center text-xs text-muted-foreground/60">
+        Powered by OnFire
+      </footer>
     </div>
   );
 }

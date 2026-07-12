@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { eq, and, desc, count } from "drizzle-orm";
+import { eq, and, or, desc, count, sql, isNull } from "drizzle-orm";
 import {
   tickets,
   history,
@@ -8,16 +8,21 @@ import {
   tenants,
   categoryRoutes,
   customers,
+  templates,
 } from "@/drizzle/schema";
 import { TicketStatus, TicketPriority } from "@/lib/types";
 import { ok, err, badRequest } from "@/lib/api/response";
 import { withCustomerAuth, parseBody, parseQuery } from "@/lib/api/handler";
-import { computeSlaDeadlines } from "@/lib/tickets/sla";
+import { computeInitialSlaDeadlines } from "@/lib/tickets/sla";
 import { serializeTicketForCustomer } from "@/lib/tickets/serialize";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { pickAssignee, derivePriority } from "@/services/allocation";
 import { emitTicketEvent } from "@/services/ticket-events";
+import {
+  parseFormSchema,
+  validateFormSubmission,
+} from "@/lib/form-schema";
 
 const listQuerySchema = z.object({
   status: z.enum(TicketStatus).optional(),
@@ -30,21 +35,33 @@ const createTicketSchema = z.object({
   subject: z.string().min(1).max(500),
   content: z.string().min(1).max(50_000),
   priority: z.enum(TicketPriority).optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
+  metadata: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .refine((value) => JSON.stringify(value).length <= 20_000, {
+      message: "Metadata exceeds the 20 KB limit",
+    }),
   turnstileToken: z.string().optional(),
 });
 
 /**
  * GET /api/toc/tickets — list the authenticated customer's tickets.
- * Identity (email + product) comes exclusively from the verified JWT.
+ * Identity claims come from the verified JWT; mutable profile fields are
+ * hydrated from the product-scoped customer row by withCustomerAuth.
  */
 export const GET = withCustomerAuth(async (req: NextRequest, { db, customer }) => {
   const query = parseQuery(req, listQuerySchema);
 
-  const conditions = [
-    eq(tickets.customerEmail, customer.email),
-    eq(tickets.productId, customer.productId),
-  ];
+  // Ownership: canonical customerId link, with an email fallback for
+  // tickets created before the link existed (or via inbound email).
+  const identity = customer.email
+    ? or(
+        eq(tickets.customerId, customer.sub),
+        sql`lower(${tickets.customerEmail}) = ${customer.email.toLowerCase()}`
+      )
+    : eq(tickets.customerId, customer.sub);
+
+  const conditions = [identity, eq(tickets.productId, customer.productId)];
   if (query.status) conditions.push(eq(tickets.status, query.status));
   const where = and(...conditions);
 
@@ -100,6 +117,42 @@ export const POST = withCustomerAuth(async (req: NextRequest, { db, customer }) 
   });
   if (!product) return err("Product not found", 404);
 
+  if (body.templateId) {
+    const template = await db.query.templates.findFirst({
+      where: and(
+        eq(templates.id, body.templateId),
+        eq(templates.productId, product.id)
+      ),
+    });
+    if (!template) throw badRequest("Template does not belong to this product");
+    const formSchema = parseFormSchema(template.formSchema);
+    if (!formSchema) throw badRequest("Template form configuration is invalid");
+    const submissionErrors = validateFormSubmission(
+      formSchema,
+      body.metadata ?? {}
+    );
+    if (submissionErrors.length > 0) {
+      throw badRequest("Template fields are invalid", submissionErrors);
+    }
+    let categories: unknown = [];
+    try {
+      categories = JSON.parse(template.categories);
+    } catch {
+      categories = [];
+    }
+    const allowedCategories = Array.isArray(categories)
+      ? categories.filter((value): value is string => typeof value === "string")
+      : [];
+    const submittedCategory = body.metadata?.category;
+    if (
+      allowedCategories.length > 0 &&
+      (typeof submittedCategory !== "string" ||
+        !allowedCategories.includes(submittedCategory))
+    ) {
+      throw badRequest("A valid template category is required");
+    }
+  }
+
   const tenant = await db.query.tenants.findFirst({
     where: eq(tenants.id, product.tenantId),
   });
@@ -110,12 +163,30 @@ export const POST = withCustomerAuth(async (req: NextRequest, { db, customer }) 
   const category =
     typeof body.metadata?.category === "string" ? body.metadata.category : null;
   if (category) {
-    const route = await db.query.categoryRoutes.findFirst({
-      where: and(
-        eq(categoryRoutes.productId, product.id),
-        eq(categoryRoutes.category, category)
-      ),
-    });
+    const subcategory =
+      typeof body.metadata?.subcategory === "string"
+        ? body.metadata.subcategory.trim()
+        : "";
+    // Prefer an exact subcategory route, then fall back to the category-wide
+    // route. Older rows may still contain NULL before migration 0009.
+    const exactRoute = subcategory
+      ? await db.query.categoryRoutes.findFirst({
+          where: and(
+            eq(categoryRoutes.productId, product.id),
+            eq(categoryRoutes.category, category),
+            eq(categoryRoutes.subcategory, subcategory)
+          ),
+        })
+      : undefined;
+    const route =
+      exactRoute ??
+      (await db.query.categoryRoutes.findFirst({
+        where: and(
+          eq(categoryRoutes.productId, product.id),
+          eq(categoryRoutes.category, category),
+          or(eq(categoryRoutes.subcategory, ""), isNull(categoryRoutes.subcategory))
+        ),
+      }));
     if (route) teamId = route.teamId;
   }
   if (!teamId) {
@@ -125,8 +196,13 @@ export const POST = withCustomerAuth(async (req: NextRequest, { db, customer }) 
   const now = new Date().toISOString();
   const ticketId = crypto.randomUUID();
   const priority = body.priority ?? derivePriority(customer.level);
-  const sla = computeSlaDeadlines(product, priority, new Date(now));
   const assignee = await pickAssignee(db, teamId);
+  const sla = computeInitialSlaDeadlines(
+    product,
+    priority,
+    Boolean(assignee),
+    new Date(now)
+  );
 
   await db.batch([
     db.insert(tickets).values({
@@ -139,7 +215,8 @@ export const POST = withCustomerAuth(async (req: NextRequest, { db, customer }) 
       priority,
       subject: body.subject,
       content: body.content,
-      customerEmail: customer.email,
+      customerId: customer.sub,
+      customerEmail: customer.email ?? null,
       customerLevel: customer.level ?? null,
       templateId: body.templateId ?? null,
       metadata: body.metadata ? JSON.stringify(body.metadata) : null,

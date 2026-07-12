@@ -1,7 +1,7 @@
 "use client";
 
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/ui/theme-provider";
 import type { RefObject } from "react";
 
 export const TURNSTILE_SITE_KEY: string | undefined =
@@ -19,8 +19,9 @@ interface TurnstileWidgetProps {
 
 /**
  * Cloudflare Turnstile widget. Renders nothing when
- * NEXT_PUBLIC_TURNSTILE_SITE_KEY is not configured — the backend skips
- * verification in that case too.
+ * NEXT_PUBLIC_TURNSTILE_SITE_KEY is not configured. Deployments must pair the
+ * public site key with TURNSTILE_SECRET; a configured backend secret remains
+ * fail-closed even when the widget key is accidentally omitted.
  */
 export function TurnstileWidget({ onToken, widgetRef }: TurnstileWidgetProps) {
   const { resolvedTheme } = useTheme();

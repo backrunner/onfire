@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { isTocProxyLocation, tocPath } from "@/lib/toc-path";
 
 /**
  * Service Worker Registration Component
@@ -18,8 +19,11 @@ export function ServiceWorkerRegister() {
     ) {
       // Register after the page has loaded
       window.addEventListener("load", () => {
+        const proxied = isTocProxyLocation();
         navigator.serviceWorker
-          .register("/sw.js", { scope: "/" })
+          .register(tocPath("/sw.js"), {
+            scope: proxied ? "/support/" : "/",
+          })
           .then((registration) => {
             console.log("SW registered:", registration.scope);
 

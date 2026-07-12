@@ -7,11 +7,13 @@ import type { FormSchema } from "@/lib/form-schema";
 
 export interface TocWhoAmI {
   customerId: string;
-  email: string;
+  email: string | null;
   productId: string;
   productName: string | null;
   externalId: string | null;
   level: number | null;
+  /** email → externalId fallback for the header identity chip. */
+  displayName: string | null;
 }
 
 export interface TocTemplate {

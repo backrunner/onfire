@@ -11,6 +11,7 @@ import { TicketList } from "@/components/toc/ticket-list";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { tocPath } from "@/lib/toc-path";
 
 function SubmitSuccess({
   result,
@@ -58,12 +59,12 @@ export default function TocHomePage() {
   return (
     <TocPortalShell>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-4 grid w-full grid-cols-2">
-          <TabsTrigger value="submit" className="gap-1.5">
+        <TabsList className="mb-4 grid h-11 w-full grid-cols-2 rounded-full p-1">
+          <TabsTrigger value="submit" className="gap-1.5 rounded-full">
             <PlusCircle className="size-4" />
             {t.toc.tabs.submit}
           </TabsTrigger>
-          <TabsTrigger value="list" className="gap-1.5">
+          <TabsTrigger value="list" className="gap-1.5 rounded-full">
             <List className="size-4" />
             {t.toc.tabs.list}
           </TabsTrigger>
@@ -73,7 +74,9 @@ export default function TocHomePage() {
           {submitted ? (
             <SubmitSuccess
               result={submitted}
-              onViewTicket={() => router.push(`/tickets/${submitted.ticketId}`)}
+              onViewTicket={() =>
+                router.push(tocPath(`/tickets/${submitted.ticketId}`))
+              }
               onSubmitAnother={() => setSubmitted(null)}
             />
           ) : (
@@ -82,7 +85,9 @@ export default function TocHomePage() {
         </TabsContent>
 
         <TabsContent value="list" className="mt-0">
-          <TicketList onSelect={(ticketId) => router.push(`/tickets/${ticketId}`)} />
+          <TicketList
+            onSelect={(ticketId) => router.push(tocPath(`/tickets/${ticketId}`))}
+          />
         </TabsContent>
       </Tabs>
     </TocPortalShell>

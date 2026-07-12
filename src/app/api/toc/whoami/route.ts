@@ -15,10 +15,12 @@ export const GET = withCustomerAuth(async (_req: NextRequest, { db, customer }) 
 
   return ok({
     customerId: customer.sub,
-    email: customer.email,
+    email: customer.email ?? null,
     productId: customer.productId,
     productName: product?.name ?? null,
     externalId: customer.externalId ?? null,
     level: customer.level ?? null,
+    /** What the portal header should show as the signed-in identity. */
+    displayName: customer.email ?? customer.externalId ?? null,
   });
 });

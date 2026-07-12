@@ -1,17 +1,20 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { tickets, history } from "@/drizzle/schema";
+import { tickets, history, products } from "@/drizzle/schema";
 import { TicketStatus } from "@/lib/types";
-import { ok, badRequest } from "@/lib/api/response";
+import { ok, err, badRequest } from "@/lib/api/response";
 import { withCustomerAuth, parseBody } from "@/lib/api/handler";
 import { loadCustomerTicket } from "@/lib/tickets/customer-access";
 import { chooseEscalationAssignee } from "@/services/allocation";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { emitTicketEvent } from "@/services/ticket-events";
+import { verifyTurnstileToken } from "@/lib/turnstile";
+import { restartReplySla } from "@/lib/tickets/sla";
 
 const escalateSchema = z.object({
   reason: z.string().max(2000).optional(),
+  turnstileToken: z.string().optional(),
 });
 
 /**
@@ -38,6 +41,14 @@ export const POST = withCustomerAuth(async (req: NextRequest, ctx) => {
 
   const body = await parseBody(req, escalateSchema);
 
+  const captcha = await verifyTurnstileToken(
+    body.turnstileToken,
+    req.headers.get("cf-connecting-ip")
+  );
+  if (!captcha.success) {
+    return err("CAPTCHA verification failed", 400, captcha.errorCodes);
+  }
+
   const newAssignee = await chooseEscalationAssignee(
     ctx.db,
     ticket.teamId,
@@ -48,6 +59,12 @@ export const POST = withCustomerAuth(async (req: NextRequest, ctx) => {
   }
 
   const now = new Date().toISOString();
+  const product = await ctx.db.query.products.findFirst({
+    where: eq(products.id, ticket.productId),
+  });
+  const slaReset = product
+    ? restartReplySla(product, ticket.priority, new Date(now))
+    : {};
 
   await ctx.db.batch([
     ctx.db
@@ -56,6 +73,7 @@ export const POST = withCustomerAuth(async (req: NextRequest, ctx) => {
         assigneeId: newAssignee.id,
         status: TicketStatus.Escalated,
         updatedAt: now,
+        ...slaReset,
       })
       .where(eq(tickets.id, ticket.id)),
     ctx.db.insert(history).values({

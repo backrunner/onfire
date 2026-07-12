@@ -3,16 +3,20 @@
 /**
  * ToC portal session storage.
  *
- * Credentials (customer JWT + productId) arrive once via URL query params,
- * are persisted to sessionStorage, and the params are immediately stripped
- * from the URL so the token never lingers in the address bar, browser
- * history, or referrer headers.
+ * Credentials (customer JWT + productId) arrive once via URL parameters,
+ * preferably with the token in a fragment. They are persisted to
+ * sessionStorage and immediately stripped from the URL so the token never
+ * lingers in the address bar, browser history, or referrer headers.
  */
 
 const STORAGE_KEY = "onfire-toc-credentials";
 
 /** Window event fired when an API call returns 401 (token expired/revoked). */
 export const TOC_SESSION_EXPIRED_EVENT = "onfire-toc-session-expired";
+
+export interface TocSessionExpiredDetail {
+  productId: string | null;
+}
 
 export interface TocCredentials {
   token: string;
@@ -58,6 +62,14 @@ export function clearTocCredentials(): void {
  */
 export function notifyTocSessionExpired(): void {
   if (typeof window === "undefined") return;
+  const credentials = readTocCredentials();
+  // Several portal requests can fail with 401 at once. Only the first one
+  // owns expiry notification; later responses must not erase product context.
+  if (!credentials) return;
   clearTocCredentials();
-  window.dispatchEvent(new Event(TOC_SESSION_EXPIRED_EVENT));
+  window.dispatchEvent(
+    new CustomEvent<TocSessionExpiredDetail>(TOC_SESSION_EXPIRED_EVENT, {
+      detail: { productId: credentials.productId },
+    })
+  );
 }

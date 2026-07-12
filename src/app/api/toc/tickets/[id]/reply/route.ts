@@ -67,7 +67,14 @@ export const POST = withCustomerAuth(async (req: NextRequest, ctx) => {
     ctx.db
       .update(tickets)
       .set({
-        ...(reopen ? { status: TicketStatus.Processing } : {}),
+        ...(reopen
+          ? {
+              status: TicketStatus.Processing,
+              // A customer follow-up must not reactivate the completed
+              // first-reply SLA from the prior processing cycle.
+              slaReplyDeadline: null,
+            }
+          : {}),
         updatedAt: now,
       })
       .where(eq(tickets.id, ticket.id)),

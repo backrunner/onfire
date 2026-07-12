@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertCircle, Clock } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertCircle, ArrowUpRight, Clock, Loader2 } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
@@ -14,44 +15,107 @@ import {
 } from "@/components/ui/alert";
 import { useI18n } from "@/lib/i18n";
 import { featureFlags } from "@/lib/feature-flags";
+import { Button } from "@/components/ui/button";
+import { tocPath } from "@/lib/toc-path";
 
 interface CredentialErrorProps {
   /** "missing" — no/partial credentials; "expired" — token rejected (401). */
-  variant?: "missing" | "expired";
+  variant?: "missing" | "expired" | "identity";
+  productId?: string | null;
   missingFields?: ("productId" | "token")[];
 }
 
 export function CredentialError({
   variant = "missing",
+  productId = null,
   missingFields = [],
 }: CredentialErrorProps) {
   const { t } = useI18n();
   const showDebugDetails = featureFlags.showDebugDetails();
   const expired = variant === "expired";
-  const Icon = expired ? Clock : AlertCircle;
+  const identity = variant === "identity";
+  const sessionIssue = expired || identity;
+  const Icon = sessionIssue ? Clock : AlertCircle;
+  const [returnUrl, setReturnUrl] = useState<string | null | undefined>(
+    undefined
+  );
+
+  useEffect(() => {
+    if (!sessionIssue) return;
+    if (!productId) {
+      setReturnUrl(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(
+      tocPath(`/api/toc/portal-config?productId=${encodeURIComponent(productId)}`)
+    )
+      .then(async (response) => {
+        if (!response.ok) return null;
+        const body = (await response.json()) as {
+          ok?: boolean;
+          data?: { redirectUrl?: string | null };
+        };
+        return body.ok ? body.data?.redirectUrl ?? null : null;
+      })
+      .then((url) => {
+        if (!cancelled) setReturnUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) setReturnUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionIssue, productId]);
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-lg items-start px-4 py-20 sm:py-24">
-      <Alert variant="destructive" className="border-destructive/50">
+      <Alert
+        variant="destructive"
+        className="border-destructive/40 bg-destructive/[0.03] dark:border-destructive/45 dark:bg-destructive/20"
+      >
         <Icon />
         <AlertTitle>
-          {expired
-            ? t.toc.errors.sessionExpired
+          {sessionIssue
+            ? identity
+              ? t.toc.errors.identityRejected
+              : t.toc.errors.sessionExpired
             : t.toc.errors.configurationError}
         </AlertTitle>
         <AlertDescription className="gap-2">
           <p>
-            {expired
-              ? t.toc.errors.sessionExpiredMessage
+            {sessionIssue
+              ? identity
+                ? t.toc.errors.identityRejectedMessage
+                : t.toc.errors.sessionExpiredMessage
               : t.toc.errors.missingCredentialsMessage}
           </p>
           <p className="text-destructive/80">
-            {expired
-              ? t.toc.errors.sessionExpiredHint
+            {sessionIssue
+              ? identity
+                ? t.toc.errors.identityRejectedHint
+                : t.toc.errors.sessionExpiredHint
               : t.toc.errors.contactProvider}
           </p>
 
-          {showDebugDetails && !expired && missingFields.length > 0 && (
+          {sessionIssue && (
+            returnUrl === undefined ? (
+              <Button disabled size="sm" className="mt-2 w-full sm:w-auto">
+                <Loader2 className="size-3.5 animate-spin" />
+                {t.toc.errors.returnToProduct}
+              </Button>
+            ) : (
+              <Button asChild size="sm" className="mt-2 w-full sm:w-auto">
+                <a href={returnUrl ?? tocPath("/")}>
+                  {t.toc.errors.returnToProduct}
+                  <ArrowUpRight className="size-3.5" />
+                </a>
+              </Button>
+            )
+          )}
+
+          {showDebugDetails && !sessionIssue && missingFields.length > 0 && (
             <Accordion
               type="single"
               collapsible

@@ -8,6 +8,7 @@
 
 import { ApiClientError } from "./client";
 import { notifyTocSessionExpired, readTocCredentials } from "@/lib/toc-session";
+import { tocPath } from "@/lib/toc-path";
 
 interface Envelope<T> {
   ok: boolean;
@@ -23,7 +24,7 @@ async function request<T>(
   const { json, ...rest } = init ?? {};
   const token = readTocCredentials()?.token;
 
-  const res = await fetch(url, {
+  const res = await fetch(tocPath(url), {
     ...rest,
     headers: {
       ...(json !== undefined ? { "Content-Type": "application/json" } : {}),

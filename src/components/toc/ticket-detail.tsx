@@ -113,6 +113,10 @@ export function TicketDetail({ ticket, replies, onBack, onRefresh }: TicketDetai
   const [escalateOpen, setEscalateOpen] = useState(false);
   const [escalateReason, setEscalateReason] = useState("");
   const [escalating, setEscalating] = useState(false);
+  const [escalateTurnstileToken, setEscalateTurnstileToken] = useState<
+    string | null
+  >(null);
+  const escalateTurnstileRef = useRef<TurnstileInstance | undefined>(undefined);
 
   const isClosed = ticket.status === TicketStatus.Closed;
   const isEscalated = ticket.status === TicketStatus.Escalated;
@@ -177,6 +181,7 @@ export function TicketDetail({ ticket, replies, onBack, onRefresh }: TicketDetai
     try {
       await tocApi.post(`/api/toc/tickets/${ticket.id}/escalate`, {
         reason: escalateReason.trim() || undefined,
+        turnstileToken: escalateTurnstileToken ?? undefined,
       });
       setEscalateOpen(false);
       setEscalateReason("");
@@ -189,6 +194,8 @@ export function TicketDetail({ ticket, replies, onBack, onRefresh }: TicketDetai
           error instanceof ApiClientError ? error.message : undefined,
       });
     } finally {
+      setEscalateTurnstileToken(null);
+      escalateTurnstileRef.current?.reset();
       setEscalating(false);
     }
   };
@@ -316,7 +323,16 @@ export function TicketDetail({ ticket, replies, onBack, onRefresh }: TicketDetai
       </Card>
 
       {/* Escalate confirm dialog */}
-      <Dialog open={escalateOpen} onOpenChange={setEscalateOpen}>
+      <Dialog
+        open={escalateOpen}
+        onOpenChange={(open) => {
+          setEscalateOpen(open);
+          if (!open) {
+            setEscalateTurnstileToken(null);
+            escalateTurnstileRef.current?.reset();
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t.toc.detail.escalateTitle}</DialogTitle>
@@ -331,6 +347,10 @@ export function TicketDetail({ ticket, replies, onBack, onRefresh }: TicketDetai
               maxLength={2000}
               className="min-h-20"
             />
+            <TurnstileWidget
+              widgetRef={escalateTurnstileRef}
+              onToken={setEscalateTurnstileToken}
+            />
           </div>
           <DialogFooter>
             <Button
@@ -340,7 +360,13 @@ export function TicketDetail({ ticket, replies, onBack, onRefresh }: TicketDetai
             >
               {t.common.cancel}
             </Button>
-            <Button onClick={handleEscalate} disabled={escalating}>
+            <Button
+              onClick={handleEscalate}
+              disabled={
+                escalating ||
+                (turnstileEnabled && !escalateTurnstileToken)
+              }
+            >
               {escalating && <Loader2 className="size-4 animate-spin" />}
               {t.toc.detail.escalateConfirm}
             </Button>

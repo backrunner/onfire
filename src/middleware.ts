@@ -23,12 +23,12 @@ function parseDomains(value: string | undefined, fallback: string[]): string[] {
 
 const ADMIN_DOMAINS = parseDomains(
   process.env.ADMIN_DOMAINS || process.env.NEXT_PUBLIC_ADMIN_DOMAINS,
-  ["admin.onfire.app", "admin.localhost", "admin.127.0.0.1"]
+  ["onfire.alkinum.com", "admin.localhost", "admin.127.0.0.1"]
 );
 
 const TOC_DOMAINS = parseDomains(
   process.env.TOC_DOMAINS || process.env.NEXT_PUBLIC_TOC_DOMAINS,
-  ["support.onfire.app", "localhost", "127.0.0.1"]
+  ["support.alkinum.io", "localhost", "127.0.0.1"]
 );
 
 const TOC_PORT = process.env.NEXT_PUBLIC_TOC_PORT || "3000";
@@ -47,6 +47,8 @@ export function middleware(request: NextRequest) {
   const host = (request.headers.get("host") || "").toLowerCase();
   const [hostname, port] = host.split(":");
   const pathname = request.nextUrl.pathname;
+  const tocProxyRequest =
+    request.headers.get("x-onfire-proxy-prefix") === "/support";
 
   // Skip API routes, static files, and Next.js internals
   if (
@@ -57,6 +59,10 @@ export function middleware(request: NextRequest) {
   ) {
     return NextResponse.next();
   }
+
+  // worker.ts has already constrained and stripped /support. Keep this
+  // request on the ToC surface regardless of the upstream Host header.
+  if (tocProxyRequest) return NextResponse.next();
 
   if (portBasedRouting && port) {
     if (port === TOB_PORT) {

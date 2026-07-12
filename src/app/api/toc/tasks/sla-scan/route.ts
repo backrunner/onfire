@@ -16,7 +16,7 @@ export const POST = withPublic(async (req: NextRequest, { db }) => {
   const env = getEnv();
   const authHeader = req.headers.get("authorization") ?? "";
   const expected = `Bearer ${env.AUTH_SECRET}`;
-  if (!env.AUTH_SECRET || !timingSafeEqual(authHeader, expected)) {
+  if (!env.AUTH_SECRET || !(await timingSafeEqual(authHeader, expected))) {
     return err("Unauthorized", 401);
   }
 

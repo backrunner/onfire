@@ -1,9 +1,11 @@
 "use client";
 
+import { useI18n } from "@/lib/i18n";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -52,16 +54,20 @@ interface DynamicFormFieldProps {
   error?: string;
 }
 
-export function DynamicFormField({ field, value, onChange, error }: DynamicFormFieldProps) {
-  // Normalize options to the new format
-  const normalizeOptions = (options?: string[] | Array<{ label: string; value: string }>) => {
-    if (!options) return [];
-    if (typeof options[0] === "string") {
-      return (options as string[]).map((opt) => ({ label: opt, value: opt }));
-    }
-    return options as Array<{ label: string; value: string }>;
-  };
+/** Normalize legacy string options and drop entries without a value. */
+function normalizeOptions(
+  options?: string[] | Array<{ label: string; value: string }>
+): Array<{ label: string; value: string }> {
+  if (!options || options.length === 0) return [];
+  const normalized =
+    typeof options[0] === "string"
+      ? (options as string[]).map((opt) => ({ label: opt, value: opt }))
+      : (options as Array<{ label: string; value: string }>);
+  return normalized.filter((option) => option.value);
+}
 
+export function DynamicFormField({ field, value, onChange, error }: DynamicFormFieldProps) {
+  const { t } = useI18n();
   const options = normalizeOptions(field.options);
 
   const renderField = () => {
@@ -74,7 +80,6 @@ export function DynamicFormField({ field, value, onChange, error }: DynamicFormF
             placeholder={field.placeholder}
             className="min-h-[80px]"
             rows={field.config?.rows || 3}
-            minLength={field.validation?.minLength}
             maxLength={field.validation?.maxLength}
           />
         );
@@ -82,8 +87,10 @@ export function DynamicFormField({ field, value, onChange, error }: DynamicFormF
       case "select":
         return (
           <Select value={(value as string) || ""} onValueChange={onChange}>
-            <SelectTrigger>
-              <SelectValue placeholder={field.placeholder || "Select..."} />
+            <SelectTrigger className="w-full">
+              <SelectValue
+                placeholder={field.placeholder || t.toc.submit.selectOption}
+              />
             </SelectTrigger>
             <SelectContent>
               {options.map((option) => (
@@ -97,24 +104,21 @@ export function DynamicFormField({ field, value, onChange, error }: DynamicFormF
 
       case "radio":
         return (
-          <div className="space-y-2">
+          <RadioGroup
+            value={(value as string) || ""}
+            onValueChange={onChange}
+            className="gap-2"
+          >
             {options.map((option) => (
               <label
                 key={option.value}
-                className="flex items-center gap-2 cursor-pointer"
+                className="flex cursor-pointer items-center gap-2"
               >
-                <input
-                  type="radio"
-                  name={field.key}
-                  value={option.value}
-                  checked={value === option.value}
-                  onChange={(e) => onChange(e.target.value)}
-                  className="h-4 w-4"
-                />
+                <RadioGroupItem value={option.value} />
                 <span className="text-sm">{option.label}</span>
               </label>
             ))}
-          </div>
+          </RadioGroup>
         );
 
       case "checkbox":
@@ -126,7 +130,7 @@ export function DynamicFormField({ field, value, onChange, error }: DynamicFormF
               {options.map((option) => (
                 <label
                   key={option.value}
-                  className="flex items-center gap-2 cursor-pointer"
+                  className="flex cursor-pointer items-center gap-2"
                 >
                   <Checkbox
                     checked={selectedValues.includes(option.value)}
@@ -145,13 +149,16 @@ export function DynamicFormField({ field, value, onChange, error }: DynamicFormF
         }
         // Single checkbox
         return (
-          <div className="flex items-center gap-2">
+          <label className="flex cursor-pointer items-center gap-2">
             <Checkbox
               checked={(value as boolean) || false}
               onCheckedChange={(checked) => onChange(!!checked)}
             />
-            <span className="text-sm">{field.label}</span>
-          </div>
+            <span className="text-sm">
+              {field.label}
+              {field.required && <span className="text-destructive ml-1">*</span>}
+            </span>
+          </label>
         );
 
       case "number":
@@ -193,15 +200,14 @@ export function DynamicFormField({ field, value, onChange, error }: DynamicFormF
             value={(value as string) || ""}
             onChange={(e) => onChange(e.target.value)}
             placeholder={field.placeholder}
-            minLength={field.validation?.minLength}
             maxLength={field.validation?.maxLength}
           />
         );
     }
   };
 
-  // Don't show label for single checkbox (it's shown inline)
-  const showLabel = field.type !== "checkbox" || (field.options && field.options.length > 0);
+  // Single checkbox renders its own inline label
+  const showLabel = field.type !== "checkbox" || options.length > 0;
 
   return (
     <div className="space-y-2">
