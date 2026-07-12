@@ -18,7 +18,19 @@ import {
   FormFieldOption,
   ConditionOperator,
 } from "@/lib/form-schema";
+import { useI18n } from "@/lib/i18n";
 import { Plus, Trash2 } from "lucide-react";
+
+// Radix Select forbids empty-string item values; sentinel for "no condition".
+const ALWAYS = "__always__";
+
+const OPERATORS: ConditionOperator[] = [
+  "equals",
+  "notEquals",
+  "contains",
+  "isEmpty",
+  "isNotEmpty",
+];
 
 interface PropertyPanelProps {
   field: FormFieldSchema | null;
@@ -33,10 +45,13 @@ export function PropertyPanel({
   onChange,
   onDelete,
 }: PropertyPanelProps) {
+  const { t } = useI18n();
+  const fb = t.formBuilder;
+
   if (!field) {
     return (
-      <div className="p-4 text-center text-muted-foreground">
-        Select a field to edit its properties
+      <div className="p-4 text-center text-sm text-muted-foreground">
+        {fb.selectFieldHint}
       </div>
     );
   }
@@ -67,7 +82,13 @@ export function PropertyPanel({
   const addOption = () => {
     const newOptions = [
       ...(field.options || []),
-      { label: `Option ${(field.options?.length || 0) + 1}`, value: "" },
+      {
+        label: fb.defaultOption.replace(
+          "{{n}}",
+          String((field.options?.length || 0) + 1)
+        ),
+        value: "",
+      },
     ];
     onChange({ ...field, options: newOptions });
   };
@@ -83,9 +104,15 @@ export function PropertyPanel({
   return (
     <div className="space-y-4 p-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-medium">Field Properties</h3>
-        <Button variant="destructive" size="sm" onClick={onDelete}>
-          <Trash2 className="h-4 w-4" />
+        <h3 className="text-sm font-medium">{fb.fieldProperties}</h3>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 text-destructive hover:text-destructive"
+          onClick={onDelete}
+          aria-label={t.common.delete}
+        >
+          <Trash2 className="size-4" />
         </Button>
       </div>
 
@@ -94,18 +121,20 @@ export function PropertyPanel({
       {/* Basic Properties */}
       <div className="space-y-3">
         <div className="space-y-1.5">
-          <Label htmlFor="label">Label</Label>
+          <Label htmlFor="label">{fb.label}</Label>
           <Input
             id="label"
+            className="h-8"
             value={field.label}
             onChange={(e) => updateField({ label: e.target.value })}
           />
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="key">Field Key</Label>
+          <Label htmlFor="key">{fb.fieldKey}</Label>
           <Input
             id="key"
+            className="h-8"
             value={field.key}
             onChange={(e) => updateField({ key: e.target.value })}
             placeholder="unique_field_key"
@@ -113,16 +142,17 @@ export function PropertyPanel({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="placeholder">Placeholder</Label>
+          <Label htmlFor="placeholder">{fb.placeholder}</Label>
           <Input
             id="placeholder"
+            className="h-8"
             value={field.placeholder || ""}
             onChange={(e) => updateField({ placeholder: e.target.value })}
           />
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="helpText">Help Text</Label>
+          <Label htmlFor="helpText">{fb.helpText}</Label>
           <Textarea
             id="helpText"
             value={field.helpText || ""}
@@ -132,7 +162,7 @@ export function PropertyPanel({
         </div>
 
         <div className="flex items-center justify-between">
-          <Label htmlFor="required">Required</Label>
+          <Label htmlFor="required">{fb.required}</Label>
           <Switch
             id="required"
             checked={field.required || false}
@@ -147,37 +177,39 @@ export function PropertyPanel({
           <Separator />
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label>Options</Label>
-              <Button variant="outline" size="sm" onClick={addOption}>
-                <Plus className="h-4 w-4 mr-1" />
-                Add
+              <Label>{fb.options}</Label>
+              <Button variant="outline" size="sm" className="h-7" onClick={addOption}>
+                <Plus className="size-3.5" />
+                {fb.add}
               </Button>
             </div>
             <div className="space-y-2">
               {(field.options || []).map((option, index) => (
                 <div key={index} className="flex gap-2">
                   <Input
-                    placeholder="Label"
+                    placeholder={fb.optionLabel}
                     value={option.label}
                     onChange={(e) =>
                       updateOption(index, { label: e.target.value })
                     }
-                    className="flex-1"
+                    className="h-8 flex-1"
                   />
                   <Input
-                    placeholder="Value"
+                    placeholder={fb.optionValue}
                     value={option.value}
                     onChange={(e) =>
                       updateOption(index, { value: e.target.value })
                     }
-                    className="flex-1"
+                    className="h-8 flex-1"
                   />
                   <Button
                     variant="ghost"
                     size="icon"
+                    className="size-8"
                     onClick={() => removeOption(index)}
+                    aria-label={t.common.delete}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="size-4" />
                   </Button>
                 </div>
               ))}
@@ -189,18 +221,19 @@ export function PropertyPanel({
       {/* Validation */}
       <Separator />
       <div className="space-y-3">
-        <Label>Validation</Label>
+        <Label>{fb.validation}</Label>
 
         {(field.type === "text" || field.type === "textarea") && (
           <>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1.5">
                 <Label htmlFor="minLength" className="text-xs">
-                  Min Length
+                  {fb.minLength}
                 </Label>
                 <Input
                   id="minLength"
                   type="number"
+                  className="h-8"
                   value={field.validation?.minLength || ""}
                   onChange={(e) =>
                     updateValidation(
@@ -212,11 +245,12 @@ export function PropertyPanel({
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="maxLength" className="text-xs">
-                  Max Length
+                  {fb.maxLength}
                 </Label>
                 <Input
                   id="maxLength"
                   type="number"
+                  className="h-8"
                   value={field.validation?.maxLength || ""}
                   onChange={(e) =>
                     updateValidation(
@@ -229,10 +263,11 @@ export function PropertyPanel({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="pattern" className="text-xs">
-                Regex Pattern
+                {fb.pattern}
               </Label>
               <Input
                 id="pattern"
+                className="h-8"
                 value={field.validation?.pattern || ""}
                 onChange={(e) => updateValidation("pattern", e.target.value)}
                 placeholder="^[a-zA-Z]+$"
@@ -245,11 +280,12 @@ export function PropertyPanel({
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5">
               <Label htmlFor="min" className="text-xs">
-                Min Value
+                {fb.minValue}
               </Label>
               <Input
                 id="min"
                 type="number"
+                className="h-8"
                 value={field.validation?.min ?? ""}
                 onChange={(e) =>
                   updateValidation(
@@ -261,11 +297,12 @@ export function PropertyPanel({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="max" className="text-xs">
-                Max Value
+                {fb.maxValue}
               </Label>
               <Input
                 id="max"
                 type="number"
+                className="h-8"
                 value={field.validation?.max ?? ""}
                 onChange={(e) =>
                   updateValidation(
@@ -284,27 +321,28 @@ export function PropertyPanel({
         <>
           <Separator />
           <div className="space-y-3">
-            <Label>Conditional Display</Label>
+            <Label>{fb.conditional}</Label>
             <div className="space-y-2">
               <Select
-                value={field.condition?.fieldId || ""}
+                value={field.condition?.fieldId || ALWAYS}
                 onValueChange={(value) =>
                   updateField({
-                    condition: value
-                      ? {
-                          fieldId: value,
-                          operator: field.condition?.operator || "equals",
-                          value: field.condition?.value,
-                        }
-                      : undefined,
+                    condition:
+                      value !== ALWAYS
+                        ? {
+                            fieldId: value,
+                            operator: field.condition?.operator || "equals",
+                            value: field.condition?.value,
+                          }
+                        : undefined,
                   })
                 }
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Show when field..." />
+                <SelectTrigger className="h-8">
+                  <SelectValue placeholder={fb.conditionField} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Always show</SelectItem>
+                  <SelectItem value={ALWAYS}>{fb.alwaysShow}</SelectItem>
                   {otherFields.map((f) => (
                     <SelectItem key={f.id} value={f.id}>
                       {f.label}
@@ -326,15 +364,15 @@ export function PropertyPanel({
                       })
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-8">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="equals">Equals</SelectItem>
-                      <SelectItem value="notEquals">Not Equals</SelectItem>
-                      <SelectItem value="contains">Contains</SelectItem>
-                      <SelectItem value="isEmpty">Is Empty</SelectItem>
-                      <SelectItem value="isNotEmpty">Is Not Empty</SelectItem>
+                      {OPERATORS.map((op) => (
+                        <SelectItem key={op} value={op}>
+                          {fb.operators[op]}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
 
@@ -342,7 +380,8 @@ export function PropertyPanel({
                     field.condition.operator
                   ) && (
                     <Input
-                      placeholder="Value"
+                      placeholder={fb.optionValue}
+                      className="h-8"
                       value={String(field.condition.value || "")}
                       onChange={(e) =>
                         updateField({

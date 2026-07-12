@@ -8,7 +8,9 @@ import {
   createField,
   createEmptyFormSchema,
   validateFormSchema,
+  type SchemaError,
 } from "@/lib/form-schema";
+import { useI18n } from "@/lib/i18n";
 import { FieldPalette } from "./field-palette";
 import { Canvas } from "./canvas";
 import { PropertyPanel } from "./property-panel";
@@ -31,34 +33,45 @@ interface FormBuilderProps {
 }
 
 export function FormBuilder({ initialSchema, onSave }: FormBuilderProps) {
+  const { t } = useI18n();
+  const fb = t.formBuilder;
   const [schema, setSchema] = useState<FormSchema>(
     initialSchema || createEmptyFormSchema()
   );
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [jsonInput, setJsonInput] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [validationErrors, setValidationErrors] = useState<SchemaError[]>([]);
+
+  const formatError = useCallback(
+    (error: SchemaError) =>
+      fb.errors[error.code].replace("{{field}}", error.field),
+    [fb.errors]
+  );
 
   const selectedField = schema.fields.find((f) => f.id === selectedFieldId);
 
-  const handleAddField = useCallback((type: FormFieldType) => {
-    const key = `field_${Date.now()}`;
-    const newField = createField(type, key);
+  const handleAddField = useCallback(
+    (type: FormFieldType) => {
+      const key = `field_${Date.now()}`;
+      const newField = createField(type, key);
 
-    // Add default options for select/radio/checkbox
-    if (["select", "radio", "checkbox"].includes(type)) {
-      newField.options = [
-        { label: "Option 1", value: "option1" },
-        { label: "Option 2", value: "option2" },
-      ];
-    }
+      // Add default options for select/radio/checkbox
+      if (["select", "radio", "checkbox"].includes(type)) {
+        newField.options = [1, 2].map((n) => ({
+          label: fb.defaultOption.replace("{{n}}", String(n)),
+          value: `option${n}`,
+        }));
+      }
 
-    setSchema((prev) => ({
-      ...prev,
-      fields: [...prev.fields, newField],
-    }));
-    setSelectedFieldId(newField.id);
-  }, []);
+      setSchema((prev) => ({
+        ...prev,
+        fields: [...prev.fields, newField],
+      }));
+      setSelectedFieldId(newField.id);
+    },
+    [fb.defaultOption]
+  );
 
   const handleUpdateField = useCallback((updatedField: FormFieldSchema) => {
     setSchema((prev) => ({
@@ -95,19 +108,19 @@ export function FormBuilder({ initialSchema, onSave }: FormBuilderProps) {
     try {
       const parsed = JSON.parse(jsonInput);
       if (parsed.version !== "1.0" || !Array.isArray(parsed.fields)) {
-        setImportError("Invalid schema format");
+        setImportError(fb.invalidSchema);
         return;
       }
       const errors = validateFormSchema(parsed);
       if (errors.length > 0) {
-        setImportError(errors.join(", "));
+        setImportError(errors.map(formatError).join("; "));
         return;
       }
       setSchema(parsed);
       setImportError(null);
       setJsonInput("");
     } catch {
-      setImportError("Invalid JSON");
+      setImportError(fb.invalidJson);
     }
   };
 
@@ -127,21 +140,21 @@ export function FormBuilder({ initialSchema, onSave }: FormBuilderProps) {
       {/* Toolbar */}
       <div className="flex items-center justify-between p-4 border-b">
         <div className="flex items-center gap-2">
-          <Button onClick={handleSave}>
-            <Save className="h-4 w-4 mr-2" />
-            Save
+          <Button size="sm" className="h-8" onClick={handleSave}>
+            <Save className="size-4" />
+            {t.common.save}
           </Button>
 
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline">
-                <Eye className="h-4 w-4 mr-2" />
-                Preview
+              <Button variant="outline" size="sm" className="h-8">
+                <Eye className="size-4" />
+                {fb.preview}
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[80vh] overflow-auto">
               <DialogHeader>
-                <DialogTitle>Form Preview</DialogTitle>
+                <DialogTitle>{fb.previewTitle}</DialogTitle>
               </DialogHeader>
               <Preview schema={schema} />
             </DialogContent>
@@ -151,18 +164,18 @@ export function FormBuilder({ initialSchema, onSave }: FormBuilderProps) {
         <div className="flex items-center gap-2">
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Upload className="h-4 w-4 mr-2" />
-                Import
+              <Button variant="outline" size="sm" className="h-8">
+                <Upload className="size-4" />
+                {fb.import}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Import JSON Schema</DialogTitle>
+                <DialogTitle>{fb.importTitle}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <Textarea
-                  placeholder="Paste JSON schema here..."
+                  placeholder={fb.importPlaceholder}
                   value={jsonInput}
                   onChange={(e) => setJsonInput(e.target.value)}
                   rows={10}
@@ -171,15 +184,15 @@ export function FormBuilder({ initialSchema, onSave }: FormBuilderProps) {
                   <p className="text-sm text-destructive">{importError}</p>
                 )}
                 <Button onClick={handleImportJson} className="w-full">
-                  Import
+                  {fb.import}
                 </Button>
               </div>
             </DialogContent>
           </Dialog>
 
-          <Button variant="outline" size="sm" onClick={handleExportJson}>
-            <FileJson className="h-4 w-4 mr-2" />
-            Export
+          <Button variant="outline" size="sm" className="h-8" onClick={handleExportJson}>
+            <FileJson className="size-4" />
+            {fb.export}
           </Button>
         </div>
       </div>
@@ -190,10 +203,10 @@ export function FormBuilder({ initialSchema, onSave }: FormBuilderProps) {
           <div className="flex items-start gap-2 text-destructive">
             <AlertCircle className="h-4 w-4 mt-0.5" />
             <div className="text-sm">
-              <p className="font-medium">Please fix the following errors:</p>
+              <p className="font-medium">{fb.fixErrors}</p>
               <ul className="list-disc list-inside mt-1">
                 {validationErrors.map((error, i) => (
-                  <li key={i}>{error}</li>
+                  <li key={i}>{formatError(error)}</li>
                 ))}
               </ul>
             </div>
@@ -212,8 +225,8 @@ export function FormBuilder({ initialSchema, onSave }: FormBuilderProps) {
         <div className="flex-1 flex flex-col p-4 overflow-hidden">
           <Tabs defaultValue="edit" className="flex-1 flex flex-col">
             <TabsList className="w-fit">
-              <TabsTrigger value="edit">Edit</TabsTrigger>
-              <TabsTrigger value="preview">Preview</TabsTrigger>
+              <TabsTrigger value="edit">{fb.editTab}</TabsTrigger>
+              <TabsTrigger value="preview">{fb.previewTab}</TabsTrigger>
             </TabsList>
             <TabsContent value="edit" className="flex-1 flex mt-4">
               <Canvas

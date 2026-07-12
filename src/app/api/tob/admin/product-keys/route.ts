@@ -4,7 +4,7 @@ import { eq, inArray } from "drizzle-orm";
 import { productKeys, products } from "@/drizzle/schema";
 import { ok } from "@/lib/api/response";
 import { withAuth, parseBody, parseQuery } from "@/lib/api/handler";
-import { assertProductAccess, tenantCondition } from "@/lib/api/scope";
+import { assertProductAccess, productScopeCondition } from "@/lib/api/scope";
 import { generateProductKeySecret } from "@/lib/auth/api-key";
 
 const listQuerySchema = z.object({
@@ -28,7 +28,7 @@ function toKeyView(row: typeof productKeys.$inferSelect) {
   };
 }
 
-export const GET = withAuth({ permission: "product.manage" }, async (req: NextRequest, ctx) => {
+export const GET = withAuth({ permission: "product.settings" }, async (req: NextRequest, ctx) => {
   const { productId } = parseQuery(req, listQuerySchema);
 
   if (productId) {
@@ -43,7 +43,7 @@ export const GET = withAuth({ permission: "product.manage" }, async (req: NextRe
   const accessible = await ctx.db
     .select({ id: products.id })
     .from(products)
-    .where(tenantCondition(ctx, products.tenantId));
+    .where(productScopeCondition(ctx));
   const productIds = accessible.map((p) => p.id);
   if (productIds.length === 0) return ok([]);
 
@@ -54,7 +54,7 @@ export const GET = withAuth({ permission: "product.manage" }, async (req: NextRe
   return ok(keys.map(toKeyView));
 });
 
-export const POST = withAuth({ permission: "product.manage" }, async (req: NextRequest, ctx) => {
+export const POST = withAuth({ permission: "product.settings" }, async (req: NextRequest, ctx) => {
   const body = await parseBody(req, createKeySchema);
   await assertProductAccess(ctx, body.productId);
 
@@ -70,7 +70,7 @@ export const POST = withAuth({ permission: "product.manage" }, async (req: NextR
   });
 
   // The plaintext credential is returned exactly once.
-  return ok(
+  const response = ok(
     {
       id: generated.id,
       productId: body.productId,
@@ -80,4 +80,6 @@ export const POST = withAuth({ permission: "product.manage" }, async (req: NextR
     },
     201
   );
+  response.headers.set("Cache-Control", "no-store");
+  return response;
 });

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
-import { Ban, Copy, Plus, RefreshCw, Trash2, Undo2 } from "lucide-react";
+import { Ban, Copy, Pencil, Plus, RefreshCw, Trash2, Undo2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { api, qs, swrFetcher } from "@/lib/api/client";
 import { Badge } from "@/components/ui/badge";
@@ -118,6 +118,9 @@ export function ProductKeyManagement() {
   const [secret, setSecret] = useState<SecretReveal | null>(null);
   const [rotating, setRotating] = useState<ProductKeyView | null>(null);
   const [rotatePending, setRotatePending] = useState(false);
+  const [editing, setEditing] = useState<ProductKeyView | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPending, setEditPending] = useState(false);
   const [deleting, setDeleting] = useState<ProductKeyView | null>(null);
 
   const productNames = useMemo(
@@ -189,6 +192,28 @@ export function ProductKeyManagement() {
     }
   };
 
+  const openEdit = (key: ProductKeyView) => {
+    setEditing(key);
+    setEditName(key.name ?? "");
+  };
+
+  const handleEdit = async () => {
+    if (!editing) return;
+    setEditPending(true);
+    try {
+      await api.patch(`/api/tob/admin/product-keys/${editing.id}`, {
+        name: editName.trim(),
+      });
+      toast.success(m.toastUpdated);
+      setEditing(null);
+      await mutate();
+    } catch (err) {
+      toast.error(errorMessage(err, m.loadFailed));
+    } finally {
+      setEditPending(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleting) return;
     try {
@@ -232,7 +257,12 @@ export function ProductKeyManagement() {
                 ))}
               </SelectContent>
             </Select>
-            <Button size="sm" className="h-8" onClick={openCreate}>
+            <Button
+              size="sm"
+              className="h-8"
+              onClick={openCreate}
+              disabled={(products?.length ?? 0) === 0}
+            >
               <Plus className="mr-1.5 size-3.5" />
               {m.apiKeys.create}
             </Button>
@@ -294,6 +324,11 @@ export function ProductKeyManagement() {
                     <TableCell className="text-right">
                       <RowActions
                         actions={[
+                          {
+                            label: t.common.edit,
+                            icon: Pencil,
+                            onSelect: () => openEdit(key),
+                          },
                           {
                             label: m.apiKeys.rotate,
                             icon: RefreshCw,
@@ -381,6 +416,46 @@ export function ProductKeyManagement() {
             </Button>
             <Button size="sm" className="h-8" onClick={handleCreate} disabled={pending}>
               {pending ? t.common.loading : t.common.save}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!editing}
+        onOpenChange={(open) => !editPending && !open && setEditing(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{m.apiKeys.edit}</DialogTitle>
+          </DialogHeader>
+          <FormField label={m.apiKeys.name} htmlFor="edit-key-name">
+            <Input
+              id="edit-key-name"
+              value={editName}
+              onChange={(event) => setEditName(event.target.value)}
+              placeholder={m.apiKeys.namePlaceholder}
+              maxLength={100}
+              className="h-8"
+            />
+          </FormField>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setEditing(null)}
+              disabled={editPending}
+            >
+              {t.common.cancel}
+            </Button>
+            <Button
+              size="sm"
+              className="h-8"
+              onClick={() => void handleEdit()}
+              disabled={editPending}
+            >
+              {editPending ? t.common.loading : t.common.save}
             </Button>
           </DialogFooter>
         </DialogContent>

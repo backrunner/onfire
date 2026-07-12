@@ -90,7 +90,10 @@ export function ChannelDialog({
       return;
     }
     const missingRequired = fields.some(
-      (f) => f.required && !config[f.key]?.trim()
+      (f) =>
+        f.required &&
+        !config[f.key]?.trim() &&
+        !channel?.secretFields?.includes(f.key)
     );
     if (missingRequired) {
       toast.error(t.notifChannels.configRequired);

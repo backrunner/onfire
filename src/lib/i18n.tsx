@@ -1,10 +1,19 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  ReactNode,
+} from "react";
 import { en } from "@/locales/en";
 import { zh, type Translations } from "@/locales/zh";
 
-type Language = "en" | "zh";
+export type Language = "en" | "zh";
+
+export const LANGUAGE_COOKIE = "onfire-lang";
 
 interface I18nContextType {
   language: Language;
@@ -16,22 +25,39 @@ const I18nContext = createContext<I18nContextType | null>(null);
 
 const translations: Record<Language, Translations> = { en, zh };
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<Language>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("onfire-lang");
-      if (saved === "en" || saved === "zh") return saved;
-      const browserLang = navigator.language.toLowerCase();
-      return browserLang.startsWith("zh") ? "zh" : "en";
-    }
-    return "en";
-  });
+/**
+ * The language is resolved SERVER-SIDE (cookie, falling back to the
+ * Accept-Language header) and passed in as `initialLanguage`, so SSR output
+ * already matches the user's language — no hydration mismatch, no flash of
+ * English before Chinese renders.
+ */
+export function I18nProvider({
+  children,
+  initialLanguage,
+}: {
+  children: ReactNode;
+  initialLanguage?: Language;
+}) {
+  const [language, setLanguageState] = useState<Language>(
+    initialLanguage ?? "en"
+  );
 
   const setLanguage = useCallback((lang: Language) => {
     setLanguageState(lang);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("onfire-lang", lang);
+    document.cookie = `${LANGUAGE_COOKIE}=${lang}; path=/; max-age=31536000; samesite=lax`;
+    localStorage.setItem(LANGUAGE_COOKIE, lang);
+    document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+  }, []);
+
+  // One-time migration for users who picked a language before the cookie
+  // existed (preference used to live only in localStorage).
+  useEffect(() => {
+    if (document.cookie.includes(`${LANGUAGE_COOKIE}=`)) return;
+    const saved = localStorage.getItem(LANGUAGE_COOKIE);
+    if (saved === "en" || saved === "zh") {
+      setLanguage(saved);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const t = translations[language];

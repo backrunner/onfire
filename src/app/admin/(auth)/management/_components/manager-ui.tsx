@@ -51,8 +51,8 @@ export function ManagerPanel({
   children,
 }: ManagerPanelProps) {
   return (
-    <Card>
-      <CardHeader className="flex flex-col gap-3 space-y-0 pb-4 sm:flex-row sm:items-start sm:justify-between">
+    <Card className="h-full gap-0 overflow-hidden py-0">
+      <CardHeader className="flex flex-col gap-3 space-y-0 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
           <CardTitle className="text-base">{title}</CardTitle>
           {description && (
@@ -76,7 +76,9 @@ export function ManagerPanel({
           {actions}
         </div>
       </CardHeader>
-      <CardContent>{children}</CardContent>
+      <CardContent className="flex min-h-0 flex-1 flex-col px-5 pb-4">
+        {children}
+      </CardContent>
     </Card>
   );
 }
@@ -93,7 +95,7 @@ export function TableSkeleton({ rows = 5 }: { rows?: number }) {
 
 export function EmptyState({ message }: { message: string }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+    <div className="flex min-h-44 flex-1 flex-col items-center justify-center gap-2 py-8 text-center">
       <Inbox className="size-8 text-muted-foreground/50" />
       <p className="text-sm text-muted-foreground">{message}</p>
     </div>
@@ -109,7 +111,7 @@ export function ErrorState({
 }) {
   const { t } = useI18n();
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+    <div className="flex min-h-44 flex-1 flex-col items-center justify-center gap-3 py-8 text-center">
       <p className="text-sm text-muted-foreground">
         {message || t.management.loadFailed}
       </p>

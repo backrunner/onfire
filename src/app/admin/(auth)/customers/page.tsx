@@ -75,7 +75,7 @@ export default function AdminCustomersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">
+        <h1 className="text-xl font-semibold">
           {t.customersPage.title}
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -164,7 +164,7 @@ export default function AdminCustomersPage() {
                       onClick={() => setSelected(customer)}
                     >
                       <TableCell className="text-sm font-medium">
-                        {customer.email}
+                        {customer.email || "—"}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {customer.externalId || "—"}
@@ -209,7 +209,9 @@ export default function AdminCustomersPage() {
                 <dt className="text-muted-foreground">
                   {t.customersPage.detail.email}
                 </dt>
-                <dd className="break-all font-medium">{selected.email}</dd>
+                <dd className="break-all font-medium">
+                  {selected.email || "—"}
+                </dd>
                 <dt className="text-muted-foreground">
                   {t.customersPage.detail.externalId}
                 </dt>
@@ -235,7 +237,9 @@ export default function AdminCustomersPage() {
               </dl>
               <Button asChild size="sm" className="w-full">
                 <Link
-                  href={`/admin/tickets?q=${encodeURIComponent(selected.email)}`}
+                  href={`/admin/tickets?q=${encodeURIComponent(
+                    selected.email ?? selected.externalId ?? selected.id
+                  )}`}
                 >
                   <ExternalLink className="mr-1.5 size-3.5" />
                   {t.customersPage.detail.viewTickets}

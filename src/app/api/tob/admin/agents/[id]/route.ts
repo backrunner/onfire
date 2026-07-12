@@ -1,18 +1,25 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
-import { users, agents, agentTeams, agentProfiles, teams } from "@/drizzle/schema";
-import { ok, notFound, forbidden } from "@/lib/api/response";
+import {
+  users,
+  agents,
+  agentTeams,
+  agentProfiles,
+  teams,
+  tickets,
+} from "@/drizzle/schema";
+import { ok, notFound, forbidden, conflict } from "@/lib/api/response";
 import { withAuth, parseBody, type AuthedContext } from "@/lib/api/handler";
-import { tenantCondition } from "@/lib/api/scope";
+import { canManageRole } from "@/lib/api-utils";
 
 const updateAgentSchema = z.object({
-  level: z.number().int().optional(),
+  level: z.number().int().min(1).max(10).optional(),
   active: z.boolean().optional(),
-  displayName: z.string().min(1).optional(),
-  email: z.string().min(1).optional(),
-  avatarUrl: z.string().nullable().optional(),
+  displayName: z.string().trim().min(1).max(100).optional(),
+  email: z.string().trim().email().max(320).optional(),
+  avatarUrl: z.string().url().max(2_048).nullable().optional(),
   teamIds: z.array(z.string()).optional(),
 });
 
@@ -54,14 +61,22 @@ export const PATCH = withAuth({ permission: "user.manage" }, async (req: NextReq
   const { agent, user } = await loadAccessibleAgent(ctx, ctx.params.id);
   const body = await parseBody(req, updateAgentSchema);
 
+  if (!canManageRole(ctx.role, user.role)) {
+    throw forbidden("Cannot manage an agent for an equal or higher role");
+  }
+
   if (body.teamIds && body.teamIds.length > 0) {
+    const teamIds = [...new Set(body.teamIds)];
     const accessibleTeams = await ctx.db
-      .select({ id: teams.id })
+      .select({ id: teams.id, tenantId: teams.tenantId })
       .from(teams)
-      .where(tenantCondition(ctx, teams.tenantId));
+      .where(inArray(teams.id, teamIds));
     const accessibleTeamIds = new Set(accessibleTeams.map((t) => t.id));
-    if (body.teamIds.some((teamId) => !accessibleTeamIds.has(teamId))) {
-      throw forbidden("Cannot assign to teams outside your tenant");
+    if (
+      teamIds.some((teamId) => !accessibleTeamIds.has(teamId)) ||
+      accessibleTeams.some((team) => team.tenantId !== user.tenantId)
+    ) {
+      throw forbidden("Agents can only join teams in their own tenant");
     }
   }
 
@@ -109,14 +124,15 @@ export const PATCH = withAuth({ permission: "user.manage" }, async (req: NextReq
   }
 
   if (body.teamIds !== undefined) {
+    const teamIds = [...new Set(body.teamIds)];
     statements.push(
       ctx.db.delete(agentTeams).where(eq(agentTeams.userId, agent.userId))
     );
-    if (body.teamIds.length > 0) {
+    if (teamIds.length > 0) {
       statements.push(
         ctx.db
           .insert(agentTeams)
-          .values(body.teamIds.map((teamId) => ({ userId: agent.userId, teamId })))
+          .values(teamIds.map((teamId) => ({ userId: agent.userId, teamId })))
       );
     }
   }
@@ -129,7 +145,19 @@ export const PATCH = withAuth({ permission: "user.manage" }, async (req: NextReq
 });
 
 export const DELETE = withAuth({ permission: "user.manage" }, async (_req: NextRequest, ctx) => {
-  const { agent } = await loadAccessibleAgent(ctx, ctx.params.id);
+  const { agent, user } = await loadAccessibleAgent(ctx, ctx.params.id);
+  if (!canManageRole(ctx.role, user.role)) {
+    throw forbidden("Cannot manage an agent for an equal or higher role");
+  }
+
+  const [assignedTicket] = await ctx.db
+    .select({ id: tickets.id })
+    .from(tickets)
+    .where(eq(tickets.assigneeId, agent.userId))
+    .limit(1);
+  if (assignedTicket) {
+    throw conflict("Reassign this agent's tickets before removing the agent role");
+  }
 
   // Delete agent records (keep the user account).
   await ctx.db.batch([

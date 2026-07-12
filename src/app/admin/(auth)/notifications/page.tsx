@@ -75,10 +75,10 @@ export default function AdminNotificationsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">
+          <h1 className="text-xl font-semibold">
             {t.notifChannels.title}
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -90,6 +90,7 @@ export default function AdminNotificationsPage() {
             value={productId}
             onChange={setProductId}
             placeholder={t.notifChannels.selectProduct}
+            emptyLabel={t.notifChannels.noProducts}
             autoSelectFirst
           />
           <Button
@@ -225,7 +226,7 @@ export default function AdminNotificationsPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 text-white hover:bg-red-700"
+              className="bg-destructive text-white hover:bg-destructive/90"
               onClick={confirmDelete}
             >
               {t.common.delete}

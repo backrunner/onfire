@@ -119,7 +119,7 @@ export default function AdminInstallPage() {
             <Flame className="size-5" />
           </span>
           <div>
-            <h1 className="text-lg font-semibold tracking-tight">
+            <h1 className="text-lg font-semibold">
               {t.install.title}
             </h1>
             <p className="text-sm text-muted-foreground">{t.install.subtitle}</p>

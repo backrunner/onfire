@@ -11,6 +11,12 @@ import {
 import { eq, and } from "drizzle-orm";
 import type { NotificationTriggerEvent } from "@/drizzle/schema";
 import { createChannel, type ChannelConfig } from "./channels";
+import { getEnv } from "@/lib/db";
+import {
+  openChannelConfig,
+  triggerEventsSchema,
+  validateChannelConfig,
+} from "@/lib/notifications/channel-schema";
 
 export interface SendNotificationOptions {
   ticketId: string;
@@ -50,9 +56,15 @@ export async function sendAgentNotification(
   const now = new Date().toISOString();
 
   for (const channel of channels) {
-    // Check if this channel handles this event
-    const triggerEvents = JSON.parse(channel.triggerEvents || "[]") as string[];
-    if (!triggerEvents.includes(triggerEvent)) {
+    let parsedEvents: unknown;
+    try {
+      parsedEvents = JSON.parse(channel.triggerEvents || "[]");
+    } catch {
+      console.error(`Invalid trigger events for notification channel ${channel.id}`);
+      continue;
+    }
+    const triggerEvents = triggerEventsSchema.safeParse(parsedEvents);
+    if (!triggerEvents.success || !triggerEvents.data.includes(triggerEvent)) {
       continue;
     }
 
@@ -100,16 +112,38 @@ export async function sendAgentNotification(
         agentName,
         productName: product?.name || "",
         previousAgentName,
-        customerEmail: customerEmail || ticket.customerEmail,
+        customerEmail: customerEmail || ticket.customerEmail || undefined,
       });
 
       // Create channel provider and send
+      const parsedConfig = JSON.parse(channel.config || "{}") as unknown;
+      if (
+        !parsedConfig ||
+        typeof parsedConfig !== "object" ||
+        Array.isArray(parsedConfig)
+      ) {
+        throw new Error("Invalid notification channel configuration");
+      }
       const channelConfig: ChannelConfig = {
         type: channel.channelType,
-        config: JSON.parse(channel.config || "{}"),
+        config: await openChannelConfig(
+          channel.id,
+          parsedConfig as Record<string, unknown>,
+          getEnv().AUTH_SECRET
+        ),
       };
+      const configIssues = validateChannelConfig(
+        channelConfig.type,
+        channelConfig.config
+      );
+      if (configIssues.length > 0) {
+        throw new Error(`Invalid notification channel configuration: ${configIssues.join("; ")}`);
+      }
 
-      const provider = await createChannel(channelConfig);
+      const provider = await createChannel(channelConfig, {
+        db,
+        productId: ticket.productId,
+      });
       const result = await provider.send({
         title: message.title,
         body: message.body,
@@ -124,7 +158,10 @@ export async function sendAgentNotification(
       } else {
         await db
           .update(notificationLogs)
-          .set({ status: "failed", errorMessage: result.error })
+          .set({
+            status: "failed",
+            errorMessage: result.error?.slice(0, 2_000),
+          })
           .where(eq(notificationLogs.id, logId));
       }
     } catch (error) {
@@ -132,7 +169,10 @@ export async function sendAgentNotification(
         .update(notificationLogs)
         .set({
           status: "failed",
-          errorMessage: error instanceof Error ? error.message : "Unknown error",
+          errorMessage:
+            error instanceof Error
+              ? error.message.slice(0, 2_000)
+              : "Unknown error",
         })
         .where(eq(notificationLogs.id, logId));
     }

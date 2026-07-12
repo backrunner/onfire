@@ -87,7 +87,7 @@ export default function AdminLoginPage() {
             <Flame className="size-5" />
           </span>
           <div>
-            <h1 className="text-lg font-semibold tracking-tight">
+            <h1 className="text-lg font-semibold">
               {t.login.title}
             </h1>
             <p className="text-sm text-muted-foreground">{t.login.subtitle}</p>

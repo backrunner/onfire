@@ -1,12 +1,19 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Menu, Search, LogOut, UserRound } from "lucide-react";
+import useSWR from "swr";
+import { Clock3, Menu, Search, LogOut, UserRound } from "lucide-react";
 import { signOut } from "@/lib/auth";
+import { swrFetcher, qs } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 import { useMe } from "@/lib/hooks/use-me";
+import { TicketStatus } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { StatusBadge } from "@/components/admin/status-badges";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,25 +25,65 @@ import {
 import { ThemeToggle } from "./theme-toggle";
 import { LanguageToggle } from "./language-toggle";
 
-const ROLE_LABELS: Record<string, string> = {
-  super_admin: "Super Admin",
-  tenant_admin: "Tenant Admin",
-  product_admin: "Product Admin",
-  team_admin: "Team Admin",
-  agent: "Agent",
-};
+interface TicketSuggestion {
+  id: string;
+  subject: string;
+  customerEmail: string | null;
+  customerLabel: string | null;
+  status: TicketStatus;
+  updatedAt: string;
+}
+
+interface SuggestResponse {
+  tickets: TicketSuggestion[];
+}
 
 export function AdminHeader({ onMobileMenu }: { onMobileMenu: () => void }) {
   const router = useRouter();
   const { t } = useI18n();
   const { me } = useMe();
+  const searchRef = useRef<HTMLDivElement>(null);
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  useEffect(() => {
+    router.prefetch("/admin/search");
+  }, [router]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 180);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  const suggestKey =
+    searchOpen && debouncedQuery.length >= 2
+      ? `/api/tob/search/suggest${qs({ q: debouncedQuery })}`
+      : null;
+  const { data: suggestions, isLoading: suggestionsLoading } =
+    useSWR<SuggestResponse>(suggestKey, swrFetcher, {
+      keepPreviousData: true,
+      revalidateOnFocus: false,
+    });
+
+  useEffect(() => {
+    for (const ticket of suggestions?.tickets ?? []) {
+      router.prefetch(`/admin/tickets/${ticket.id}`);
+    }
+  }, [router, suggestions]);
+
+  const submitSearch = () => {
+    const q = query.trim();
+    setSearchOpen(false);
+    router.push(q ? `/admin/search${qs({ q })}` : "/admin/search");
+  };
 
   const initials = (me?.user.displayName || me?.user.email || "?")
     .slice(0, 2)
     .toUpperCase();
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border/60 bg-background/80 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border/70 bg-background/85 px-4 shadow-[0_1px_0_rgb(0_0_0/0.02)] backdrop-blur-xl">
       <Button
         variant="ghost"
         size="icon"
@@ -47,15 +94,87 @@ export function AdminHeader({ onMobileMenu }: { onMobileMenu: () => void }) {
         <Menu className="size-4" />
       </Button>
 
-      {/* Global search */}
-      <button
-        type="button"
-        onClick={() => router.push("/admin/search")}
-        className="flex h-8 w-full max-w-xs items-center gap-2 rounded-md border border-border/60 bg-muted/40 px-3 text-sm text-muted-foreground transition-colors hover:bg-muted"
+      <div
+        ref={searchRef}
+        className="relative w-full max-w-md"
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) {
+            setSearchOpen(false);
+          }
+        }}
       >
-        <Search className="size-3.5" />
-        <span className="truncate text-xs">{t.topbar.searchPlaceholder}</span>
-      </button>
+        <form onSubmit={(event) => { event.preventDefault(); submitSearch(); }}>
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setSearchOpen(true);
+            }}
+            onFocus={() => setSearchOpen(true)}
+            placeholder={t.topbar.searchPlaceholder}
+            className="h-8 w-full rounded-md border border-border/70 bg-muted/35 pl-9 pr-3 text-xs text-foreground shadow-xs outline-none transition-colors placeholder:text-muted-foreground hover:border-border hover:bg-muted/55 focus:border-ring focus:bg-background focus:ring-2 focus:ring-ring/20"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={searchOpen && Boolean(suggestKey)}
+            aria-controls="global-ticket-suggestions"
+          />
+        </form>
+
+        {searchOpen && suggestKey && (
+          <div
+            id="global-ticket-suggestions"
+            role="listbox"
+            className="absolute top-full z-50 mt-1.5 w-full overflow-hidden rounded-md border border-border/80 bg-popover p-1 shadow-lg shadow-black/8"
+          >
+            {suggestionsLoading && !suggestions ? (
+              <div className="space-y-1 p-1">
+                <Skeleton className="h-11 w-full" />
+                <Skeleton className="h-11 w-full" />
+              </div>
+            ) : (suggestions?.tickets.length ?? 0) > 0 ? (
+              suggestions!.tickets.map((ticket) => (
+                <button
+                  key={ticket.id}
+                  type="button"
+                  role="option"
+                  className="flex w-full items-center gap-3 rounded-sm px-2.5 py-2 text-left transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
+                  onClick={() => {
+                    setSearchOpen(false);
+                    router.push(`/admin/tickets/${ticket.id}`);
+                  }}
+                >
+                  <Clock3 className="size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">
+                      {ticket.subject}
+                    </span>
+                    <span className="block truncate text-[11px] text-muted-foreground">
+                      {ticket.id} · {ticket.customerLabel ?? "—"}
+                    </span>
+                  </span>
+                  <StatusBadge status={ticket.status} className="shrink-0" />
+                </button>
+              ))
+            ) : (
+              <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+                {t.search.noResults}
+              </div>
+            )}
+            <button
+              type="button"
+              className={cn(
+                "mt-1 flex h-8 w-full items-center justify-center gap-2 rounded-sm border-t border-border/60 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+                (suggestions?.tickets.length ?? 0) === 0 && "mt-0"
+              )}
+              onClick={submitSearch}
+            >
+              <Search className="size-3.5" />
+              {t.topbar.viewAllResults}
+            </button>
+          </div>
+        )}
+      </div>
 
       <div className="ml-auto flex items-center gap-1">
         <LanguageToggle />
@@ -65,11 +184,17 @@ export function AdminHeader({ onMobileMenu }: { onMobileMenu: () => void }) {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="ml-1 h-8 gap-2 px-1.5">
               <Avatar className="size-6">
-                <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
+                <AvatarFallback className="text-[10px]">
+                  {me ? initials : ""}
+                </AvatarFallback>
               </Avatar>
-              <span className="hidden max-w-[140px] truncate text-sm sm:inline">
-                {me?.user.displayName}
-              </span>
+              {me ? (
+                <span className="hidden max-w-[140px] truncate text-sm sm:inline">
+                  {me.user.displayName}
+                </span>
+              ) : (
+                <Skeleton className="hidden h-4 w-16 sm:inline-block" />
+              )}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
@@ -80,7 +205,7 @@ export function AdminHeader({ onMobileMenu }: { onMobileMenu: () => void }) {
               </div>
               {me?.role && (
                 <div className="pt-0.5 text-[11px] font-normal text-muted-foreground">
-                  {ROLE_LABELS[me.role] ?? me.role}
+                  {t.roles[me.role] ?? me.role}
                 </div>
               )}
             </DropdownMenuLabel>

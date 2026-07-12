@@ -6,7 +6,7 @@ import { withAuth } from "@/lib/api/handler";
 import { assertProductAccess } from "@/lib/api/scope";
 import { rotateProductKeySecret } from "@/lib/auth/api-key";
 
-export const POST = withAuth({ permission: "product.manage" }, async (_req: NextRequest, ctx) => {
+export const POST = withAuth({ permission: "product.settings" }, async (_req: NextRequest, ctx) => {
   const key = await ctx.db.query.productKeys.findFirst({
     where: eq(productKeys.id, ctx.params.id),
   });
@@ -25,9 +25,11 @@ export const POST = withAuth({ permission: "product.manage" }, async (_req: Next
     .where(eq(productKeys.id, key.id));
 
   // The plaintext credential is returned exactly once.
-  return ok({
+  const response = ok({
     id: key.id,
     apiKey: rotated.plaintext,
     rotatedAt: new Date().toISOString(),
   });
+  response.headers.set("Cache-Control", "no-store");
+  return response;
 });

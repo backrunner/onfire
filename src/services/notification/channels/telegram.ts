@@ -1,4 +1,6 @@
 import type { NotificationChannel, NotificationMessage, SendResult } from "./index";
+import { readResponseJson } from "@/lib/response-body";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 export class TelegramChannel implements NotificationChannel {
   name = "telegram";
@@ -14,7 +16,7 @@ export class TelegramChannel implements NotificationChannel {
     try {
       const text = `*${escapeMarkdown(message.title)}*\n\n${escapeMarkdown(message.body)}`;
 
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         `https://api.telegram.org/bot${this.botToken}/sendMessage`,
         {
           method: "POST",
@@ -28,7 +30,9 @@ export class TelegramChannel implements NotificationChannel {
         }
       );
 
-      const data = (await response.json()) as { ok?: boolean; description?: string };
+      const data = await readResponseJson<{ ok?: boolean; description?: string }>(
+        response
+      );
 
       if (!data.ok) {
         return { success: false, error: data.description || "Unknown error" };

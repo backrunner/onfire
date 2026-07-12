@@ -3,7 +3,8 @@ import { desc, sql, count } from "drizzle-orm";
 import { tickets, products } from "@/drizzle/schema";
 import { ok } from "@/lib/api/response";
 import { withAuth } from "@/lib/api/handler";
-import { ticketScopeCondition, tenantCondition } from "@/lib/api/scope";
+import { ticketScopeCondition, productScopeCondition } from "@/lib/api/scope";
+import { activeSlaOverdueCondition } from "@/lib/tickets/sla";
 
 export const GET = withAuth({ permission: "ticket.read" }, async (_req: NextRequest, ctx) => {
   const scope = ticketScopeCondition(ctx);
@@ -15,12 +16,7 @@ export const GET = withAuth({ permission: "ticket.read" }, async (_req: NextRequ
     .select({
       pending: sql<number>`COUNT(CASE WHEN ${tickets.status} IN ('new', 'processing') THEN 1 END)`,
       escalated: sql<number>`COUNT(CASE WHEN ${tickets.status} = 'escalated' THEN 1 END)`,
-      overdue: sql<number>`COUNT(CASE WHEN
-        ${tickets.slaAcceptBreached} = 1
-        OR ${tickets.slaReplyBreached} = 1
-        OR (${tickets.slaAcceptDeadline} IS NOT NULL AND ${tickets.slaAcceptDeadline} < ${now} AND ${tickets.status} = 'new')
-        OR (${tickets.slaReplyDeadline} IS NOT NULL AND ${tickets.slaReplyDeadline} < ${now} AND ${tickets.status} IN ('new','processing','escalated'))
-      THEN 1 END)`,
+      overdue: sql<number>`COUNT(CASE WHEN ${activeSlaOverdueCondition(now)} THEN 1 END)`,
     })
     .from(tickets)
     .where(scope);
@@ -30,7 +26,7 @@ export const GET = withAuth({ permission: "ticket.read" }, async (_req: NextRequ
   const [productCountRow] = await ctx.db
     .select({ count: count() })
     .from(products)
-    .where(tenantCondition(ctx, products.tenantId));
+    .where(productScopeCondition(ctx));
 
   const recentTickets = await ctx.db
     .select()

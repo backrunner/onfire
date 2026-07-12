@@ -1,16 +1,20 @@
 import type { NotificationChannel, NotificationMessage, SendResult } from "./index";
+import { readResponseJson } from "@/lib/response-body";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 export class PushdeerChannel implements NotificationChannel {
   name = "pushdeer";
   private pushkey: string;
+  private serverUrl: string;
 
-  constructor(pushkey: string) {
+  constructor(pushkey: string, serverUrl = "https://api2.pushdeer.com") {
     this.pushkey = pushkey;
+    this.serverUrl = serverUrl.replace(/\/$/, "");
   }
 
   async send(message: NotificationMessage): Promise<SendResult> {
     try {
-      const response = await fetch("https://api2.pushdeer.com/message/push", {
+      const response = await fetchWithTimeout(`${this.serverUrl}/message/push`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
@@ -21,7 +25,9 @@ export class PushdeerChannel implements NotificationChannel {
         }),
       });
 
-      const data = (await response.json()) as { code?: number; error?: string };
+      const data = await readResponseJson<{ code?: number; error?: string }>(
+        response
+      );
 
       if (data.code !== 0) {
         return { success: false, error: data.error || "Unknown error" };

@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
 import { useMe } from "@/lib/hooks/use-me";
 import type { Permission } from "@/lib/types";
@@ -34,7 +34,7 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { value: "tenants", permission: "tenant.manage", render: () => <TenantManagement /> },
-  { value: "products", permission: "product.manage", render: () => <ProductManagement /> },
+  { value: "products", permission: "product.settings", render: () => <ProductManagement /> },
   { value: "teams", permission: "team.manage", render: () => <TeamManagement /> },
   { value: "templates", permission: "template.read", render: () => <TemplateManagement /> },
   { value: "users", permission: "user.manage", render: () => <UserManagement /> },
@@ -44,7 +44,7 @@ const TABS: TabDef[] = [
     permission: "category.map",
     render: () => <CategoryRouteManagement />,
   },
-  { value: "apiKeys", permission: "product.manage", render: () => <ProductKeyManagement /> },
+  { value: "apiKeys", permission: "product.settings", render: () => <ProductKeyManagement /> },
 ];
 
 function ManagementPageSkeleton() {
@@ -59,7 +59,6 @@ function ManagementPageSkeleton() {
 function ManagementTabs() {
   const { t } = useI18n();
   const { can, isLoading } = useMe();
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -85,7 +84,7 @@ function ManagementTabs() {
   const handleTabChange = (value: string) => {
     const sp = new URLSearchParams(searchParams.toString());
     sp.set("tab", value);
-    router.replace(`${pathname}?${sp.toString()}`, { scroll: false });
+    window.history.replaceState(null, "", `${pathname}?${sp.toString()}`);
   };
 
   return (
@@ -99,7 +98,7 @@ function ManagementTabs() {
       </TabsList>
 
       {visibleTabs.map((tab) => (
-        <TabsContent key={tab.value} value={tab.value} className="mt-6">
+        <TabsContent key={tab.value} value={tab.value} className="mt-4">
           {tab.render()}
         </TabsContent>
       ))}
@@ -111,10 +110,12 @@ export default function AdminManagementPage() {
   const { t } = useI18n();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">{t.management.title}</h1>
-        <p className="text-muted-foreground">{t.management.subtitle}</p>
+        <h1 className="text-xl font-semibold">
+          {t.management.title}
+        </h1>
+        <p className="text-sm text-muted-foreground">{t.management.subtitle}</p>
       </div>
 
       {/* useSearchParams requires a Suspense boundary in the App Router. */}

@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DeleteConfirmDialog } from "./delete-confirm-dialog";
 import {
   EmptyState,
@@ -71,6 +72,12 @@ const SLA_FIELDS: SlaField[] = [
 interface ProductForm {
   name: string;
   tenantId: string;
+  homepageUrl: string;
+  portalReturnUrl: string;
+  identityEnabled: boolean;
+  identityEndpointUrl: string;
+  identityAuthSecret: string;
+  identitySecretConfigured: boolean;
   slaHighAccept: string;
   slaHighReply: string;
   slaMediumAccept: string;
@@ -83,6 +90,12 @@ interface ProductForm {
 const emptyForm = (): ProductForm => ({
   name: "",
   tenantId: "",
+  homepageUrl: "",
+  portalReturnUrl: "",
+  identityEnabled: false,
+  identityEndpointUrl: "",
+  identityAuthSecret: "",
+  identitySecretConfigured: false,
   slaHighAccept: "",
   slaHighReply: "",
   slaMediumAccept: "",
@@ -104,6 +117,7 @@ export function ProductManagement() {
   const m = t.management;
   const { can } = useMe();
   const isSuperAdmin = can("tenant.manage");
+  const canManageProducts = can("product.manage");
 
   const {
     data: products,
@@ -147,6 +161,12 @@ export function ProductManagement() {
     setForm({
       name: product.name,
       tenantId: product.tenantId,
+      homepageUrl: product.homepageUrl ?? "",
+      portalReturnUrl: product.portalReturnUrl ?? "",
+      identityEnabled: product.identityEnabled,
+      identityEndpointUrl: product.identityEndpointUrl ?? "",
+      identityAuthSecret: "",
+      identitySecretConfigured: product.identitySecretConfigured,
       slaHighAccept: product.slaHighAccept?.toString() ?? "",
       slaHighReply: product.slaHighReply?.toString() ?? "",
       slaMediumAccept: product.slaMediumAccept?.toString() ?? "",
@@ -162,6 +182,29 @@ export function ProductManagement() {
   const handleSubmit = async () => {
     const errors: Record<string, string> = {};
     if (!form.name.trim()) errors.name = m.products.nameRequired;
+    for (const field of ["homepageUrl", "portalReturnUrl"] as const) {
+      const value = form[field].trim();
+      if (value && !/^https?:\/\//i.test(value)) {
+        errors[field] = m.products.urlInvalid;
+      }
+    }
+    if (form.identityEnabled) {
+      if (!/^https:\/\/[^/]+\./i.test(form.identityEndpointUrl.trim())) {
+        errors.identityEndpointUrl = m.products.identityUrlInvalid;
+      }
+      if (
+        !form.identitySecretConfigured &&
+        form.identityAuthSecret.trim().length < 16
+      ) {
+        errors.identityAuthSecret = m.products.identitySecretRequired;
+      }
+    }
+    if (
+      form.identityAuthSecret &&
+      form.identityAuthSecret.trim().length < 16
+    ) {
+      errors.identityAuthSecret = m.products.identitySecretRequired;
+    }
     for (const field of [...SLA_FIELDS, "autoCloseMinutes"] as const) {
       const parsed = parsePositiveInt(form[field]);
       if (parsed !== undefined && Number.isNaN(parsed)) {
@@ -174,7 +217,16 @@ export function ProductManagement() {
     setPending(true);
     try {
       if (editing) {
-        const payload: Record<string, unknown> = { name: form.name.trim() };
+        const payload: Record<string, unknown> = {
+          name: form.name.trim(),
+          homepageUrl: form.homepageUrl.trim() || null,
+          portalReturnUrl: form.portalReturnUrl.trim() || null,
+          identityEnabled: form.identityEnabled,
+          identityEndpointUrl: form.identityEndpointUrl.trim() || null,
+        };
+        if (form.identityAuthSecret.trim()) {
+          payload.identityAuthSecret = form.identityAuthSecret.trim();
+        }
         for (const field of SLA_FIELDS) {
           payload[field] = parsePositiveInt(form[field]) ?? null;
         }
@@ -183,8 +235,21 @@ export function ProductManagement() {
         await api.patch(`/api/tob/admin/products/${editing.id}`, payload);
         toast.success(m.toastUpdated);
       } else {
-        const payload: Record<string, unknown> = { name: form.name.trim() };
+        const payload: Record<string, unknown> = {
+          name: form.name.trim(),
+        };
         if (isSuperAdmin && form.tenantId) payload.tenantId = form.tenantId;
+        if (form.homepageUrl.trim()) payload.homepageUrl = form.homepageUrl.trim();
+        if (form.portalReturnUrl.trim()) {
+          payload.portalReturnUrl = form.portalReturnUrl.trim();
+        }
+        payload.identityEnabled = form.identityEnabled;
+        if (form.identityEndpointUrl.trim()) {
+          payload.identityEndpointUrl = form.identityEndpointUrl.trim();
+        }
+        if (form.identityAuthSecret.trim()) {
+          payload.identityAuthSecret = form.identityAuthSecret.trim();
+        }
         for (const field of SLA_FIELDS) {
           const value = parsePositiveInt(form[field]);
           if (value !== undefined) payload[field] = value;
@@ -220,7 +285,7 @@ export function ProductManagement() {
     const parts: string[] = [];
     const row = (label: string, accept: number | null, reply: number | null) => {
       if (accept == null && reply == null) return;
-      parts.push(`${label} ${accept ?? "—"}/${reply ?? "—"}`);
+      parts.push(`${label} ${accept ?? "-"}/${reply ?? "-"}`);
     };
     row(t.tickets.priority.high, product.slaHighAccept, product.slaHighReply);
     row(t.tickets.priority.medium, product.slaMediumAccept, product.slaMediumReply);
@@ -278,12 +343,12 @@ export function ProductManagement() {
         searchValue={search}
         onSearchChange={setSearch}
         searchPlaceholder={t.common.search}
-        actions={
+        actions={canManageProducts ? (
           <Button size="sm" className="h-8" onClick={openCreate}>
             <Plus className="mr-1.5 size-3.5" />
             {m.products.create}
           </Button>
-        }
+        ) : null}
       >
         {isLoading ? (
           <TableSkeleton />
@@ -327,7 +392,7 @@ export function ProductManagement() {
                     <TableCell>
                       {product.autoCloseMinutes != null ? (
                         <span className="text-sm tabular-nums">
-                          {product.autoCloseMinutes} min
+                          {product.autoCloseMinutes}
                         </span>
                       ) : (
                         <span className="text-sm text-muted-foreground">
@@ -343,13 +408,13 @@ export function ProductManagement() {
                             icon: Pencil,
                             onSelect: () => openEdit(product),
                           },
-                          {
+                          ...(canManageProducts ? [{
                             label: t.common.delete,
                             icon: Trash2,
                             destructive: true,
                             separatorBefore: true,
                             onSelect: () => setDeleting(product),
-                          },
+                          }] : []),
                         ]}
                       />
                     </TableCell>
@@ -403,6 +468,117 @@ export function ProductManagement() {
                 </Select>
               </FormField>
             )}
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FormField
+                label={m.products.homepageUrl}
+                htmlFor="product-homepage-url"
+                hint={m.products.homepageUrlHint}
+                error={formErrors.homepageUrl}
+              >
+                <Input
+                  id="product-homepage-url"
+                  type="url"
+                  value={form.homepageUrl}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, homepageUrl: e.target.value }))
+                  }
+                  placeholder={m.products.homepageUrlPlaceholder}
+                  className="h-8"
+                />
+              </FormField>
+              <FormField
+                label={m.products.portalReturnUrl}
+                htmlFor="product-portal-return-url"
+                hint={m.products.portalReturnUrlHint}
+                error={formErrors.portalReturnUrl}
+              >
+                <Input
+                  id="product-portal-return-url"
+                  type="url"
+                  value={form.portalReturnUrl}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, portalReturnUrl: e.target.value }))
+                  }
+                  placeholder={m.products.portalReturnUrlPlaceholder}
+                  className="h-8"
+                />
+              </FormField>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="product-identity-enabled"
+                  checked={form.identityEnabled}
+                  onCheckedChange={(checked) =>
+                    setForm((current) => ({
+                      ...current,
+                      identityEnabled: checked === true,
+                    }))
+                  }
+                />
+                <div className="space-y-0.5">
+                  <Label htmlFor="product-identity-enabled">
+                    {m.products.identityTitle}
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    {m.products.identityHint}
+                  </p>
+                </div>
+              </div>
+
+              <FormField
+                label={m.products.identityEndpoint}
+                htmlFor="product-identity-endpoint"
+                hint={m.products.identityEndpointHint}
+                error={formErrors.identityEndpointUrl}
+              >
+                <Input
+                  id="product-identity-endpoint"
+                  type="url"
+                  value={form.identityEndpointUrl}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      identityEndpointUrl: event.target.value,
+                    }))
+                  }
+                  placeholder="https://api.example.com/onfire/userinfo"
+                  className="h-8"
+                  disabled={!form.identityEnabled}
+                />
+              </FormField>
+
+              <FormField
+                label={m.products.identitySecret}
+                htmlFor="product-identity-secret"
+                hint={
+                  form.identitySecretConfigured
+                    ? m.products.identitySecretConfigured
+                    : m.products.identitySecretHint
+                }
+                error={formErrors.identityAuthSecret}
+              >
+                <Input
+                  id="product-identity-secret"
+                  type="password"
+                  autoComplete="new-password"
+                  value={form.identityAuthSecret}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      identityAuthSecret: event.target.value,
+                    }))
+                  }
+                  placeholder={m.products.identitySecretPlaceholder}
+                  className="h-8"
+                  disabled={!form.identityEnabled}
+                />
+              </FormField>
+            </div>
 
             <Separator />
 

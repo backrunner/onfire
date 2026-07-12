@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import useSWR from "swr";
 import { toast } from "sonner";
 import { UserPlus, ArrowUpRight, XCircle } from "lucide-react";
-import { api } from "@/lib/api/client";
-import type { TicketView } from "@/lib/api/types";
+import { api, swrFetcher } from "@/lib/api/client";
+import type { TicketView, TeamView } from "@/lib/api/types";
 import { TicketStatus, TicketPriority } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { useMe } from "@/lib/hooks/use-me";
@@ -44,7 +45,7 @@ const PRIORITIES = [
 /** Action toolbar for a single ticket, gated by the current user's permissions. */
 export function TicketActions({ ticket, onMutated }: TicketActionsProps) {
   const { t } = useI18n();
-  const { can } = useMe();
+  const { me, can } = useMe();
   const [assignOpen, setAssignOpen] = useState(false);
   const [escalateOpen, setEscalateOpen] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
@@ -52,6 +53,20 @@ export function TicketActions({ ticket, onMutated }: TicketActionsProps) {
   const [busy, setBusy] = useState(false);
 
   const isClosed = ticket.status === TicketStatus.Closed;
+
+  // Agents may reassign within their own team when the team allows it.
+  const { data: teams } = useSWR<TeamView[]>(
+    !can("ticket.assign") && me?.role === "agent" && ticket.assigneeId
+      ? "/api/tob/meta/teams"
+      : null,
+    swrFetcher
+  );
+  const agentMayReassign =
+    me?.role === "agent" &&
+    Boolean(ticket.assigneeId) &&
+    (me?.teamIds ?? []).includes(ticket.teamId) &&
+    teams?.find((team) => team.id === ticket.teamId)?.allowReassign === true;
+  const showAssign = can("ticket.assign") || agentMayReassign;
 
   const run = async (action: () => Promise<unknown>, successMsg: string) => {
     setBusy(true);
@@ -70,7 +85,7 @@ export function TicketActions({ ticket, onMutated }: TicketActionsProps) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {can("ticket.assign") && !isClosed && (
+      {showAssign && !isClosed && (
         <Button
           variant="outline"
           size="sm"
@@ -132,7 +147,12 @@ export function TicketActions({ ticket, onMutated }: TicketActionsProps) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {ALL_STATUSES.map((status) => (
+              {ALL_STATUSES.filter(
+                (status) =>
+                  status === ticket.status ||
+                  (status !== TicketStatus.Closed &&
+                    status !== TicketStatus.Escalated)
+              ).map((status) => (
                 <SelectItem
                   key={status}
                   value={status}

@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { FormSchema, FormFieldSchema, isFieldVisible } from "@/lib/form-schema";
+import { useI18n } from "@/lib/i18n";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -19,18 +21,23 @@ interface PreviewProps {
 }
 
 export function Preview({ schema }: PreviewProps) {
+  const { t } = useI18n();
   const [formData, setFormData] = useState<Record<string, unknown>>({});
+
+  // Conditions reference fields by id, while values are stored by key.
+  const valuesById = useMemo(() => {
+    const map: Record<string, unknown> = {};
+    for (const field of schema.fields) {
+      map[field.id] = formData[field.key];
+    }
+    return map;
+  }, [schema.fields, formData]);
 
   const updateField = (key: string, value: unknown) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
   const renderField = (field: FormFieldSchema) => {
-    // Check visibility condition
-    if (!isFieldVisible(field, formData)) {
-      return null;
-    }
-
     const value = formData[field.key];
 
     switch (field.type) {
@@ -80,38 +87,41 @@ export function Preview({ schema }: PreviewProps) {
             onValueChange={(v) => updateField(field.key, v)}
           >
             <SelectTrigger>
-              <SelectValue placeholder={field.placeholder || "Select..."} />
+              <SelectValue
+                placeholder={field.placeholder || t.formBuilder.selectPlaceholder}
+              />
             </SelectTrigger>
             <SelectContent>
-              {field.options?.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
+              {field.options
+                ?.filter((option) => option.value)
+                .map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
         );
 
       case "radio":
         return (
-          <div className="space-y-2">
-            {field.options?.map((option) => (
-              <label
-                key={option.value}
-                className="flex items-center gap-2 cursor-pointer"
-              >
-                <input
-                  type="radio"
-                  name={field.key}
-                  value={option.value}
-                  checked={value === option.value}
-                  onChange={(e) => updateField(field.key, e.target.value)}
-                  className="h-4 w-4"
-                />
-                <span className="text-sm">{option.label}</span>
-              </label>
-            ))}
-          </div>
+          <RadioGroup
+            value={(value as string) || ""}
+            onValueChange={(v) => updateField(field.key, v)}
+            className="gap-2"
+          >
+            {field.options
+              ?.filter((option) => option.value)
+              .map((option) => (
+                <label
+                  key={option.value}
+                  className="flex cursor-pointer items-center gap-2"
+                >
+                  <RadioGroupItem value={option.value} />
+                  <span className="text-sm">{option.label}</span>
+                </label>
+              ))}
+          </RadioGroup>
         );
 
       case "checkbox":
@@ -167,8 +177,8 @@ export function Preview({ schema }: PreviewProps) {
 
   if (schema.fields.length === 0) {
     return (
-      <div className="text-center text-muted-foreground py-8">
-        Add fields to see the preview
+      <div className="text-center text-sm text-muted-foreground py-8">
+        {t.formBuilder.emptyPreview}
       </div>
     );
   }
@@ -176,6 +186,7 @@ export function Preview({ schema }: PreviewProps) {
   return (
     <div className="space-y-4">
       {schema.fields.map((field) => {
+        if (!isFieldVisible(field, valuesById)) return null;
         const fieldElement = renderField(field);
         if (!fieldElement) return null;
 

@@ -50,15 +50,10 @@ interface TeamDetail extends TeamView {
   productIds: string[];
 }
 
-interface ProductDetail extends Product {
-  teamIds: string[];
-}
-
 export function TeamManagement() {
   const { t } = useI18n();
   const m = t.management;
   const { can } = useMe();
-  const canManageProducts = can("product.manage");
   const canSeeMembers = can("user.manage");
 
   const {
@@ -68,7 +63,7 @@ export function TeamManagement() {
     mutate,
   } = useSWR<TeamView[]>("/api/tob/admin/teams", swrFetcher);
   const { data: products } = useSWR<Product[]>(
-    canManageProducts ? "/api/tob/admin/products" : null,
+    "/api/tob/meta/products",
     swrFetcher
   );
   const { data: agents } = useSWR<AgentView[]>(
@@ -81,7 +76,6 @@ export function TeamManagement() {
   const [deleting, setDeleting] = useState<TeamView | null>(null);
   const [form, setForm] = useState({ name: "", allowReassign: true });
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
-  const [originalProductIds, setOriginalProductIds] = useState<string[]>([]);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -100,7 +94,6 @@ export function TeamManagement() {
     setEditing(null);
     setForm({ name: "", allowReassign: true });
     setSelectedProductIds([]);
-    setOriginalProductIds([]);
     setFormErrors({});
     setDialogOpen(true);
   };
@@ -110,34 +103,14 @@ export function TeamManagement() {
       const detail = await api.get<TeamDetail>(`/api/tob/admin/teams/${team.id}`);
       setEditing(team);
       setForm({ name: detail.name, allowReassign: detail.allowReassign ?? true });
-      setSelectedProductIds(detail.productIds);
-      setOriginalProductIds(detail.productIds);
+      const visibleProductIds = new Set((products ?? []).map((product) => product.id));
+      setSelectedProductIds(
+        detail.productIds.filter((productId) => visibleProductIds.has(productId))
+      );
       setFormErrors({});
       setDialogOpen(true);
     } catch (err) {
       toast.error(errorMessage(err, m.loadFailed));
-    }
-  };
-
-  /** Sync product↔team associations through the product PATCH endpoint. */
-  const syncProductAssociations = async (teamId: string) => {
-    if (!canManageProducts) return;
-    const before = new Set(originalProductIds);
-    const after = new Set(selectedProductIds);
-    const changed = [
-      ...selectedProductIds.filter((id) => !before.has(id)),
-      ...originalProductIds.filter((id) => !after.has(id)),
-    ];
-    for (const productId of changed) {
-      const detail = await api.get<ProductDetail>(
-        `/api/tob/admin/products/${productId}`
-      );
-      const teamIds = new Set(detail.teamIds);
-      if (after.has(productId)) teamIds.add(teamId);
-      else teamIds.delete(teamId);
-      await api.patch(`/api/tob/admin/products/${productId}`, {
-        teamIds: [...teamIds],
-      });
     }
   };
 
@@ -153,15 +126,15 @@ export function TeamManagement() {
         await api.patch(`/api/tob/admin/teams/${editing.id}`, {
           name: form.name.trim(),
           allowReassign: form.allowReassign,
+          productIds: selectedProductIds,
         });
-        await syncProductAssociations(editing.id);
         toast.success(m.toastUpdated);
       } else {
-        const created = await api.post<TeamView>("/api/tob/admin/teams", {
+        await api.post<TeamView>("/api/tob/admin/teams", {
           name: form.name.trim(),
           allowReassign: form.allowReassign,
+          productIds: selectedProductIds,
         });
-        await syncProductAssociations(created.id);
         toast.success(m.toastCreated);
       }
       setDialogOpen(false);
@@ -311,34 +284,32 @@ export function TeamManagement() {
               />
             </div>
 
-            {canManageProducts && (
-              <FormField label={m.teams.bindProducts}>
-                {!products || products.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    {m.teams.noProducts}
-                  </p>
-                ) : (
-                  <ScrollArea className="max-h-44 rounded-md border">
-                    <div className="space-y-1 p-2">
-                      {products.map((product) => (
-                        <label
-                          key={product.id}
-                          className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
-                        >
-                          <Checkbox
-                            checked={selectedProductIds.includes(product.id)}
-                            onCheckedChange={(checked) =>
-                              toggleProduct(product.id, checked === true)
-                            }
-                          />
-                          {product.name}
-                        </label>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                )}
-              </FormField>
-            )}
+            <FormField label={m.teams.bindProducts}>
+              {!products || products.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {m.teams.noProducts}
+                </p>
+              ) : (
+                <ScrollArea className="max-h-44 rounded-md border">
+                  <div className="space-y-1 p-2">
+                    {products.map((product) => (
+                      <label
+                        key={product.id}
+                        className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                      >
+                        <Checkbox
+                          checked={selectedProductIds.includes(product.id)}
+                          onCheckedChange={(checked) =>
+                            toggleProduct(product.id, checked === true)
+                          }
+                        />
+                        {product.name}
+                      </label>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </FormField>
           </div>
           <DialogFooter>
             <Button

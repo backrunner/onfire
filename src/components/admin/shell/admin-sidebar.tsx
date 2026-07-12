@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Ticket,
@@ -25,6 +26,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 interface NavItem {
   href: string;
@@ -54,7 +61,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/admin/management", icon: Settings, labelKey: "admin", permission: "team.manage" },
       { href: "/admin/email", icon: Mail, labelKey: "email", permission: "email.config" },
       { href: "/admin/notifications", icon: Bell, labelKey: "notifications", permission: "notification.manage" },
-      { href: "/admin/ai", icon: Sparkles, labelKey: "ai", permission: "tenant.manage" },
+      { href: "/admin/ai", icon: Sparkles, labelKey: "ai", permission: "ai.knowledge" },
     ],
   },
 ];
@@ -73,6 +80,7 @@ export function AdminSidebar({
   onMobileClose,
 }: AdminSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { t } = useI18n();
   const { can, isLoading } = useMe();
 
@@ -86,21 +94,27 @@ export function AdminSidebar({
     ),
   })).filter((group) => group.items.length > 0);
 
-  const nav = (
+  useEffect(() => {
+    for (const group of NAV_GROUPS) {
+      for (const item of group.items) router.prefetch(item.href);
+    }
+  }, [router]);
+
+  const renderNav = (compact: boolean) => (
     <TooltipProvider delayDuration={0}>
       <div className="flex h-full flex-col">
         {/* Brand */}
         <div
           className={cn(
             "flex h-14 items-center border-b border-border/60 px-4",
-            collapsed && "justify-center px-0"
+            compact && "justify-center px-0"
           )}
         >
           <Link href="/admin" className="flex items-center gap-2 font-semibold">
-            <span className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <span className="flex size-7 items-center justify-center rounded-md bg-gradient-to-br from-orange-500 to-red-600 text-white shadow-sm shadow-orange-500/20">
               <Flame className="size-4" />
             </span>
-            {!collapsed && <span className="text-sm tracking-tight">OnFire</span>}
+            {!compact && <span className="text-sm">OnFire</span>}
           </Link>
         </div>
 
@@ -108,8 +122,8 @@ export function AdminSidebar({
         <nav className="flex-1 space-y-5 overflow-y-auto px-2 py-4">
           {visibleGroups.map((group) => (
             <div key={group.labelKey}>
-              {!collapsed && (
-                <div className="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+              {!compact && (
+                <div className="mb-1.5 px-2 text-[11px] font-medium uppercase text-muted-foreground/70">
                   {t.nav[group.labelKey]}
                 </div>
               )}
@@ -120,25 +134,28 @@ export function AdminSidebar({
                     <Link
                       key={item.href}
                       href={item.href}
+                      prefetch
                       onClick={onMobileClose}
                       className={cn(
-                        "group flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors",
-                        collapsed && "justify-center px-0 py-2",
+                        "group relative flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors",
+                        compact && "justify-center px-0 py-2",
                         active
-                          ? "bg-accent font-medium text-accent-foreground"
+                          ? "bg-gradient-to-r from-orange-500/12 via-amber-500/8 to-transparent font-medium text-foreground ring-1 ring-inset ring-orange-500/10"
                           : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
                       )}
                     >
                       <item.icon
                         className={cn(
                           "size-4 shrink-0",
-                          active ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+                          active
+                            ? "text-orange-600 dark:text-orange-400"
+                            : "text-muted-foreground group-hover:text-foreground"
                         )}
                       />
-                      {!collapsed && <span>{t.nav[item.labelKey]}</span>}
+                      {!compact && <span>{t.nav[item.labelKey]}</span>}
                     </Link>
                   );
-                  return collapsed ? (
+                  return compact ? (
                     <Tooltip key={item.href}>
                       <TooltipTrigger asChild>{link}</TooltipTrigger>
                       <TooltipContent side="right">{t.nav[item.labelKey]}</TooltipContent>
@@ -157,10 +174,11 @@ export function AdminSidebar({
           <Button
             variant="ghost"
             size="sm"
-            className={cn("w-full justify-start gap-2 text-muted-foreground", collapsed && "justify-center")}
+            className={cn("w-full justify-start gap-2 text-muted-foreground", compact && "justify-center")}
             onClick={onToggleCollapsed}
+            aria-label={compact ? t.nav.expand : t.nav.collapse}
           >
-            {collapsed ? (
+            {compact ? (
               <PanelLeftOpen className="size-4" />
             ) : (
               <>
@@ -179,26 +197,25 @@ export function AdminSidebar({
       {/* Desktop sidebar */}
       <aside
         className={cn(
-          "hidden shrink-0 border-r border-border/60 bg-card transition-[width] duration-200 lg:block",
+          "hidden shrink-0 border-r border-sidebar-border bg-sidebar transition-[width] duration-200 lg:block",
           collapsed ? "w-14" : "w-60"
         )}
       >
-        <div className="sticky top-0 h-screen">{nav}</div>
+        <div className="sticky top-0 h-screen">{renderNav(collapsed)}</div>
       </aside>
 
-      {/* Mobile drawer */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={onMobileClose}
-            aria-hidden
-          />
-          <aside className="absolute inset-y-0 left-0 w-64 border-r border-border/60 bg-card shadow-xl">
-            {nav}
-          </aside>
-        </div>
-      )}
+      <Sheet open={mobileOpen} onOpenChange={(open) => !open && onMobileClose()}>
+        <SheetContent
+          side="left"
+          className="w-64 gap-0 border-sidebar-border bg-sidebar p-0 lg:hidden"
+        >
+          <SheetTitle className="sr-only">OnFire</SheetTitle>
+          <SheetDescription className="sr-only">
+            {t.nav.workspace}
+          </SheetDescription>
+          {renderNav(false)}
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

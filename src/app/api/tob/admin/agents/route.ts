@@ -5,6 +5,7 @@ import { users, agents, agentTeams, agentProfiles, teams } from "@/drizzle/schem
 import { ok, notFound, badRequest, forbidden } from "@/lib/api/response";
 import { withAuth, parseBody, parseQuery } from "@/lib/api/handler";
 import { tenantCondition } from "@/lib/api/scope";
+import { canManageRole } from "@/lib/api-utils";
 
 const listQuerySchema = z.object({
   teamId: z.string().optional(),
@@ -13,7 +14,7 @@ const listQuerySchema = z.object({
 
 const createAgentSchema = z.object({
   userId: z.string().min(1),
-  level: z.number().int().optional(),
+  level: z.number().int().min(1).max(10).optional(),
   teamIds: z.array(z.string()).optional(),
 });
 
@@ -93,25 +94,29 @@ export const POST = withAuth({ permission: "user.manage" }, async (req: NextRequ
   if (!user || (!ctx.isSuperAdmin && !ctx.tenantIds.includes(user.tenantId))) {
     throw notFound("User not found");
   }
+  if (!canManageRole(ctx.role, user.role)) {
+    throw forbidden("Cannot manage an agent for an equal or higher role");
+  }
 
   const existing = await ctx.db.query.agents.findFirst({
     where: eq(agents.userId, body.userId),
   });
   if (existing) throw badRequest("User is already an agent");
 
-  if (body.teamIds && body.teamIds.length > 0) {
+  const teamIds = [...new Set(body.teamIds ?? [])];
+  if (teamIds.length > 0) {
     const teamRows = await ctx.db
       .select({ id: teams.id, tenantId: teams.tenantId })
       .from(teams)
-      .where(inArray(teams.id, body.teamIds));
+      .where(inArray(teams.id, teamIds));
     const foundTeamIds = new Set(teamRows.map((t) => t.id));
 
-    const invalidTeamIds = body.teamIds.filter((id) => !foundTeamIds.has(id));
+    const invalidTeamIds = teamIds.filter((id) => !foundTeamIds.has(id));
     if (invalidTeamIds.length > 0) {
       throw badRequest("Invalid team IDs: " + invalidTeamIds.join(", "));
     }
-    if (!ctx.isSuperAdmin && teamRows.some((t) => !ctx.tenantIds.includes(t.tenantId))) {
-      throw forbidden("Cannot assign to teams outside your tenant");
+    if (teamRows.some((team) => team.tenantId !== user.tenantId)) {
+      throw forbidden("Agents can only join teams in their own tenant");
     }
   }
 
@@ -121,12 +126,12 @@ export const POST = withAuth({ permission: "user.manage" }, async (req: NextRequ
     active: true,
   });
 
-  if (body.teamIds && body.teamIds.length > 0) {
+  if (teamIds.length > 0) {
     await ctx.db.batch([
       insertAgent,
       ctx.db
         .insert(agentTeams)
-        .values(body.teamIds.map((teamId) => ({ userId: body.userId, teamId }))),
+        .values(teamIds.map((teamId) => ({ userId: body.userId, teamId }))),
     ]);
   } else {
     await insertAgent;

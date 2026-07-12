@@ -1,4 +1,6 @@
 import type { NotificationChannel, NotificationMessage, SendResult } from "./index";
+import { readResponseText } from "@/lib/response-body";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 export class NtfyChannel implements NotificationChannel {
   name = "ntfy";
@@ -12,7 +14,7 @@ export class NtfyChannel implements NotificationChannel {
 
   async send(message: NotificationMessage): Promise<SendResult> {
     try {
-      const response = await fetch(`${this.serverUrl}/${this.topic}`, {
+      const response = await fetchWithTimeout(`${this.serverUrl}/${this.topic}`, {
         method: "POST",
         headers: {
           "Title": message.title,
@@ -24,7 +26,7 @@ export class NtfyChannel implements NotificationChannel {
       });
 
       if (!response.ok) {
-        const text = await response.text();
+        const text = await readResponseText(response);
         return { success: false, error: text || `HTTP ${response.status}` };
       }
 

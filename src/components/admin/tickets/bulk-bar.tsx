@@ -219,7 +219,11 @@ export function BulkBar({ selectedIds, onClear, onDone }: BulkBarProps) {
                 <SelectValue placeholder={t.common.status} />
               </SelectTrigger>
               <SelectContent>
-                {ALL_STATUSES.filter((s) => s !== TicketStatus.Closed).map(
+                {ALL_STATUSES.filter(
+                  (s) =>
+                    s !== TicketStatus.Closed &&
+                    s !== TicketStatus.Escalated
+                ).map(
                   (s) => (
                     <SelectItem key={s} value={s}>
                       {t.tickets.status[s]}

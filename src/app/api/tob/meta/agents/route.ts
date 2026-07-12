@@ -2,9 +2,9 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq, and, inArray } from "drizzle-orm";
 import { agents, agentTeams, agentProfiles, users } from "@/drizzle/schema";
-import { ok, forbidden, badRequest } from "@/lib/api/response";
+import { ok, badRequest } from "@/lib/api/response";
 import { withAuth, parseQuery } from "@/lib/api/handler";
-import { isTeamScoped } from "@/lib/api/scope";
+import { assertTeamAccess } from "@/lib/api/scope";
 
 const querySchema = z.object({
   teamId: z.string().min(1),
@@ -13,17 +13,14 @@ const querySchema = z.object({
 
 /**
  * GET /api/tob/meta/agents?teamId= — agents of a team, for assignment
- * pickers. Unlike /admin/agents (user.manage), this only requires
- * ticket.assign and returns the minimal projection needed by the UI.
+ * pickers. Assignment-capable roles may inspect any visible team; Agents
+ * can list their own teams only (needed for allowReassign reassignment).
  */
-export const GET = withAuth({ permission: "ticket.assign" }, async (req: NextRequest, ctx) => {
+export const GET = withAuth({ permission: "ticket.read" }, async (req: NextRequest, ctx) => {
   const query = parseQuery(req, querySchema);
 
-  // Team-scoped roles may only inspect their own teams
-  if (isTeamScoped(ctx) && !ctx.teamIds.includes(query.teamId)) {
-    throw forbidden("Not a member of this team");
-  }
   if (!query.teamId) throw badRequest("teamId is required");
+  await assertTeamAccess(ctx, query.teamId);
 
   const memberRows = await ctx.db
     .select({ userId: agentTeams.userId })

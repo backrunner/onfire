@@ -9,10 +9,12 @@ import { historyLabel } from "./utils";
 
 interface TimelineProps {
   entries: TimelineEntry[];
+  /** userId → display name, used to label assignees inside history snapshots. */
+  actors?: Record<string, string>;
 }
 
 /** Merged conversation: replies as chat bubbles, history as system lines. */
-export function Timeline({ entries }: TimelineProps) {
+export function Timeline({ entries, actors }: TimelineProps) {
   const { t } = useI18n();
 
   if (entries.length === 0) {
@@ -32,7 +34,7 @@ export function Timeline({ entries }: TimelineProps) {
         entry.type === "reply" ? (
           <ReplyBubble key={`r-${entry.id}`} reply={entry} />
         ) : (
-          <HistoryLine key={`h-${entry.id}`} event={entry} />
+          <HistoryLine key={`h-${entry.id}`} event={entry} actors={actors} />
         )
       )}
     </div>
@@ -68,7 +70,7 @@ function ReplyBubble({ reply }: { reply: ReplyView }) {
         >
           <span className="font-medium">
             {fromAgent
-              ? t.tickets.detail.agentReply
+              ? reply.senderName || t.tickets.detail.agentReply
               : reply.senderEmail || t.tickets.detail.customerReply}
           </span>
           {internal && (
@@ -91,9 +93,15 @@ function ReplyBubble({ reply }: { reply: ReplyView }) {
   );
 }
 
-function HistoryLine({ event }: { event: HistoryView }) {
+function HistoryLine({
+  event,
+  actors,
+}: {
+  event: HistoryView;
+  actors?: Record<string, string>;
+}) {
   const { t } = useI18n();
-  const detail = snapshotDetail(event.snapshot, t);
+  const detail = snapshotDetail(event.snapshot, t, actors);
 
   return (
     <div className="flex items-center justify-center gap-2 py-0.5">
@@ -102,6 +110,7 @@ function HistoryLine({ event }: { event: HistoryView }) {
         <span className="font-medium text-foreground/70">
           {historyLabel(t, event.action)}
         </span>
+        {event.actorName && <span> · {event.actorName}</span>}
         {detail && <span> · {detail}</span>}
         <span> · {formatDateTime(event.createdAt)}</span>
       </p>
@@ -123,7 +132,8 @@ interface Snapshot {
 
 function snapshotDetail(
   snapshot: unknown,
-  t: ReturnType<typeof useI18n>["t"]
+  t: ReturnType<typeof useI18n>["t"],
+  actors?: Record<string, string>
 ): string | null {
   if (!snapshot || typeof snapshot !== "object") return null;
   const s = snapshot as Snapshot;
@@ -151,7 +161,7 @@ function snapshotDetail(
     );
   }
   if (s.newAssignee) {
-    parts.push(`→ ${shortId(s.newAssignee)}`);
+    parts.push(`→ ${actors?.[s.newAssignee] ?? shortId(s.newAssignee)}`);
   }
   if (s.reason) {
     parts.push(s.reason);

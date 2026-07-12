@@ -1,24 +1,31 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
-import { teams, agentTeams, productTeams } from "@/drizzle/schema";
-import { ok, notFound } from "@/lib/api/response";
+import {
+  categoryRoutes,
+  teams,
+  agentTeams,
+  productTeams,
+  tenants,
+  tickets,
+  users,
+  agents,
+} from "@/drizzle/schema";
+import { conflict, ok, badRequest, forbidden } from "@/lib/api/response";
 import { withAuth, parseBody, type AuthedContext } from "@/lib/api/handler";
+import { assertProductAccess, assertTeamAccess } from "@/lib/api/scope";
+import { Role } from "@/lib/types";
 
 const updateTeamSchema = z.object({
-  name: z.string().min(1).optional(),
+  name: z.string().trim().min(1).max(100).optional(),
   allowReassign: z.boolean().optional(),
   memberIds: z.array(z.string()).optional(),
+  productIds: z.array(z.string()).optional(),
 });
 
 async function loadAccessibleTeam(ctx: AuthedContext, id: string) {
-  const team = await ctx.db.query.teams.findFirst({ where: eq(teams.id, id) });
-  // 404 for cross-tenant access to avoid leaking team existence.
-  if (!team || (!ctx.isSuperAdmin && !ctx.tenantIds.includes(team.tenantId))) {
-    throw notFound("Team not found");
-  }
-  return team;
+  return assertTeamAccess(ctx, id);
 }
 
 export const GET = withAuth({ permission: "team.manage" }, async (_req: NextRequest, ctx) => {
@@ -37,13 +44,73 @@ export const GET = withAuth({ permission: "team.manage" }, async (_req: NextRequ
   return ok({
     ...team,
     memberIds: memberRows.map((r) => r.userId),
-    productIds: productRows.map((r) => r.productId),
+    productIds: productRows
+      .map((r) => r.productId)
+      .filter(
+        (productId) =>
+          ctx.role !== Role.ProductAdmin || ctx.productIds.includes(productId)
+      ),
   });
 });
 
 export const PATCH = withAuth({ permission: "team.manage" }, async (req: NextRequest, ctx) => {
   const team = await loadAccessibleTeam(ctx, ctx.params.id);
   const body = await parseBody(req, updateTeamSchema);
+
+  const productIds = body.productIds
+    ? [...new Set(body.productIds)]
+    : undefined;
+  const memberIds = body.memberIds
+    ? [...new Set(body.memberIds)]
+    : undefined;
+
+  // Team identity, membership, and reassignment policy are global to a team.
+  // A ProductAdmin must not change those fields on a team shared with a
+  // product outside their `user_products` scope.
+  if (
+    ctx.role === Role.ProductAdmin &&
+    ((body.name !== undefined && body.name.trim() !== team.name) ||
+      (body.allowReassign !== undefined &&
+        body.allowReassign !== (team.allowReassign ?? true)) ||
+      memberIds !== undefined)
+  ) {
+    const existingAssociations = await ctx.db
+      .select({ productId: productTeams.productId })
+      .from(productTeams)
+      .where(eq(productTeams.teamId, team.id));
+    if (
+      existingAssociations.some(
+        (row) => !ctx.productIds.includes(row.productId)
+      )
+    ) {
+      throw forbidden("Cannot modify a team shared with another product");
+    }
+  }
+
+  if (productIds) {
+    if (ctx.role === Role.ProductAdmin && productIds.length === 0) {
+      throw badRequest("ProductAdmin must keep the team attached to a product");
+    }
+    const selectedProducts = await Promise.all(
+      productIds.map((id) => assertProductAccess(ctx, id))
+    );
+    if (selectedProducts.some((product) => product.tenantId !== team.tenantId)) {
+      throw badRequest("Products must belong to the team's tenant");
+    }
+  }
+  if (memberIds && memberIds.length > 0) {
+    const [userRows, agentRows] = await Promise.all([
+      ctx.db.select().from(users).where(inArray(users.id, memberIds)),
+      ctx.db.select().from(agents).where(inArray(agents.userId, memberIds)),
+    ]);
+    if (
+      userRows.length !== memberIds.length ||
+      userRows.some((user) => user.tenantId !== team.tenantId) ||
+      agentRows.length !== memberIds.length
+    ) {
+      throw badRequest("Every team member must be an agent in the same tenant");
+    }
+  }
 
   const teamFields = {
     ...(body.name !== undefined && { name: body.name }),
@@ -54,13 +121,36 @@ export const PATCH = withAuth({ permission: "team.manage" }, async (req: NextReq
   if (Object.keys(teamFields).length > 0) {
     statements.push(ctx.db.update(teams).set(teamFields).where(eq(teams.id, team.id)));
   }
-  if (body.memberIds !== undefined) {
+  if (memberIds !== undefined) {
     statements.push(ctx.db.delete(agentTeams).where(eq(agentTeams.teamId, team.id)));
-    if (body.memberIds.length > 0) {
+    if (memberIds.length > 0) {
       statements.push(
         ctx.db
           .insert(agentTeams)
-          .values(body.memberIds.map((userId) => ({ userId, teamId: team.id })))
+          .values(memberIds.map((userId) => ({ userId, teamId: team.id })))
+      );
+    }
+  }
+  if (productIds !== undefined) {
+    const existing = await ctx.db
+      .select({ productId: productTeams.productId })
+      .from(productTeams)
+      .where(eq(productTeams.teamId, team.id));
+    const retained =
+      ctx.role === Role.ProductAdmin
+        ? existing
+            .map((row) => row.productId)
+            .filter((id) => !ctx.productIds.includes(id))
+        : [];
+    const nextProductIds = [...new Set([...retained, ...productIds])];
+    statements.push(
+      ctx.db.delete(productTeams).where(eq(productTeams.teamId, team.id))
+    );
+    if (nextProductIds.length > 0) {
+      statements.push(
+        ctx.db.insert(productTeams).values(
+          nextProductIds.map((productId) => ({ productId, teamId: team.id }))
+        )
       );
     }
   }
@@ -74,6 +164,25 @@ export const PATCH = withAuth({ permission: "team.manage" }, async (req: NextReq
 
 export const DELETE = withAuth({ permission: "team.manage" }, async (_req: NextRequest, ctx) => {
   const team = await loadAccessibleTeam(ctx, ctx.params.id);
+
+  const dependencies = await Promise.all([
+    ctx.db.query.tickets.findFirst({ where: eq(tickets.teamId, team.id) }),
+    ctx.db.query.tenants.findFirst({ where: eq(tenants.defaultTeamId, team.id) }),
+    ctx.db.query.categoryRoutes.findFirst({ where: eq(categoryRoutes.teamId, team.id) }),
+  ]);
+  if (dependencies.some(Boolean)) {
+    throw conflict("Team is still referenced by tickets, routing, or a tenant default");
+  }
+
+  if (ctx.role === Role.ProductAdmin) {
+    const associations = await ctx.db
+      .select({ productId: productTeams.productId })
+      .from(productTeams)
+      .where(eq(productTeams.teamId, team.id));
+    if (associations.some((row) => !ctx.productIds.includes(row.productId))) {
+      throw forbidden("Cannot delete a team shared with another product");
+    }
+  }
 
   await ctx.db.batch([
     ctx.db.delete(agentTeams).where(eq(agentTeams.teamId, team.id)),

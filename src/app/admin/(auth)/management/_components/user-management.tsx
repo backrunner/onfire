@@ -11,7 +11,9 @@ import { Role } from "@/lib/types";
 import { ROLE_HIERARCHY, canManageRole } from "@/lib/api-utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Table,
   TableBody,
@@ -54,10 +56,17 @@ interface UserRow {
   isAgent?: boolean;
   agentLevel?: number;
   agentActive?: boolean;
+  productIds?: string[];
 }
 
 interface Tenant {
   id: string;
+  name: string;
+}
+
+interface Product {
+  id: string;
+  tenantId: string;
   name: string;
 }
 
@@ -96,6 +105,10 @@ export function UserManagement() {
     isSuperAdmin ? "/api/tob/admin/tenants" : null,
     swrFetcher
   );
+  const { data: products } = useSWR<Product[]>(
+    "/api/tob/meta/products",
+    swrFetcher
+  );
 
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -103,9 +116,11 @@ export function UserManagement() {
   const [deleting, setDeleting] = useState<UserRow | null>(null);
   const [form, setForm] = useState({
     email: "",
+    temporaryPassword: "",
     displayName: "",
     role: "" as Role | "",
     tenantId: "",
+    productIds: [] as string[],
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
@@ -113,6 +128,14 @@ export function UserManagement() {
   const tenantNames = useMemo(
     () => new Map((tenants ?? []).map((tenant) => [tenant.id, tenant.name])),
     [tenants]
+  );
+  const productNames = useMemo(
+    () => new Map((products ?? []).map((product) => [product.id, product.name])),
+    [products]
+  );
+  const targetTenantId = form.tenantId || me?.user.tenantId;
+  const availableProducts = (products ?? []).filter(
+    (product) => !targetTenantId || product.tenantId === targetTenantId
   );
 
   /** Roles strictly below the current user's role, highest first. */
@@ -140,7 +163,14 @@ export function UserManagement() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ email: "", displayName: "", role: "", tenantId: "" });
+    setForm({
+      email: "",
+      temporaryPassword: "",
+      displayName: "",
+      role: "",
+      tenantId: "",
+      productIds: [],
+    });
     setFormErrors({});
     setDialogOpen(true);
   };
@@ -149,9 +179,11 @@ export function UserManagement() {
     setEditing(user);
     setForm({
       email: user.email,
+      temporaryPassword: "",
       displayName: user.displayName,
       role: user.role,
       tenantId: user.tenantId,
+      productIds: user.productIds ?? [],
     });
     setFormErrors({});
     setDialogOpen(true);
@@ -162,9 +194,16 @@ export function UserManagement() {
     if (!editing) {
       if (!form.email.trim()) errors.email = m.fieldRequired;
       else if (!EMAIL_RE.test(form.email.trim())) errors.email = m.users.emailInvalid;
+      if (!form.temporaryPassword) errors.temporaryPassword = m.fieldRequired;
+      else if (form.temporaryPassword.length < 8) {
+        errors.temporaryPassword = m.users.passwordMinLength;
+      }
     }
     if (!form.displayName.trim()) errors.displayName = m.fieldRequired;
     if (!form.role) errors.role = m.users.selectRole;
+    if (form.role === Role.ProductAdmin && form.productIds.length === 0) {
+      errors.productIds = m.users.productRequired;
+    }
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
@@ -174,13 +213,19 @@ export function UserManagement() {
         await api.patch(`/api/tob/admin/users/${editing.id}`, {
           displayName: form.displayName.trim(),
           role: form.role,
+          productIds:
+            form.role === Role.ProductAdmin ? form.productIds : [],
         });
         toast.success(m.toastUpdated);
       } else {
         await api.post("/api/tob/admin/users", {
           email: form.email.trim(),
+          temporaryPassword: form.temporaryPassword,
           displayName: form.displayName.trim(),
           role: form.role,
+          ...(form.role === Role.ProductAdmin && {
+            productIds: form.productIds,
+          }),
           ...(isSuperAdmin && form.tenantId ? { tenantId: form.tenantId } : {}),
         });
         toast.success(m.toastCreated);
@@ -235,6 +280,7 @@ export function UserManagement() {
                 <TableHead>{m.users.displayName}</TableHead>
                 <TableHead>{m.users.email}</TableHead>
                 <TableHead>{m.users.role}</TableHead>
+                <TableHead>{m.users.products}</TableHead>
                 {isSuperAdmin && <TableHead>{m.users.tenant}</TableHead>}
                 <TableHead>{m.tabs.agents}</TableHead>
                 <TableHead className="w-12" />
@@ -255,6 +301,13 @@ export function UserManagement() {
                       <Badge variant={ROLE_BADGE[user.role]}>
                         {roleLabels[user.role]}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="max-w-56 text-sm text-muted-foreground">
+                      {user.role === Role.ProductAdmin
+                        ? (user.productIds ?? [])
+                            .map((id) => productNames.get(id) ?? id)
+                            .join(", ") || "-"
+                        : "-"}
                     </TableCell>
                     {isSuperAdmin && (
                       <TableCell className="text-sm text-muted-foreground">
@@ -327,6 +380,30 @@ export function UserManagement() {
               />
             </FormField>
 
+            {!editing && (
+              <FormField
+                label={m.users.temporaryPassword}
+                htmlFor="user-temporary-password"
+                required
+                error={formErrors.temporaryPassword}
+                hint={m.users.temporaryPasswordHint}
+              >
+                <Input
+                  id="user-temporary-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={form.temporaryPassword}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      temporaryPassword: e.target.value,
+                    }))
+                  }
+                  className="h-8"
+                />
+              </FormField>
+            )}
+
             <FormField
               label={m.users.displayName}
               htmlFor="user-name"
@@ -346,7 +423,13 @@ export function UserManagement() {
             <FormField label={m.users.role} required error={formErrors.role}>
               <Select
                 value={form.role}
-                onValueChange={(v) => setForm((f) => ({ ...f, role: v as Role }))}
+                onValueChange={(v) =>
+                  setForm((f) => ({
+                    ...f,
+                    role: v as Role,
+                    ...(v !== Role.ProductAdmin && { productIds: [] }),
+                  }))
+                }
               >
                 <SelectTrigger className="h-8">
                   <SelectValue placeholder={m.users.selectRole} />
@@ -361,11 +444,54 @@ export function UserManagement() {
               </Select>
             </FormField>
 
+            {form.role === Role.ProductAdmin && (
+              <FormField
+                label={m.users.products}
+                required
+                error={formErrors.productIds}
+              >
+                {availableProducts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {m.users.noProducts}
+                  </p>
+                ) : (
+                  <ScrollArea className="max-h-40 rounded-md border">
+                    <div className="space-y-1 p-2">
+                      {availableProducts.map((product) => (
+                        <label
+                          key={product.id}
+                          className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                        >
+                          <Checkbox
+                            checked={form.productIds.includes(product.id)}
+                            onCheckedChange={(checked) =>
+                              setForm((current) => ({
+                                ...current,
+                                productIds:
+                                  checked === true
+                                    ? [...current.productIds, product.id]
+                                    : current.productIds.filter(
+                                        (id) => id !== product.id
+                                      ),
+                              }))
+                            }
+                          />
+                          {product.name}
+                        </label>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </FormField>
+            )}
+
             {isSuperAdmin && !editing && (
               <FormField label={m.users.tenant}>
                 <Select
                   value={form.tenantId}
-                  onValueChange={(v) => setForm((f) => ({ ...f, tenantId: v }))}
+                  onValueChange={(v) =>
+                    setForm((f) => ({ ...f, tenantId: v, productIds: [] }))
+                  }
                 >
                   <SelectTrigger className="h-8">
                     <SelectValue placeholder={m.products.selectTenant} />

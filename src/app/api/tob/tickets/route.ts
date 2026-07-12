@@ -1,12 +1,14 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { and, desc, eq, or, sql, count } from "drizzle-orm";
-import { tickets } from "@/drizzle/schema";
+import { and, desc, eq, exists, or, sql, count } from "drizzle-orm";
+import { customers, tickets } from "@/drizzle/schema";
 import { TicketStatus, TicketPriority } from "@/lib/types";
 import { ok } from "@/lib/api/response";
 import { withAuth, parseQuery } from "@/lib/api/handler";
 import { ticketScopeCondition } from "@/lib/api/scope";
 import { serializeTicket } from "@/lib/tickets/serialize";
+import { resolveUserNames, resolveCustomerExternalIds } from "@/lib/tickets/names";
+import { activeSlaOverdueCondition } from "@/lib/tickets/sla";
 
 const listQuerySchema = z.object({
   productId: z.string().optional(),
@@ -39,22 +41,25 @@ export const GET = withAuth({ permission: "ticket.read" }, async (req: NextReque
   if (query.status) conditions.push(eq(tickets.status, query.status));
   if (query.priority) conditions.push(eq(tickets.priority, query.priority));
   if (query.overdue) {
-    conditions.push(
-      or(
-        eq(tickets.slaAcceptBreached, true),
-        eq(tickets.slaReplyBreached, true),
-        sql`(${tickets.slaAcceptDeadline} IS NOT NULL AND ${tickets.slaAcceptDeadline} < ${new Date().toISOString()} AND ${tickets.status} = 'new')`,
-        sql`(${tickets.slaReplyDeadline} IS NOT NULL AND ${tickets.slaReplyDeadline} < ${new Date().toISOString()} AND ${tickets.status} IN ('new','processing','escalated'))`
-      )
-    );
+    conditions.push(activeSlaOverdueCondition());
   }
   if (query.q) {
-    const term = `%${query.q.replace(/[%_]/g, "")}%`;
     conditions.push(
       or(
-        sql`${tickets.subject} LIKE ${term}`,
-        sql`${tickets.customerEmail} LIKE ${term}`,
-        eq(tickets.id, query.q)
+        sql`instr(lower(${tickets.subject}), lower(${query.q})) > 0`,
+        sql`instr(lower(${tickets.customerEmail}), lower(${query.q})) > 0`,
+        sql`instr(lower(${tickets.id}), lower(${query.q})) > 0`,
+        exists(
+          ctx.db
+            .select({ value: sql<number>`1` })
+            .from(customers)
+            .where(
+              and(
+                eq(customers.id, tickets.customerId),
+                sql`instr(lower(${customers.externalId}), lower(${query.q})) > 0`
+              )
+            )
+        )
       )
     );
   }
@@ -74,8 +79,25 @@ export const GET = withAuth({ permission: "ticket.read" }, async (req: NextReque
     .limit(query.pageSize)
     .offset((query.page - 1) * query.pageSize);
 
+  const [names, customerRefs] = await Promise.all([
+    resolveUserNames(
+      ctx.db,
+      rows.map((row) => row.assigneeId)
+    ),
+    resolveCustomerExternalIds(
+      ctx.db,
+      rows.filter((row) => !row.customerEmail).map((row) => row.customerId)
+    ),
+  ]);
+
   return ok({
-    items: rows.map(serializeTicket),
+    items: rows.map((row) => ({
+      ...serializeTicket(row),
+      assigneeName: row.assigneeId ? (names[row.assigneeId] ?? null) : null,
+      customerLabel:
+        row.customerEmail ??
+        (row.customerId ? (customerRefs[row.customerId] ?? null) : null),
+    })),
     total,
     page: query.page,
     pageSize: query.pageSize,

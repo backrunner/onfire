@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { FormFieldType } from "@/lib/form-schema";
+import { useI18n } from "@/lib/i18n";
 import {
   Type,
   AlignLeft,
@@ -11,88 +12,49 @@ import {
   Circle,
   CheckSquare,
   Calendar,
+  type LucideIcon,
 } from "lucide-react";
 
 interface FieldPaletteProps {
   onAddField: (type: FormFieldType) => void;
 }
 
-const FIELD_TYPES: Array<{
-  type: FormFieldType;
-  label: string;
-  icon: React.ReactNode;
-  description: string;
-}> = [
-  {
-    type: "text",
-    label: "Text",
-    icon: <Type className="h-4 w-4" />,
-    description: "Single line text input",
-  },
-  {
-    type: "textarea",
-    label: "Textarea",
-    icon: <AlignLeft className="h-4 w-4" />,
-    description: "Multi-line text input",
-  },
-  {
-    type: "number",
-    label: "Number",
-    icon: <Hash className="h-4 w-4" />,
-    description: "Numeric input",
-  },
-  {
-    type: "email",
-    label: "Email",
-    icon: <Mail className="h-4 w-4" />,
-    description: "Email address input",
-  },
-  {
-    type: "select",
-    label: "Select",
-    icon: <ChevronDown className="h-4 w-4" />,
-    description: "Dropdown selection",
-  },
-  {
-    type: "radio",
-    label: "Radio",
-    icon: <Circle className="h-4 w-4" />,
-    description: "Single choice options",
-  },
-  {
-    type: "checkbox",
-    label: "Checkbox",
-    icon: <CheckSquare className="h-4 w-4" />,
-    description: "Multiple choice options",
-  },
-  {
-    type: "date",
-    label: "Date",
-    icon: <Calendar className="h-4 w-4" />,
-    description: "Date picker",
-  },
+const FIELD_ICONS: Array<{ type: FormFieldType; icon: LucideIcon }> = [
+  { type: "text", icon: Type },
+  { type: "textarea", icon: AlignLeft },
+  { type: "number", icon: Hash },
+  { type: "email", icon: Mail },
+  { type: "select", icon: ChevronDown },
+  { type: "radio", icon: Circle },
+  { type: "checkbox", icon: CheckSquare },
+  { type: "date", icon: Calendar },
 ];
 
 export function FieldPalette({ onAddField }: FieldPaletteProps) {
+  const { t } = useI18n();
+  const types = t.formBuilder.types;
+
   return (
     <div className="space-y-2">
       <h3 className="font-medium text-sm text-muted-foreground mb-3">
-        Field Types
+        {t.formBuilder.fieldTypes}
       </h3>
       <div className="space-y-1">
-        {FIELD_TYPES.map((field) => (
+        {FIELD_ICONS.map(({ type, icon: Icon }) => (
           <Button
-            key={field.type}
+            key={type}
             variant="ghost"
             className="w-full justify-start h-auto py-2"
-            onClick={() => onAddField(field.type)}
+            onClick={() => onAddField(type)}
           >
             <div className="flex items-center gap-3">
-              <div className="p-1.5 rounded bg-muted">{field.icon}</div>
+              <div className="p-1.5 rounded bg-muted">
+                <Icon className="size-4" />
+              </div>
               <div className="text-left">
-                <div className="font-medium text-sm">{field.label}</div>
+                <div className="font-medium text-sm">{types[type]}</div>
                 <div className="text-xs text-muted-foreground">
-                  {field.description}
+                  {types[`${type}Desc` as keyof typeof types]}
                 </div>
               </div>
             </div>

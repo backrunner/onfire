@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { ArrowLeft, Clock, ExternalLink, SearchX, User } from "lucide-react";
+import { ArrowLeft, Bot, Clock, ExternalLink, SearchX, Sparkles, User } from "lucide-react";
 import { swrFetcher, ApiClientError } from "@/lib/api/client";
 import type { TicketDetailResponse } from "@/lib/api/types";
 import { TicketStatus } from "@/lib/types";
@@ -20,6 +20,7 @@ import {
 import { TicketActions } from "./ticket-actions";
 import { Timeline } from "./timeline";
 import { ReplyComposer } from "./reply-composer";
+import { AssistantPanel } from "./assistant-panel";
 import { formatDuration, interp } from "./utils";
 
 interface TicketDetailProps {
@@ -43,6 +44,7 @@ export function TicketDetail({
   fullPage,
 }: TicketDetailProps) {
   const { t } = useI18n();
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const { data, error, isLoading, mutate } = useSWR<TicketDetailResponse>(
     `/api/tob/tickets/${ticketId}`,
     swrFetcher
@@ -77,6 +79,8 @@ export function TicketDetail({
 
   const { ticket, timeline } = data;
   const isClosed = ticket.status === TicketStatus.Closed;
+  const customerLabel =
+    ticket.customerLabel || ticket.customerEmail || t.tickets.list.anonymous;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -108,6 +112,16 @@ export function TicketDetail({
               />
             </div>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 shrink-0"
+            onClick={() => setAssistantOpen(true)}
+            aria-label={t.tickets.assistant.title}
+            title={t.tickets.assistant.title}
+          >
+            <Bot />
+          </Button>
           {!fullPage && (
             <Button
               variant="ghost"
@@ -129,11 +143,14 @@ export function TicketDetail({
           <Meta
             icon={<User className="size-3" />}
             label={t.tickets.detail.customer}
-            value={ticket.customerEmail}
+            value={customerLabel}
           />
           <Meta
             label={t.tickets.detail.assignee}
-            value={ticket.assigneeId ?? t.tickets.list.unassigned}
+            value={
+              ticket.assigneeName ??
+              (ticket.assigneeId ? "—" : t.tickets.list.unassigned)
+            }
           />
           <Meta
             label={t.tickets.detail.createdAt}
@@ -164,6 +181,8 @@ export function TicketDetail({
           </div>
         )}
 
+        <AiInsights ticket={ticket} />
+
         <TicketActions ticket={ticket} onMutated={refresh} />
       </div>
 
@@ -171,20 +190,31 @@ export function TicketDetail({
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <div className="rounded-lg bg-muted px-3 py-2">
           <p className="mb-1 text-[11px] font-medium text-muted-foreground">
-            {t.tickets.detail.content} · {ticket.customerEmail}
+            {t.tickets.detail.content} · {customerLabel}
           </p>
           <p className="whitespace-pre-wrap break-words text-sm">
             {ticket.content}
           </p>
         </div>
         <Separator className="my-4" />
-        <Timeline entries={timeline} />
+        <Timeline entries={timeline} actors={data.actors} />
       </div>
 
       {/* Composer */}
       <div className="shrink-0 border-t border-border p-3">
-        <ReplyComposer ticketId={ticket.id} closed={isClosed} onSent={refresh} />
+        <ReplyComposer
+          ticketId={ticket.id}
+          closed={isClosed}
+          suggestion={ticket.aiSuggestedReply}
+          onSent={refresh}
+        />
       </div>
+
+      <AssistantPanel
+        ticketId={ticket.id}
+        open={assistantOpen}
+        onOpenChange={setAssistantOpen}
+      />
     </div>
   );
 }
@@ -200,13 +230,65 @@ function Meta({
 }) {
   return (
     <div className="min-w-0">
-      <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground/70">
+      <span className="flex items-center gap-1 text-[10px] uppercase text-muted-foreground/70">
         {icon}
         {label}
       </span>
       <p className="truncate text-foreground/90" title={value}>
         {value}
       </p>
+    </div>
+  );
+}
+
+interface ScreeningResult {
+  summary?: string;
+  sentiment?: "positive" | "neutral" | "negative";
+  urgency?: "low" | "medium" | "high";
+}
+
+/** Compact prescreening summary; rendered only when the AI analysis exists. */
+function AiInsights({
+  ticket,
+}: {
+  ticket: TicketDetailResponse["ticket"];
+}) {
+  const { t } = useI18n();
+  if (ticket.aiScreeningStatus !== "completed") return null;
+  const result = ticket.aiScreeningResult;
+  if (!result || typeof result !== "object") return null;
+  const r = result as ScreeningResult;
+  if (!r.summary) return null;
+
+  return (
+    <div className="flex items-start gap-2 rounded-md bg-muted/60 px-3 py-2 text-xs">
+      <Sparkles className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+      <p className="min-w-0 flex-1 text-muted-foreground">
+        <span className="font-medium text-foreground/80">
+          {t.tickets.detail.aiSummary}
+        </span>
+        {" · "}
+        {r.summary}
+      </p>
+      <span className="flex shrink-0 items-center gap-1">
+        {r.sentiment && r.sentiment !== "neutral" && (
+          <span
+            className={cn(
+              "rounded px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset",
+              r.sentiment === "negative"
+                ? "bg-red-500/10 text-red-700 ring-red-500/20 dark:text-red-400"
+                : "bg-emerald-500/10 text-emerald-700 ring-emerald-500/20 dark:text-emerald-400"
+            )}
+          >
+            {t.tickets.detail.aiSentiment[r.sentiment]}
+          </span>
+        )}
+        {r.urgency === "high" && (
+          <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-inset ring-amber-500/20 dark:text-amber-400">
+            {t.tickets.detail.aiUrgent}
+          </span>
+        )}
+      </span>
     </div>
   );
 }

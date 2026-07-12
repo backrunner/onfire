@@ -1,13 +1,16 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq, and, inArray } from "drizzle-orm";
-import { tickets, history } from "@/drizzle/schema";
+import { tickets, history, products } from "@/drizzle/schema";
 import { TicketStatus } from "@/lib/types";
 import { ok } from "@/lib/api/response";
 import { withAuth, parseBody } from "@/lib/api/handler";
 import { ticketScopeCondition } from "@/lib/api/scope";
-import { canTransition } from "@/lib/tickets/state-machine";
-import { emitTicketEvent } from "@/services/ticket-events";
+import {
+  assertManualStatusTarget,
+  canTransition,
+} from "@/lib/tickets/state-machine";
+import { restartReplySla } from "@/lib/tickets/sla";
 
 const bulkStatusSchema = z.object({
   ticketIds: z.array(z.string().min(1)).min(1).max(100),
@@ -16,6 +19,7 @@ const bulkStatusSchema = z.object({
 
 export const POST = withAuth({ permission: "ticket.write" }, async (req: NextRequest, ctx) => {
   const body = await parseBody(req, bulkStatusSchema);
+  assertManualStatusTarget(body.status);
 
   const rows = await ctx.db
     .select()
@@ -27,6 +31,16 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
   const now = new Date().toISOString();
   const results: { id: string; success: boolean; error?: string }[] = [];
   const foundIds = new Set(rows.map((r) => r.id));
+  const productIds = [...new Set(rows.map((ticket) => ticket.productId))];
+  const productRows = productIds.length
+    ? await ctx.db
+        .select()
+        .from(products)
+        .where(inArray(products.id, productIds))
+    : [];
+  const productsById = new Map(
+    productRows.map((product) => [product.id, product])
+  );
 
   for (const id of body.ticketIds) {
     if (!foundIds.has(id)) {
@@ -48,10 +62,23 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
       continue;
     }
 
+    let slaUpdate: Partial<typeof tickets.$inferInsert> = {};
+    if (
+      ticket.status === TicketStatus.New &&
+      body.status === TicketStatus.Processing
+    ) {
+      const product = productsById.get(ticket.productId);
+      if (product) {
+        slaUpdate = restartReplySla(product, ticket.priority, new Date(now));
+      }
+    } else if (body.status === TicketStatus.Replied) {
+      slaUpdate = { slaReplyDeadline: null };
+    }
+
     await ctx.db.batch([
       ctx.db
         .update(tickets)
-        .set({ status: body.status, updatedAt: now })
+        .set({ status: body.status, updatedAt: now, ...slaUpdate })
         .where(eq(tickets.id, ticket.id)),
       ctx.db.insert(history).values({
         id: crypto.randomUUID(),
@@ -66,14 +93,6 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
         createdAt: now,
       }),
     ]);
-
-    if (body.status === TicketStatus.Closed) {
-      emitTicketEvent(ctx.db, {
-        type: "ticket_closed",
-        ticketId: ticket.id,
-        agentId: ticket.assigneeId ?? undefined,
-      });
-    }
 
     results.push({ id: ticket.id, success: true });
   }

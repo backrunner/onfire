@@ -243,7 +243,7 @@ export default function AdminDashboardPage() {
 function PageHeading({ t }: { t: Translations }) {
   return (
     <div>
-      <h1 className="text-xl font-semibold tracking-tight">
+      <h1 className="text-xl font-semibold">
         {t.dashboard.title}
       </h1>
       <p className="text-sm text-muted-foreground">{t.dashboard.subtitle}</p>

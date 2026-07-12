@@ -38,7 +38,8 @@ interface SearchTicket {
   subject: string;
   status: TicketStatus;
   priority: TicketPriority;
-  customerEmail: string;
+  customerEmail: string | null;
+  customerLabel: string | null;
   productName: string;
   teamName: string;
   isOverdue: boolean | null;
@@ -78,9 +79,13 @@ function SearchContent() {
   const priority = searchParams.get("priority") ?? "";
   const productId = searchParams.get("product") ?? "";
   const overdue = searchParams.get("overdue") === "true";
+  const from = searchParams.get("from") ?? "";
+  const to = searchParams.get("to") ?? "";
   const page = Math.max(1, Number(searchParams.get("page")) || 1);
 
   const [draft, setDraft] = useState(q);
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [highlighted, setHighlighted] = useState(-1);
   useEffect(() => setDraft(q), [q]);
   useEffect(() => inputRef.current?.focus(), []);
 
@@ -107,7 +112,9 @@ function SearchContent() {
     return () => clearTimeout(handle);
   }, [draft, q, setParams]);
 
-  const hasCriteria = Boolean(q || status || priority || productId || overdue);
+  const hasCriteria = Boolean(
+    q || status || priority || productId || overdue || from || to
+  );
 
   const key = hasCriteria
     ? `/api/tob/search${qs({
@@ -116,6 +123,8 @@ function SearchContent() {
         priority,
         productId,
         overdue: overdue ? "true" : "",
+        dateFrom: from ? `${from}T00:00:00.000Z` : "",
+        dateTo: to ? `${to}T23:59:59.999Z` : "",
         page,
         pageSize: 20,
       })}`
@@ -124,6 +133,34 @@ function SearchContent() {
   const { data, error, isLoading, mutate } = useSWR<SearchResponse>(key, swrFetcher, {
     keepPreviousData: true,
   });
+
+  // Autocomplete suggestions for the keyword box (subjects + customer emails).
+  const suggestKey =
+    suggestOpen && draft.trim().length >= 2
+      ? `/api/tob/search/suggest${qs({ q: draft.trim() })}`
+      : null;
+  const { data: suggestions } = useSWR<{ subjects: string[]; customers: string[] }>(
+    suggestKey,
+    swrFetcher,
+    { keepPreviousData: true }
+  );
+  const suggestItems = useMemo(
+    () =>
+      suggestKey && suggestions
+        ? [
+            ...suggestions.subjects.map((value) => ({ group: "subject" as const, value })),
+            ...suggestions.customers.map((value) => ({ group: "customer" as const, value })),
+          ]
+        : [],
+    [suggestKey, suggestions]
+  );
+
+  const applySuggestion = (value: string) => {
+    setDraft(value);
+    setSuggestOpen(false);
+    setHighlighted(-1);
+    setParams({ q: value, page: null });
+  };
 
   const dateFormatter = useMemo(
     () =>
@@ -137,7 +174,7 @@ function SearchContent() {
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">{t.search.title}</h1>
+        <h1 className="text-xl font-semibold">{t.search.title}</h1>
         <p className="text-sm text-muted-foreground">{t.search.subtitle}</p>
       </div>
 
@@ -148,10 +185,84 @@ function SearchContent() {
           <Input
             ref={inputRef}
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setSuggestOpen(true);
+              setHighlighted(-1);
+            }}
+            onFocus={() => setSuggestOpen(true)}
+            onBlur={() => setSuggestOpen(false)}
+            onKeyDown={(e) => {
+              if (suggestItems.length > 0 && suggestOpen) {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setHighlighted((i) => (i + 1) % suggestItems.length);
+                  return;
+                }
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setHighlighted(
+                    (i) => (i - 1 + suggestItems.length) % suggestItems.length
+                  );
+                  return;
+                }
+                if (e.key === "Enter" && highlighted >= 0) {
+                  e.preventDefault();
+                  applySuggestion(suggestItems[highlighted].value);
+                  return;
+                }
+              }
+              if (e.key === "Escape") setSuggestOpen(false);
+              if (e.key === "Enter") {
+                setSuggestOpen(false);
+                setParams({ q: draft, page: null });
+              }
+            }}
             placeholder={t.search.keywordPlaceholder}
             className="h-10 pl-9 text-sm"
+            role="combobox"
+            aria-expanded={suggestOpen && suggestItems.length > 0}
+            aria-autocomplete="list"
           />
+          {suggestOpen && suggestItems.length > 0 && (
+            <div className="absolute top-full z-20 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
+              {(["subject", "customer"] as const).map((group) => {
+                const groupItems = suggestItems.filter((i) => i.group === group);
+                if (groupItems.length === 0) return null;
+                return (
+                  <div key={group} className="py-1">
+                    <p className="px-3 py-1 text-[11px] font-medium uppercase text-muted-foreground/70">
+                      {group === "subject"
+                        ? t.search.subject
+                        : t.search.customerEmail}
+                    </p>
+                    {groupItems.map((item) => {
+                      const index = suggestItems.indexOf(item);
+                      return (
+                        <button
+                          key={`${item.group}-${item.value}`}
+                          type="button"
+                          className={cn(
+                            "block w-full truncate px-3 py-1.5 text-left text-sm transition-colors",
+                            index === highlighted
+                              ? "bg-accent text-accent-foreground"
+                              : "hover:bg-accent/60"
+                          )}
+                          onMouseDown={(e) => {
+                            e.preventDefault(); // keep input focus until applied
+                            applySuggestion(item.value);
+                          }}
+                          onMouseEnter={() => setHighlighted(index)}
+                        >
+                          {item.value}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select
@@ -202,6 +313,28 @@ function SearchContent() {
             className="h-8 w-[160px] text-xs"
           />
 
+          <Input
+            type="date"
+            value={from}
+            max={to || undefined}
+            onChange={(e) => setParams({ from: e.target.value, page: null })}
+            aria-label={t.search.dateFrom}
+            title={t.search.dateFrom}
+            className="h-8 w-[140px] text-xs"
+          />
+          <span className="text-xs text-muted-foreground" aria-hidden>
+            –
+          </span>
+          <Input
+            type="date"
+            value={to}
+            min={from || undefined}
+            onChange={(e) => setParams({ to: e.target.value, page: null })}
+            aria-label={t.search.dateTo}
+            title={t.search.dateTo}
+            className="h-8 w-[140px] text-xs"
+          />
+
           <Button
             variant={overdue ? "default" : "outline"}
             size="sm"
@@ -209,7 +342,7 @@ function SearchContent() {
             onClick={() => setParams({ overdue: overdue ? null : "true", page: null })}
           >
             <AlertTriangle className="size-3.5" />
-            {t.dashboard.viewOverdue}
+            {t.tickets.filters.overdueOnly}
           </Button>
         </div>
       </div>
@@ -267,7 +400,7 @@ function SearchContent() {
                   {ticket.subject}
                 </div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                  <span className="truncate">{ticket.customerEmail}</span>
+                  <span className="truncate">{ticket.customerLabel ?? "—"}</span>
                   {ticket.productName && (
                     <>
                       <span aria-hidden>·</span>

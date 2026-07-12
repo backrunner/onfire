@@ -140,7 +140,9 @@ export function TicketList({
                     {ticket.subject}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {ticket.customerEmail}
+                    {ticket.customerLabel ||
+                      ticket.customerEmail ||
+                      t.tickets.list.anonymous}
                   </p>
                 </div>
               </div>

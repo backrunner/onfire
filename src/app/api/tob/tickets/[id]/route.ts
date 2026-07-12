@@ -7,6 +7,7 @@ import { ok, notFound, badRequest } from "@/lib/api/response";
 import { withAuth, parseBody } from "@/lib/api/handler";
 import { assertTicketVisible } from "@/lib/api/scope";
 import { serializeTicket, serializeHistory } from "@/lib/tickets/serialize";
+import { resolveUserNames, resolveCustomerExternalIds } from "@/lib/tickets/names";
 import { isOpen } from "@/lib/tickets/state-machine";
 import { emitTicketEvent } from "@/services/ticket-events";
 
@@ -35,16 +36,56 @@ export const GET = withAuth({ permission: "ticket.read" }, async (_req: NextRequ
       .orderBy(history.createdAt),
   ]);
 
+  const serializedHistory = serializeHistory(historyRows);
+
+  // Resolve every referenced user (assignee, reply senders, history actors,
+  // assignees inside history snapshots) to a display name in one batch.
+  const snapshotIds = serializedHistory.flatMap((h) => {
+    const s = h.snapshot as
+      | { newAssignee?: string; previousAssignee?: string | null }
+      | undefined;
+    return [s?.newAssignee, s?.previousAssignee ?? undefined];
+  });
+  const actors = await resolveUserNames(ctx.db, [
+    ticket.assigneeId,
+    ...replyRows.map((r) => r.senderId),
+    ...historyRows.map((h) => h.actorId),
+    ...snapshotIds,
+  ]);
+
+  const customerRefs = ticket.customerEmail
+    ? {}
+    : await resolveCustomerExternalIds(ctx.db, [ticket.customerId]);
+  const customerLabel =
+    ticket.customerEmail ??
+    (ticket.customerId ? (customerRefs[ticket.customerId] ?? null) : null);
+
+  const namedReplies = replyRows.map((r) => ({
+    ...r,
+    senderName: r.senderId ? (actors[r.senderId] ?? null) : null,
+  }));
+  const namedHistory = serializedHistory.map((h) => ({
+    ...h,
+    actorName: h.actorId ? (actors[h.actorId] ?? null) : null,
+  }));
+
   const timeline = [
-    ...serializeHistory(historyRows).map((h) => ({ type: "history" as const, ...h })),
-    ...replyRows.map((r) => ({ type: "reply" as const, ...r })),
+    ...namedHistory.map((h) => ({ type: "history" as const, ...h })),
+    ...namedReplies.map((r) => ({ type: "reply" as const, ...r })),
   ].sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
 
   return ok({
-    ticket: serializeTicket(ticket),
-    replies: replyRows,
-    history: serializeHistory(historyRows),
+    ticket: {
+      ...serializeTicket(ticket),
+      assigneeName: ticket.assigneeId
+        ? (actors[ticket.assigneeId] ?? null)
+        : null,
+      customerLabel,
+    },
+    replies: namedReplies,
+    history: namedHistory,
     timeline,
+    actors,
   });
 });
 
@@ -93,7 +134,13 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
       ...statements,
       ctx.db
         .update(tickets)
-        .set({ status: TicketStatus.Replied, updatedAt: now })
+        .set({
+          status: TicketStatus.Replied,
+          // The public reply completes the first-reply SLA. Keep breach flags
+          // as history, but stop the deadline from becoming active again.
+          slaReplyDeadline: null,
+          updatedAt: now,
+        })
         .where(eq(tickets.id, ticket.id)),
     ]);
     emitTicketEvent(ctx.db, {

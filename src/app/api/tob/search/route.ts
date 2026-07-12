@@ -1,14 +1,15 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { eq, and, or, like, desc, sql, inArray } from "drizzle-orm";
-import { tickets, products, teams } from "@/drizzle/schema";
+import { eq, and, or, desc, exists, sql, inArray } from "drizzle-orm";
+import { customers, tickets, products, teams } from "@/drizzle/schema";
 import { TicketStatus, TicketPriority } from "@/lib/types";
 import { ok } from "@/lib/api/response";
 import { withAuth, parseQuery } from "@/lib/api/handler";
 import { ticketScopeCondition } from "@/lib/api/scope";
+import { activeSlaOverdueCondition, isTicketSlaOverdue } from "@/lib/tickets/sla";
 
 const searchQuerySchema = z.object({
-  q: z.string().min(1).max(200).optional(),
+  q: z.string().trim().min(1).max(200).optional(),
   status: z.enum(TicketStatus).optional(),
   priority: z.enum(TicketPriority).optional(),
   productId: z.string().optional(),
@@ -33,13 +34,23 @@ export const GET = withAuth({ permission: "ticket.read" }, async (req: NextReque
 
   // Text search (subject, content, customer email, ticket ID)
   if (query.q) {
-    const searchPattern = `%${query.q}%`;
     conditions.push(
       or(
-        like(tickets.subject, searchPattern),
-        like(tickets.content, searchPattern),
-        like(tickets.customerEmail, searchPattern),
-        like(tickets.id, searchPattern)
+        sql`instr(lower(${tickets.subject}), lower(${query.q})) > 0`,
+        sql`instr(lower(${tickets.content}), lower(${query.q})) > 0`,
+        sql`instr(lower(${tickets.customerEmail}), lower(${query.q})) > 0`,
+        sql`instr(lower(${tickets.id}), lower(${query.q})) > 0`,
+        exists(
+          ctx.db
+            .select({ value: sql<number>`1` })
+            .from(customers)
+            .where(
+              and(
+                eq(customers.id, tickets.customerId),
+                sql`instr(lower(${customers.externalId}), lower(${query.q})) > 0`
+              )
+            )
+        )
       )
     );
   }
@@ -58,7 +69,9 @@ export const GET = withAuth({ permission: "ticket.read" }, async (req: NextReque
   }
 
   if (query.customerEmail) {
-    conditions.push(like(tickets.customerEmail, `%${query.customerEmail}%`));
+    conditions.push(
+      sql`instr(lower(${tickets.customerEmail}), lower(${query.customerEmail})) > 0`
+    );
   }
 
   if (query.dateFrom) {
@@ -69,12 +82,7 @@ export const GET = withAuth({ permission: "ticket.read" }, async (req: NextReque
   }
 
   if (query.overdue) {
-    conditions.push(
-      or(
-        eq(tickets.slaAcceptBreached, true),
-        eq(tickets.slaReplyBreached, true)
-      )
-    );
+    conditions.push(activeSlaOverdueCondition());
   }
 
   const whereClause = and(...conditions.filter(Boolean));
@@ -87,15 +95,19 @@ export const GET = withAuth({ permission: "ticket.read" }, async (req: NextReque
         status: tickets.status,
         priority: tickets.priority,
         customerEmail: tickets.customerEmail,
+        customerExternalId: customers.externalId,
         productId: tickets.productId,
         teamId: tickets.teamId,
         assigneeId: tickets.assigneeId,
         slaAcceptBreached: tickets.slaAcceptBreached,
         slaReplyBreached: tickets.slaReplyBreached,
+        slaAcceptDeadline: tickets.slaAcceptDeadline,
+        slaReplyDeadline: tickets.slaReplyDeadline,
         createdAt: tickets.createdAt,
         updatedAt: tickets.updatedAt,
       })
       .from(tickets)
+      .leftJoin(customers, eq(customers.id, tickets.customerId))
       .where(whereClause)
       .orderBy(desc(tickets.createdAt))
       .limit(query.pageSize)
@@ -133,9 +145,10 @@ export const GET = withAuth({ permission: "ticket.read" }, async (req: NextReque
 
   const results = ticketResults.map((ticket) => ({
     ...ticket,
+    customerLabel: ticket.customerEmail ?? ticket.customerExternalId,
     productName: productMap.get(ticket.productId) || "",
     teamName: teamMap.get(ticket.teamId) || "",
-    isOverdue: ticket.slaAcceptBreached || ticket.slaReplyBreached,
+    isOverdue: isTicketSlaOverdue(ticket),
   }));
 
   return ok({

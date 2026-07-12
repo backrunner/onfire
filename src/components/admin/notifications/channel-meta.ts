@@ -24,6 +24,8 @@ export interface ChannelView {
   name: string;
   enabled: boolean | null;
   config: Record<string, unknown>;
+  /** Secret config keys that are set but intentionally omitted from config. */
+  secretFields?: string[];
   triggerEvents: string[];
   createdAt: string;
   updatedAt: string;

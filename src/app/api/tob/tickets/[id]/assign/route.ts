@@ -1,14 +1,14 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
-import { tickets, history, agents, agentTeams, teams, products } from "@/drizzle/schema";
+import { tickets, history, agents, agentTeams, teams, products, users } from "@/drizzle/schema";
 import { Role, TicketStatus, hasPermission } from "@/lib/types";
 import { ok, notFound, badRequest, forbidden } from "@/lib/api/response";
 import { withAuth, parseBody } from "@/lib/api/handler";
 import { assertTicketVisible } from "@/lib/api/scope";
 import { serializeTicket } from "@/lib/tickets/serialize";
 import { isOpen } from "@/lib/tickets/state-machine";
-import { computeSlaDeadlines } from "@/lib/tickets/sla";
+import { computeSlaDeadlines, restartReplySla } from "@/lib/tickets/sla";
 import { emitTicketEvent } from "@/services/ticket-events";
 
 const assignSchema = z.object({
@@ -21,8 +21,11 @@ const assignSchema = z.object({
  * First assignment requires `ticket.assign`. Reassignment requires
  * `ticket.reassign`, except Agents may reassign within their own team when
  * the team has `allowReassign` enabled. Reassignment resets SLA timers.
+ *
+ * The route gate is `ticket.write` (the broadest role that can reach any
+ * branch, incl. Agents); the assign-vs-reassign permission is enforced below.
  */
-export const POST = withAuth({ permission: "ticket.assign" }, async (req: NextRequest, ctx) => {
+export const POST = withAuth({ permission: "ticket.write" }, async (req: NextRequest, ctx) => {
   const ticket = await ctx.db.query.tickets.findFirst({
     where: eq(tickets.id, ctx.params.id),
   });
@@ -36,7 +39,12 @@ export const POST = withAuth({ permission: "ticket.assign" }, async (req: NextRe
   const body = await parseBody(req, assignSchema);
   const isReassign = Boolean(ticket.assigneeId);
 
-  if (isReassign) {
+  if (!isReassign) {
+    // First assignment
+    if (!hasPermission(ctx.role, "ticket.assign")) {
+      throw forbidden("You do not have permission to assign tickets");
+    }
+  } else {
     if (!hasPermission(ctx.role, "ticket.reassign")) {
       // Agents may reassign within their own team when the team allows it.
       const team = await ctx.db.query.teams.findFirst({
@@ -57,11 +65,15 @@ export const POST = withAuth({ permission: "ticket.assign" }, async (req: NextRe
 
   // Assignee must be an active agent in the ticket's team
   const assignee = await ctx.db
-    .select({ userId: agents.userId })
+    .select({ userId: agents.userId, tenantId: users.tenantId })
     .from(agents)
+    .innerJoin(users, eq(users.id, agents.userId))
     .where(and(eq(agents.userId, body.assigneeId), eq(agents.active, true)))
     .get();
   if (!assignee) throw badRequest("Assignee not found or inactive");
+  if (assignee.tenantId !== ticket.tenantId) {
+    throw badRequest("Assignee must belong to the ticket's tenant");
+  }
 
   const inTeam = await ctx.db
     .select()
@@ -78,20 +90,24 @@ export const POST = withAuth({ permission: "ticket.assign" }, async (req: NextRe
   const now = new Date().toISOString();
 
   // Reassignment resets SLA timers from the product policy
-  let slaReset = {};
-  if (isReassign) {
-    const product = await ctx.db.query.products.findFirst({
-      where: eq(products.id, ticket.productId),
-    });
-    if (product) {
-      slaReset = {
-        ...computeSlaDeadlines(product, ticket.priority, new Date(now)),
-        slaAcceptBreached: false,
-        slaReplyBreached: false,
-        slaAcceptWarned: false,
-        slaReplyWarned: false,
-      };
-    }
+  let slaReset: Partial<typeof tickets.$inferInsert> = {};
+  const product = await ctx.db.query.products.findFirst({
+    where: eq(products.id, ticket.productId),
+  });
+  if (product && !isReassign && ticket.status === TicketStatus.New) {
+    slaReset = restartReplySla(product, ticket.priority, new Date(now));
+  } else if (product && isReassign && ticket.status !== TicketStatus.Replied) {
+    // Reassignment resets active timers. A replied ticket has already
+    // completed its first-reply SLA and must not reactivate the old deadline.
+    slaReset = {
+      ...computeSlaDeadlines(product, ticket.priority, new Date(now)),
+      slaAcceptBreached: false,
+      slaReplyBreached: false,
+      slaAcceptWarned: false,
+      slaReplyWarned: false,
+    };
+  } else if (isReassign && ticket.status === TicketStatus.Replied) {
+    slaReset = { slaReplyDeadline: null };
   }
 
   await ctx.db.batch([

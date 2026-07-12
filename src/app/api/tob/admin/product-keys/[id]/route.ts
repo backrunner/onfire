@@ -32,12 +32,12 @@ async function loadAccessibleKey(ctx: AuthedContext, id: string) {
   return key;
 }
 
-export const GET = withAuth({ permission: "product.manage" }, async (_req: NextRequest, ctx) => {
+export const GET = withAuth({ permission: "product.settings" }, async (_req: NextRequest, ctx) => {
   const key = await loadAccessibleKey(ctx, ctx.params.id);
   return ok(toKeyView(key));
 });
 
-export const PATCH = withAuth({ permission: "product.manage" }, async (req: NextRequest, ctx) => {
+export const PATCH = withAuth({ permission: "product.settings" }, async (req: NextRequest, ctx) => {
   const key = await loadAccessibleKey(ctx, ctx.params.id);
   const body = await parseBody(req, updateKeySchema);
 
@@ -55,7 +55,7 @@ export const PATCH = withAuth({ permission: "product.manage" }, async (req: Next
   return ok(updated ? toKeyView(updated) : null);
 });
 
-export const DELETE = withAuth({ permission: "product.manage" }, async (_req: NextRequest, ctx) => {
+export const DELETE = withAuth({ permission: "product.settings" }, async (_req: NextRequest, ctx) => {
   const key = await loadAccessibleKey(ctx, ctx.params.id);
   await ctx.db.delete(productKeys).where(eq(productKeys.id, key.id));
   return ok({ deleted: true });

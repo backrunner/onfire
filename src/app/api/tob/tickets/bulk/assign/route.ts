@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq, and, inArray } from "drizzle-orm";
-import { tickets, history, agents, agentTeams } from "@/drizzle/schema";
+import { tickets, history, agents, agentTeams, products, users } from "@/drizzle/schema";
 import { TicketStatus } from "@/lib/types";
 import { ok, badRequest } from "@/lib/api/response";
 import { withAuth, parseBody } from "@/lib/api/handler";
 import { ticketScopeCondition } from "@/lib/api/scope";
 import { isOpen } from "@/lib/tickets/state-machine";
+import { computeSlaDeadlines, restartReplySla } from "@/lib/tickets/sla";
 import { emitTicketEvent } from "@/services/ticket-events";
 
 const bulkAssignSchema = z.object({
@@ -18,8 +19,9 @@ export const POST = withAuth({ permission: "ticket.assign" }, async (req: NextRe
   const body = await parseBody(req, bulkAssignSchema);
 
   const assignee = await ctx.db
-    .select({ userId: agents.userId })
+    .select({ userId: agents.userId, tenantId: users.tenantId })
     .from(agents)
+    .innerJoin(users, eq(users.id, agents.userId))
     .where(and(eq(agents.userId, body.assigneeId), eq(agents.active, true)))
     .get();
   if (!assignee) throw badRequest("Assignee not found or inactive");
@@ -41,6 +43,16 @@ export const POST = withAuth({ permission: "ticket.assign" }, async (req: NextRe
   const now = new Date().toISOString();
   const results: { id: string; success: boolean; error?: string }[] = [];
   const foundIds = new Set(rows.map((r) => r.id));
+  const productIds = [...new Set(rows.map((ticket) => ticket.productId))];
+  const productRows = productIds.length
+    ? await ctx.db
+        .select()
+        .from(products)
+        .where(inArray(products.id, productIds))
+    : [];
+  const productsById = new Map(
+    productRows.map((product) => [product.id, product])
+  );
 
   for (const id of body.ticketIds) {
     if (!foundIds.has(id)) {
@@ -54,11 +66,48 @@ export const POST = withAuth({ permission: "ticket.assign" }, async (req: NextRe
       continue;
     }
     if (!assigneeTeamIds.has(ticket.teamId)) {
-      results.push({ id: ticket.id, success: false, error: "Assignee not in ticket team" });
+      results.push({
+        id: ticket.id,
+        success: false,
+        error: "Assignee not in ticket team",
+      });
+      continue;
+    }
+    if (assignee.tenantId !== ticket.tenantId) {
+      results.push({
+        id: ticket.id,
+        success: false,
+        error: "Assignee belongs to another tenant",
+      });
       continue;
     }
 
     const isReassign = Boolean(ticket.assigneeId);
+    if (isReassign && ticket.assigneeId === body.assigneeId) {
+      results.push({
+        id: ticket.id,
+        success: false,
+        error: "Ticket is already assigned to this agent",
+      });
+      continue;
+    }
+
+    const product = productsById.get(ticket.productId);
+    const slaReset =
+      product && !isReassign && ticket.status === TicketStatus.New
+        ? restartReplySla(product, ticket.priority, new Date(now))
+        : product && isReassign && ticket.status !== TicketStatus.Replied
+          ? {
+              ...computeSlaDeadlines(product, ticket.priority, new Date(now)),
+              slaAcceptBreached: false,
+              slaReplyBreached: false,
+              slaAcceptWarned: false,
+              slaReplyWarned: false,
+            }
+          : isReassign && ticket.status === TicketStatus.Replied
+            ? { slaReplyDeadline: null }
+            : {};
+
     await ctx.db.batch([
       ctx.db
         .update(tickets)
@@ -69,6 +118,7 @@ export const POST = withAuth({ permission: "ticket.assign" }, async (req: NextRe
               ? TicketStatus.Processing
               : ticket.status,
           updatedAt: now,
+          ...slaReset,
         })
         .where(eq(tickets.id, ticket.id)),
       ctx.db.insert(history).values({
