@@ -1,19 +1,22 @@
 /** Client-side view types for the email configuration pages. */
 
-export type InboundProvider = "maileroo" | "sendgrid" | "mailgun" | "generic";
+export type InboundProvider =
+  | "maileroo"
+  | "sendgrid"
+  | "mailgun"
+  | "cloudflare"
+  | "generic";
 export type OutboundProvider =
   | "resend"
   | "sendgrid"
   | "mailgun"
   | "maileroo"
+  | "cloudflare"
   | "smtp";
 export type AiFilterStrictness = "low" | "medium" | "high";
 
-export type EmailTemplateType =
-  | "ticket_created"
-  | "ticket_replied"
-  | "ticket_closed"
-  | "ticket_escalated";
+export type { EmailTemplateType } from "@/lib/email-templates";
+import type { EmailTemplateType } from "@/lib/email-templates";
 
 export const EMAIL_TEMPLATE_TYPES: EmailTemplateType[] = [
   "ticket_created",

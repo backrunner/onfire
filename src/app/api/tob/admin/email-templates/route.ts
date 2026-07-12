@@ -2,9 +2,10 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { emailTemplates } from "@/drizzle/schema";
-import { ok, notFound, badRequest } from "@/lib/api/response";
+import { ok, notFound, badRequest, conflict } from "@/lib/api/response";
 import { withAuth, parseBody, parseQuery } from "@/lib/api/handler";
 import { assertProductAccess } from "@/lib/api/scope";
+import { emailTemplateMarkupIssues } from "@/lib/email-templates";
 
 const TEMPLATE_TYPES = [
   "ticket_created",
@@ -21,7 +22,11 @@ const createSchema = z.object({
   productId: z.string().min(1),
   templateType: z.enum(TEMPLATE_TYPES),
   subjectTemplate: z.string().min(1).max(998),
-  bodyTemplate: z.string().min(1).max(100_000),
+  bodyTemplate: z.string().min(1).max(100_000).superRefine((value, refinement) => {
+    for (const message of emailTemplateMarkupIssues(value)) {
+      refinement.addIssue({ code: "custom", message });
+    }
+  }),
   enabled: z.boolean().optional(),
 });
 
@@ -53,16 +58,23 @@ export const POST = withAuth({ permission: "template.write" }, async (req: NextR
 
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
-  await ctx.db.insert(emailTemplates).values({
-    id,
-    productId: body.productId,
-    templateType: body.templateType,
-    subjectTemplate: body.subjectTemplate,
-    bodyTemplate: body.bodyTemplate,
-    enabled: body.enabled ?? true,
-    createdAt: now,
-    updatedAt: now,
-  });
+  try {
+    await ctx.db.insert(emailTemplates).values({
+      id,
+      productId: body.productId,
+      templateType: body.templateType,
+      subjectTemplate: body.subjectTemplate,
+      bodyTemplate: body.bodyTemplate,
+      enabled: body.enabled ?? true,
+      createdAt: now,
+      updatedAt: now,
+    });
+  } catch (error) {
+    if (String(error).toLowerCase().includes("unique")) {
+      throw conflict(`A "${body.templateType}" template already exists for this product`);
+    }
+    throw error;
+  }
 
   const created = await ctx.db.query.emailTemplates.findFirst({
     where: eq(emailTemplates.id, id),

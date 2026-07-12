@@ -3,7 +3,16 @@
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
-import { AlertTriangle, Copy, KeyRound, Send } from "lucide-react";
+import {
+  AlertTriangle,
+  Copy,
+  Inbox,
+  KeyRound,
+  RotateCcw,
+  Save,
+  Send,
+  ShieldCheck,
+} from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { api, swrFetcher, qs, ApiClientError } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
@@ -42,12 +51,12 @@ import type {
 } from "./types";
 
 const INBOUND_PROVIDERS: InboundProvider[] = [
+  "cloudflare",
   "maileroo",
-  "sendgrid",
-  "mailgun",
   "generic",
 ];
 const OUTBOUND_PROVIDERS: OutboundProvider[] = [
+  "cloudflare",
   "resend",
   "sendgrid",
   "mailgun",
@@ -60,6 +69,11 @@ const PROVIDER_LABELS: Record<string, string> = {
   mailgun: "Mailgun",
   resend: "Resend",
   smtp: "SMTP",
+  cloudflare: "Cloudflare Email Routing",
+};
+const OUTBOUND_LABELS: Record<string, string> = {
+  ...PROVIDER_LABELS,
+  cloudflare: "Cloudflare Email",
 };
 
 interface FormState {
@@ -102,7 +116,13 @@ function toFormState(config: EmailConfigView | null): FormState {
   };
 }
 
-export function EmailSettingsTab({ productId }: { productId: string }) {
+export function EmailSettingsTab({
+  productId,
+  onDirtyChange,
+}: {
+  productId: string;
+  onDirtyChange?: (dirty: boolean) => void;
+}) {
   const { t } = useI18n();
   const tc = t.emailConfig;
 
@@ -119,6 +139,20 @@ export function EmailSettingsTab({ productId }: { productId: string }) {
   const [testOpen, setTestOpen] = useState(false);
   const [testTo, setTestTo] = useState("");
   const [testing, setTesting] = useState(false);
+  const persistedForm = toFormState(config);
+  const isDirty = JSON.stringify(form) !== JSON.stringify(persistedForm);
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+    return () => onDirtyChange?.(false);
+  }, [isDirty, onDirtyChange]);
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [isDirty]);
 
   useEffect(() => {
     setForm(toFormState(config));
@@ -165,6 +199,8 @@ export function EmailSettingsTab({ productId }: { productId: string }) {
       setSaving(false);
     }
   };
+
+  const resetForm = () => setForm(persistedForm);
 
   const handleGenerateSecret = async () => {
     setGenerating(true);
@@ -235,20 +271,31 @@ export function EmailSettingsTab({ productId }: { productId: string }) {
   }
 
   return (
-    <div className="space-y-4">
+    <form
+      className="space-y-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void handleSave();
+      }}
+    >
       {/* Inbound */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between space-y-0">
-          <div>
-            <CardTitle className="text-base">{tc.inbound.title}</CardTitle>
-            <CardDescription className="mt-1 text-xs">
-              {tc.inbound.description}
-            </CardDescription>
+      <Card className="gap-0 overflow-hidden border-border/70 py-0 shadow-[0_1px_2px_0_rgb(0_0_0/0.03)]">
+        <CardHeader className="flex flex-row items-start justify-between space-y-0 px-5 py-4">
+          <div className="flex min-w-0 gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-sky-500/20 bg-sky-500/10 text-sky-700 dark:text-sky-400">
+              <Inbox className="size-4" />
+            </span>
+            <div>
+              <CardTitle className="text-base">{tc.inbound.title}</CardTitle>
+              <CardDescription className="mt-1 text-xs">
+                {tc.inbound.description}
+              </CardDescription>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <Label
               htmlFor="inbound-enabled"
-              className="text-xs text-muted-foreground"
+              className="whitespace-nowrap text-xs text-muted-foreground"
             >
               {tc.inbound.enabled}
             </Label>
@@ -259,7 +306,7 @@ export function EmailSettingsTab({ productId }: { productId: string }) {
             />
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 px-5 pb-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label className="text-xs">{tc.inbound.provider}</Label>
@@ -287,6 +334,7 @@ export function EmailSettingsTab({ productId }: { productId: string }) {
               <Label className="text-xs">{tc.inbound.address}</Label>
               <Input
                 type="email"
+                autoComplete="email"
                 value={form.inboundAddress}
                 onChange={(e) => set("inboundAddress", e.target.value)}
                 placeholder={tc.inbound.addressPlaceholder}
@@ -295,49 +343,62 @@ export function EmailSettingsTab({ productId }: { productId: string }) {
             </div>
           </div>
 
-          <Separator />
-
-          {/* Webhook secret */}
-          <div className="flex flex-wrap items-center gap-3">
-            <KeyRound className="size-4 text-muted-foreground" />
-            <div className="flex-1">
-              <p className="text-sm font-medium">{tc.inbound.webhookSecret}</p>
-              <p className="text-xs text-muted-foreground">
-                {config
-                  ? config.hasWebhookSecret
-                    ? tc.inbound.secretConfigured
-                    : tc.inbound.secretNotConfigured
-                  : tc.inbound.saveFirst}
-              </p>
+          {form.inboundProvider === "cloudflare" ? (
+            <div className="flex gap-3 rounded-lg border border-sky-500/20 bg-sky-500/[0.06] px-3 py-2.5 text-sky-800 dark:text-sky-300">
+              <ShieldCheck className="mt-0.5 size-4 shrink-0" />
+              <p className="text-xs leading-5">{tc.inbound.cloudflareHint}</p>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8"
-              disabled={!config || generating}
-              onClick={handleGenerateSecret}
-            >
-              {config?.hasWebhookSecret
-                ? tc.inbound.regenerate
-                : tc.inbound.generate}
-            </Button>
-          </div>
+          ) : (
+            <>
+              <Separator />
+              <div className="flex flex-wrap items-center gap-3">
+                <KeyRound className="size-4 text-muted-foreground" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{tc.inbound.webhookSecret}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {config
+                      ? config.hasWebhookSecret
+                        ? tc.inbound.secretConfigured
+                        : tc.inbound.secretNotConfigured
+                      : tc.inbound.saveFirst}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  disabled={!config || generating}
+                  onClick={handleGenerateSecret}
+                >
+                  {config?.hasWebhookSecret
+                    ? tc.inbound.regenerate
+                    : tc.inbound.generate}
+                </Button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
       {/* Outbound */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between space-y-0">
-          <div>
-            <CardTitle className="text-base">{tc.outbound.title}</CardTitle>
-            <CardDescription className="mt-1 text-xs">
-              {tc.outbound.description}
-            </CardDescription>
+      <Card className="gap-0 overflow-hidden border-border/70 py-0 shadow-[0_1px_2px_0_rgb(0_0_0/0.03)]">
+        <CardHeader className="flex flex-row items-start justify-between space-y-0 px-5 py-4">
+          <div className="flex min-w-0 gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
+              <Send className="size-4" />
+            </span>
+            <div>
+              <CardTitle className="text-base">{tc.outbound.title}</CardTitle>
+              <CardDescription className="mt-1 text-xs">
+                {tc.outbound.description}
+              </CardDescription>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <Label
               htmlFor="outbound-enabled"
-              className="text-xs text-muted-foreground"
+              className="whitespace-nowrap text-xs text-muted-foreground"
             >
               {tc.outbound.enabled}
             </Label>
@@ -348,7 +409,7 @@ export function EmailSettingsTab({ productId }: { productId: string }) {
             />
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 px-5 pb-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label className="text-xs">{tc.outbound.provider}</Label>
@@ -364,18 +425,19 @@ export function EmailSettingsTab({ productId }: { productId: string }) {
                 <SelectContent>
                   {OUTBOUND_PROVIDERS.map((provider) => (
                     <SelectItem key={provider} value={provider}>
-                      {PROVIDER_LABELS[provider]}
+                      {OUTBOUND_LABELS[provider]}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            {form.outboundProvider !== "smtp" && (
+            {form.outboundProvider !== "smtp" &&
+              form.outboundProvider !== "cloudflare" && (
               <div className="space-y-1.5">
                 <Label className="text-xs">{tc.outbound.apiKey}</Label>
                 <Input
                   type="password"
-                  autoComplete="new-password"
+                  autoComplete="off"
                   value={form.outboundApiKey}
                   onChange={(e) => set("outboundApiKey", e.target.value)}
                   placeholder={
@@ -389,11 +451,18 @@ export function EmailSettingsTab({ productId }: { productId: string }) {
             )}
           </div>
 
+          {form.outboundProvider === "cloudflare" && (
+            <p className="text-xs text-muted-foreground">
+              {tc.outbound.cloudflareHint}
+            </p>
+          )}
+
           {form.outboundProvider === "smtp" && (
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label className="text-xs">{tc.outbound.smtpHost}</Label>
                 <Input
+                  autoComplete="url"
                   value={form.outboundSmtpHost}
                   onChange={(e) => set("outboundSmtpHost", e.target.value)}
                   placeholder={tc.outbound.smtpHostPlaceholder}
@@ -413,6 +482,7 @@ export function EmailSettingsTab({ productId }: { productId: string }) {
               <div className="space-y-1.5">
                 <Label className="text-xs">{tc.outbound.smtpUser}</Label>
                 <Input
+                  autoComplete="username"
                   value={form.outboundSmtpUser}
                   onChange={(e) => set("outboundSmtpUser", e.target.value)}
                   className="h-8 text-sm"
@@ -422,7 +492,7 @@ export function EmailSettingsTab({ productId }: { productId: string }) {
                 <Label className="text-xs">{tc.outbound.smtpPass}</Label>
                 <Input
                   type="password"
-                  autoComplete="new-password"
+                  autoComplete="current-password"
                   value={form.outboundSmtpPass}
                   onChange={(e) => set("outboundSmtpPass", e.target.value)}
                   placeholder={
@@ -442,6 +512,7 @@ export function EmailSettingsTab({ productId }: { productId: string }) {
             <div className="space-y-1.5">
               <Label className="text-xs">{tc.outbound.senderName}</Label>
               <Input
+                autoComplete="name"
                 value={form.outboundSenderName}
                 onChange={(e) => set("outboundSenderName", e.target.value)}
                 placeholder={tc.outbound.senderNamePlaceholder}
@@ -452,6 +523,7 @@ export function EmailSettingsTab({ productId }: { productId: string }) {
               <Label className="text-xs">{tc.outbound.senderEmail}</Label>
               <Input
                 type="email"
+                autoComplete="email"
                 value={form.outboundSenderEmail}
                 onChange={(e) => set("outboundSenderEmail", e.target.value)}
                 placeholder={tc.outbound.senderEmailPlaceholder}
@@ -462,6 +534,7 @@ export function EmailSettingsTab({ productId }: { productId: string }) {
               <Label className="text-xs">{tc.outbound.replyTo}</Label>
               <Input
                 type="email"
+                autoComplete="email"
                 value={form.outboundReplyTo}
                 onChange={(e) => set("outboundReplyTo", e.target.value)}
                 placeholder={tc.outbound.replyToPlaceholder}
@@ -472,12 +545,15 @@ export function EmailSettingsTab({ productId }: { productId: string }) {
 
           <div className="flex justify-end">
             <Button
+              type="button"
               size="sm"
               variant="outline"
               className="h-8"
-              disabled={!config?.outboundEnabled}
+              disabled={!config?.outboundEnabled || isDirty}
               title={
-                !config?.outboundEnabled ? tc.outbound.testSaveFirst : undefined
+                !config?.outboundEnabled || isDirty
+                  ? tc.outbound.testSaveFirst
+                  : undefined
               }
               onClick={() => setTestOpen(true)}
             >
@@ -489,18 +565,23 @@ export function EmailSettingsTab({ productId }: { productId: string }) {
       </Card>
 
       {/* AI filter */}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between space-y-0">
-          <div>
-            <CardTitle className="text-base">{tc.aiFilter.title}</CardTitle>
-            <CardDescription className="mt-1 text-xs">
-              {tc.aiFilter.description}
-            </CardDescription>
+      <Card className="gap-0 overflow-hidden border-border/70 py-0 shadow-[0_1px_2px_0_rgb(0_0_0/0.03)]">
+        <CardHeader className="flex flex-row items-start justify-between space-y-0 px-5 py-4">
+          <div className="flex min-w-0 gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400">
+              <ShieldCheck className="size-4" />
+            </span>
+            <div>
+              <CardTitle className="text-base">{tc.aiFilter.title}</CardTitle>
+              <CardDescription className="mt-1 text-xs">
+                {tc.aiFilter.description}
+              </CardDescription>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <Label
               htmlFor="ai-filter-enabled"
-              className="text-xs text-muted-foreground"
+              className="whitespace-nowrap text-xs text-muted-foreground"
             >
               {tc.aiFilter.enabled}
             </Label>
@@ -511,7 +592,7 @@ export function EmailSettingsTab({ productId }: { productId: string }) {
             />
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-5 pb-4">
           <div className="max-w-xs space-y-1.5">
             <Label className="text-xs">{tc.aiFilter.strictness}</Label>
             <Select
@@ -533,10 +614,26 @@ export function EmailSettingsTab({ productId }: { productId: string }) {
         </CardContent>
       </Card>
 
-      <div className="flex justify-end">
-        <Button size="sm" onClick={handleSave} disabled={saving}>
-          {tc.save}
-        </Button>
+      <div className="sticky bottom-3 z-20 flex items-center justify-between gap-3 rounded-lg border border-border/80 bg-background/90 px-3 py-2 shadow-[0_8px_30px_rgb(0_0_0/0.08)] backdrop-blur-xl">
+        <p className="text-xs text-muted-foreground">
+          {isDirty ? tc.unsaved : tc.upToDate}
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={resetForm}
+            disabled={!isDirty || saving}
+          >
+            <RotateCcw className="size-3.5" />
+            {tc.reset}
+          </Button>
+          <Button type="submit" size="sm" disabled={!isDirty || saving}>
+            <Save className="size-3.5" />
+            {tc.save}
+          </Button>
+        </div>
       </div>
 
       {/* New webhook secret dialog */}
@@ -603,6 +700,6 @@ export function EmailSettingsTab({ productId }: { productId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </form>
   );
 }

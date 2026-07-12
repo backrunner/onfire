@@ -1,4 +1,6 @@
 import type { EmailProvider, EmailMessage, SendResult } from "./index";
+import { readResponseJson } from "@/lib/response-body";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 export class MailgunProvider implements EmailProvider {
   name = "mailgun";
@@ -7,15 +9,21 @@ export class MailgunProvider implements EmailProvider {
 
   constructor(apiKey: string, domain?: string) {
     this.apiKey = apiKey;
-    // Extract domain from API key format: key-xxx:domain.com or just use default
+    // API key field carries "key:domain" (domain required for the API URL)
     const parts = apiKey.split(":");
-    this.domain = domain || parts[1] || "mg.example.com";
+    this.domain = domain || parts[1] || "";
     if (parts.length > 1) {
       this.apiKey = parts[0];
     }
   }
 
   async send(message: EmailMessage): Promise<SendResult> {
+    if (!this.domain) {
+      return {
+        success: false,
+        error: "Mailgun domain missing — set the API key as 'key:yourdomain.com'",
+      };
+    }
     try {
       const formData = new FormData();
       formData.append(
@@ -33,8 +41,11 @@ export class MailgunProvider implements EmailProvider {
       if (message.replyTo) {
         formData.append("h:Reply-To", message.replyTo);
       }
+      for (const [name, value] of Object.entries(message.headers ?? {})) {
+        formData.append(`h:${name}`, value);
+      }
 
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         `https://api.mailgun.net/v3/${this.domain}/messages`,
         {
           method: "POST",
@@ -42,10 +53,13 @@ export class MailgunProvider implements EmailProvider {
             Authorization: `Basic ${btoa(`api:${this.apiKey}`)}`,
           },
           body: formData,
-        }
+        },
+        15_000
       );
 
-      const data = (await response.json()) as { id?: string; message?: string };
+      const data = await readResponseJson<{ id?: string; message?: string }>(
+        response
+      );
 
       if (!response.ok) {
         return {

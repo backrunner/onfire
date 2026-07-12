@@ -76,12 +76,31 @@ describe("inbound email processing", () => {
     expect(ticket.productId).toBe(productId);
     expect(ticket.source).toBe("email");
     expect(ticket.slaAcceptDeadline).not.toBeNull();
-    expect(ticket.slaReplyDeadline).not.toBeNull();
+    // No agent was available, so the reply SLA starts only after acceptance.
+    expect(ticket.slaReplyDeadline).toBeNull();
 
     const customer = await db.query.customers.findFirst({
       where: eq(customers.productId, productId),
     });
     expect(customer?.email).toBe("customer@example.com");
+  });
+
+  it("uses the HTML body when the plain-text part is only whitespace", async () => {
+    const { address } = await seedInbound();
+
+    const result = await processInboundEmail(
+      db,
+      email(address, {
+        bodyPlain: "  \n\t",
+        bodyHtml: "<p>The HTML fallback is useful.</p>",
+      })
+    );
+
+    const ticket = await db.query.tickets.findFirst({
+      where: eq(tickets.id, result.ticketId!),
+    });
+    expect(result.action).toBe("ticket_created");
+    expect(ticket?.content).toBe("The HTML fallback is useful.");
   });
 
   it("deduplicates by provider message ID", async () => {

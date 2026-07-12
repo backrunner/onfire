@@ -15,14 +15,19 @@ export default function AdminEmailPage() {
   const { t } = useI18n();
   const { data: products, isLoading } = useProducts();
   const [productId, setProductId] = useState("");
+  const [activeTab, setActiveTab] = useState("settings");
+  const [settingsDirty, setSettingsDirty] = useState(false);
+
+  const canDiscardSettings = () =>
+    !settingsDirty || window.confirm(t.emailConfig.discardConfirm);
 
   const noProducts = !isLoading && (products?.length ?? 0) === 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">
+          <h1 className="text-xl font-semibold">
             {t.emailConfig.title}
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -31,8 +36,13 @@ export default function AdminEmailPage() {
         </div>
         <ProductSelect
           value={productId}
-          onChange={setProductId}
+          onChange={(nextProductId) => {
+            if (nextProductId !== productId && !canDiscardSettings()) return;
+            setSettingsDirty(false);
+            setProductId(nextProductId);
+          }}
           placeholder={t.emailConfig.selectProduct}
+          emptyLabel={t.emailConfig.noProducts}
           autoSelectFirst
         />
       </div>
@@ -54,20 +64,30 @@ export default function AdminEmailPage() {
           <Skeleton className="h-48 w-full rounded-xl" />
         </div>
       ) : (
-        <Tabs defaultValue="settings">
-          <TabsList className="h-8">
-            <TabsTrigger value="settings" className="text-xs">
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => {
+            if (value !== "settings" && !canDiscardSettings()) return;
+            setSettingsDirty(false);
+            setActiveTab(value);
+          }}
+        >
+          <TabsList>
+            <TabsTrigger value="settings">
               {t.emailConfig.tabs.settings}
             </TabsTrigger>
-            <TabsTrigger value="templates" className="text-xs">
+            <TabsTrigger value="templates">
               {t.emailConfig.tabs.templates}
             </TabsTrigger>
-            <TabsTrigger value="logs" className="text-xs">
+            <TabsTrigger value="logs">
               {t.emailConfig.tabs.logs}
             </TabsTrigger>
           </TabsList>
           <TabsContent value="settings" className="mt-4">
-            <EmailSettingsTab productId={productId} />
+            <EmailSettingsTab
+              productId={productId}
+              onDirtyChange={setSettingsDirty}
+            />
           </TabsContent>
           <TabsContent value="templates" className="mt-4">
             <EmailTemplatesTab productId={productId} />

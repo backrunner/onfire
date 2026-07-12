@@ -1,4 +1,6 @@
 import type { EmailProvider, EmailMessage, SendResult } from "./index";
+import { readResponseText } from "@/lib/response-body";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 export class SendGridProvider implements EmailProvider {
   name = "sendgrid";
@@ -10,14 +12,19 @@ export class SendGridProvider implements EmailProvider {
 
   async send(message: EmailMessage): Promise<SendResult> {
     try {
-      const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+      const response = await fetchWithTimeout("https://api.sendgrid.com/v3/mail/send", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          personalizations: [{ to: [{ email: message.to }] }],
+          personalizations: [
+            {
+              to: [{ email: message.to }],
+              headers: message.headers,
+            },
+          ],
           from: {
             email: message.from,
             name: message.fromName,
@@ -29,10 +36,10 @@ export class SendGridProvider implements EmailProvider {
             ...(message.text ? [{ type: "text/plain", value: message.text }] : []),
           ],
         }),
-      });
+      }, 15_000);
 
       if (!response.ok) {
-        const text = await response.text();
+        const text = await readResponseText(response);
         return {
           success: false,
           error: text || `HTTP ${response.status}`,

@@ -5,6 +5,11 @@ import { ok, notFound } from "@/lib/api/response";
 import { withAuth } from "@/lib/api/handler";
 import { assertProductAccess } from "@/lib/api/scope";
 import { randomHex } from "@/lib/crypto";
+import { getEnv } from "@/lib/db";
+import {
+  emailSecretPurpose,
+} from "@/services/email/config-secrets";
+import { sealSecret } from "@/lib/secret-storage";
 
 /**
  * POST /api/tob/admin/email-config/:productId/webhook-secret — rotate the
@@ -20,10 +25,17 @@ export const POST = withAuth({ permission: "email.config" }, async (_req: NextRe
   if (!config) throw notFound("Email config not found for this product");
 
   const secret = randomHex(32);
+  const sealedSecret = await sealSecret(
+    secret,
+    getEnv().AUTH_SECRET,
+    emailSecretPurpose(productId, "inboundWebhookSecret")
+  );
   await ctx.db
     .update(emailConfigs)
-    .set({ inboundWebhookSecret: secret, updatedAt: new Date().toISOString() })
+    .set({ inboundWebhookSecret: sealedSecret, updatedAt: new Date().toISOString() })
     .where(eq(emailConfigs.id, config.id));
 
-  return ok({ webhookSecret: secret });
+  const response = ok({ webhookSecret: secret });
+  response.headers.set("Cache-Control", "no-store");
+  return response;
 });

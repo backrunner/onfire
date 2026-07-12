@@ -5,10 +5,20 @@ import { emailTemplates } from "@/drizzle/schema";
 import { ok, notFound } from "@/lib/api/response";
 import { withAuth, parseBody, type AuthedContext } from "@/lib/api/handler";
 import { assertProductAccess } from "@/lib/api/scope";
+import { emailTemplateMarkupIssues } from "@/lib/email-templates";
 
 const updateSchema = z.object({
   subjectTemplate: z.string().min(1).max(998).optional(),
-  bodyTemplate: z.string().min(1).max(100_000).optional(),
+  bodyTemplate: z
+    .string()
+    .min(1)
+    .max(100_000)
+    .superRefine((value, refinement) => {
+      for (const message of emailTemplateMarkupIssues(value)) {
+        refinement.addIssue({ code: "custom", message });
+      }
+    })
+    .optional(),
   enabled: z.boolean().optional(),
 });
 

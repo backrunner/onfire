@@ -1,9 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
-import { AlertTriangle, FileText } from "lucide-react";
+import {
+  AlertTriangle,
+  Code2,
+  FileText,
+  Monitor,
+  RotateCcw,
+  Smartphone,
+} from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { api, swrFetcher, qs, ApiClientError } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
@@ -21,6 +28,13 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  EMAIL_TEMPLATE_SAMPLE_VARIABLES,
+  getDefaultBodyTemplate,
+  getDefaultSubjectTemplate,
+  renderEmailTemplate,
+  sanitizeEmailTemplateHtml,
+} from "@/lib/email-templates";
 import {
   EMAIL_TEMPLATE_TYPES,
   TEMPLATE_VARIABLES,
@@ -50,6 +64,9 @@ export function EmailTemplatesTab({ productId }: { productId: string }) {
 
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [saving, setSaving] = useState(false);
+  const [previewMobile, setPreviewMobile] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<"editor" | "preview">("editor");
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   const byType = new Map<EmailTemplateType, EmailTemplateView>();
   for (const template of data ?? []) {
@@ -61,9 +78,55 @@ export function EmailTemplatesTab({ productId }: { productId: string }) {
     setEditor({
       templateType,
       template,
-      subject: template?.subjectTemplate ?? "",
-      body: template?.bodyTemplate ?? "",
+      subject:
+        template?.subjectTemplate ?? getDefaultSubjectTemplate(templateType),
+      body: template?.bodyTemplate ?? getDefaultBodyTemplate(templateType),
       enabled: template?.enabled ?? true,
+    });
+    setPreviewMobile(false);
+    setMobilePanel("editor");
+  };
+
+  const preview = useMemo(() => {
+    if (!editor) return null;
+    const subject = renderEmailTemplate(
+      editor.subject,
+      EMAIL_TEMPLATE_SAMPLE_VARIABLES,
+      { html: false }
+    );
+    const body = renderEmailTemplate(
+      sanitizeEmailTemplateHtml(editor.body),
+      EMAIL_TEMPLATE_SAMPLE_VARIABLES,
+      { html: true }
+    );
+    return {
+      subject,
+      srcDoc: `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:"><style>html,body{margin:0;min-height:100%;background:#f4f4f5}body{padding:24px 12px;box-sizing:border-box}</style></head><body>${body}</body></html>`,
+    };
+  }, [editor]);
+
+  const resetToDefault = () => {
+    if (!editor) return;
+    setEditor({
+      ...editor,
+      subject: getDefaultSubjectTemplate(editor.templateType),
+      body: getDefaultBodyTemplate(editor.templateType),
+    });
+  };
+
+  const insertVariable = (variable: string) => {
+    if (!editor) return;
+    const textarea = bodyRef.current;
+    const token = `{{${variable}}}`;
+    const start = textarea?.selectionStart ?? editor.body.length;
+    const end = textarea?.selectionEnd ?? start;
+    setEditor({
+      ...editor,
+      body: `${editor.body.slice(0, start)}${token}${editor.body.slice(end)}`,
+    });
+    requestAnimationFrame(() => {
+      textarea?.focus();
+      textarea?.setSelectionRange(start + token.length, start + token.length);
     });
   };
 
@@ -138,12 +201,12 @@ export function EmailTemplatesTab({ productId }: { productId: string }) {
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="gap-0 py-0">
+      <CardHeader className="px-5 py-4">
         <CardTitle className="text-base">{tt.heading}</CardTitle>
         <CardDescription className="text-xs">{tt.hint}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-2 px-5 pb-4">
         {EMAIL_TEMPLATE_TYPES.map((type) => {
           const template = byType.get(type) ?? null;
           return (
@@ -188,7 +251,7 @@ export function EmailTemplatesTab({ productId }: { productId: string }) {
                       "bg-zinc-500/10 text-zinc-600 ring-zinc-500/20 dark:text-zinc-400"
                     )}
                   >
-                    {tt.notCreated}
+                    {tt.systemDefault}
                   </span>
                   <Button
                     size="sm"
@@ -196,7 +259,7 @@ export function EmailTemplatesTab({ productId }: { productId: string }) {
                     className="h-8"
                     onClick={() => openEditor(type)}
                   >
-                    {tt.create}
+                    {tt.customize}
                   </Button>
                 </>
               )}
@@ -210,9 +273,9 @@ export function EmailTemplatesTab({ productId }: { productId: string }) {
         open={editor !== null}
         onOpenChange={(open) => !open && setEditor(null)}
       >
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="flex max-h-[calc(100vh-2rem)] min-h-[680px] flex-col overflow-hidden p-0 sm:max-w-6xl">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="px-6 pt-6">
               {editor?.template ? tt.editTitle : tt.createTitle}
               {editor && (
                 <span className="ml-2 text-sm font-normal text-muted-foreground">
@@ -220,9 +283,38 @@ export function EmailTemplatesTab({ productId }: { productId: string }) {
                 </span>
               )}
             </DialogTitle>
+            <div className="mx-6 grid grid-cols-2 rounded-md bg-muted p-0.5 lg:hidden">
+              <Button
+                type="button"
+                variant={mobilePanel === "editor" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8 gap-1.5"
+                onClick={() => setMobilePanel("editor")}
+              >
+                <Code2 className="size-3.5" />
+                {tt.edit}
+              </Button>
+              <Button
+                type="button"
+                variant={mobilePanel === "preview" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8 gap-1.5"
+                onClick={() => setMobilePanel("preview")}
+              >
+                <Monitor className="size-3.5" />
+                {tt.preview}
+              </Button>
+            </div>
           </DialogHeader>
-          {editor && (
-            <div className="space-y-4">
+          {editor && preview && (
+            <div className="grid min-h-0 flex-1 border-y border-border lg:grid-cols-2">
+              <div
+                className={cn(
+                  "min-h-0 flex-col gap-3 overflow-y-auto p-5",
+                  mobilePanel === "editor" ? "flex" : "hidden",
+                  "lg:flex"
+                )}
+              >
               <div className="space-y-1.5">
                 <Label className="text-xs">{tt.subject}</Label>
                 <Input
@@ -234,32 +326,47 @@ export function EmailTemplatesTab({ productId }: { productId: string }) {
                   className="h-8 text-sm"
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">{tt.body}</Label>
+              <div className="flex min-h-0 flex-1 flex-col space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-xs">{tt.body}</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1.5 text-xs text-muted-foreground"
+                    onClick={resetToDefault}
+                  >
+                    <RotateCcw className="size-3.5" />
+                    {tt.resetDefault}
+                  </Button>
+                </div>
                 <Textarea
+                  ref={bodyRef}
                   value={editor.body}
                   onChange={(e) =>
                     setEditor({ ...editor, body: e.target.value })
                   }
                   placeholder={tt.bodyPlaceholder}
-                  rows={10}
-                  className="font-mono text-xs"
+                  rows={16}
+                  className="min-h-72 flex-1 resize-none font-mono text-xs leading-5"
                 />
               </div>
-              <div className="rounded-md bg-muted/60 px-3 py-2">
+              <div className="rounded-md border border-border/60 bg-muted/35 px-3 py-2">
                 <p className="text-xs text-muted-foreground">
                   {tt.variablesHint}
                 </p>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {TEMPLATE_VARIABLES.map((variable) => (
-                    <code
+                    <button
+                      type="button"
                       key={variable}
-                      className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground ring-1 ring-inset ring-border"
+                      className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground ring-1 ring-inset ring-border transition-colors hover:text-foreground"
+                      onClick={() => insertVariable(variable)}
                     >
                       {"{{"}
                       {variable}
                       {"}}"}
-                    </code>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -273,9 +380,66 @@ export function EmailTemplatesTab({ productId }: { productId: string }) {
                   {tt.enabledLabel}
                 </Label>
               </div>
+              </div>
+
+              <div
+                className={cn(
+                  "min-h-0 min-w-0 flex-col bg-muted/30 lg:border-l lg:border-border",
+                  mobilePanel === "preview" ? "flex" : "hidden",
+                  "lg:flex"
+                )}
+              >
+                <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
+                  <div className="flex items-center gap-2 text-xs font-medium">
+                    <Code2 className="size-3.5 text-muted-foreground" />
+                    {tt.preview}
+                  </div>
+                  <div className="flex rounded-md border border-border bg-background p-0.5">
+                    <Button
+                      type="button"
+                      variant={previewMobile ? "ghost" : "secondary"}
+                      size="icon"
+                      className="size-7"
+                      onClick={() => setPreviewMobile(false)}
+                      aria-label={tt.desktopPreview}
+                      title={tt.desktopPreview}
+                    >
+                      <Monitor className="size-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={previewMobile ? "secondary" : "ghost"}
+                      size="icon"
+                      className="size-7"
+                      onClick={() => setPreviewMobile(true)}
+                      aria-label={tt.mobilePreview}
+                      title={tt.mobilePreview}
+                    >
+                      <Smartphone className="size-3.5" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="border-b border-border/70 bg-background px-4 py-2.5">
+                  <p className="truncate text-xs text-muted-foreground">
+                    {tt.previewSubject}
+                  </p>
+                  <p className="truncate text-sm font-medium">{preview.subject}</p>
+                </div>
+                <div className="flex min-h-0 flex-1 justify-center overflow-auto p-3">
+                  <iframe
+                    title={tt.preview}
+                    sandbox=""
+                    srcDoc={preview.srcDoc}
+                    className={cn(
+                      "h-full min-h-[420px] rounded-md border border-border bg-white shadow-sm transition-[width]",
+                      previewMobile ? "w-[375px] max-w-full" : "w-full"
+                    )}
+                  />
+                </div>
+              </div>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="shrink-0 px-6 pb-6">
             <Button
               size="sm"
               variant="outline"

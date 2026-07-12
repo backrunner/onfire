@@ -1,4 +1,6 @@
 import type { EmailProvider, EmailMessage, SendResult } from "./index";
+import { readResponseJson } from "@/lib/response-body";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 export class ResendProvider implements EmailProvider {
   name = "resend";
@@ -10,7 +12,7 @@ export class ResendProvider implements EmailProvider {
 
   async send(message: EmailMessage): Promise<SendResult> {
     try {
-      const response = await fetch("https://api.resend.com/emails", {
+      const response = await fetchWithTimeout("https://api.resend.com/emails", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -25,10 +27,13 @@ export class ResendProvider implements EmailProvider {
           html: message.html,
           text: message.text,
           reply_to: message.replyTo,
+          headers: message.headers,
         }),
-      });
+      }, 15_000);
 
-      const data = (await response.json()) as { id?: string; message?: string };
+      const data = await readResponseJson<{ id?: string; message?: string }>(
+        response
+      );
 
       if (!response.ok) {
         return {
