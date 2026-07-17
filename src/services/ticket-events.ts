@@ -1,7 +1,7 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { Database } from "@/lib/db";
 import type { NotificationTriggerEvent } from "@/drizzle/schema";
-import { sendAgentNotification } from "@/services/notification/service";
+import { sendRecipientNotifications } from "@/services/notification/service";
 import { sendTicketNotification } from "@/services/email/outbound";
 import { prescreenTicket } from "@/services/ai/prescreening";
 
@@ -26,6 +26,8 @@ export interface TicketEvent {
   /** Reply that triggered the event (drives the email body) */
   replyId?: string;
   customerEmail?: string;
+  /** Email ingestion can complete the same prescreening before ticket creation. */
+  aiPrescreened?: boolean;
 }
 
 const NOTIFICATION_EVENTS = new Set<NotificationTriggerEvent>([
@@ -56,7 +58,7 @@ async function dispatch(db: Database, event: TicketEvent): Promise<void> {
 
   if (NOTIFICATION_EVENTS.has(event.type as NotificationTriggerEvent)) {
     jobs.push(
-      sendAgentNotification(db, {
+      sendRecipientNotifications(db, {
         ticketId: event.ticketId,
         agentId: event.agentId,
         triggerEvent: event.type as NotificationTriggerEvent,
@@ -83,7 +85,7 @@ async function dispatch(db: Database, event: TicketEvent): Promise<void> {
 
   // AI prescreening on new tickets — no-op when the prescreening task
   // is not configured; failures only mark aiScreeningStatus=error.
-  if (event.type === "ticket_created") {
+  if (event.type === "ticket_created" && !event.aiPrescreened) {
     jobs.push(
       prescreenTicket(db, event.ticketId).catch((error) =>
         console.error("AI prescreening failed:", error)

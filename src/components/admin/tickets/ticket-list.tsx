@@ -54,7 +54,7 @@ export function TicketList({
 
   if (error) {
     return (
-      <div className="flex flex-col items-center gap-3 p-8 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
         <p className="text-sm text-muted-foreground">
           {error.message || t.tickets.list.loadError}
         </p>
@@ -72,7 +72,7 @@ export function TicketList({
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 p-10 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-2 p-10 text-center">
         <Inbox className="size-7 text-muted-foreground/50" />
         <p className="text-sm font-medium">{t.tickets.list.noTickets}</p>
         <p className="text-xs text-muted-foreground">

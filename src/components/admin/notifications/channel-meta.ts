@@ -2,33 +2,109 @@
 
 import {
   BellRing,
+  Blocks,
+  Bot,
+  Building2,
+  Feather,
   Mail,
+  MessageCircleMore,
   MessageSquare,
   Radio,
   Send,
   Smartphone,
   type LucideIcon,
 } from "lucide-react";
-import { CHANNEL_TYPES, TRIGGER_EVENTS } from "@/lib/notifications/channel-schema";
+import {
+  CHANNEL_DEFINITIONS,
+  CHANNEL_TYPES,
+  RECIPIENT_TYPES,
+  REQUIREMENT_SCOPE_TYPES,
+  TRIGGER_EVENTS,
+  type ChannelFieldDefinition,
+  type NotificationChannelType,
+  type NotificationRecipientType,
+  type NotificationRequirementScope,
+  type NotificationTriggerEvent,
+} from "@/lib/notifications/channel-definitions";
 
-export { CHANNEL_TYPES, TRIGGER_EVENTS };
+export {
+  CHANNEL_TYPES,
+  RECIPIENT_TYPES,
+  REQUIREMENT_SCOPE_TYPES,
+  TRIGGER_EVENTS,
+};
+export type ChannelType = NotificationChannelType;
+export type TriggerEvent = NotificationTriggerEvent;
+export type RecipientType = NotificationRecipientType;
+export type RequirementScope = NotificationRequirementScope;
+export type ChannelFieldMeta = ChannelFieldDefinition;
 
-export type ChannelType = (typeof CHANNEL_TYPES)[number];
-export type TriggerEvent = (typeof TRIGGER_EVENTS)[number];
-
-/** Notification channel as returned by the ToB admin API (config parsed). */
-export interface ChannelView {
+export interface EndpointView {
   id: string;
-  productId: string;
+  userId: string;
   channelType: ChannelType;
   name: string;
   enabled: boolean | null;
   config: Record<string, unknown>;
-  /** Secret config keys that are set but intentionally omitted from config. */
   secretFields?: string[];
-  triggerEvents: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface NotificationRuleView {
+  id: string;
+  productId: string;
+  name: string;
+  enabled: boolean | null;
+  triggerEvents: TriggerEvent[];
+  channelTypes: ChannelType[];
+  recipientType: RecipientType;
+  recipientTeamId: string | null;
+  recipientUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationRequirementView {
+  id: string;
+  productId: string;
+  name: string;
+  enabled: boolean | null;
+  scopeType: RequirementScope;
+  scopeTeamId: string | null;
+  scopeUserId: string | null;
+  triggerEvents: TriggerEvent[];
+  channelTypes: ChannelType[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationTeamView {
+  id: string;
+  name: string;
+}
+
+export interface NotificationAgentView {
+  userId: string;
+  displayName: string;
+  email: string;
+  teamIds: string[];
+  channelTypes: ChannelType[];
+}
+
+export interface NotificationComplianceView {
+  teams: NotificationTeamView[];
+  agents: NotificationAgentView[];
+  requirements: Array<
+    NotificationRequirementView & {
+      targetCount: number;
+      missing: Array<{
+        userId: string;
+        displayName: string;
+        channelTypes: ChannelType[];
+      }>;
+    }
+  >;
 }
 
 export const CHANNEL_ICONS: Record<ChannelType, LucideIcon> = {
@@ -38,42 +114,24 @@ export const CHANNEL_ICONS: Record<ChannelType, LucideIcon> = {
   ntfy: Radio,
   telegram: Send,
   discord: MessageSquare,
+  slack: MessageSquare,
+  teams: Blocks,
+  feishu: Feather,
+  dingtalk: MessageCircleMore,
+  wecom: Building2,
 };
 
-export interface ChannelFieldMeta {
-  /** Config object key — must match what the notification service reads. */
-  key: "email" | "pushkey" | "deviceKey" | "topic" | "botToken" | "chatId" | "webhookUrl" | "serverUrl";
-  required: boolean;
-  placeholder?: string;
-  secret?: boolean;
-}
+export const CHANNEL_FIELDS: Record<
+  ChannelType,
+  readonly ChannelFieldMeta[]
+> = Object.fromEntries(
+  CHANNEL_TYPES.map((type) => [type, CHANNEL_DEFINITIONS[type].fields])
+) as Record<ChannelType, readonly ChannelFieldMeta[]>;
 
-/** Per-type config fields; keys mirror src/services/notification/channels. */
-export const CHANNEL_FIELDS: Record<ChannelType, ChannelFieldMeta[]> = {
-  email: [
-    { key: "email", required: true, placeholder: "alerts@example.com" },
-  ],
-  pushdeer: [
-    { key: "pushkey", required: true, secret: true },
-    { key: "serverUrl", required: false, placeholder: "https://api2.pushdeer.com" },
-  ],
-  bark: [
-    { key: "deviceKey", required: true, secret: true },
-    { key: "serverUrl", required: false, placeholder: "https://api.day.app" },
-  ],
-  ntfy: [
-    { key: "topic", required: true },
-    { key: "serverUrl", required: false, placeholder: "https://ntfy.sh" },
-  ],
-  telegram: [
-    { key: "botToken", required: true, secret: true },
-    { key: "chatId", required: true },
-  ],
-  discord: [
-    {
-      key: "webhookUrl",
-      required: true,
-      placeholder: "https://discord.com/api/webhooks/...",
-    },
-  ],
+export const RECIPIENT_ICONS: Record<RecipientType, LucideIcon> = {
+  assignee: Bot,
+  ticket_team: MessageSquare,
+  product_agents: Building2,
+  team: Building2,
+  user: Bot,
 };

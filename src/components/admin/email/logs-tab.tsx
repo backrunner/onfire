@@ -2,9 +2,10 @@
 
 import { useState, Fragment } from "react";
 import useSWR from "swr";
-import { AlertTriangle, ChevronDown, ChevronRight, Inbox } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, Inbox, RotateCcw } from "lucide-react";
+import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
-import { swrFetcher, qs } from "@/lib/api/client";
+import { api, swrFetcher, qs } from "@/lib/api/client";
 import type { Paginated } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PaginationBar } from "@/components/admin/pagination-bar";
 import type { InboundEmailLog, OutboundEmailLog } from "./types";
 
@@ -32,6 +48,8 @@ const LOG_STATUS_STYLES: Record<string, string> = {
   sent: "bg-emerald-500/10 text-emerald-700 ring-emerald-500/20 dark:text-emerald-400",
   delivered: "bg-emerald-500/10 text-emerald-700 ring-emerald-500/20 dark:text-emerald-400",
   filtered: "bg-amber-500/10 text-amber-700 ring-amber-500/20 dark:text-amber-400",
+  quarantined: "bg-amber-500/10 text-amber-700 ring-amber-500/20 dark:text-amber-400",
+  releasing: "bg-sky-500/10 text-sky-700 ring-sky-500/20 dark:text-sky-400",
   error: "bg-red-500/10 text-red-700 ring-red-500/20 dark:text-red-400",
   failed: "bg-red-500/10 text-red-700 ring-red-500/20 dark:text-red-400",
   bounced: "bg-red-500/10 text-red-700 ring-red-500/20 dark:text-red-400",
@@ -170,6 +188,10 @@ function InboundLogsTable({ productId }: { productId: string }) {
   const { t } = useI18n();
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [releasing, setReleasing] = useState<InboundEmailLog | null>(null);
+  const [releaseTypeId, setReleaseTypeId] = useState("");
+  const [releaseReason, setReleaseReason] = useState("");
+  const [releasePending, setReleasePending] = useState(false);
 
   const { data, error, isLoading, mutate } = useSWR<Paginated<InboundEmailLog>>(
     `/api/tob/admin/email-logs/inbound${qs({ productId, page, pageSize: PAGE_SIZE })}`,
@@ -178,6 +200,38 @@ function InboundLogsTable({ productId }: { productId: string }) {
   );
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
+  const { data: typeRows } = useSWR<Array<{
+    id: string;
+    productId: string;
+    name: string;
+    systemKey: string | null;
+    archivedAt: string | null;
+  }>>(releasing ? "/api/tob/admin/ticket-types" : null, swrFetcher);
+  const releaseTypes = (typeRows ?? []).filter(
+    (type) =>
+      type.productId === productId &&
+      !type.archivedAt &&
+      (!type.systemKey || type.systemKey === "unclassified")
+  );
+  const release = async () => {
+    if (!releasing || !releaseReason.trim() || (!releasing.candidateTicketId && !releaseTypeId)) return;
+    setReleasePending(true);
+    try {
+      await api.post(`/api/tob/admin/email-logs/inbound/${releasing.id}/release`, {
+        ...(releaseTypeId ? { ticketTypeId: releaseTypeId } : {}),
+        reason: releaseReason.trim(),
+      });
+      toast.success(t.emailConfig.logs.released);
+      setReleasing(null);
+      setReleaseReason("");
+      setReleaseTypeId("");
+      await mutate();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t.emailConfig.logs.releaseFailed);
+    } finally {
+      setReleasePending(false);
+    }
+  };
 
   return (
     <LogsShell
@@ -213,15 +267,24 @@ function InboundLogsTable({ productId }: { productId: string }) {
                   {new Date(log.createdAt).toLocaleString()}
                 </TableCell>
                 <ErrorToggleCell
-                  hasError={Boolean(log.errorMessage)}
+                  hasError={Boolean(log.errorMessage || log.filterReason)}
                   expanded={expanded === log.id}
                   onToggle={() =>
                     setExpanded(expanded === log.id ? null : log.id)
                   }
                 />
               </TableRow>
-              {expanded === log.id && log.errorMessage && (
-                <ErrorRow message={log.errorMessage} colSpan={5} />
+              {expanded === log.id && (log.errorMessage || log.filterReason) && (
+                <ErrorRow message={log.errorMessage || log.filterReason || ""} colSpan={5} />
+              )}
+              {log.processingStatus === "quarantined" && !log.releasedAt && (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={5} className="py-1 text-right">
+                    <Button size="sm" variant="outline" className="h-7" onClick={() => { setReleasing(log); setReleaseTypeId(""); setReleaseReason(""); }}>
+                      <RotateCcw className="mr-1.5 size-3.5" />{t.emailConfig.logs.release}
+                    </Button>
+                  </TableCell>
+                </TableRow>
               )}
             </Fragment>
           ))}
@@ -233,6 +296,19 @@ function InboundLogsTable({ productId }: { productId: string }) {
         onPageChange={setPage}
         className="mt-4"
       />
+      <Dialog open={Boolean(releasing)} onOpenChange={(open) => !releasePending && !open && setReleasing(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>{t.emailConfig.logs.release}</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <Select value={releaseTypeId} onValueChange={setReleaseTypeId}>
+              <SelectTrigger><SelectValue placeholder={t.emailConfig.logs.selectReleaseType} /></SelectTrigger>
+              <SelectContent>{releaseTypes.map((type) => <SelectItem key={type.id} value={type.id}>{type.systemKey === "unclassified" ? t.emailConfig.logs.unclassified : type.name}</SelectItem>)}</SelectContent>
+            </Select>
+            <Textarea value={releaseReason} onChange={(event) => setReleaseReason(event.target.value)} placeholder={t.emailConfig.logs.releaseReason} rows={3} />
+          </div>
+          <DialogFooter><Button variant="outline" size="sm" onClick={() => setReleasing(null)} disabled={releasePending}>{t.common.cancel}</Button><Button size="sm" onClick={() => void release()} disabled={releasePending || !releaseReason.trim() || (!releasing?.candidateTicketId && !releaseTypeId)}>{releasePending ? t.common.loading : t.emailConfig.logs.release}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </LogsShell>
   );
 }

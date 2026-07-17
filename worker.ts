@@ -166,6 +166,10 @@ export default {
         parsed.messageId || message.headers.get("message-id") || undefined,
       inReplyTo: message.headers.get("in-reply-to") || undefined,
       references: message.headers.get("references") || undefined,
+      autoSubmitted: message.headers.get("auto-submitted") || undefined,
+      precedence: message.headers.get("precedence") || undefined,
+      listId: message.headers.get("list-id") || undefined,
+      returnPath: message.headers.get("return-path") || undefined,
       ...auth,
     };
 

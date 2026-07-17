@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
 import {
@@ -14,7 +14,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { api, swrFetcher, qs, ApiClientError } from "@/lib/api/client";
+import { api, swrFetcher, qs } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -49,6 +49,7 @@ import type {
   InboundProvider,
   OutboundProvider,
 } from "./types";
+import { showEmailMutationFailure } from "./toast";
 
 const INBOUND_PROVIDERS: InboundProvider[] = [
   "cloudflare",
@@ -76,6 +77,13 @@ const OUTBOUND_LABELS: Record<string, string> = {
   cloudflare: "Cloudflare Email",
 };
 
+function isOutboundProvider(value: unknown): value is OutboundProvider {
+  return (
+    typeof value === "string" &&
+    (OUTBOUND_PROVIDERS as readonly string[]).includes(value)
+  );
+}
+
 interface FormState {
   inboundEnabled: boolean;
   inboundProvider: InboundProvider;
@@ -100,7 +108,9 @@ function toFormState(config: EmailConfigView | null): FormState {
     inboundProvider: config?.inboundProvider ?? "generic",
     inboundAddress: config?.inboundAddress ?? "",
     outboundEnabled: config?.outboundEnabled ?? false,
-    outboundProvider: config?.outboundProvider ?? "resend",
+    outboundProvider: isOutboundProvider(config?.outboundProvider)
+      ? config.outboundProvider
+      : "resend",
     outboundApiKey: "",
     outboundSmtpHost: config?.outboundSmtpHost ?? "",
     outboundSmtpPort: config?.outboundSmtpPort
@@ -131,16 +141,21 @@ export function EmailSettingsTab({
     swrFetcher
   );
   const config = data ?? null;
+  const persistedForm = toFormState(config);
+  const persistedSnapshot = JSON.stringify(persistedForm);
 
-  const [form, setForm] = useState<FormState>(() => toFormState(null));
+  const [form, setForm] = useState<FormState>(() => persistedForm);
   const [saving, setSaving] = useState(false);
   const [newSecret, setNewSecret] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [testOpen, setTestOpen] = useState(false);
   const [testTo, setTestTo] = useState("");
   const [testing, setTesting] = useState(false);
-  const persistedForm = toFormState(config);
-  const isDirty = JSON.stringify(form) !== JSON.stringify(persistedForm);
+  const syncedSnapshotRef = useRef({ productId, snapshot: persistedSnapshot });
+  const isDirty =
+    syncedSnapshotRef.current.productId === productId &&
+    syncedSnapshotRef.current.snapshot === persistedSnapshot &&
+    JSON.stringify(form) !== persistedSnapshot;
 
   useEffect(() => {
     onDirtyChange?.(isDirty);
@@ -155,9 +170,10 @@ export function EmailSettingsTab({
   }, [isDirty]);
 
   useEffect(() => {
-    setForm(toFormState(config));
+    setForm(persistedForm);
+    syncedSnapshotRef.current = { productId, snapshot: persistedSnapshot };
     // Re-sync the form whenever the product or stored config changes.
-  }, [productId, config]);
+  }, [productId, persistedSnapshot]);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -192,9 +208,14 @@ export function EmailSettingsTab({
       }
       await api.post("/api/tob/admin/email-config", payload);
       toast.success(tc.saved);
+      setForm((current) => ({
+        ...current,
+        outboundApiKey: "",
+        outboundSmtpPass: "",
+      }));
       await mutate();
     } catch (err) {
-      toast.error(err instanceof ApiClientError ? err.message : tc.saveFailed);
+      showEmailMutationFailure(err, tc.saveFailed);
     } finally {
       setSaving(false);
     }
@@ -211,18 +232,17 @@ export function EmailSettingsTab({
       setNewSecret(result.webhookSecret);
       await mutate();
     } catch (err) {
-      toast.error(
-        err instanceof ApiClientError
-          ? err.message
-          : tc.inbound.regenerateFailed
-      );
+      showEmailMutationFailure(err, tc.inbound.regenerateFailed);
     } finally {
       setGenerating(false);
     }
   };
 
   const handleTestSend = async () => {
-    if (!testTo.trim()) return;
+    if (!testTo.trim()) {
+      toast.warning(tc.outbound.testRecipientRequired);
+      return;
+    }
     setTesting(true);
     try {
       await api.post(`/api/tob/admin/email-config/${productId}/test`, {
@@ -232,9 +252,7 @@ export function EmailSettingsTab({
       setTestOpen(false);
       setTestTo("");
     } catch (err) {
-      toast.error(
-        err instanceof ApiClientError ? err.message : tc.outbound.testFailed
-      );
+      showEmailMutationFailure(err, tc.outbound.testFailed);
     } finally {
       setTesting(false);
     }
@@ -419,8 +437,10 @@ export function EmailSettingsTab({
                   set("outboundProvider", v as OutboundProvider)
                 }
               >
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue />
+                <SelectTrigger className="h-8 w-full text-sm">
+                  <SelectValue placeholder={tc.outbound.providerPlaceholder}>
+                    {OUTBOUND_LABELS[form.outboundProvider]}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {OUTBOUND_PROVIDERS.map((provider) => (
@@ -485,6 +505,7 @@ export function EmailSettingsTab({
                   autoComplete="username"
                   value={form.outboundSmtpUser}
                   onChange={(e) => set("outboundSmtpUser", e.target.value)}
+                  placeholder={tc.outbound.smtpUserPlaceholder}
                   className="h-8 text-sm"
                 />
               </div>

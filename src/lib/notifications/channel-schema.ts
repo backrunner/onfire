@@ -1,43 +1,23 @@
 import { z } from "zod";
-import type { NotificationChannelRow } from "@/drizzle/schema";
+import type { NotificationEndpointRow } from "@/drizzle/schema";
 import {
   isSealedSecret,
   openStoredSecret,
   sealSecret,
 } from "@/lib/secret-storage";
 import { safePublicHttpUrl } from "@/lib/external-url";
+import {
+  CHANNEL_SECRET_KEYS,
+  CHANNEL_TYPES,
+  TRIGGER_EVENTS,
+} from "./channel-definitions";
 
-export const CHANNEL_TYPES = [
-  "email",
-  "pushdeer",
-  "bark",
-  "ntfy",
-  "telegram",
-  "discord",
-] as const;
+export { CHANNEL_SECRET_KEYS, CHANNEL_TYPES, TRIGGER_EVENTS };
 
 type ChannelType = (typeof CHANNEL_TYPES)[number];
 
-export const TRIGGER_EVENTS = [
-  "ticket_created",
-  "ticket_assigned",
-  "ticket_reassigned",
-  "ticket_escalated",
-  "ticket_expiring",
-  "customer_replied",
-  "ticket_closed",
-] as const;
-
 export const channelTypeSchema = z.enum(CHANNEL_TYPES);
 export const triggerEventsSchema = z.array(z.enum(TRIGGER_EVENTS)).min(1);
-
-/** Values that must never be sent back to a browser from channel config. */
-export const CHANNEL_SECRET_KEYS = [
-  "pushkey",
-  "deviceKey",
-  "botToken",
-  "webhookUrl",
-] as const;
 
 const sealedSecretPattern = /^v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 
@@ -104,6 +84,15 @@ const channelConfigSchemas = {
   discord: z
     .object({ webhookUrl: secretUrlSchema })
     .passthrough(),
+  slack: z.object({ webhookUrl: secretUrlSchema }).passthrough(),
+  teams: z.object({ webhookUrl: secretUrlSchema }).passthrough(),
+  feishu: z
+    .object({ webhookUrl: secretUrlSchema, signingSecret: secretSchema.optional() })
+    .passthrough(),
+  dingtalk: z
+    .object({ webhookUrl: secretUrlSchema, signingSecret: secretSchema.optional() })
+    .passthrough(),
+  wecom: z.object({ webhookUrl: secretUrlSchema }).passthrough(),
 } satisfies Record<(typeof CHANNEL_TYPES)[number], z.ZodType>;
 
 /** Return user-safe validation messages for provider-specific config. */
@@ -121,12 +110,12 @@ export function validateChannelConfig(
   });
 }
 
-export function channelSecretPurpose(channelId: string, key: string): string {
-  return `notification-channel:${channelId}:${key}`;
+export function endpointSecretPurpose(endpointId: string, key: string): string {
+  return `notification-endpoint:${endpointId}:${key}`;
 }
 
-export async function sealChannelConfig(
-  channelId: string,
+export async function sealEndpointConfig(
+  endpointId: string,
   config: Record<string, unknown>,
   masterSecret: string
 ): Promise<Record<string, unknown>> {
@@ -141,15 +130,15 @@ export async function sealChannelConfig(
       result[key] = await sealSecret(
         value,
         masterSecret,
-        channelSecretPurpose(channelId, key)
+        endpointSecretPurpose(endpointId, key)
       );
     }
   }
   return result;
 }
 
-export async function openChannelConfig(
-  channelId: string,
+export async function openEndpointConfig(
+  endpointId: string,
   config: Record<string, unknown>,
   masterSecret: string
 ): Promise<Record<string, string>> {
@@ -162,23 +151,17 @@ export async function openChannelConfig(
       ? await openStoredSecret(
           value,
           masterSecret,
-          channelSecretPurpose(channelId, key)
+          endpointSecretPurpose(endpointId, key)
         )
       : value;
   }
   return result;
 }
 
-export function toChannelView(row: NotificationChannelRow) {
+export function toEndpointView(row: NotificationEndpointRow) {
   let config: Record<string, unknown> = {};
-  let triggerEvents: string[] = [];
   try {
     config = JSON.parse(row.config || "{}");
-  } catch {
-    /* keep empty */
-  }
-  try {
-    triggerEvents = JSON.parse(row.triggerEvents || "[]");
   } catch {
     /* keep empty */
   }
@@ -189,5 +172,5 @@ export function toChannelView(row: NotificationChannelRow) {
       delete config[key];
     }
   }
-  return { ...row, config, secretFields, triggerEvents };
+  return { ...row, config, secretFields };
 }

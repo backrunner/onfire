@@ -13,16 +13,36 @@ export interface EmailClassification {
   isSpam: boolean;
   confidence: number;
   reason: string;
+  ticketTypeId?: string;
+  typeConfidence: number;
+  issues: string[];
+  keywords: string[];
+  sentiment?: "positive" | "neutral" | "negative";
+  urgency?: "low" | "medium" | "high";
+  summary?: string;
 }
 
-const FILTER_PROMPT = `You are an email classifier for a customer support system. Classify the email below.
+export interface EmailTicketTypeCandidate {
+  id: string;
+  path: string;
+  description?: string | null;
+}
+
+const FILTER_PROMPT = `You are the prescreening classifier for a customer support system. Analyze the email, reject spam/non-support content, and select the best ticket type from the provided candidates.
 
 Respond in JSON format only:
 {
   "isSupportRequest": true/false,  // is this a genuine customer support request?
   "isSpam": true/false,            // is this spam, marketing, phishing or automated noise?
-  "confidence": 0.0-1.0,           // your confidence in this classification
-  "reason": "one short sentence"
+  "confidence": 0.0-1.0,           // confidence in the spam/support decision
+  "reason": "one short sentence",
+  "ticketTypeId": "one exact candidate id or null",
+  "typeConfidence": 0.0-1.0,
+  "issues": ["main issue"],
+  "keywords": ["keyword"],
+  "sentiment": "positive|neutral|negative",
+  "urgency": "low|medium|high",
+  "summary": "one sentence"
 }`;
 
 /** Minimum confidence required to REJECT an email, per strictness level. */
@@ -34,7 +54,8 @@ const REJECT_CONFIDENCE: Record<AIFilterStrictness, number> = {
 
 export async function classifyInboundEmail(
   db: Database,
-  input: { fromEmail: string; subject: string; content: string }
+  input: { fromEmail: string; subject: string; content: string },
+  candidates: EmailTicketTypeCandidate[] = []
 ): Promise<EmailClassification | null> {
   const provider = await getAIProvider(db, "prescreening");
   if (!provider) return null;
@@ -45,11 +66,11 @@ export async function classifyInboundEmail(
         { role: "system", content: FILTER_PROMPT },
         {
           role: "user",
-          content: `From: ${input.fromEmail}\nSubject: ${input.subject}\n\n${input.content.slice(0, 4000)}`,
+          content: `Ticket type candidates:\n${JSON.stringify(candidates)}\n\nFrom: ${input.fromEmail}\nSubject: ${input.subject}\n\n${input.content.slice(0, 8000)}`,
         },
       ],
       temperature: 0,
-      maxTokens: 256,
+      maxTokens: 768,
     });
 
     const jsonMatch = result.content.match(/\{[\s\S]*\}/);
@@ -69,6 +90,27 @@ export async function classifyInboundEmail(
           ? Math.min(1, Math.max(0, parsed.confidence))
           : 0.5,
       reason: typeof parsed.reason === "string" ? parsed.reason : "",
+      ticketTypeId:
+        typeof parsed.ticketTypeId === "string" ? parsed.ticketTypeId : undefined,
+      typeConfidence:
+        typeof parsed.typeConfidence === "number"
+          ? Math.min(1, Math.max(0, parsed.typeConfidence))
+          : 0,
+      issues: Array.isArray(parsed.issues)
+        ? parsed.issues.filter((value): value is string => typeof value === "string")
+        : [],
+      keywords: Array.isArray(parsed.keywords)
+        ? parsed.keywords.filter((value): value is string => typeof value === "string")
+        : [],
+      sentiment:
+        parsed.sentiment === "positive" || parsed.sentiment === "neutral" || parsed.sentiment === "negative"
+          ? parsed.sentiment
+          : undefined,
+      urgency:
+        parsed.urgency === "low" || parsed.urgency === "medium" || parsed.urgency === "high"
+          ? parsed.urgency
+          : undefined,
+      summary: typeof parsed.summary === "string" ? parsed.summary : undefined,
     };
   } catch (error) {
     // AI filtering is best-effort: a provider outage must never block inbound mail.

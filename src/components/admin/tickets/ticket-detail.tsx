@@ -81,6 +81,9 @@ export function TicketDetail({
   const isClosed = ticket.status === TicketStatus.Closed;
   const customerLabel =
     ticket.customerLabel || ticket.customerEmail || t.tickets.list.anonymous;
+  const ticketTypeLabel = Array.isArray(ticket.ticketTypePath)
+    ? ticket.ticketTypePath.map((item) => item.name).join(" / ")
+    : "—";
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -139,7 +142,8 @@ export function TicketDetail({
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground sm:grid-cols-5">
+          <Meta label={t.tickets.detail.ticketType} value={ticketTypeLabel} />
           <Meta
             icon={<User className="size-3" />}
             label={t.tickets.detail.customer}
@@ -196,6 +200,11 @@ export function TicketDetail({
             {ticket.content}
           </p>
         </div>
+        <HistoricalFields
+          metadata={ticket.metadata}
+          schema={data.templateVersion?.formSchema}
+          version={data.templateVersion?.version}
+        />
         <Separator className="my-4" />
         <Timeline entries={timeline} actors={data.actors} />
       </div>
@@ -215,6 +224,46 @@ export function TicketDetail({
         open={assistantOpen}
         onOpenChange={setAssistantOpen}
       />
+    </div>
+  );
+}
+
+function HistoricalFields({
+  metadata,
+  schema,
+  version,
+}: {
+  metadata: unknown;
+  schema?: { fields?: Array<{ key: string; label: string }> };
+  version?: number;
+}) {
+  const { t } = useI18n();
+  if (!metadata || typeof metadata !== "object" || !Array.isArray(schema?.fields)) {
+    return null;
+  }
+  const values = metadata as Record<string, unknown>;
+  const fields = schema.fields.filter((field) => values[field.key] !== undefined);
+  if (fields.length === 0) return null;
+  const display = (value: unknown) => {
+    if (Array.isArray(value)) return value.join(", ");
+    if (typeof value === "boolean") return value ? t.common.yes : t.common.no;
+    if (value === null) return "—";
+    return String(value);
+  };
+  return (
+    <div className="mt-3 rounded-md border border-border px-3 py-2">
+      <p className="mb-2 text-[11px] font-medium text-muted-foreground">
+        {t.tickets.detail.submittedFields}
+        {version ? ` · v${version}` : ""}
+      </p>
+      <dl className="grid gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
+        {fields.map((field) => (
+          <div key={field.key} className="min-w-0">
+            <dt className="text-muted-foreground">{field.label}</dt>
+            <dd className="break-words text-foreground">{display(values[field.key])}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }

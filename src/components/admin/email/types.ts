@@ -80,6 +80,12 @@ export interface InboundEmailLog {
   subject: string | null;
   processingStatus: string;
   filterResult: string | null;
+  filterStage: string | null;
+  filterProvider: string | null;
+  filterVerdict: string | null;
+  filterScore: number | null;
+  filterReason: string | null;
+  candidateTicketId: string | null;
   ticketId: string | null;
   replyId: string | null;
   errorMessage: string | null;
@@ -88,6 +94,10 @@ export interface InboundEmailLog {
   isSpam: boolean | null;
   createdAt: string;
   processedAt: string | null;
+  releasedAt: string | null;
+  releasedBy: string | null;
+  releaseReason: string | null;
+  releaseTicketTypeId: string | null;
 }
 
 export interface OutboundEmailLog {

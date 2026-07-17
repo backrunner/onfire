@@ -1,21 +1,29 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState, type ComponentType } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
 import {
+  AlignLeft,
   AlertTriangle,
   Code2,
   FileText,
+  Minimize2,
   Monitor,
   RotateCcw,
   Smartphone,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { api, swrFetcher, qs, ApiClientError } from "@/lib/api/client";
+import { api, swrFetcher, qs } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -27,7 +35,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   EMAIL_TEMPLATE_SAMPLE_VARIABLES,
   getDefaultBodyTemplate,
@@ -41,6 +53,28 @@ import {
   type EmailTemplateType,
   type EmailTemplateView,
 } from "./types";
+import type {
+  EmailTemplateEditorApi,
+  MonacoTemplateEditorProps,
+} from "./monaco-template-editor";
+import { showEmailMutationFailure } from "./toast";
+
+type MonacoTemplateEditorModule = typeof import("./monaco-template-editor");
+
+let monacoTemplateEditorPromise: Promise<MonacoTemplateEditorModule> | null =
+  null;
+
+function loadMonacoTemplateEditor(): Promise<MonacoTemplateEditorModule> {
+  if (!monacoTemplateEditorPromise) {
+    monacoTemplateEditorPromise = import("./monaco-template-editor").catch(
+      (error) => {
+        monacoTemplateEditorPromise = null;
+        throw error;
+      }
+    );
+  }
+  return monacoTemplateEditorPromise;
+}
 
 const statusBadge =
   "inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset whitespace-nowrap";
@@ -65,13 +99,30 @@ export function EmailTemplatesTab({ productId }: { productId: string }) {
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [saving, setSaving] = useState(false);
   const [previewMobile, setPreviewMobile] = useState(false);
-  const [mobilePanel, setMobilePanel] = useState<"editor" | "preview">("editor");
-  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const [mobilePanel, setMobilePanel] =
+    useState<"editor" | "preview">("editor");
+  const [MonacoTemplateEditor, setMonacoTemplateEditor] =
+    useState<ComponentType<MonacoTemplateEditorProps> | null>(null);
+  const [bodyEditorApi, setBodyEditorApi] =
+    useState<EmailTemplateEditorApi | null>(null);
+  const [editorLoadFailed, setEditorLoadFailed] = useState(false);
 
   const byType = new Map<EmailTemplateType, EmailTemplateView>();
   for (const template of data ?? []) {
     byType.set(template.templateType, template);
   }
+
+  const ensureMonacoEditor = () => {
+    setEditorLoadFailed(false);
+    void loadMonacoTemplateEditor()
+      .then((module) => {
+        setMonacoTemplateEditor(() => module.MonacoTemplateEditor);
+      })
+      .catch(() => {
+        setEditorLoadFailed(true);
+        toast.error(tt.editorLoadFailed);
+      });
+  };
 
   const openEditor = (templateType: EmailTemplateType) => {
     const template = byType.get(templateType) ?? null;
@@ -83,8 +134,10 @@ export function EmailTemplatesTab({ productId }: { productId: string }) {
       body: template?.bodyTemplate ?? getDefaultBodyTemplate(templateType),
       enabled: template?.enabled ?? true,
     });
+    setBodyEditorApi(null);
     setPreviewMobile(false);
     setMobilePanel("editor");
+    ensureMonacoEditor();
   };
 
   const preview = useMemo(() => {
@@ -115,25 +168,21 @@ export function EmailTemplatesTab({ productId }: { productId: string }) {
   };
 
   const insertVariable = (variable: string) => {
-    if (!editor) return;
-    const textarea = bodyRef.current;
-    const token = `{{${variable}}}`;
-    const start = textarea?.selectionStart ?? editor.body.length;
-    const end = textarea?.selectionEnd ?? start;
-    setEditor({
-      ...editor,
-      body: `${editor.body.slice(0, start)}${token}${editor.body.slice(end)}`,
-    });
-    requestAnimationFrame(() => {
-      textarea?.focus();
-      textarea?.setSelectionRange(start + token.length, start + token.length);
-    });
+    if (bodyEditorApi) {
+      bodyEditorApi.insertVariable(variable);
+      return;
+    }
+    setEditor((current) =>
+      current
+        ? { ...current, body: `${current.body}{{${variable}}}` }
+        : current
+    );
   };
 
   const handleSave = async () => {
     if (!editor) return;
     if (!editor.subject.trim() || !editor.body.trim()) {
-      toast.error(tt.required);
+      toast.warning(tt.required);
       return;
     }
     setSaving(true);
@@ -157,20 +206,23 @@ export function EmailTemplatesTab({ productId }: { productId: string }) {
       setEditor(null);
       await mutate();
     } catch (err) {
-      toast.error(err instanceof ApiClientError ? err.message : tt.saveFailed);
+      showEmailMutationFailure(err, tt.saveFailed);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleToggle = async (template: EmailTemplateView, enabled: boolean) => {
+  const handleToggle = async (
+    template: EmailTemplateView,
+    enabled: boolean
+  ) => {
     try {
       await api.patch(`/api/tob/admin/email-templates/${template.id}`, {
         enabled,
       });
       await mutate();
     } catch (err) {
-      toast.error(err instanceof ApiClientError ? err.message : tt.saveFailed);
+      showEmailMutationFailure(err, tt.saveFailed);
     }
   };
 
@@ -315,71 +367,142 @@ export function EmailTemplatesTab({ productId }: { productId: string }) {
                   "lg:flex"
                 )}
               >
-              <div className="space-y-1.5">
-                <Label className="text-xs">{tt.subject}</Label>
-                <Input
-                  value={editor.subject}
-                  onChange={(e) =>
-                    setEditor({ ...editor, subject: e.target.value })
-                  }
-                  placeholder={tt.subjectPlaceholder}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div className="flex min-h-0 flex-1 flex-col space-y-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <Label className="text-xs">{tt.body}</Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 gap-1.5 text-xs text-muted-foreground"
-                    onClick={resetToDefault}
-                  >
-                    <RotateCcw className="size-3.5" />
-                    {tt.resetDefault}
-                  </Button>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">{tt.subject}</Label>
+                  <Input
+                    value={editor.subject}
+                    onChange={(e) =>
+                      setEditor({ ...editor, subject: e.target.value })
+                    }
+                    placeholder={tt.subjectPlaceholder}
+                    className="h-8 text-sm"
+                  />
                 </div>
-                <Textarea
-                  ref={bodyRef}
-                  value={editor.body}
-                  onChange={(e) =>
-                    setEditor({ ...editor, body: e.target.value })
-                  }
-                  placeholder={tt.bodyPlaceholder}
-                  rows={16}
-                  className="min-h-72 flex-1 resize-none font-mono text-xs leading-5"
-                />
-              </div>
-              <div className="rounded-md border border-border/60 bg-muted/35 px-3 py-2">
-                <p className="text-xs text-muted-foreground">
-                  {tt.variablesHint}
-                </p>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {TEMPLATE_VARIABLES.map((variable) => (
-                    <button
-                      type="button"
-                      key={variable}
-                      className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground ring-1 ring-inset ring-border transition-colors hover:text-foreground"
-                      onClick={() => insertVariable(variable)}
-                    >
-                      {"{{"}
-                      {variable}
-                      {"}}"}
-                    </button>
-                  ))}
+                <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-xs">{tt.body}</Label>
+                    <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-0.5 rounded-md border border-border/60 bg-muted/30 p-0.5">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              className="size-7"
+                              disabled={!bodyEditorApi}
+                              onClick={() => {
+                                void bodyEditorApi?.formatDocument();
+                              }}
+                              aria-label={tt.format}
+                              aria-keyshortcuts="Alt+Shift+F"
+                            >
+                              <AlignLeft className="size-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>{tt.formatShortcut}</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              className="size-7"
+                              disabled={!bodyEditorApi}
+                              onClick={() => bodyEditorApi?.minifyDocument()}
+                              aria-label={tt.minify}
+                              aria-keyshortcuts="Control+Shift+M Meta+Shift+M"
+                            >
+                              <Minimize2 className="size-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>{tt.minifyShortcut}</TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            className="size-7"
+                            onClick={resetToDefault}
+                            aria-label={tt.resetDefault}
+                          >
+                            <RotateCcw className="size-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{tt.resetDefault}</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-border/60 bg-muted/35 px-2.5 py-2">
+                    <p className="text-[11px] font-medium text-muted-foreground">
+                      {tt.quickVariables}
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {TEMPLATE_VARIABLES.map((variable) => (
+                        <button
+                          type="button"
+                          key={variable}
+                          className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground ring-1 ring-inset ring-border transition-colors hover:text-foreground"
+                          onClick={() => insertVariable(variable)}
+                        >
+                          {"{{"}
+                          {variable}
+                          {"}}"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="min-h-72 flex-1 overflow-hidden rounded-md border border-input bg-background shadow-xs">
+                    {MonacoTemplateEditor ? (
+                      <MonacoTemplateEditor
+                        value={editor.body}
+                        variables={TEMPLATE_VARIABLES}
+                        ariaLabel={tt.body}
+                        loadingLabel={tt.editorLoading}
+                        minifyActionLabel={tt.minify}
+                        onReady={setBodyEditorApi}
+                        onChange={(body) =>
+                          setEditor((current) =>
+                            current ? { ...current, body } : current
+                          )
+                        }
+                      />
+                    ) : editorLoadFailed ? (
+                      <div className="flex h-full min-h-72 flex-col items-center justify-center gap-2 text-center">
+                        <p className="text-xs text-muted-foreground">
+                          {tt.editorLoadFailed}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8"
+                          onClick={ensureMonacoEditor}
+                        >
+                          {t.emailConfig.retry}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex h-full min-h-72 items-center justify-center bg-muted/30 text-xs text-muted-foreground">
+                        {tt.editorLoading}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="template-enabled"
-                  checked={editor.enabled}
-                  onCheckedChange={(v) => setEditor({ ...editor, enabled: v })}
-                />
-                <Label htmlFor="template-enabled" className="text-xs">
-                  {tt.enabledLabel}
-                </Label>
-              </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="template-enabled"
+                    checked={editor.enabled}
+                    onCheckedChange={(v) => setEditor({ ...editor, enabled: v })}
+                  />
+                  <Label htmlFor="template-enabled" className="text-xs">
+                    {tt.enabledLabel}
+                  </Label>
+                </div>
               </div>
 
               <div

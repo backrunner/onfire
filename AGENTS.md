@@ -130,7 +130,9 @@ SuperAdmin
 Tenant
     ├── Product ←→ Team  [Many-to-Many]
     │       │
-    │       └── Template (Ticket Template)
+    │       └── TicketType (up to 3 levels)
+    │               └── TicketTemplate
+    │                       └── TemplateVersion (immutable)
     │       └── ProductKey (API Key)
     │
     └── Team
@@ -147,8 +149,11 @@ Tenant
 | ticket.escalate | ✓ | ✓ | ✓ | ✓ | ✓ |
 | ticket.close | ✓ | ✓ | ✓ | ✓ | ✓ |
 | ticket.reassign | ✓ | ✓ | ✓ | ✓ | - |
-| template.read | ✓ | ✓ | ✓ | - | - |
-| template.write | ✓ | ✓ | ✓ | - | - |
+| ticket_type.read | ✓ | ✓ | ✓ | ✓ | - |
+| ticket_type.write | ✓ | ✓ | ✓ | - | - |
+| ticket_type.route | ✓ | ✓ | ✓ | ✓ | - |
+| ticket_template.read | ✓ | ✓ | ✓ | - | - |
+| ticket_template.write | ✓ | ✓ | ✓ | - | - |
 | team.manage | ✓ | ✓ | ✓ | - | - |
 | product.manage | ✓ | ✓ | - | - | - |
 | product.settings | ✓ | ✓ | ✓ | - | - |
@@ -157,9 +162,9 @@ Tenant
 | role.manage | ✓ | ✓ | - | - | - |
 | customer.read | ✓ | ✓ | ✓ | ✓ | - |
 | customer.write | ✓ | ✓ | ✓ | - | - |
-| category.map | ✓ | ✓ | ✓ | ✓ | - |
 | agent.profile | ✓ | ✓ | ✓ | ✓ | ✓ |
 | email.config | ✓ | ✓ | ✓ | - | - |
+| spam.config | ✓ | ✓ | - | - | - |
 | notification.manage | ✓ | ✓ | ✓ | - | - |
 | ai.config | ✓ | - | - | - | - |
 | ai.knowledge | ✓ | ✓ | ✓ | - | - |
@@ -233,9 +238,9 @@ Product administrators can configure automatic ticket closure:
 
 ### Auto-Assignment Rules
 
-1. User specifies product and category when submitting a ticket
-2. System finds the handling team based on CategoryRoute
-3. If no matching route, uses the tenant's default team
+1. The customer selects a product-owned ticket type; the form version is hidden from the customer
+2. The system resolves the nearest team route from the selected type through its ancestors
+3. If no type route matches, it uses the tenant's default team
 4. Selects an agent within the team using load balancing algorithm
 
 ### Load Balancing Algorithm
@@ -275,10 +280,15 @@ OnFire supports multi-channel notifications to keep agents informed about ticket
 | ntfy | Open-source push notification service |
 | Telegram | Telegram bot notifications |
 | Discord | Discord webhook notifications |
+| Slack | Slack incoming webhook notifications |
+| Microsoft Teams | Teams Adaptive Card webhook notifications |
+| Feishu | Feishu custom bot notifications with optional signing |
+| DingTalk | DingTalk robot notifications with optional signing |
+| WeCom | WeCom robot notifications |
 
 ### Notification Events
 
-Each notification channel can be configured to trigger on specific events:
+Product notification rules and requirements can match these events:
 
 | Event | Description |
 |-------|-------------|
@@ -290,12 +300,14 @@ Each notification channel can be configured to trigger on specific events:
 | customer_replied | Customer has replied to a ticket |
 | ticket_closed | Ticket has been closed |
 
-### Channel Configuration
+### Delivery Model
 
-Each product can have multiple notification channels configured:
-- **Channel Type**: Select from available notification providers
-- **Trigger Events**: Choose which events trigger notifications
-- **Channel Config**: Provider-specific configuration (API keys, webhook URLs, etc.)
+- Every system user owns their receiving endpoints. Endpoint credentials and destinations are configured from the user's account and are not stored on products.
+- A product delivery rule selects trigger events, channel types, and recipients: current assignee, current ticket team, all product agents, a specific team, or a specific agent.
+- A product requirement declares mandatory channel types for all product agents, a team, or a specific agent on selected events. Requirements participate directly in delivery and also expose compliance gaps.
+- Rules and requirements resolve to active support agents, then send through each matching enabled personal endpoint. Overlapping policies deduplicate the same endpoint.
+- Missing required or selected endpoints are recorded as failed notification logs instead of being silently skipped.
+- Email endpoints use the event product's configured outbound email provider. Other endpoint types use their provider-specific APIs or webhooks.
 
 ---
 
@@ -423,7 +435,7 @@ secret.
 
 A blank plain-text MIME alternative falls back to usable HTML-derived text; it never overwrites valid content with an empty body.
 
-Custom product templates use the same escaped variable renderer for preview and delivery. Preview runs in a sandboxed iframe with scripts and external requests disabled.
+Custom product templates use the same escaped variable renderer for preview and delivery. Template authoring uses a locally bundled Monaco HTML editor that lazy-loads when a template opens, formats HTML by default, provides format/minify actions and shortcuts, and supports cursor-aware quick-variable insertion with highlighted `{{variable}}` tokens. Email settings discard restores the persisted product snapshot when the settings tab is revisited, and secret drafts clear after a successful save. Preview runs in a sandboxed iframe with scripts and external requests disabled. User-correctable validation and HTTP 4xx feedback use warning toasts; authorization, network, and server failures use error toasts.
 
 ---
 
@@ -432,6 +444,8 @@ Custom product templates use the same escaped variable renderer for preview and 
 - Language tasks (`agent`, `prescreening`, `prereply`) support OpenAI, Anthropic, Google, xAI, and DeepSeek.
 - OpenAI explicitly selects `responses` or `chat`; new configurations default to Responses API.
 - Embedding is separate and supports OpenAI, Qwen/DashScope, Jina AI, Cohere, and Google.
+- Provider credentials are stored once in an encrypted credential pool and can be reused by multiple AI tasks.
+- Each task has an ordered credential route and a model per route entry. Provider failures fall through to the next available credential; failed credentials enter their configured cooldown only when another route entry is available.
 - All adapters request 1024 dimensions. Vectorize uses a 1024-dimension cosine index with product namespaces.
 - Knowledge mutations synchronize Vectorize. AI assistant and pre-reply use semantic retrieval with scoped D1 fallback.
 - AI credentials require `ai.config`; product knowledge requires `ai.knowledge` plus product scope.
@@ -481,11 +495,12 @@ POST   /tickets/bulk/close    - Bulk close
 GET/POST/PATCH/DELETE /admin/tenants      - Tenant management
 GET/POST/PATCH/DELETE /admin/products     - Product management
 GET/POST/PATCH/DELETE /admin/teams        - Team management
-GET/POST/PATCH/DELETE /admin/templates    - Template management
+GET/POST/PATCH/DELETE /admin/ticket-types - Ticket type tree management
+GET/POST/DELETE       /admin/ticket-types/:id/template - Versioned form management
+GET/PATCH/DELETE      /admin/ticket-types/:id/team-route - Type routing
 GET/PATCH             /admin/users        - User management
 GET/PATCH             /admin/agents       - Agent management
 GET                   /admin/customers    - Customer query
-GET/POST/PATCH/DELETE /admin/category-routes - Category routing
 GET/POST              /admin/product-keys     - API key management
 POST                  /admin/product-keys/:id/rotate - Rotate key
 
@@ -498,13 +513,23 @@ GET/POST/DELETE       /admin/ai/documents    - Product knowledge documents
 GET/POST/PATCH        /admin/email-config     - Email config management
 GET/POST/PATCH/DELETE /admin/email-templates  - Email template management
 GET                   /admin/email-logs/inbound  - Inbound email logs
+POST                  /admin/email-logs/inbound/:id/release - Release quarantined email
 GET                   /admin/email-logs/outbound - Outbound email logs
+GET/PATCH             /admin/spam-filter - Global or tenant external spam service
 POST                  /admin/email-config/:productId/test - Test outbound config
 POST                  /admin/email-config/:productId/webhook-secret - Generate webhook secret
 
-# Notification Channels (Admin)
-GET/POST              /admin/notification-channels      - Channel management
-GET/PATCH/DELETE      /admin/notification-channels/:id  - Channel detail
+# Personal Notification Endpoints
+GET/POST              /notification-endpoints           - Current user's receiving methods
+GET/PATCH/DELETE      /notification-endpoints/:id       - Current user's receiving method detail
+POST                  /notification-endpoints/:id/test  - Test the current user's saved endpoint
+
+# Notification Policies (Admin)
+GET/POST              /admin/notification-rules             - Product delivery rules
+GET/PATCH/DELETE      /admin/notification-rules/:id          - Product delivery rule detail
+GET/POST              /admin/notification-requirements      - Mandatory receiving requirements
+GET/PATCH/DELETE      /admin/notification-requirements/:id  - Requirement detail
+GET                   /admin/notification-compliance         - Product endpoint compliance
 
 # Metadata
 GET  /meta/teams          - Get accessible teams
@@ -526,8 +551,9 @@ GET  /portal-config       - Get safe product return URLs for expired-session gui
 POST /tokens              - Issue customer JWT using a product API key (server-to-server)
 POST /identity/exchange   - Exchange a product-issued opaque credential server-side
 
-# Templates
-GET  /templates           - Get product template list
+# Ticket Types
+GET  /ticket-types             - Get the active product ticket type tree
+GET  /ticket-types/:id/form    - Get the current hidden form version
 
 # Tickets
 POST   /tickets           - Submit ticket
@@ -567,17 +593,19 @@ const client = new OnfireClient({
 ### Main Methods
 
 ```typescript
-// Get template list
-await client.listTemplates(productId);
+// Get the product ticket type tree and selected type form
+const types = await client.listTicketTypes();
+const form = await client.getTicketTypeForm(ticketTypeId);
 
 // Create ticket
 await client.createTicket({
   productId: 'prod-xxx',
-  templateId: 'tpl-xxx',
+  ticketTypeId: 'type-xxx',
+  templateVersionId: form.templateVersionId,
   subject: 'Issue title',
   content: 'Issue description',
   priority: 'medium',
-  metadata: { category: 'Technical Support' },
+  metadata: { environment: 'production' },
   customer: {
     email: 'user@example.com',
     externalId: 'user-123',
@@ -634,20 +662,27 @@ const portalUrl =
 | agents | Support agents |
 | agent_teams | Agent-Team association (many-to-many) |
 | user_products | ProductAdmin-Product scope association (many-to-many) |
-| templates | Ticket templates |
+| ticket_types | Product-owned ticket type hierarchy and archive state |
+| ticket_type_routes | Optional direct team mappings with ancestor fallback |
+| ticket_templates | One soft-deletable form series per ticket type |
+| ticket_template_versions | Immutable form versions and invalidation audit |
+| templates | Read-only legacy ticket templates |
 | product_keys | API keys |
 | product_identity_configs | Encrypted per-product remote identity resolver configuration |
 | tickets | Tickets |
 | replies | Ticket replies |
 | history | Operation history |
 | customers | Customer information |
-| category_routes | Category routing rules |
+| category_routes | Read-only legacy category routing rules |
 | agent_profiles | Agent profiles (can differ from user info) |
 | email_configs | Email configuration (per product) |
 | email_templates | Email templates |
 | inbound_emails | Inbound email logs |
+| spam_filter_configs | Global and tenant external spam-filter configuration |
 | outbound_emails | Outbound email logs |
-| notification_channels | Notification channel configuration |
+| notification_endpoints | User-owned notification destinations and sealed credentials |
+| notification_rules | Product event, recipient, and channel routing rules |
+| notification_requirements | Mandatory product/team/agent receiving-channel requirements |
 | notification_logs | Notification delivery logs |
 | rate_limits | Fixed-window rate-limit counters for public endpoints |
 
@@ -810,7 +845,7 @@ pnpm deploy
 
 ## Current Predeployment Verification
 
-As of 2026-07-12, frozen install, generated binding check, TypeScript, Drizzle metadata, 32 test files / 150 tests, OpenNext Worker build, Wrangler deploy dry-run, startup profiling, fresh local application of migrations `0000`-`0009`, and production dependency audit all pass. The remaining build warnings are expected: Vectorize has no local simulator, and OpenNext 1.20.1 still requires `src/middleware.ts` instead of Next 16 `proxy.ts`.
+As of 2026-07-18, generated binding checks, TypeScript, 43 test files / 182 tests, Drizzle consistency, fresh local application of migrations `0000`-`0013`, and a non-empty legacy-data migration regression pass. Production still has migrations only through `0009`; applying `0010_busy_the_hunter.sql` through `0013_big_psynapse.sql` remains an explicit remote operation. The remaining build warnings are expected: Vectorize has no local simulator, and OpenNext 1.20.1 still requires `src/middleware.ts` instead of Next 16 `proxy.ts`.
 
 ## Contribution Convention
 

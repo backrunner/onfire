@@ -10,6 +10,9 @@ import {
   agentTeams,
   agentProfiles,
   aiChatMessages,
+  notificationEndpoints,
+  notificationRequirements,
+  notificationRules,
   products,
   tickets,
   userProducts,
@@ -155,7 +158,20 @@ export const DELETE = withAuth({ permission: "user.manage" }, async (_req: NextR
     throw conflict("Reassign this user's tickets before deleting the account");
   }
 
+  const notificationReferences = await Promise.all([
+    ctx.db.query.notificationRules.findFirst({
+      where: eq(notificationRules.recipientUserId, user.id),
+    }),
+    ctx.db.query.notificationRequirements.findFirst({
+      where: eq(notificationRequirements.scopeUserId, user.id),
+    }),
+  ]);
+  if (notificationReferences.some(Boolean)) {
+    throw conflict("Remove notification rules and requirements for this user first");
+  }
+
   await ctx.db.batch([
+    ctx.db.delete(notificationEndpoints).where(eq(notificationEndpoints.userId, user.id)),
     ctx.db.delete(agentTeams).where(eq(agentTeams.userId, user.id)),
     ctx.db.delete(userProducts).where(eq(userProducts.userId, user.id)),
     ctx.db.delete(agentProfiles).where(eq(agentProfiles.userId, user.id)),

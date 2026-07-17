@@ -16,11 +16,21 @@ export interface TocWhoAmI {
   displayName: string | null;
 }
 
-export interface TocTemplate {
+export interface TocTicketTypeNode {
   id: string;
-  productId: string;
-  title: string;
-  categories: string[];
+  parentId: string | null;
+  name: string;
+  description: string | null;
+  level: number;
+  sortOrder: number;
+  selectable: boolean;
+  children: TocTicketTypeNode[];
+}
+
+export interface TocTicketTypeForm {
+  ticketTypeId: string;
+  templateVersionId: string;
+  version: number;
   formSchema: Partial<FormSchema> | Record<string, unknown>;
 }
 

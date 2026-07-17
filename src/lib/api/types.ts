@@ -1,4 +1,11 @@
-import type { Permission, Role, TicketPriority, TicketStatus } from "@/lib/types";
+import type {
+  Permission,
+  Role,
+  TicketPriority,
+  TicketStatus,
+  TicketTypePathItem,
+} from "@/lib/types";
+import type { FormSchema } from "@/lib/form-schema";
 
 /** Pagination envelope returned by list endpoints. */
 export interface Paginated<T> {
@@ -33,6 +40,9 @@ export interface TicketView {
   /** Display identity: email, else the product's external id, else a label. */
   customerLabel?: string | null;
   customerLevel: number | null;
+  ticketTypeId: string;
+  templateVersionId: string | null;
+  ticketTypePath: TicketTypePathItem[];
   templateId: string | null;
   metadata?: unknown;
   sla?: SlaView;
@@ -75,6 +85,12 @@ export type TimelineEntry =
 
 export interface TicketDetailResponse {
   ticket: TicketView;
+  templateVersion: {
+    id: string;
+    version: number;
+    formSchema: FormSchema;
+    invalidatedAt: string | null;
+  } | null;
   replies: ReplyView[];
   history: HistoryView[];
   timeline: TimelineEntry[];

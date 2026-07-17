@@ -1,0 +1,1 @@
+ALTER TABLE `notification_logs` ADD `requirement_id` text;

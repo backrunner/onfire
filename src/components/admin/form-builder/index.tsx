@@ -136,9 +136,9 @@ export function FormBuilder({ initialSchema, onSave }: FormBuilderProps) {
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Toolbar */}
-      <div className="flex items-center justify-between p-4 border-b">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b p-3 sm:p-4">
         <div className="flex items-center gap-2">
           <Button size="sm" className="h-8" onClick={handleSave}>
             <Save className="size-4" />
@@ -215,15 +215,15 @@ export function FormBuilder({ initialSchema, onSave }: FormBuilderProps) {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-y-auto md:flex md:overflow-hidden">
         {/* Left Panel - Field Palette */}
-        <div className="w-56 border-r p-4 overflow-auto">
+        <div className="w-full border-b p-3 md:w-56 md:shrink-0 md:overflow-auto md:border-r md:border-b-0 md:p-4">
           <FieldPalette onAddField={handleAddField} />
         </div>
 
         {/* Center - Canvas */}
-        <div className="flex-1 flex flex-col p-4 overflow-hidden">
-          <Tabs defaultValue="edit" className="flex-1 flex flex-col">
+        <div className="flex min-h-80 w-full flex-col overflow-hidden p-3 md:min-h-0 md:min-w-0 md:flex-1 md:p-4">
+          <Tabs defaultValue="edit" className="flex min-h-0 flex-1 flex-col">
             <TabsList className="w-fit">
               <TabsTrigger value="edit">{fb.editTab}</TabsTrigger>
               <TabsTrigger value="preview">{fb.previewTab}</TabsTrigger>
@@ -246,7 +246,7 @@ export function FormBuilder({ initialSchema, onSave }: FormBuilderProps) {
         </div>
 
         {/* Right Panel - Property Editor */}
-        <div className="w-72 border-l overflow-auto">
+        <div className="w-full border-t md:w-72 md:shrink-0 md:overflow-auto md:border-t-0 md:border-l">
           <PropertyPanel
             field={selectedField || null}
             allFields={schema.fields}

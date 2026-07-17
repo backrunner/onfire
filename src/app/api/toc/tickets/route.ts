@@ -1,17 +1,18 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { eq, and, or, desc, count, sql, isNull } from "drizzle-orm";
+import { eq, and, or, desc, count, sql } from "drizzle-orm";
 import {
   tickets,
   history,
   products,
   tenants,
-  categoryRoutes,
   customers,
-  templates,
+  ticketTypes,
+  ticketTemplates,
+  ticketTemplateVersions,
 } from "@/drizzle/schema";
 import { TicketStatus, TicketPriority } from "@/lib/types";
-import { ok, err, badRequest } from "@/lib/api/response";
+import { ok, err, badRequest, conflict } from "@/lib/api/response";
 import { withCustomerAuth, parseBody, parseQuery } from "@/lib/api/handler";
 import { computeInitialSlaDeadlines } from "@/lib/tickets/sla";
 import { serializeTicketForCustomer } from "@/lib/tickets/serialize";
@@ -19,6 +20,11 @@ import { verifyTurnstileToken } from "@/lib/turnstile";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { pickAssignee, derivePriority } from "@/services/allocation";
 import { emitTicketEvent } from "@/services/ticket-events";
+import {
+  loadTicketTypePath,
+  resolveTicketTypeTeam,
+  ticketTypePathSnapshot,
+} from "@/services/ticket-types";
 import {
   parseFormSchema,
   validateFormSubmission,
@@ -31,9 +37,10 @@ const listQuerySchema = z.object({
 });
 
 const createTicketSchema = z.object({
-  templateId: z.string().optional(),
-  subject: z.string().min(1).max(500),
-  content: z.string().min(1).max(50_000),
+  ticketTypeId: z.string().min(1),
+  templateVersionId: z.string().min(1),
+  subject: z.string().trim().min(1).max(500),
+  content: z.string().trim().min(1).max(50_000),
   priority: z.enum(TicketPriority).optional(),
   metadata: z
     .record(z.string(), z.unknown())
@@ -89,9 +96,7 @@ export const GET = withCustomerAuth(async (req: NextRequest, { db, customer }) =
 /**
  * POST /api/toc/tickets — submit a ticket.
  *
- * Routing: category (from metadata.category) → CategoryRoute → team,
- * falling back to the tenant default team; an agent is auto-assigned via
- * the load-balancing algorithm.
+ * Routing: selected ticket type → nearest ancestor route → tenant default.
  */
 export const POST = withCustomerAuth(async (req: NextRequest, { db, customer }) => {
   await enforceRateLimit(
@@ -117,40 +122,36 @@ export const POST = withCustomerAuth(async (req: NextRequest, { db, customer }) 
   });
   if (!product) return err("Product not found", 404);
 
-  if (body.templateId) {
-    const template = await db.query.templates.findFirst({
-      where: and(
-        eq(templates.id, body.templateId),
-        eq(templates.productId, product.id)
-      ),
-    });
-    if (!template) throw badRequest("Template does not belong to this product");
-    const formSchema = parseFormSchema(template.formSchema);
-    if (!formSchema) throw badRequest("Template form configuration is invalid");
-    const submissionErrors = validateFormSubmission(
-      formSchema,
-      body.metadata ?? {}
-    );
-    if (submissionErrors.length > 0) {
-      throw badRequest("Template fields are invalid", submissionErrors);
-    }
-    let categories: unknown = [];
-    try {
-      categories = JSON.parse(template.categories);
-    } catch {
-      categories = [];
-    }
-    const allowedCategories = Array.isArray(categories)
-      ? categories.filter((value): value is string => typeof value === "string")
-      : [];
-    const submittedCategory = body.metadata?.category;
-    if (
-      allowedCategories.length > 0 &&
-      (typeof submittedCategory !== "string" ||
-        !allowedCategories.includes(submittedCategory))
-    ) {
-      throw badRequest("A valid template category is required");
-    }
+  const ticketType = await db.query.ticketTypes.findFirst({
+    where: and(
+      eq(ticketTypes.id, body.ticketTypeId),
+      eq(ticketTypes.productId, product.id)
+    ),
+  });
+  if (!ticketType || ticketType.archivedAt || ticketType.systemKey) {
+    throw badRequest("Ticket type is not available");
+  }
+  const template = await db.query.ticketTemplates.findFirst({
+    where: eq(ticketTemplates.ticketTypeId, ticketType.id),
+  });
+  const version = await db.query.ticketTemplateVersions.findFirst({
+    where: eq(ticketTemplateVersions.id, body.templateVersionId),
+  });
+  if (!template || template.archivedAt || !version || version.templateId !== template.id) {
+    throw badRequest("Template version does not belong to this ticket type");
+  }
+  if (version.invalidatedAt) {
+    throw conflict("Template version has been invalidated");
+  }
+  const formSchema = parseFormSchema(version.formSchema);
+  if (!formSchema) throw badRequest("Template form configuration is invalid");
+  const submissionErrors = validateFormSubmission(formSchema, body.metadata ?? {});
+  if (submissionErrors.length > 0) {
+    throw badRequest("Template fields are invalid", submissionErrors);
+  }
+  const typePath = await loadTicketTypePath(db, ticketType);
+  if (typePath.some((item) => item.archivedAt)) {
+    throw badRequest("Ticket type path is archived");
   }
 
   const tenant = await db.query.tenants.findFirst({
@@ -158,37 +159,7 @@ export const POST = withCustomerAuth(async (req: NextRequest, { db, customer }) 
   });
   if (!tenant) return err("Tenant not found", 404);
 
-  // Resolve handling team: category route → tenant default
-  let teamId = tenant.defaultTeamId;
-  const category =
-    typeof body.metadata?.category === "string" ? body.metadata.category : null;
-  if (category) {
-    const subcategory =
-      typeof body.metadata?.subcategory === "string"
-        ? body.metadata.subcategory.trim()
-        : "";
-    // Prefer an exact subcategory route, then fall back to the category-wide
-    // route. Older rows may still contain NULL before migration 0009.
-    const exactRoute = subcategory
-      ? await db.query.categoryRoutes.findFirst({
-          where: and(
-            eq(categoryRoutes.productId, product.id),
-            eq(categoryRoutes.category, category),
-            eq(categoryRoutes.subcategory, subcategory)
-          ),
-        })
-      : undefined;
-    const route =
-      exactRoute ??
-      (await db.query.categoryRoutes.findFirst({
-        where: and(
-          eq(categoryRoutes.productId, product.id),
-          eq(categoryRoutes.category, category),
-          or(eq(categoryRoutes.subcategory, ""), isNull(categoryRoutes.subcategory))
-        ),
-      }));
-    if (route) teamId = route.teamId;
-  }
+  const teamId = await resolveTicketTypeTeam(db, typePath, tenant.defaultTeamId);
   if (!teamId) {
     throw badRequest("No team available to handle this ticket");
   }
@@ -218,7 +189,10 @@ export const POST = withCustomerAuth(async (req: NextRequest, { db, customer }) 
       customerId: customer.sub,
       customerEmail: customer.email ?? null,
       customerLevel: customer.level ?? null,
-      templateId: body.templateId ?? null,
+      ticketTypeId: ticketType.id,
+      templateVersionId: version.id,
+      ticketTypePath: JSON.stringify(ticketTypePathSnapshot(typePath)),
+      templateId: null,
       metadata: body.metadata ? JSON.stringify(body.metadata) : null,
       ...sla,
       source: "api",

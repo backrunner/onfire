@@ -20,6 +20,7 @@ export class TelegramChannel implements NotificationChannel {
         `https://api.telegram.org/bot${this.botToken}/sendMessage`,
         {
           method: "POST",
+          redirect: "error",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: this.chatId,

@@ -1,9 +1,13 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import {
   categoryRoutes,
+  notificationRequirements,
+  ticketTypeRoutes,
+  ticketTypes,
+  notificationRules,
   teams,
   agentTeams,
   productTeams,
@@ -63,6 +67,7 @@ export const PATCH = withAuth({ permission: "team.manage" }, async (req: NextReq
   const memberIds = body.memberIds
     ? [...new Set(body.memberIds)]
     : undefined;
+  let nextProductIds: string[] | undefined;
 
   // Team identity, membership, and reassignment policy are global to a team.
   // A ProductAdmin must not change those fields on a team shared with a
@@ -96,6 +101,63 @@ export const PATCH = withAuth({ permission: "team.manage" }, async (req: NextReq
     );
     if (selectedProducts.some((product) => product.tenantId !== team.tenantId)) {
       throw badRequest("Products must belong to the team's tenant");
+    }
+
+    const existing = await ctx.db
+      .select({ productId: productTeams.productId })
+      .from(productTeams)
+      .where(eq(productTeams.teamId, team.id));
+    const retained =
+      ctx.role === Role.ProductAdmin
+        ? existing
+            .map((row) => row.productId)
+            .filter((id) => !ctx.productIds.includes(id))
+        : [];
+    nextProductIds = [...new Set([...retained, ...productIds])];
+    const removedProductIds = existing
+      .map((row) => row.productId)
+      .filter((id) => !nextProductIds?.includes(id));
+    if (removedProductIds.length > 0) {
+      const removedTypes = await ctx.db
+        .select({ id: ticketTypes.id })
+        .from(ticketTypes)
+        .where(inArray(ticketTypes.productId, removedProductIds));
+      const [typeRoute, notificationRule, notificationRequirement] =
+        await Promise.all([
+          removedTypes.length
+            ? ctx.db.query.ticketTypeRoutes.findFirst({
+                where: and(
+                  eq(ticketTypeRoutes.teamId, team.id),
+                  inArray(
+                    ticketTypeRoutes.ticketTypeId,
+                    removedTypes.map((type) => type.id)
+                  )
+                ),
+              })
+            : undefined,
+          ctx.db.query.notificationRules.findFirst({
+            where: and(
+              eq(notificationRules.recipientTeamId, team.id),
+              inArray(notificationRules.productId, removedProductIds)
+            ),
+          }),
+          ctx.db.query.notificationRequirements.findFirst({
+            where: and(
+              eq(notificationRequirements.scopeTeamId, team.id),
+              inArray(notificationRequirements.productId, removedProductIds)
+            ),
+          }),
+        ]);
+      if (typeRoute) {
+        throw conflict(
+          "Remove or reassign ticket type routes before detaching their products"
+        );
+      }
+      if (notificationRule || notificationRequirement) {
+        throw conflict(
+          "Remove or reassign notification policies before detaching their products"
+        );
+      }
     }
   }
   if (memberIds && memberIds.length > 0) {
@@ -132,21 +194,10 @@ export const PATCH = withAuth({ permission: "team.manage" }, async (req: NextReq
     }
   }
   if (productIds !== undefined) {
-    const existing = await ctx.db
-      .select({ productId: productTeams.productId })
-      .from(productTeams)
-      .where(eq(productTeams.teamId, team.id));
-    const retained =
-      ctx.role === Role.ProductAdmin
-        ? existing
-            .map((row) => row.productId)
-            .filter((id) => !ctx.productIds.includes(id))
-        : [];
-    const nextProductIds = [...new Set([...retained, ...productIds])];
     statements.push(
       ctx.db.delete(productTeams).where(eq(productTeams.teamId, team.id))
     );
-    if (nextProductIds.length > 0) {
+    if (nextProductIds && nextProductIds.length > 0) {
       statements.push(
         ctx.db.insert(productTeams).values(
           nextProductIds.map((productId) => ({ productId, teamId: team.id }))
@@ -169,9 +220,16 @@ export const DELETE = withAuth({ permission: "team.manage" }, async (_req: NextR
     ctx.db.query.tickets.findFirst({ where: eq(tickets.teamId, team.id) }),
     ctx.db.query.tenants.findFirst({ where: eq(tenants.defaultTeamId, team.id) }),
     ctx.db.query.categoryRoutes.findFirst({ where: eq(categoryRoutes.teamId, team.id) }),
+    ctx.db.query.ticketTypeRoutes.findFirst({ where: eq(ticketTypeRoutes.teamId, team.id) }),
+    ctx.db.query.notificationRules.findFirst({
+      where: eq(notificationRules.recipientTeamId, team.id),
+    }),
+    ctx.db.query.notificationRequirements.findFirst({
+      where: eq(notificationRequirements.scopeTeamId, team.id),
+    }),
   ]);
   if (dependencies.some(Boolean)) {
-    throw conflict("Team is still referenced by tickets, routing, or a tenant default");
+    throw conflict("Team is still referenced by tickets, routing, notifications, or a tenant default");
   }
 
   if (ctx.role === Role.ProductAdmin) {

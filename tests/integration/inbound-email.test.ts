@@ -2,16 +2,21 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { eq } from "drizzle-orm";
 import {
   emailConfigs,
+  inboundEmails,
   tenants,
   teams,
   products,
+  ticketTypes,
   tickets,
   replies,
   customers,
 } from "@/drizzle/schema";
 import { TicketStatus, TicketPriority } from "@/lib/types";
 import type { Database } from "@/lib/db";
-import { processInboundEmail } from "@/services/email/inbound";
+import {
+  processInboundEmail,
+  releaseQuarantinedEmail,
+} from "@/services/email/inbound";
 import { createTestDb, uid, NOW } from "./test-db";
 
 let db: Database;
@@ -171,7 +176,7 @@ describe("inbound email processing", () => {
       email(address, { isSpam: true })
     );
     expect(result.success).toBe(false);
-    expect(result.action).toBe("rejected");
+    expect(result.action).toBe("quarantined");
   });
 
   it("rejects unknown inbound addresses", async () => {
@@ -201,7 +206,107 @@ describe("inbound email processing", () => {
       db,
       email(address, { spfResult: "fail" })
     );
-    expect(result.action).toBe("rejected");
+    expect(result.action).toBe("quarantined");
+  });
+
+  it("claims a quarantined email before concurrent release", async () => {
+    const { address, productId } = await seedInbound();
+    const payload = email(address, { isSpam: true });
+    await processInboundEmail(db, payload);
+    const log = await db.query.inboundEmails.findFirst({
+      where: eq(inboundEmails.messageId, payload.messageId),
+    });
+    expect(log?.processingStatus).toBe("quarantined");
+
+    const typeId = uid("unclassified");
+    await db.insert(ticketTypes).values({
+      id: typeId,
+      productId,
+      level: 1,
+      name: "Unclassified",
+      systemKey: "unclassified",
+      sortOrder: 0,
+      createdAt: NOW(),
+      updatedAt: NOW(),
+    });
+
+    const release = () => releaseQuarantinedEmail(db, {
+      emailId: log!.id,
+      ticketTypeId: typeId,
+      actorId: uid("admin"),
+      reason: "Reviewed by an administrator",
+    });
+    const results = await Promise.all([release(), release()]);
+    expect(results.some((result) => result.action === "ticket_created")).toBe(true);
+
+    const created = await db
+      .select()
+      .from(tickets)
+      .where(eq(tickets.sourceEmailId, log!.id));
+    expect(created).toHaveLength(1);
+    const released = await db.query.inboundEmails.findFirst({
+      where: eq(inboundEmails.id, log!.id),
+    });
+    expect(released?.processingStatus).toBe("processed");
+    expect(released?.releasedAt).not.toBeNull();
+  });
+
+  it("restores quarantine state when release validation fails", async () => {
+    const { address } = await seedInbound();
+    const payload = email(address, { isSpam: true });
+    await processInboundEmail(db, payload);
+    const log = await db.query.inboundEmails.findFirst({
+      where: eq(inboundEmails.messageId, payload.messageId),
+    });
+
+    await expect(releaseQuarantinedEmail(db, {
+      emailId: log!.id,
+      actorId: uid("admin"),
+      reason: "Reviewed by an administrator",
+    })).rejects.toThrow(/ticket type is required/i);
+
+    const restored = await db.query.inboundEmails.findFirst({
+      where: eq(inboundEmails.id, log!.id),
+    });
+    expect(restored?.processingStatus).toBe("quarantined");
+  });
+
+  it("does not report a closed-thread reply as released", async () => {
+    const { address } = await seedInbound();
+    const created = await processInboundEmail(db, email(address));
+    await db
+      .update(tickets)
+      .set({ status: TicketStatus.Closed })
+      .where(eq(tickets.id, created.ticketId!));
+
+    const payload = email(address, {
+      isSpam: true,
+      subject: `Re: [Ticket #${created.ticketId}] Help needed`,
+    });
+    await processInboundEmail(db, payload);
+    const log = await db.query.inboundEmails.findFirst({
+      where: eq(inboundEmails.messageId, payload.messageId),
+    });
+    await db
+      .update(inboundEmails)
+      .set({ candidateTicketId: created.ticketId })
+      .where(eq(inboundEmails.id, log!.id));
+
+    await expect(releaseQuarantinedEmail(db, {
+      emailId: log!.id,
+      actorId: uid("admin"),
+      reason: "Reviewed by an administrator",
+    })).rejects.toThrow(/closed tickets/i);
+
+    const restored = await db.query.inboundEmails.findFirst({
+      where: eq(inboundEmails.id, log!.id),
+    });
+    expect(restored?.processingStatus).toBe("quarantined");
+    const thread = await db
+      .select()
+      .from(replies)
+      .where(eq(replies.ticketId, created.ticketId!));
+    expect(thread).toHaveLength(0);
   });
 
   it("ignores priority casing in ticket defaults (medium)", async () => {

@@ -2,12 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Send } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Loader2, Send } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { tocApi, ApiClientError } from "@/lib/api/toc-client";
-import type { TocCreateTicketResult, TocTemplate } from "@/lib/toc/portal";
+import type {
+  TocCreateTicketResult,
+  TocTicketTypeForm,
+  TocTicketTypeNode,
+} from "@/lib/toc/portal";
 import { TicketPriority } from "@/lib/types";
 import { isFieldVisible, isEmptyFieldValue } from "@/lib/form-schema";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,15 +39,15 @@ interface TicketFormProps {
   onSuccess: (result: TocCreateTicketResult) => void;
 }
 
-function templateFields(template: TocTemplate | null): FormFieldSchema[] {
-  if (!template) return [];
-  const schema = template.formSchema as { fields?: FormFieldSchema[] } | null;
+function formFields(form: TocTicketTypeForm | null): FormFieldSchema[] {
+  if (!form) return [];
+  const schema = form.formSchema as { fields?: FormFieldSchema[] } | null;
   return Array.isArray(schema?.fields) ? schema.fields : [];
 }
 
-function templateDefaults(template: TocTemplate | null): Record<string, FieldValue> {
+function formDefaults(form: TocTicketTypeForm | null): Record<string, FieldValue> {
   const values: Record<string, FieldValue> = {};
-  for (const field of templateFields(template)) {
+  for (const field of formFields(form)) {
     if (field.defaultValue === undefined) continue;
     values[field.key] = Array.isArray(field.defaultValue)
       ? field.defaultValue
@@ -53,16 +58,121 @@ function templateDefaults(template: TocTemplate | null): Record<string, FieldVal
   return values;
 }
 
+interface SelectableType {
+  id: string;
+  label: string;
+}
+
+function flattenSelectableTypes(
+  nodes: TocTicketTypeNode[],
+  ancestors: string[] = []
+): SelectableType[] {
+  const result: SelectableType[] = [];
+  for (const node of nodes) {
+    const path = [...ancestors, node.name];
+    if (node.selectable) result.push({ id: node.id, label: path.join(" / ") });
+    result.push(...flattenSelectableTypes(node.children, path));
+  }
+  return result;
+}
+
+function expandableTypeIds(nodes: TocTicketTypeNode[]): Set<string> {
+  const ids = new Set<string>();
+  const visit = (items: TocTicketTypeNode[]) => {
+    for (const item of items) {
+      if (item.children.length > 0) ids.add(item.id);
+      visit(item.children);
+    }
+  };
+  visit(nodes);
+  return ids;
+}
+
+function TicketTypeTree({
+  nodes,
+  selectedId,
+  expandedIds,
+  onSelect,
+  onToggle,
+  expandLabel,
+  collapseLabel,
+}: {
+  nodes: TocTicketTypeNode[];
+  selectedId: string;
+  expandedIds: Set<string>;
+  onSelect: (id: string) => void;
+  onToggle: (id: string) => void;
+  expandLabel: string;
+  collapseLabel: string;
+}) {
+  const renderNodes = (items: TocTicketTypeNode[]) =>
+    items.map((node) => {
+      const hasChildren = node.children.length > 0;
+      const expanded = hasChildren && expandedIds.has(node.id);
+      const selected = selectedId === node.id;
+      return (
+        <div
+          key={node.id}
+          role="treeitem"
+          aria-expanded={hasChildren ? expanded : undefined}
+          aria-selected={selected}
+        >
+          <div className="flex min-w-0 items-center gap-1">
+            {hasChildren ? (
+              <button
+                type="button"
+                className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => onToggle(node.id)}
+                aria-label={`${expanded ? collapseLabel : expandLabel}: ${node.name}`}
+              >
+                {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+              </button>
+            ) : (
+              <span className="size-8 shrink-0" aria-hidden="true" />
+            )}
+            <button
+              type="button"
+              disabled={!node.selectable}
+              onClick={() => onSelect(node.id)}
+              className={cn(
+                "flex min-w-0 flex-1 items-center justify-between gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                node.selectable
+                  ? "hover:bg-accent hover:text-accent-foreground"
+                  : "cursor-default text-muted-foreground",
+                selected && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+              )}
+            >
+              <span className="min-w-0 break-words">{node.name}</span>
+              {selected && <Check className="size-4 shrink-0" />}
+            </button>
+          </div>
+          {expanded && (
+            <div role="group" className="ml-4 border-l border-border/70 pl-2">
+              {renderNodes(node.children)}
+            </div>
+          )}
+        </div>
+      );
+    });
+
+  return (
+    <div role="tree" className="max-h-64 space-y-0.5 overflow-y-auto rounded-md border bg-background p-1">
+      {renderNodes(nodes)}
+    </div>
+  );
+}
+
 export function TicketForm({ onSuccess }: TicketFormProps) {
   const { t } = useI18n();
 
-  // Templates
-  const [templates, setTemplates] = useState<TocTemplate[] | null>(null);
-  const [templatesError, setTemplatesError] = useState(false);
+  const [ticketTypes, setTicketTypes] = useState<TocTicketTypeNode[] | null>(null);
+  const [typesError, setTypesError] = useState(false);
+  const [activeForm, setActiveForm] = useState<TocTicketTypeForm | null>(null);
+  const [formLoading, setFormLoading] = useState(false);
+  const [expandedTypeIds, setExpandedTypeIds] = useState<Set<string>>(new Set());
 
   // Form state
-  const [selectedTemplateId, setSelectedTemplateId] = useState("");
-  const [category, setCategory] = useState("");
+  const [selectedTypeId, setSelectedTypeId] = useState("");
   const [subject, setSubject] = useState("");
   const [content, setContent] = useState("");
   const [priority, setPriority] = useState<TicketPriority>(TicketPriority.Medium);
@@ -70,37 +180,66 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const formRequestIdRef = useRef(0);
 
   // Turnstile
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileRef = useRef<TurnstileInstance | undefined>(undefined);
 
-  const loadTemplates = useCallback(async () => {
-    setTemplates(null);
-    setTemplatesError(false);
+  const loadTypeForm = useCallback(async (typeId: string, preserveValues = false) => {
+    const requestId = ++formRequestIdRef.current;
+    setFormLoading(true);
     try {
-      const data = await tocApi.get<TocTemplate[]>("/api/toc/templates");
-      setTemplates(data);
-      if (data.length === 1) {
-        setSelectedTemplateId(data[0].id);
-        setCustomFields(templateDefaults(data[0]));
-      }
+      const form = await tocApi.get<TocTicketTypeForm>(
+        `/api/toc/ticket-types/${typeId}/form`
+      );
+      if (requestId !== formRequestIdRef.current) return;
+      setActiveForm(form);
+      setCustomFields((previous) => {
+        const defaults = formDefaults(form);
+        if (!preserveValues) return defaults;
+        const validKeys = new Set(formFields(form).map((field) => field.key));
+        return Object.fromEntries(
+          [...Object.entries({ ...defaults, ...previous })].filter(([key]) => validKeys.has(key))
+        );
+      });
+      setFieldErrors({});
     } catch (error) {
-      if (error instanceof ApiClientError && error.status === 401) return;
-      setTemplatesError(true);
+      if (requestId !== formRequestIdRef.current) return;
+      throw error;
+    } finally {
+      if (requestId === formRequestIdRef.current) setFormLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    void loadTemplates();
-  }, [loadTemplates]);
+  const loadTicketTypes = useCallback(async () => {
+    setTicketTypes(null);
+    setTypesError(false);
+    try {
+      const data = await tocApi.get<TocTicketTypeNode[]>("/api/toc/ticket-types");
+      setTicketTypes(data);
+      setExpandedTypeIds(expandableTypeIds(data));
+      const selectable = flattenSelectableTypes(data);
+      if (selectable.length === 1) {
+        setSelectedTypeId(selectable[0].id);
+        await loadTypeForm(selectable[0].id);
+      }
+    } catch (error) {
+      if (error instanceof ApiClientError && error.status === 401) return;
+      setTypesError(true);
+    }
+  }, [loadTypeForm]);
 
-  const selectedTemplate = useMemo(
-    () => templates?.find((tpl) => tpl.id === selectedTemplateId) ?? null,
-    [templates, selectedTemplateId]
+  useEffect(() => {
+    void loadTicketTypes();
+  }, [loadTicketTypes]);
+
+  const selectableTypes = useMemo(
+    () => flattenSelectableTypes(ticketTypes ?? []),
+    [ticketTypes]
   );
 
-  const fields = useMemo(() => templateFields(selectedTemplate), [selectedTemplate]);
+  const fields = useMemo(() => formFields(activeForm), [activeForm]);
 
   const valuesById = useMemo(() => {
     const map: Record<string, FieldValue | undefined> = {};
@@ -115,13 +254,24 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
     [fields, valuesById]
   );
 
-  const handleTemplateChange = (templateId: string) => {
-    setSelectedTemplateId(templateId);
-    setCategory("");
+  const handleTypeChange = (typeId: string) => {
+    setSelectedTypeId(typeId);
+    setActiveForm(null);
     setFieldErrors({});
-    // Seed defaults from the newly selected template's schema.
-    const tpl = templates?.find((item) => item.id === templateId) ?? null;
-    setCustomFields(templateDefaults(tpl));
+    setCustomFields({});
+    setFormError("");
+    void loadTypeForm(typeId).catch((error) => {
+      setFormError(error instanceof Error ? error.message : t.toc.errors.loadFailed);
+    });
+  };
+
+  const toggleType = (typeId: string) => {
+    setExpandedTypeIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(typeId)) next.delete(typeId);
+      else next.add(typeId);
+      return next;
+    });
   };
 
   const setFieldValue = (key: string, value: FieldValue) => {
@@ -199,19 +349,18 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
     setSubject("");
     setContent("");
     setPriority(TicketPriority.Medium);
-    setCustomFields({});
+    setCustomFields(formDefaults(activeForm));
     setFieldErrors({});
-    setCategory("");
     setFormError("");
   };
 
   const handleSubmit = async () => {
     setFormError("");
-    const categoryRequired = Boolean(selectedTemplate?.categories.length);
     if (
       !subject.trim() ||
       !content.trim() ||
-      (categoryRequired && !category) ||
+      !selectedTypeId ||
+      !activeForm ||
       !validate()
     ) {
       setFormError(t.toc.submit.fillRequired);
@@ -235,10 +384,9 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
             ? Number(value)
             : value;
       }
-      if (category) metadata.category = category;
-
       const result = await tocApi.post<TocCreateTicketResult>("/api/toc/tickets", {
-        templateId: selectedTemplate?.id || undefined,
+        ticketTypeId: selectedTypeId,
+        templateVersionId: activeForm.templateVersionId,
         subject: subject.trim(),
         content: content.trim(),
         priority,
@@ -250,6 +398,9 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
       onSuccess(result);
     } catch (error) {
       if (error instanceof ApiClientError && error.status === 401) return;
+      if (error instanceof ApiClientError && error.status === 409 && selectedTypeId) {
+        await loadTypeForm(selectedTypeId, true).catch(() => undefined);
+      }
       const message =
         error instanceof ApiClientError ? error.message : t.toc.submit.submitFailed;
       setFormError(message);
@@ -262,7 +413,7 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
     }
   };
 
-  if (templatesError) {
+  if (typesError) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
@@ -270,7 +421,7 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
           <p className="text-sm text-muted-foreground">
             {t.toc.errors.loadFailedMessage}
           </p>
-          <Button variant="outline" size="sm" onClick={() => void loadTemplates()}>
+          <Button variant="outline" size="sm" onClick={() => void loadTicketTypes()}>
             {t.toc.errors.retry}
           </Button>
         </CardContent>
@@ -278,7 +429,7 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
     );
   }
 
-  if (templates === null) {
+  if (ticketTypes === null) {
     return (
       <Card>
         <CardHeader>
@@ -300,9 +451,11 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
 
   const submitDisabled =
     submitting ||
+    formLoading ||
+    !selectedTypeId ||
+    !activeForm ||
     !subject.trim() ||
     !content.trim() ||
-    (Boolean(selectedTemplate?.categories.length) && !category) ||
     (turnstileEnabled && !turnstileToken);
 
   return (
@@ -312,44 +465,24 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
         <CardDescription>{t.toc.submit.description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        {templates.length > 1 && (
-          <div className="space-y-2">
-            <Label>{t.toc.submit.template}</Label>
-            <Select value={selectedTemplateId} onValueChange={handleTemplateChange}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder={t.toc.submit.selectTemplate} />
-              </SelectTrigger>
-              <SelectContent>
-                {templates.map((template) => (
-                  <SelectItem key={template.id} value={template.id}>
-                    {template.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+        <div className="space-y-2">
+          <Label>{t.toc.submit.ticketType}</Label>
+          {selectableTypes.length > 0 ? (
+            <TicketTypeTree
+              nodes={ticketTypes}
+              selectedId={selectedTypeId}
+              expandedIds={expandedTypeIds}
+              onSelect={handleTypeChange}
+              onToggle={toggleType}
+              expandLabel={t.toc.submit.expandTicketType}
+              collapseLabel={t.toc.submit.collapseTicketType}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">{t.toc.submit.noTicketTypes}</p>
+          )}
+        </div>
 
-        {selectedTemplate && selectedTemplate.categories.length > 0 && (
-          <div className="space-y-2">
-            <Label>
-              {t.toc.submit.category}
-              <span className="text-destructive">*</span>
-            </Label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder={t.toc.submit.selectCategory} />
-              </SelectTrigger>
-              <SelectContent>
-                {selectedTemplate.categories.map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {cat}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+        {formLoading && <Skeleton className="h-20 w-full" />}
 
         <div className="space-y-2">
           <Label>

@@ -1,4 +1,5 @@
 import type { Database } from "@/lib/db";
+import type { NotificationChannelType } from "@/lib/notifications/channel-definitions";
 
 export interface NotificationMessage {
   title: string;
@@ -16,7 +17,7 @@ export interface NotificationChannel {
   send(message: NotificationMessage): Promise<SendResult>;
 }
 
-export type ChannelType = "email" | "pushdeer" | "bark" | "ntfy" | "telegram" | "discord";
+export type ChannelType = NotificationChannelType;
 
 export interface ChannelConfig {
   type: ChannelType;
@@ -29,52 +30,72 @@ export interface ChannelContext {
   productId: string;
 }
 
+type ChannelFactory = (
+  config: Record<string, string>,
+  ctx: ChannelContext
+) => Promise<NotificationChannel>;
+
+const CHANNEL_FACTORIES = {
+  pushdeer: async (config) => {
+    const { PushdeerChannel } = await import("./pushdeer");
+    return new PushdeerChannel(
+      config.pushkey || "",
+      config.serverUrl || "https://api2.pushdeer.com"
+    );
+  },
+  bark: async (config) => {
+    const { BarkChannel } = await import("./bark");
+    return new BarkChannel(
+      config.serverUrl || "https://api.day.app",
+      config.deviceKey || ""
+    );
+  },
+  ntfy: async (config) => {
+    const { NtfyChannel } = await import("./ntfy");
+    return new NtfyChannel(
+      config.serverUrl || "https://ntfy.sh",
+      config.topic || ""
+    );
+  },
+  telegram: async (config) => {
+    const { TelegramChannel } = await import("./telegram");
+    return new TelegramChannel(config.botToken || "", config.chatId || "");
+  },
+  discord: async (config) => {
+    const { DiscordChannel } = await import("./discord");
+    return new DiscordChannel(config.webhookUrl || "");
+  },
+  slack: async (config) => {
+    const { SlackChannel } = await import("./slack");
+    return new SlackChannel(config.webhookUrl || "");
+  },
+  teams: async (config) => {
+    const { TeamsChannel } = await import("./teams");
+    return new TeamsChannel(config.webhookUrl || "");
+  },
+  feishu: async (config) => {
+    const { FeishuChannel } = await import("./feishu");
+    return new FeishuChannel(config.webhookUrl || "", config.signingSecret);
+  },
+  dingtalk: async (config) => {
+    const { DingTalkChannel } = await import("./dingtalk");
+    return new DingTalkChannel(config.webhookUrl || "", config.signingSecret);
+  },
+  wecom: async (config) => {
+    const { WeComChannel } = await import("./wecom");
+    return new WeComChannel(config.webhookUrl || "");
+  },
+  email: async (config, ctx) => {
+    const { EmailChannel } = await import("./email");
+    return new EmailChannel(config.email || "", ctx.db, ctx.productId);
+  },
+} satisfies Record<ChannelType, ChannelFactory>;
+
 export async function createChannel(
   channelConfig: ChannelConfig,
   ctx: ChannelContext
 ): Promise<NotificationChannel> {
-  switch (channelConfig.type) {
-    case "pushdeer": {
-      const { PushdeerChannel } = await import("./pushdeer");
-      return new PushdeerChannel(
-        channelConfig.config.pushkey || "",
-        channelConfig.config.serverUrl || "https://api2.pushdeer.com"
-      );
-    }
-    case "bark": {
-      const { BarkChannel } = await import("./bark");
-      return new BarkChannel(
-        channelConfig.config.serverUrl || "https://api.day.app",
-        channelConfig.config.deviceKey || ""
-      );
-    }
-    case "ntfy": {
-      const { NtfyChannel } = await import("./ntfy");
-      return new NtfyChannel(
-        channelConfig.config.serverUrl || "https://ntfy.sh",
-        channelConfig.config.topic || ""
-      );
-    }
-    case "telegram": {
-      const { TelegramChannel } = await import("./telegram");
-      return new TelegramChannel(
-        channelConfig.config.botToken || "",
-        channelConfig.config.chatId || ""
-      );
-    }
-    case "discord": {
-      const { DiscordChannel } = await import("./discord");
-      return new DiscordChannel(channelConfig.config.webhookUrl || "");
-    }
-    case "email": {
-      const { EmailChannel } = await import("./email");
-      return new EmailChannel(
-        channelConfig.config.email || "",
-        ctx.db,
-        ctx.productId
-      );
-    }
-    default:
-      throw new Error(`Unknown channel type: ${channelConfig.type}`);
-  }
+  const factory = CHANNEL_FACTORIES[channelConfig.type];
+  if (!factory) throw new Error(`Unknown channel type: ${channelConfig.type}`);
+  return factory(channelConfig.config, ctx);
 }

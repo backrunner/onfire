@@ -16,6 +16,7 @@ export class PushdeerChannel implements NotificationChannel {
     try {
       const response = await fetchWithTimeout(`${this.serverUrl}/message/push`, {
         method: "POST",
+        redirect: "error",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
           pushkey: this.pushkey,

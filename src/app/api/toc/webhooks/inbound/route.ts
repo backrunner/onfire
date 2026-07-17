@@ -27,6 +27,10 @@ const inboundPayloadSchema = z
     spf_result: z.string().max(32).optional(),
     dkim_result: z.boolean().optional(),
     is_spam: z.boolean().optional(),
+    auto_submitted: z.string().max(256).optional(),
+    precedence: z.string().max(256).optional(),
+    list_id: z.string().max(998).optional(),
+    return_path: z.string().max(998).optional(),
   })
   .refine((p) => p.body_plain || p.body_html, {
     message: "At least one of body_plain or body_html is required",
@@ -99,6 +103,10 @@ export const POST = withPublic(async (req: NextRequest, { db }) => {
     spfResult: body.spf_result,
     dkimResult: body.dkim_result,
     isSpam: body.is_spam,
+    autoSubmitted: body.auto_submitted,
+    precedence: body.precedence,
+    listId: body.list_id,
+    returnPath: body.return_path,
   });
 
   if (!result.success && result.action === "error") {

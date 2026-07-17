@@ -23,7 +23,9 @@ export class BarkChannel implements NotificationChannel {
       params.set("group", "OnFire");
       params.set("sound", "minuet");
 
-      const response = await fetchWithTimeout(`${url}?${params.toString()}`);
+      const response = await fetchWithTimeout(`${url}?${params.toString()}`, {
+        redirect: "error",
+      });
       const data = await readResponseJson<{ code?: number; message?: string }>(
         response
       );

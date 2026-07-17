@@ -16,6 +16,7 @@ export class NtfyChannel implements NotificationChannel {
     try {
       const response = await fetchWithTimeout(`${this.serverUrl}/${this.topic}`, {
         method: "POST",
+        redirect: "error",
         headers: {
           "Title": message.title,
           "Priority": "default",

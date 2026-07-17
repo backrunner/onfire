@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import {
   categoryRoutes,
@@ -8,8 +8,11 @@ import {
   emailConfigs,
   emailTemplates,
   inboundEmails,
-  notificationChannels,
   notificationLogs,
+  ticketTypes,
+  ticketTypeRoutes,
+  notificationRequirements,
+  notificationRules,
   outboundEmails,
   productDocuments,
   productIdentityConfigs,
@@ -113,6 +116,45 @@ export const PATCH = withAuth({ permission: "product.settings" }, async (req: Ne
     }
   }
 
+  if (teamIds !== undefined) {
+    const [productTypeIds, ruleTargets, requirementTargets] = await Promise.all([
+      ctx.db
+        .select({ id: ticketTypes.id })
+        .from(ticketTypes)
+        .where(eq(ticketTypes.productId, product.id)),
+      ctx.db
+        .select({ teamId: notificationRules.recipientTeamId })
+        .from(notificationRules)
+        .where(eq(notificationRules.productId, product.id)),
+      ctx.db
+        .select({ teamId: notificationRequirements.scopeTeamId })
+        .from(notificationRequirements)
+        .where(eq(notificationRequirements.productId, product.id)),
+    ]);
+    const routes = productTypeIds.length
+      ? await ctx.db
+          .select({ teamId: ticketTypeRoutes.teamId })
+          .from(ticketTypeRoutes)
+          .where(
+            inArray(
+              ticketTypeRoutes.ticketTypeId,
+              productTypeIds.map((type) => type.id)
+            )
+          )
+      : [];
+    if (routes.some((route) => !teamIds.includes(route.teamId))) {
+      throw conflict("Remove or reassign ticket type routes before detaching their teams");
+    }
+    const notificationTeamIds = [...ruleTargets, ...requirementTargets]
+      .map((target) => target.teamId)
+      .filter((teamId): teamId is string => Boolean(teamId));
+    if (notificationTeamIds.some((teamId) => !teamIds.includes(teamId))) {
+      throw conflict(
+        "Remove or reassign notification policies before detaching their teams"
+      );
+    }
+  }
+
   const productFields = {
     ...(body.name !== undefined && { name: body.name }),
     ...(body.homepageUrl !== undefined && { homepageUrl: body.homepageUrl }),
@@ -210,14 +252,20 @@ export const DELETE = withAuth({ permission: "product.manage" }, async (_req: Ne
     ctx.db.query.tickets.findFirst({ where: eq(tickets.productId, product.id) }),
     ctx.db.query.customers.findFirst({ where: eq(customers.productId, product.id) }),
     ctx.db.query.templates.findFirst({ where: eq(templates.productId, product.id) }),
+    ctx.db.query.ticketTypes.findFirst({
+      where: and(eq(ticketTypes.productId, product.id), isNull(ticketTypes.systemKey)),
+    }),
     ctx.db.query.productKeys.findFirst({ where: eq(productKeys.productId, product.id) }),
     ctx.db.query.categoryRoutes.findFirst({ where: eq(categoryRoutes.productId, product.id) }),
     ctx.db.query.emailConfigs.findFirst({ where: eq(emailConfigs.productId, product.id) }),
     ctx.db.query.emailTemplates.findFirst({ where: eq(emailTemplates.productId, product.id) }),
     ctx.db.query.inboundEmails.findFirst({ where: eq(inboundEmails.productId, product.id) }),
     ctx.db.query.outboundEmails.findFirst({ where: eq(outboundEmails.productId, product.id) }),
-    ctx.db.query.notificationChannels.findFirst({
-      where: eq(notificationChannels.productId, product.id),
+    ctx.db.query.notificationRules.findFirst({
+      where: eq(notificationRules.productId, product.id),
+    }),
+    ctx.db.query.notificationRequirements.findFirst({
+      where: eq(notificationRequirements.productId, product.id),
     }),
     ctx.db.query.notificationLogs.findFirst({
       where: eq(notificationLogs.productId, product.id),
@@ -233,12 +281,21 @@ export const DELETE = withAuth({ permission: "product.manage" }, async (_req: Ne
     throw conflict("Product still has tickets, customers, configuration, or history records");
   }
 
+  const systemTypes = await ctx.db
+    .select({ id: ticketTypes.id })
+    .from(ticketTypes)
+    .where(eq(ticketTypes.productId, product.id));
+  const systemTypeIds = systemTypes.map((type) => type.id);
   await ctx.db.batch([
     ctx.db
       .delete(productIdentityConfigs)
       .where(eq(productIdentityConfigs.productId, product.id)),
     ctx.db.delete(productTeams).where(eq(productTeams.productId, product.id)),
     ctx.db.delete(userProducts).where(eq(userProducts.productId, product.id)),
+    ctx.db
+      .delete(ticketTypeRoutes)
+      .where(inArray(ticketTypeRoutes.ticketTypeId, systemTypeIds.length ? systemTypeIds : ["__none__"])),
+    ctx.db.delete(ticketTypes).where(eq(ticketTypes.productId, product.id)),
     ctx.db.delete(products).where(eq(products.id, product.id)),
   ]);
 

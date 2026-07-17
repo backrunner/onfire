@@ -7,6 +7,8 @@ import {
   agents,
   agentTeams,
   agentProfiles,
+  notificationRequirements,
+  notificationRules,
   teams,
   tickets,
 } from "@/drizzle/schema";
@@ -157,6 +159,18 @@ export const DELETE = withAuth({ permission: "user.manage" }, async (_req: NextR
     .limit(1);
   if (assignedTicket) {
     throw conflict("Reassign this agent's tickets before removing the agent role");
+  }
+
+  const notificationReferences = await Promise.all([
+    ctx.db.query.notificationRules.findFirst({
+      where: eq(notificationRules.recipientUserId, agent.userId),
+    }),
+    ctx.db.query.notificationRequirements.findFirst({
+      where: eq(notificationRequirements.scopeUserId, agent.userId),
+    }),
+  ]);
+  if (notificationReferences.some(Boolean)) {
+    throw conflict("Remove notification rules and requirements for this agent first");
   }
 
   // Delete agent records (keep the user account).

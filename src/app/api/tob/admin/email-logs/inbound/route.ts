@@ -34,6 +34,12 @@ export const GET = withAuth({ permission: "email.config" }, async (req: NextRequ
       subject: inboundEmails.subject,
       processingStatus: inboundEmails.processingStatus,
       filterResult: inboundEmails.filterResult,
+      filterStage: inboundEmails.filterStage,
+      filterProvider: inboundEmails.filterProvider,
+      filterVerdict: inboundEmails.filterVerdict,
+      filterScore: inboundEmails.filterScore,
+      filterReason: inboundEmails.filterReason,
+      candidateTicketId: inboundEmails.candidateTicketId,
       ticketId: inboundEmails.ticketId,
       replyId: inboundEmails.replyId,
       errorMessage: inboundEmails.errorMessage,
@@ -42,6 +48,10 @@ export const GET = withAuth({ permission: "email.config" }, async (req: NextRequ
       isSpam: inboundEmails.isSpam,
       createdAt: inboundEmails.createdAt,
       processedAt: inboundEmails.processedAt,
+      releasedAt: inboundEmails.releasedAt,
+      releasedBy: inboundEmails.releasedBy,
+      releaseReason: inboundEmails.releaseReason,
+      releaseTicketTypeId: inboundEmails.releaseTicketTypeId,
     })
     .from(inboundEmails)
     .where(where)

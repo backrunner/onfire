@@ -20,6 +20,10 @@ const payloadSchema = z.object({
   references: z.string().max(20_000).optional(),
   spfResult: z.string().optional(),
   dkimResult: z.boolean().optional(),
+  autoSubmitted: z.string().max(256).optional(),
+  precedence: z.string().max(256).optional(),
+  listId: z.string().max(998).optional(),
+  returnPath: z.string().max(998).optional(),
 });
 
 /**

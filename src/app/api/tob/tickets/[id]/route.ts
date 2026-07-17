@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { tickets, replies, history } from "@/drizzle/schema";
+import { tickets, replies, history, ticketTemplateVersions } from "@/drizzle/schema";
 import { TicketStatus } from "@/lib/types";
 import { ok, notFound, badRequest } from "@/lib/api/response";
 import { withAuth, parseBody } from "@/lib/api/handler";
@@ -10,6 +10,7 @@ import { serializeTicket, serializeHistory } from "@/lib/tickets/serialize";
 import { resolveUserNames, resolveCustomerExternalIds } from "@/lib/tickets/names";
 import { isOpen } from "@/lib/tickets/state-machine";
 import { emitTicketEvent } from "@/services/ticket-events";
+import { parseFormSchema } from "@/lib/form-schema";
 
 const replySchema = z.object({
   content: z.string().min(1).max(20_000),
@@ -23,7 +24,7 @@ export const GET = withAuth({ permission: "ticket.read" }, async (_req: NextRequ
   if (!ticket) throw notFound("Ticket not found");
   assertTicketVisible(ctx, ticket);
 
-  const [replyRows, historyRows] = await Promise.all([
+  const [replyRows, historyRows, templateVersion] = await Promise.all([
     ctx.db
       .select()
       .from(replies)
@@ -34,6 +35,11 @@ export const GET = withAuth({ permission: "ticket.read" }, async (_req: NextRequ
       .from(history)
       .where(eq(history.ticketId, ticket.id))
       .orderBy(history.createdAt),
+    ticket.templateVersionId
+      ? ctx.db.query.ticketTemplateVersions.findFirst({
+          where: eq(ticketTemplateVersions.id, ticket.templateVersionId),
+        })
+      : undefined,
   ]);
 
   const serializedHistory = serializeHistory(historyRows);
@@ -82,6 +88,14 @@ export const GET = withAuth({ permission: "ticket.read" }, async (_req: NextRequ
         : null,
       customerLabel,
     },
+    templateVersion: templateVersion
+      ? {
+          id: templateVersion.id,
+          version: templateVersion.version,
+          formSchema: parseFormSchema(templateVersion.formSchema),
+          invalidatedAt: templateVersion.invalidatedAt,
+        }
+      : null,
     replies: namedReplies,
     history: namedHistory,
     timeline,

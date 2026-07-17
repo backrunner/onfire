@@ -10,20 +10,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TenantManagement } from "./_components/tenant-management";
 import { ProductManagement } from "./_components/product-management";
 import { TeamManagement } from "./_components/team-management";
-import { TemplateManagement } from "./_components/template-management";
 import { UserManagement } from "./_components/user-management";
 import { AgentManagement } from "./_components/agent-management";
-import { CategoryRouteManagement } from "./_components/category-route-management";
+import { TicketTypeManagement } from "./_components/ticket-type-management";
+import { TicketTypeRouteManagement } from "./_components/ticket-type-route-management";
+import { TicketTemplateVersionManagement } from "./_components/ticket-template-version-management";
+import { SpamFilterManagement } from "./_components/spam-filter-management";
 import { ProductKeyManagement } from "./_components/product-key-management";
 
 type TabKey =
   | "tenants"
   | "products"
   | "teams"
+  | "ticketTypes"
   | "templates"
   | "users"
   | "agents"
-  | "categoryRoutes"
+  | "ticketTypeRoutes"
+  | "spamFilter"
   | "apiKeys";
 
 interface TabDef {
@@ -36,15 +40,17 @@ const TABS: TabDef[] = [
   { value: "tenants", permission: "tenant.manage", render: () => <TenantManagement /> },
   { value: "products", permission: "product.settings", render: () => <ProductManagement /> },
   { value: "teams", permission: "team.manage", render: () => <TeamManagement /> },
-  { value: "templates", permission: "template.read", render: () => <TemplateManagement /> },
+  { value: "ticketTypes", permission: "ticket_type.write", render: () => <TicketTypeManagement /> },
+  { value: "templates", permission: "ticket_template.read", render: () => <TicketTemplateVersionManagement /> },
   { value: "users", permission: "user.manage", render: () => <UserManagement /> },
   { value: "agents", permission: "user.manage", render: () => <AgentManagement /> },
   {
-    value: "categoryRoutes",
-    permission: "category.map",
-    render: () => <CategoryRouteManagement />,
+    value: "ticketTypeRoutes",
+    permission: "ticket_type.route",
+    render: () => <TicketTypeRouteManagement />,
   },
   { value: "apiKeys", permission: "product.settings", render: () => <ProductKeyManagement /> },
+  { value: "spamFilter", permission: "spam.config", render: () => <SpamFilterManagement /> },
 ];
 
 function ManagementPageSkeleton() {
@@ -89,9 +95,9 @@ function ManagementTabs() {
 
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange}>
-      <TabsList className="flex-wrap">
+      <TabsList className="w-full max-w-full justify-start overflow-x-auto">
         {visibleTabs.map((tab) => (
-          <TabsTrigger key={tab.value} value={tab.value}>
+          <TabsTrigger key={tab.value} value={tab.value} className="flex-none shrink-0">
             {t.management.tabs[tab.value]}
           </TabsTrigger>
         ))}

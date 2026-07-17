@@ -71,6 +71,34 @@
       "when": 1783863371530,
       "tag": "0009_freezing_slayback",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1783883790506,
+      "tag": "0010_busy_the_hunter",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1784053011706,
+      "tag": "0011_easy_the_leader",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1784053872742,
+      "tag": "0012_normal_old_lace",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1784134088446,
+      "tag": "0013_big_psynapse",
+      "breakpoints": true
     }
   ]
 }

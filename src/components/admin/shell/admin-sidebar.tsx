@@ -58,7 +58,12 @@ const NAV_GROUPS: NavGroup[] = [
   {
     labelKey: "configuration",
     items: [
-      { href: "/admin/management", icon: Settings, labelKey: "admin", permission: "team.manage" },
+      {
+        href: "/admin/management",
+        icon: Settings,
+        labelKey: "admin",
+        permission: "ticket_type.route",
+      },
       { href: "/admin/email", icon: Mail, labelKey: "email", permission: "email.config" },
       { href: "/admin/notifications", icon: Bell, labelKey: "notifications", permission: "notification.manage" },
       { href: "/admin/ai", icon: Sparkles, labelKey: "ai", permission: "ai.knowledge" },

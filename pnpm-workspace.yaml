@@ -18,4 +18,5 @@ minimumReleaseAgeExclude:
 
 overrides:
   '@esbuild-kit/core-utils>esbuild': 0.25.12
+  dompurify: 3.4.12
   'next>postcss': 8.5.17

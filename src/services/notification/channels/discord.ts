@@ -1,6 +1,5 @@
 import type { NotificationChannel, NotificationMessage, SendResult } from "./index";
-import { readResponseText } from "@/lib/response-body";
-import { fetchWithTimeout } from "@/lib/fetch-timeout";
+import { postWebhookJson, webhookFailure } from "./webhook-utils";
 
 export class DiscordChannel implements NotificationChannel {
   name = "discord";
@@ -12,28 +11,23 @@ export class DiscordChannel implements NotificationChannel {
 
   async send(message: NotificationMessage): Promise<SendResult> {
     try {
-      const response = await fetchWithTimeout(this.webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          embeds: [
-            {
-              title: message.title,
-              description: message.body,
-              color: 0x5865f2, // Discord blurple
-              url: message.url,
-              footer: {
-                text: "OnFire Support",
-              },
-              timestamp: new Date().toISOString(),
+      const { response, text } = await postWebhookJson(this.webhookUrl, {
+        embeds: [
+          {
+            title: message.title,
+            description: message.body,
+            color: 0x5865f2, // Discord blurple
+            url: message.url,
+            footer: {
+              text: "OnFire Support",
             },
-          ],
-        }),
+            timestamp: new Date().toISOString(),
+          },
+        ],
       });
 
       if (!response.ok) {
-        const text = await readResponseText(response);
-        return { success: false, error: text || `HTTP ${response.status}` };
+        return webhookFailure(response, text);
       }
 
       return { success: true };

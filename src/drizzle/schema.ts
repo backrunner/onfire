@@ -217,6 +217,76 @@ export const agentProfiles = sqliteTable("agent_profiles", {
   avatarUrl: text("avatar_url"),
 });
 
+export type TicketTypeSystemKey = "unclassified" | `legacy:${string}`;
+
+/** Product-owned ticket taxonomy. Parent chains are validated to a maximum depth of three. */
+export const ticketTypes = sqliteTable(
+  "ticket_types",
+  {
+    id: text("id").primaryKey(),
+    productId: text("product_id").notNull(),
+    parentId: text("parent_id"),
+    level: integer("level").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    systemKey: text("system_key").$type<TicketTypeSystemKey>(),
+    archivedAt: text("archived_at"),
+    archivedBy: text("archived_by"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    index("ticket_types_product_parent_idx").on(t.productId, t.parentId),
+    uniqueIndex("ticket_types_product_system_uq").on(t.productId, t.systemKey),
+  ]
+);
+
+/** Optional team mapping; resolution walks from the selected type to its ancestors. */
+export const ticketTypeRoutes = sqliteTable("ticket_type_routes", {
+  ticketTypeId: text("ticket_type_id").primaryKey(),
+  teamId: text("team_id").notNull(),
+  createdBy: text("created_by"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+/** One template series per ticket type. The current version is immediately live. */
+export const ticketTemplates = sqliteTable("ticket_templates", {
+  id: text("id").primaryKey(),
+  ticketTypeId: text("ticket_type_id").notNull().unique(),
+  currentVersionId: text("current_version_id"),
+  archivedAt: text("archived_at"),
+  archivedBy: text("archived_by"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+/** Immutable template contents; only explicit invalidation audit fields may change. */
+export const ticketTemplateVersions = sqliteTable(
+  "ticket_template_versions",
+  {
+    id: text("id").primaryKey(),
+    templateId: text("template_id").notNull(),
+    version: integer("version").notNull(),
+    formSchema: text("form_schema").notNull(),
+    changeNote: text("change_note"),
+    createdBy: text("created_by"),
+    createdAt: text("created_at").notNull(),
+    invalidatedAt: text("invalidated_at"),
+    invalidatedBy: text("invalidated_by"),
+    invalidationReason: text("invalidation_reason"),
+  },
+  (t) => [
+    uniqueIndex("ticket_template_versions_template_version_uq").on(
+      t.templateId,
+      t.version
+    ),
+    index("ticket_template_versions_template_idx").on(t.templateId),
+  ]
+);
+
+/** Legacy template rows retained read-only for migration and historical audit. */
 export const templates = sqliteTable(
   "templates",
   {
@@ -264,6 +334,10 @@ export const tickets = sqliteTable(
     customerId: text("customer_id"),
     customerEmail: text("customer_email"),
     customerLevel: integer("customer_level"),
+    ticketTypeId: text("ticket_type_id").notNull().default(""),
+    templateVersionId: text("template_version_id"),
+    ticketTypePath: text("ticket_type_path").notNull().default("[]"),
+    /** Legacy template identifier retained for pre-migration history. */
     templateId: text("template_id"),
     metadata: text("metadata"),
     slaAcceptDeadline: text("sla_accept_deadline"),
@@ -300,6 +374,8 @@ export const tickets = sqliteTable(
     index("tickets_tenant_status_idx").on(t.tenantId, t.status),
     index("tickets_team_status_idx").on(t.teamId, t.status),
     index("tickets_product_status_idx").on(t.productId, t.status),
+    index("tickets_type_idx").on(t.ticketTypeId),
+    index("tickets_template_version_idx").on(t.templateVersionId),
     index("tickets_assignee_idx").on(t.assigneeId),
     index("tickets_customer_idx").on(t.customerEmail, t.productId),
     index("tickets_customer_id_idx").on(t.customerId),
@@ -352,21 +428,68 @@ export type AIProvider =
   | "cohere";
 export type OpenAIApiMode = "responses" | "chat";
 
+export const aiCredentials = sqliteTable(
+  "ai_credentials",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    provider: text("provider").$type<AIProvider>().notNull(),
+    apiMode: text("api_mode")
+      .$type<OpenAIApiMode>()
+      .notNull()
+      .default("responses"),
+    apiKey: text("api_key").notNull(),
+    secretPurpose: text("secret_purpose").notNull(),
+    baseUrl: text("base_url"),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    cooldownSeconds: integer("cooldown_seconds").notNull().default(60),
+    blockedUntil: text("blocked_until"),
+    failureCount: integer("failure_count").notNull().default(0),
+    lastFailureAt: text("last_failure_at"),
+    lastFailureMessage: text("last_failure_message"),
+    lastSuccessAt: text("last_success_at"),
+    lastUsedAt: text("last_used_at"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    index("ai_credentials_provider_idx").on(t.provider),
+    index("ai_credentials_available_idx").on(t.enabled, t.blockedUntil),
+  ]
+);
+
 export const aiConfigs = sqliteTable("ai_configs", {
   id: text("id").primaryKey(),
   taskType: text("task_type").$type<AITaskType>().notNull().unique(),
-  provider: text("provider").$type<AIProvider>().notNull(),
-  apiMode: text("api_mode")
-    .$type<OpenAIApiMode>()
-    .notNull()
-    .default("responses"),
-  model: text("model").notNull(),
-  apiKey: text("api_key").notNull(),
-  baseUrl: text("base_url"),
-  enabled: integer("enabled", { mode: "boolean" }).default(true),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
+
+export const aiTaskCredentials = sqliteTable(
+  "ai_task_credentials",
+  {
+    id: text("id").primaryKey(),
+    taskType: text("task_type").$type<AITaskType>().notNull(),
+    credentialId: text("credential_id").notNull(),
+    model: text("model").notNull(),
+    priority: integer("priority").notNull().default(0),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("ai_task_credentials_task_credential_unique").on(
+      t.taskType,
+      t.credentialId
+    ),
+    index("ai_task_credentials_task_priority_idx").on(
+      t.taskType,
+      t.priority
+    ),
+    index("ai_task_credentials_credential_idx").on(t.credentialId),
+  ]
+);
 
 export type DocumentStatus = "pending" | "processing" | "ready" | "error";
 
@@ -450,6 +573,8 @@ export type EmailProcessingStatus =
   | "pending"
   | "processed"
   | "filtered"
+  | "quarantined"
+  | "releasing"
   | "error";
 export type EmailDeliveryStatus =
   | "pending"
@@ -458,6 +583,23 @@ export type EmailDeliveryStatus =
   | "bounced"
   | "failed";
 export type AIFilterStrictness = "low" | "medium" | "high";
+export type SpamFilterScope = "global" | "tenant";
+export type SpamFilterMode = "inherit" | "disabled" | "custom";
+export type SpamFilterVerdict = "allow" | "suspect" | "spam";
+
+/** Optional global or tenant override for a generic HTTPS spam classifier. */
+export const spamFilterConfigs = sqliteTable("spam_filter_configs", {
+  id: text("id").primaryKey(),
+  scopeKey: text("scope_key").notNull().unique(),
+  scope: text("scope").$type<SpamFilterScope>().notNull(),
+  tenantId: text("tenant_id"),
+  mode: text("mode").$type<SpamFilterMode>().notNull().default("inherit"),
+  endpointUrl: text("endpoint_url"),
+  authSecret: text("auth_secret"),
+  timeoutMs: integer("timeout_ms").notNull().default(3000),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
 
 export const emailConfigs = sqliteTable(
   "email_configs",
@@ -533,12 +675,22 @@ export const inboundEmails = sqliteTable(
   subject: text("subject"),
   bodyPlain: text("body_plain"),
   bodyHtml: text("body_html"),
+  autoSubmitted: text("auto_submitted"),
+  precedence: text("precedence"),
+  listId: text("list_id"),
+  returnPath: text("return_path"),
   // Processing result
   processingStatus: text("processing_status")
     .$type<EmailProcessingStatus>()
     .notNull()
     .default("pending"),
   filterResult: text("filter_result"),
+  filterStage: text("filter_stage"),
+  filterProvider: text("filter_provider"),
+  filterVerdict: text("filter_verdict").$type<SpamFilterVerdict>(),
+  filterScore: real("filter_score"),
+  filterReason: text("filter_reason"),
+  candidateTicketId: text("candidate_ticket_id"),
   ticketId: text("ticket_id"),
   replyId: text("reply_id"),
   errorMessage: text("error_message"),
@@ -548,6 +700,10 @@ export const inboundEmails = sqliteTable(
   isSpam: integer("is_spam", { mode: "boolean" }),
   // Raw payload
   rawPayload: text("raw_payload"),
+  releasedAt: text("released_at"),
+  releasedBy: text("released_by"),
+  releaseReason: text("release_reason"),
+  releaseTicketTypeId: text("release_ticket_type_id"),
   createdAt: text("created_at").notNull(),
   processedAt: text("processed_at"),
   },
@@ -594,7 +750,12 @@ export type NotificationChannelType =
   | "bark"
   | "ntfy"
   | "telegram"
-  | "discord";
+  | "discord"
+  | "slack"
+  | "teams"
+  | "feishu"
+  | "dingtalk"
+  | "wecom";
 export type NotificationTriggerEvent =
   | "ticket_created"
   | "ticket_assigned"
@@ -603,22 +764,74 @@ export type NotificationTriggerEvent =
   | "ticket_expiring"
   | "customer_replied"
   | "ticket_closed";
+export type NotificationRecipientType =
+  | "assignee"
+  | "ticket_team"
+  | "product_agents"
+  | "team"
+  | "user";
+export type NotificationRequirementScope = "product" | "team" | "user";
 export type NotificationStatus = "pending" | "sent" | "failed";
 
-export const notificationChannels = sqliteTable(
-  "notification_channels",
+/** User-owned destinations. Product rules select channel types, never credentials. */
+export const notificationEndpoints = sqliteTable(
+  "notification_endpoints",
   {
     id: text("id").primaryKey(),
-    productId: text("product_id").notNull(),
+    userId: text("user_id").notNull(),
     channelType: text("channel_type").$type<NotificationChannelType>().notNull(),
     name: text("name").notNull(),
     enabled: integer("enabled", { mode: "boolean" }).default(true),
     config: text("config").notNull(),
-    triggerEvents: text("trigger_events").notNull(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
-  (t) => [index("notification_channels_product_idx").on(t.productId)]
+  (t) => [
+    index("notification_endpoints_user_idx").on(t.userId),
+    index("notification_endpoints_user_type_idx").on(t.userId, t.channelType),
+  ]
+);
+
+/** Product-owned routing rules: event -> recipients -> allowed endpoint types. */
+export const notificationRules = sqliteTable(
+  "notification_rules",
+  {
+    id: text("id").primaryKey(),
+    productId: text("product_id").notNull(),
+    name: text("name").notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).default(true),
+    triggerEvents: text("trigger_events").notNull(),
+    channelTypes: text("channel_types").notNull(),
+    recipientType: text("recipient_type")
+      .$type<NotificationRecipientType>()
+      .notNull(),
+    recipientTeamId: text("recipient_team_id"),
+    recipientUserId: text("recipient_user_id"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [index("notification_rules_product_idx").on(t.productId)]
+);
+
+/** Compliance requirements for endpoint types at product, team, or user scope. */
+export const notificationRequirements = sqliteTable(
+  "notification_requirements",
+  {
+    id: text("id").primaryKey(),
+    productId: text("product_id").notNull(),
+    name: text("name").notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).default(true),
+    scopeType: text("scope_type")
+      .$type<NotificationRequirementScope>()
+      .notNull(),
+    scopeTeamId: text("scope_team_id"),
+    scopeUserId: text("scope_user_id"),
+    triggerEvents: text("trigger_events").notNull(),
+    channelTypes: text("channel_types").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [index("notification_requirements_product_idx").on(t.productId)]
 );
 
 export const notificationLogs = sqliteTable(
@@ -626,10 +839,12 @@ export const notificationLogs = sqliteTable(
   {
     id: text("id").primaryKey(),
     productId: text("product_id").notNull(),
-    channelId: text("channel_id").notNull(),
+    ruleId: text("rule_id"),
+    requirementId: text("requirement_id"),
+    endpointId: text("endpoint_id"),
+    recipientUserId: text("recipient_user_id").notNull(),
     channelType: text("channel_type").$type<NotificationChannelType>().notNull(),
     ticketId: text("ticket_id").notNull(),
-    agentId: text("agent_id").notNull(),
     triggerEvent: text("trigger_event").$type<NotificationTriggerEvent>().notNull(),
     status: text("status").$type<NotificationStatus>().notNull().default("pending"),
     errorMessage: text("error_message"),
@@ -659,11 +874,17 @@ export const rateLimits = sqliteTable("rate_limits", {
 export type TicketRow = typeof tickets.$inferSelect;
 export type ReplyRow = typeof replies.$inferSelect;
 export type TemplateRow = typeof templates.$inferSelect;
+export type TicketTypeRow = typeof ticketTypes.$inferSelect;
+export type TicketTypeRouteRow = typeof ticketTypeRoutes.$inferSelect;
+export type TicketTemplateRow = typeof ticketTemplates.$inferSelect;
+export type TicketTemplateVersionRow = typeof ticketTemplateVersions.$inferSelect;
 export type ProductKeyRow = typeof productKeys.$inferSelect;
 export type CustomerRow = typeof customers.$inferSelect;
 export type CategoryRouteRow = typeof categoryRoutes.$inferSelect;
 
 export type AIConfigRow = typeof aiConfigs.$inferSelect;
+export type AICredentialRow = typeof aiCredentials.$inferSelect;
+export type AITaskCredentialRow = typeof aiTaskCredentials.$inferSelect;
 export type ProductDocumentRow = typeof productDocuments.$inferSelect;
 export type ProductKnowledgeRow = typeof productKnowledge.$inferSelect;
 export type AIChatMessageRow = typeof aiChatMessages.$inferSelect;
@@ -673,6 +894,9 @@ export type EmailConfigRow = typeof emailConfigs.$inferSelect;
 export type EmailTemplateRow = typeof emailTemplates.$inferSelect;
 export type InboundEmailRow = typeof inboundEmails.$inferSelect;
 export type OutboundEmailRow = typeof outboundEmails.$inferSelect;
+export type SpamFilterConfigRow = typeof spamFilterConfigs.$inferSelect;
 
-export type NotificationChannelRow = typeof notificationChannels.$inferSelect;
+export type NotificationEndpointRow = typeof notificationEndpoints.$inferSelect;
+export type NotificationRuleRow = typeof notificationRules.$inferSelect;
+export type NotificationRequirementRow = typeof notificationRequirements.$inferSelect;
 export type NotificationLogRow = typeof notificationLogs.$inferSelect;

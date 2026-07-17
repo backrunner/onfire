@@ -2,7 +2,7 @@
  * AI Service Entry Point
  */
 
-export { getAIConfig, getAIProvider, saveAIConfig, clearConfigCache } from "./config";
+export { getAIConfig, getAIProvider, clearConfigCache } from "./config";
 export { prescreenTicket, batchPrescreenTickets, type PrescreeningResult } from "./prescreening";
 export { generatePrereply, type PrereplyOptions, type PrereplyResult } from "./prereply";
 export { chatWithAgent, getChatHistory, clearChatSession, type AgentChatOptions, type AgentChatResult } from "./agent";

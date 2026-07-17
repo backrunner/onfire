@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq, inArray } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
-import { productIdentityConfigs, products, tenants } from "@/drizzle/schema";
+import { productIdentityConfigs, products, tenants, ticketTypes } from "@/drizzle/schema";
 import { ok, badRequest, notFound } from "@/lib/api/response";
 import { withAuth, parseBody } from "@/lib/api/handler";
 import { productScopeCondition } from "@/lib/api/scope";
@@ -124,12 +124,25 @@ export const POST = withAuth({ permission: "product.manage" }, async (req: NextR
   const statements: [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]] = [
     productInsert,
   ];
+  const now = new Date().toISOString();
+  statements.push(
+    ctx.db.insert(ticketTypes).values({
+      id: crypto.randomUUID(),
+      productId: id,
+      level: 1,
+      name: "Unclassified",
+      description: "System fallback for messages that cannot be classified",
+      sortOrder: -2147483648,
+      systemKey: "unclassified",
+      createdAt: now,
+      updatedAt: now,
+    })
+  );
   if (
     body.identityEnabled !== undefined ||
     body.identityEndpointUrl !== undefined ||
     body.identityAuthSecret !== undefined
   ) {
-    const now = new Date().toISOString();
     statements.push(
       ctx.db.insert(productIdentityConfigs).values({
         productId: id,

@@ -34,6 +34,8 @@ export type TeamID = string;
 export type UserID = string;
 export type TicketID = string;
 export type TemplateID = string;
+export type TicketTypeID = string;
+export type TemplateVersionID = string;
 export type Category = string;
 
 // ============================================
@@ -100,6 +102,22 @@ export interface TicketTemplate {
   formSchema: Record<string, unknown>;
 }
 
+export interface TicketTypePathItem {
+  id: TicketTypeID;
+  name: string;
+}
+
+export interface TicketType {
+  id: TicketTypeID;
+  productId: ProductID;
+  parentId?: TicketTypeID | null;
+  level: 1 | 2 | 3;
+  name: string;
+  description?: string | null;
+  sortOrder: number;
+  archivedAt?: string | null;
+}
+
 export interface Customer {
   id: string;
   tenantId: TenantID;
@@ -132,6 +150,9 @@ export interface Ticket {
   content: string;
   customerEmail: string;
   customerLevel?: number;
+  ticketTypeId: TicketTypeID;
+  templateVersionId?: TemplateVersionID | null;
+  ticketTypePath: TicketTypePathItem[];
   templateId?: TemplateID;
   metadata?: Record<string, unknown>;
   history: TicketTimelineEntry[];
@@ -219,6 +240,11 @@ export type Permission =
   | "ticket.reassign"
   | "template.read"
   | "template.write"
+  | "ticket_type.read"
+  | "ticket_type.write"
+  | "ticket_type.route"
+  | "ticket_template.read"
+  | "ticket_template.write"
   | "team.manage"
   | "product.settings"
   | "product.manage"
@@ -230,6 +256,7 @@ export type Permission =
   | "category.map"
   | "agent.profile"
   | "email.config"
+  | "spam.config"
   | "notification.manage"
   | "ai.config"
   | "ai.knowledge";
@@ -244,6 +271,11 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "ticket.reassign",
     "template.read",
     "template.write",
+    "ticket_type.read",
+    "ticket_type.write",
+    "ticket_type.route",
+    "ticket_template.read",
+    "ticket_template.write",
     "team.manage",
     "product.settings",
     "product.manage",
@@ -255,6 +287,7 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "category.map",
     "agent.profile",
     "email.config",
+    "spam.config",
     "notification.manage",
     "ai.config",
     "ai.knowledge",
@@ -268,6 +301,11 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "ticket.reassign",
     "template.read",
     "template.write",
+    "ticket_type.read",
+    "ticket_type.write",
+    "ticket_type.route",
+    "ticket_template.read",
+    "ticket_template.write",
     "team.manage",
     "product.settings",
     "product.manage",
@@ -278,6 +316,7 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "category.map",
     "agent.profile",
     "email.config",
+    "spam.config",
     "notification.manage",
     "ai.knowledge",
   ],
@@ -290,6 +329,11 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "ticket.reassign",
     "template.read",
     "template.write",
+    "ticket_type.read",
+    "ticket_type.write",
+    "ticket_type.route",
+    "ticket_template.read",
+    "ticket_template.write",
     "team.manage",
     "product.settings",
     "customer.read",
@@ -308,6 +352,8 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "ticket.close",
     "ticket.reassign",
     "customer.read",
+    "ticket_type.read",
+    "ticket_type.route",
     "category.map",
     "agent.profile",
   ],

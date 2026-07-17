@@ -156,6 +156,18 @@
       0 1px 2px rgb(0 0 0 / 0.18),
       0 10px 30px rgb(0 0 0 / 0.12);
   }
+
+  .onfire-monaco-variable {
+    border-radius: 0.1875rem;
+    background: rgb(14 165 233 / 12%);
+    color: #0369a1 !important;
+    font-weight: 600;
+  }
+
+  .dark .onfire-monaco-variable {
+    background: rgb(56 189 248 / 14%);
+    color: #7dd3fc !important;
+  }
 }
 
 @layer base {
