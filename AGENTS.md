@@ -802,11 +802,11 @@ NEXT_PUBLIC_TURNSTILE_SITE_KEY=xxx  # Pair with TURNSTILE_SECRET; leave both uns
 On 2026-07-13, the APAC `onfire-d1` D1 database, APAC Standard
 `onfire-storage` R2 bucket, and 1024-dimension cosine `onfire-knowledge`
 Vectorize index were provisioned in the Alkinum account. The D1 ID is recorded
-in `wrangler.jsonc`, and migrations through `0009_freezing_slayback.sql` have
-been applied remotely. The initial `onfire` Worker release is deployed on both
-Custom Domains with the SLA cron and runtime secrets configured. Remaining
-external rollout steps are Cloudflare Email Sending/routing onboarding,
-Cloudflare Access for ToB, and the first `/admin/install` SuperAdmin setup.
+in `wrangler.jsonc`, and migrations through `0013_big_psynapse.sql` have
+been applied remotely. Worker version `c683cfd6-7d5f-42d9-a161-4f1a587773fe`
+is deployed on both Custom Domains with the SLA cron and runtime secrets configured. Remaining
+external rollout steps are Cloudflare Email Sending/routing onboarding and the
+first `/admin/install` SuperAdmin setup. Cloudflare Access is enforced on ToB.
 
 ---
 
@@ -845,7 +845,7 @@ pnpm deploy
 
 ## Current Predeployment Verification
 
-As of 2026-07-18, generated binding checks, TypeScript, 43 test files / 182 tests, Drizzle consistency, fresh local application of migrations `0000`-`0013`, and a non-empty legacy-data migration regression pass. Production still has migrations only through `0009`; applying `0010_busy_the_hunter.sql` through `0013_big_psynapse.sql` remains an explicit remote operation. The remaining build warnings are expected: Vectorize has no local simulator, and OpenNext 1.20.1 still requires `src/middleware.ts` instead of Next 16 `proxy.ts`.
+As of 2026-07-18, generated binding checks, TypeScript, 43 test files / 182 tests, Drizzle consistency, fresh local application of migrations `0000`-`0013`, and a non-empty legacy-data migration regression pass. Production D1 is migrated through `0013_big_psynapse.sql` with no pending migration or foreign-key violation, and Worker version `c683cfd6-7d5f-42d9-a161-4f1a587773fe` is live on both Custom Domains. The public ToC health probe returns 200, the ToC-to-ToB surface guard returns 404, the ticket-type API returns JSON 401 without customer credentials, and Cloudflare Access returns its expected 302 login redirect for unauthenticated ToB probes. The remaining build warnings are expected: Vectorize has no local simulator, and OpenNext 1.20.1 still requires `src/middleware.ts` instead of Next 16 `proxy.ts`.
 
 ## Contribution Convention
 
