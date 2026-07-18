@@ -96,6 +96,21 @@ export interface TicketDetailResponse {
   timeline: TimelineEntry[];
   /** userId → display name for every user referenced by the timeline. */
   actors?: Record<string, string>;
+  internalStates: TicketInternalStateView[];
+}
+
+export interface TicketInternalStateView {
+  id: string;
+  ticketTypeId: string;
+  name: string;
+  description: string | null;
+  kind: "boolean" | "select";
+  options: string[];
+  sortOrder: number;
+  archivedAt: string | null;
+  value: string | null;
+  updatedAt: string | null;
+  updatedBy: string | null;
 }
 
 export interface MeResponse {

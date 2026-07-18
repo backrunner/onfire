@@ -128,9 +128,11 @@ SuperAdmin
 
 ```
 Tenant
+    ├── TicketTypePreset (up to 3 levels; copied into products)
     ├── Product ←→ Team  [Many-to-Many]
     │       │
     │       └── TicketType (up to 3 levels)
+    │               ├── InternalState (ToB-only boolean/select)
     │               └── TicketTemplate
     │                       └── TemplateVersion (immutable)
     │       └── ProductKey (API Key)
@@ -152,6 +154,8 @@ Tenant
 | ticket_type.read | ✓ | ✓ | ✓ | ✓ | - |
 | ticket_type.write | ✓ | ✓ | ✓ | - | - |
 | ticket_type.route | ✓ | ✓ | ✓ | ✓ | - |
+| ticket_type.preset.read | ✓ | ✓ | ✓ | - | - |
+| ticket_type.preset.write | ✓ | ✓ | - | - | - |
 | ticket_template.read | ✓ | ✓ | ✓ | - | - |
 | ticket_template.write | ✓ | ✓ | ✓ | - | - |
 | team.manage | ✓ | ✓ | ✓ | - | - |
@@ -483,6 +487,7 @@ GET    /tickets           - Ticket list (filters + pagination)
 GET    /tickets/:id       - Ticket details (with timeline)
 POST   /tickets/:id       - Reply to ticket (content, internal)
 POST   /tickets/:id/status    - Update status
+PATCH  /tickets/:id/internal-states - Update a ToB-only internal state value
 POST   /tickets/:id/assign    - Assign/reassign
 POST   /tickets/:id/priority  - Change priority
 POST   /tickets/:id/close     - Close ticket
@@ -498,6 +503,9 @@ GET/POST/PATCH/DELETE /admin/teams        - Team management
 GET/POST/PATCH/DELETE /admin/ticket-types - Ticket type tree management
 GET/POST/DELETE       /admin/ticket-types/:id/template - Versioned form management
 GET/PATCH/DELETE      /admin/ticket-types/:id/team-route - Type routing
+GET/POST/PATCH/DELETE /admin/ticket-type-presets - Tenant preset-tree management
+POST                  /admin/ticket-type-presets/apply - Copy preset subtree into a product
+GET/POST/PATCH/DELETE /admin/ticket-types/:id/internal-states - ToB-only state definitions
 GET/PATCH             /admin/users        - User management
 GET/PATCH             /admin/agents       - Agent management
 GET                   /admin/customers    - Customer query
@@ -663,7 +671,10 @@ const portalUrl =
 | agent_teams | Agent-Team association (many-to-many) |
 | user_products | ProductAdmin-Product scope association (many-to-many) |
 | ticket_types | Product-owned ticket type hierarchy and archive state |
+| ticket_type_presets | Tenant-owned reusable ticket type trees |
 | ticket_type_routes | Optional direct team mappings with ancestor fallback |
+| ticket_type_internal_states | Product type-owned ToB-only state definitions |
+| ticket_internal_state_values | Current per-ticket internal state values |
 | ticket_templates | One soft-deletable form series per ticket type |
 | ticket_template_versions | Immutable form versions and invalidation audit |
 | templates | Read-only legacy ticket templates |
@@ -845,7 +856,7 @@ pnpm deploy
 
 ## Current Predeployment Verification
 
-As of 2026-07-18, generated binding checks, TypeScript, 44 test files / 187 tests, Drizzle consistency, fresh local application of migrations `0000`-`0013`, and a non-empty legacy-data migration regression pass. Production D1 is migrated through `0013_big_psynapse.sql` with no pending migration or foreign-key violation, and Worker version `67bfbd90-50fa-4040-b16e-05c2ea50c81e` is live on both Custom Domains. The public ToC health probe returns 200, the ToC-to-ToB surface guard returns 404, the ticket-type API returns JSON 401 without customer credentials, and Cloudflare Access returns its expected 302 login redirect for unauthenticated ToB probes. The remaining build warnings are expected: Vectorize has no local simulator, and OpenNext 1.20.1 still requires `src/middleware.ts` instead of Next 16 `proxy.ts`.
+As of 2026-07-18, generated binding checks, TypeScript, 45 test files / 193 tests, Drizzle consistency, fresh local application of migrations `0000`-`0014`, non-empty legacy-data migration regression, Worker dry-run, production dependency audit, startup profiling, and desktop/mobile light/dark Playwright checks pass. Production D1 is currently migrated through `0013_big_psynapse.sql`, and Worker version `67bfbd90-50fa-4040-b16e-05c2ea50c81e` remains live on both Custom Domains until the authorized `0014` rollout completes. The public ToC health probe returns 200, the ToC-to-ToB surface guard returns 404, the ticket-type API returns JSON 401 without customer credentials, and Cloudflare Access returns its expected 302 login redirect for unauthenticated ToB probes. The remaining build warnings are expected: Vectorize has no local simulator, and OpenNext 1.20.1 still requires `src/middleware.ts` instead of Next 16 `proxy.ts`.
 
 ## Contribution Convention
 

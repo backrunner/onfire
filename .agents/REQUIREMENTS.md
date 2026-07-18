@@ -28,6 +28,9 @@
 - Tickets pin `ticketTypeId`, optional `templateVersionId`, and the submitted type-path snapshot. Renaming, moving, archiving, or invalidating configuration never changes historical ticket rendering.
 - Types and forms use archive/restore instead of physical deletion. A parent with active children cannot be archived.
 - Resolve assignment from the selected type to its nearest routed ancestor, then the tenant default team. Every product owns a hidden, non-deletable `unclassified` fallback type.
+- Tenant administrators may maintain reusable ticket-type preset trees with the same three-level limit. Product administrators may copy an active preset subtree into an accessible product; copied types have no live preset linkage and evolve independently.
+- Internal operational states belong to one exact product ticket type and support boolean or finite-select controls. They are visible only in ToB, never in ToC form selection or submission metadata.
+- Internal-state definitions archive instead of deleting. Existing ticket values remain readable after archive, archived definitions cannot be changed on tickets, and every value mutation writes an `internal_state_changed` history record.
 
 ## ToB Interaction
 

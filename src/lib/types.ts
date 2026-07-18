@@ -243,6 +243,8 @@ export type Permission =
   | "ticket_type.read"
   | "ticket_type.write"
   | "ticket_type.route"
+  | "ticket_type.preset.read"
+  | "ticket_type.preset.write"
   | "ticket_template.read"
   | "ticket_template.write"
   | "team.manage"
@@ -274,6 +276,8 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "ticket_type.read",
     "ticket_type.write",
     "ticket_type.route",
+    "ticket_type.preset.read",
+    "ticket_type.preset.write",
     "ticket_template.read",
     "ticket_template.write",
     "team.manage",
@@ -304,6 +308,8 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "ticket_type.read",
     "ticket_type.write",
     "ticket_type.route",
+    "ticket_type.preset.read",
+    "ticket_type.preset.write",
     "ticket_template.read",
     "ticket_template.write",
     "team.manage",
@@ -332,6 +338,7 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "ticket_type.read",
     "ticket_type.write",
     "ticket_type.route",
+    "ticket_type.preset.read",
     "ticket_template.read",
     "ticket_template.write",
     "team.manage",

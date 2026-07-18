@@ -17,12 +17,16 @@ import { TicketTypeRouteManagement } from "./_components/ticket-type-route-manag
 import { TicketTemplateVersionManagement } from "./_components/ticket-template-version-management";
 import { SpamFilterManagement } from "./_components/spam-filter-management";
 import { ProductKeyManagement } from "./_components/product-key-management";
+import { TicketTypePresetManagement } from "./_components/ticket-type-preset-management";
+import { TicketInternalStateManagement } from "./_components/ticket-internal-state-management";
 
 type TabKey =
   | "tenants"
   | "products"
   | "teams"
   | "ticketTypes"
+  | "ticketTypePresets"
+  | "internalStates"
   | "templates"
   | "users"
   | "agents"
@@ -41,6 +45,8 @@ const TABS: TabDef[] = [
   { value: "products", permission: "product.settings", render: () => <ProductManagement /> },
   { value: "teams", permission: "team.manage", render: () => <TeamManagement /> },
   { value: "ticketTypes", permission: "ticket_type.write", render: () => <TicketTypeManagement /> },
+  { value: "ticketTypePresets", permission: "ticket_type.preset.read", render: () => <TicketTypePresetManagement /> },
+  { value: "internalStates", permission: "ticket_type.write", render: () => <TicketInternalStateManagement /> },
   { value: "templates", permission: "ticket_template.read", render: () => <TicketTemplateVersionManagement /> },
   { value: "users", permission: "user.manage", render: () => <UserManagement /> },
   { value: "agents", permission: "user.manage", render: () => <AgentManagement /> },

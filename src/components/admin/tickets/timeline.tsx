@@ -128,6 +128,9 @@ interface Snapshot {
   newAssignee?: string;
   newAssigneeLevel?: number;
   reason?: string;
+  stateName?: string;
+  previousValue?: string | null;
+  value?: string | null;
 }
 
 function snapshotDetail(
@@ -165,6 +168,14 @@ function snapshotDetail(
   }
   if (s.reason) {
     parts.push(s.reason);
+  }
+  if (s.stateName) {
+    const display = (value: string | null | undefined) => {
+      if (value === "true") return t.common.yes;
+      if (value === "false") return t.common.no;
+      return value || "—";
+    };
+    parts.push(`${s.stateName}: ${display(s.previousValue)} → ${display(s.value)}`);
   }
   return parts.length > 0 ? parts.join(" · ") : null;
 }

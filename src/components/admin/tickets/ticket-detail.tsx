@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { ArrowLeft, Bot, Clock, ExternalLink, SearchX, Sparkles, User } from "lucide-react";
-import { swrFetcher, ApiClientError } from "@/lib/api/client";
+import { toast } from "sonner";
+import { api, swrFetcher, ApiClientError } from "@/lib/api/client";
 import type { TicketDetailResponse } from "@/lib/api/types";
 import { TicketStatus } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
@@ -12,6 +13,8 @@ import { cn, formatDateTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   StatusBadge,
   PriorityBadge,
@@ -187,6 +190,12 @@ export function TicketDetail({
 
         <AiInsights ticket={ticket} />
 
+        <InternalStateControls
+          ticketId={ticket.id}
+          states={data.internalStates ?? []}
+          onMutated={refresh}
+        />
+
         <TicketActions ticket={ticket} onMutated={refresh} />
       </div>
 
@@ -224,6 +233,80 @@ export function TicketDetail({
         open={assistantOpen}
         onOpenChange={setAssistantOpen}
       />
+    </div>
+  );
+}
+
+function InternalStateControls({
+  ticketId,
+  states,
+  onMutated,
+}: {
+  ticketId: string;
+  states: TicketDetailResponse["internalStates"];
+  onMutated: () => void;
+}) {
+  const unsetValue = "__onfire_internal_state_unset__";
+  const { t } = useI18n();
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  if (states.length === 0) return null;
+  const update = async (stateId: string, value: boolean | string | null) => {
+    setPendingId(stateId);
+    try {
+      await api.patch(`/api/tob/tickets/${ticketId}/internal-states`, { stateId, value });
+      toast.success(t.tickets.detail.internalStateSaved);
+      onMutated();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t.tickets.detail.internalStateFailed);
+    } finally {
+      setPendingId(null);
+    }
+  };
+  return (
+    <div className="border-y border-border/70 py-2.5">
+      <p className="mb-2 text-[11px] font-medium text-muted-foreground">
+        {t.tickets.detail.internalStates}
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {states.map((state) => {
+          const disabled = Boolean(state.archivedAt) || pendingId === state.id;
+          return (
+            <div key={state.id} className="flex min-h-9 items-center justify-between gap-3 rounded-md bg-muted/50 px-3 py-1.5">
+              <div className="min-w-0">
+                <p className="truncate text-xs font-medium" title={state.name}>{state.name}</p>
+                {state.archivedAt && <p className="text-[10px] text-muted-foreground">{t.tickets.detail.internalStateArchived}</p>}
+              </div>
+              {state.kind === "boolean" ? (
+                <Switch
+                  checked={state.value === "true"}
+                  disabled={disabled}
+                  aria-label={state.name}
+                  onCheckedChange={(checked) => void update(state.id, checked)}
+                />
+              ) : (
+                <Select
+                  value={state.value === null ? unsetValue : `value:${encodeURIComponent(state.value)}`}
+                  disabled={disabled}
+                  onValueChange={(value) => void update(
+                    state.id,
+                    value === unsetValue ? null : decodeURIComponent(value.slice("value:".length))
+                  )}
+                >
+                  <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={unsetValue}>{t.tickets.detail.internalStateUnset}</SelectItem>
+                    {state.options.map((option) => (
+                      <SelectItem key={option} value={`value:${encodeURIComponent(option)}`}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

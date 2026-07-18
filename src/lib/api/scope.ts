@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import {
   productTeams,
   products,
+  tenants,
   teams,
   tickets,
   type TicketRow,
@@ -97,6 +98,20 @@ export async function assertProductAccess(
     throw notFound("Product not found");
   }
   return product;
+}
+
+/** Assert visibility of a tenant-owned configuration record. */
+export async function assertTenantAccess(
+  ctx: AuthedContext,
+  tenantId: string
+): Promise<typeof tenants.$inferSelect> {
+  const tenant = await ctx.db.query.tenants.findFirst({
+    where: eq(tenants.id, tenantId),
+  });
+  if (!tenant || (!ctx.isSuperAdmin && !ctx.tenantIds.includes(tenant.id))) {
+    throw notFound("Tenant not found");
+  }
+  return tenant;
 }
 
 /** SQL condition for listing products within the current role's scope. */

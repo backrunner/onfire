@@ -5,6 +5,8 @@ Updated: 2026-07-18
 ## Current State
 
 - Ticket classification is now product-owned and type-first. Products contain a maximum three-level ticket type tree; any configured node can be submitted, and type routes inherit from the nearest ancestor before falling back to the tenant default team.
+- Tenant administrators can maintain reusable three-level ticket-type preset trees. Product administrators copy an active preset subtree into a scoped product, after which the product tree is fully independent from the tenant preset.
+- Product ticket types can define ToB-only boolean and select internal states. Agents update them inline on ticket details; values are audited in ticket history, while archived definitions retain historical values in read-only form.
 - Each ticket type owns one immediately active, immutable form-version series. Saving creates `N+1`, prior versions remain submit-capable until explicitly invalidated, rollback copies old content into a new version, and archive/restore never removes history.
 - Tickets pin the selected type, exact form version, and submission-time type path. ToB details render historical custom fields with the pinned schema, while ToC exposes an expandable type tree and hides template selection.
 - Every product has a protected hidden `unclassified` type for AI failure. Legacy template/category rows remain read-only and are backfilled into archived historical form versions.
@@ -56,28 +58,29 @@ Updated: 2026-07-18
 - `0011_easy_the_leader.sql`: user notification endpoints, product delivery rules and requirements, and recipient-oriented delivery logs.
 - `0012_normal_old_lace.sql`: distinguish mandatory requirement deliveries from ordinary rule deliveries in notification logs.
 - `0013_big_psynapse.sql`: product ticket-type trees, inherited routes, immutable form versions, historical snapshots, external spam configuration, and recoverable inbound quarantine.
+- `0014_thick_edwin_jarvis.sql`: tenant ticket-type preset trees, product ticket-type internal-state definitions, and audited per-ticket internal-state values.
 
-A fresh local D1 successfully applied migrations `0000` through `0013`. A separate non-empty legacy fixture also verifies unique migrated type keys, invalid legacy metadata tolerance, pinned version backfill, and historical path snapshots. Production D1 also has migrations `0000` through `0013` applied.
+A fresh local D1 successfully applied migrations `0000` through `0014`. A separate non-empty legacy fixture also verifies unique migrated type keys, invalid legacy metadata tolerance, pinned version backfill, and historical path snapshots. Production D1 currently has migrations `0000` through `0013` applied; `0014` is staged for the authorized rollout.
 
 ## Verification
 
 - `pnpm lint`: passing.
-- `pnpm test`: 44 files, 187 tests passing, including admin navigation normalization, outbound and inbound email thread recovery, stale subject-marker precedence, ticket type paths and inherited routing, immutable form versions, non-empty legacy migration, archived-template recovery, concurrent and closed-thread quarantine release, customer projection privacy, unclassified fallback, external spam protocol safety, notification membership and delivery, redirect rejection, AI failover, proxy isolation, resolver limits, SLA state transitions, and RBAC scope.
+- `pnpm test`: 45 files, 193 tests passing, including tenant preset scope/depth/cycle/copy independence, internal-state validation/archive/history audit, admin navigation normalization, outbound and inbound email thread recovery, stale subject-marker precedence, ticket type paths and inherited routing, immutable form versions, non-empty legacy migration, archived-template recovery, concurrent and closed-thread quarantine release, customer projection privacy, unclassified fallback, external spam protocol safety, notification membership and delivery, redirect rejection, AI failover, proxy isolation, resolver limits, SLA state transitions, and RBAC scope.
 - `pnpm build:worker`: passing with OpenNext Cloudflare 1.20.1, Next 16.2.10, Wrangler 4.110.0, and Wrangler-generated workerd runtime types.
 - `pnpm cf-typegen --check`: passing with generated `CloudflareEnv`; `wrangler.types.env` keeps secret typing deterministic without storing values.
 - `pnpm exec drizzle-kit check`: passing.
 - `pnpm install --frozen-lockfile`: passing on the tracked pnpm lockfile.
 - `pnpm audit --prod`: no known vulnerabilities after scoped esbuild/PostCSS overrides in `pnpm-workspace.yaml`.
 - `wrangler deploy --dry-run`: passing with all D1, R2, Vectorize, Email, service, and asset bindings detected.
-- `wrangler check startup`: passing; final local CPU profile span was approximately 325 ms (the generated profile was removed after inspection).
+- `wrangler check startup`: passing; final local CPU profile span was approximately 824 ms (the generated profile was removed after inspection).
 - Wrangler local workerd smoke: admin-domain rewrite returns 200, ToC `/admin` access redirects with 307, and API bypass returns 200.
-- Playwright desktop/mobile visual regression: passed in light and dark at 1440x900 and 390x844 for product ticket-type trees, parent/child ToC selection, form-version history, the responsive form editor, type routing, external spam settings, notification summaries, fixed-footer policy dialogs, inline validation, metadata/endpoint errors, batched compliance details, personal endpoint rows, and endpoint testing.
+- Playwright desktop/mobile visual regression: passed in light and dark at 1440x900 and 390x844 for tenant preset dialogs, responsive internal-state management, live ticket state updates and history rendering, product ticket-type trees, parent/child ToC selection, form-version history, the responsive form editor, type routing, external spam settings, notification summaries, fixed-footer policy dialogs, inline validation, metadata/endpoint errors, batched compliance details, personal endpoint rows, and endpoint testing.
 - Local Wrangler reverse-proxy smoke: `/support` HTML and prefixed CSS/JS load successfully; ToB paths below `/support` return 404; cross-origin preflight receives no CORS allow headers; the portal has no browser console errors.
 
 ## Deployment Prerequisites
 
 - Target Cloudflare account is `Alkinum` (`b6754402d59fc29ee8b62119014fec89`). On 2026-07-13, the APAC `onfire-d1` D1 database (`3f3294ab-8c05-4935-93c0-677ee18641dd`), APAC Standard `onfire-storage` R2 bucket, and 1024-dimension cosine `onfire-knowledge` Vectorize index were created.
-- `wrangler.jsonc` contains the production D1 ID. Migrations `0000` through `0013` are applied remotely, Wrangler reports no pending migration, the new tables are queryable, and `PRAGMA foreign_key_check` returns no violations.
+- `wrangler.jsonc` contains the production D1 ID. Migrations `0000` through `0013` are applied remotely; `0014` is pending the authorized rollout. Existing production tables are queryable and `PRAGMA foreign_key_check` returns no violations.
 - `wrangler deploy --dry-run` resolves all DB, R2, Vectorize, Email, service, and asset bindings against the production configuration.
 - Vectorize has no local simulator. Use a selected Cloudflare account and temporary remote binding only when remote development is intended; do not commit an account ID.
 - Enable Cloudflare Email Sending for the sender domain and route inbound email to the Worker. The current Wrangler OAuth token lacks `email_sending:write` and `email_routing:write`, so this remains pending a refreshed login.

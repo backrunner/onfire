@@ -1,7 +1,14 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { tickets, replies, history, ticketTemplateVersions } from "@/drizzle/schema";
+import {
+  tickets,
+  replies,
+  history,
+  ticketTemplateVersions,
+  ticketTypeInternalStates,
+  ticketInternalStateValues,
+} from "@/drizzle/schema";
 import { TicketStatus } from "@/lib/types";
 import { ok, notFound, badRequest } from "@/lib/api/response";
 import { withAuth, parseBody } from "@/lib/api/handler";
@@ -11,6 +18,7 @@ import { resolveUserNames, resolveCustomerExternalIds } from "@/lib/tickets/name
 import { isOpen } from "@/lib/tickets/state-machine";
 import { emitTicketEvent } from "@/services/ticket-events";
 import { parseFormSchema } from "@/lib/form-schema";
+import { serializeState } from "@/services/ticket-internal-states";
 
 const replySchema = z.object({
   content: z.string().min(1).max(20_000),
@@ -24,7 +32,7 @@ export const GET = withAuth({ permission: "ticket.read" }, async (_req: NextRequ
   if (!ticket) throw notFound("Ticket not found");
   assertTicketVisible(ctx, ticket);
 
-  const [replyRows, historyRows, templateVersion] = await Promise.all([
+  const [replyRows, historyRows, templateVersion, internalStateRows, internalStateValues] = await Promise.all([
     ctx.db
       .select()
       .from(replies)
@@ -40,7 +48,26 @@ export const GET = withAuth({ permission: "ticket.read" }, async (_req: NextRequ
           where: eq(ticketTemplateVersions.id, ticket.templateVersionId),
         })
       : undefined,
+    ctx.db
+      .select()
+      .from(ticketTypeInternalStates)
+      .where(eq(ticketTypeInternalStates.ticketTypeId, ticket.ticketTypeId))
+      .orderBy(ticketTypeInternalStates.sortOrder, ticketTypeInternalStates.name),
+    ctx.db
+      .select()
+      .from(ticketInternalStateValues)
+      .where(eq(ticketInternalStateValues.ticketId, ticket.id)),
   ]);
+
+  const valuesByState = new Map(internalStateValues.map((row) => [row.stateId, row]));
+  const internalStates = internalStateRows
+    .filter((state) => !state.archivedAt || valuesByState.has(state.id))
+    .map((state) => ({
+      ...serializeState(state),
+      value: valuesByState.get(state.id)?.value ?? null,
+      updatedAt: valuesByState.get(state.id)?.updatedAt ?? null,
+      updatedBy: valuesByState.get(state.id)?.updatedBy ?? null,
+    }));
 
   const serializedHistory = serializeHistory(historyRows);
 
@@ -100,6 +127,7 @@ export const GET = withAuth({ permission: "ticket.read" }, async (_req: NextRequ
     history: namedHistory,
     timeline,
     actors,
+    internalStates,
   });
 });
 

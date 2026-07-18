@@ -242,6 +242,53 @@ export const ticketTypes = sqliteTable(
   ]
 );
 
+export type TicketInternalStateKind = "boolean" | "select";
+
+/** Tenant-owned reusable ticket-type trees. Applying a preset copies its subtree. */
+export const ticketTypePresets = sqliteTable(
+  "ticket_type_presets",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    parentId: text("parent_id"),
+    level: integer("level").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    archivedAt: text("archived_at"),
+    archivedBy: text("archived_by"),
+    createdBy: text("created_by"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    index("ticket_type_presets_tenant_parent_idx").on(t.tenantId, t.parentId),
+  ]
+);
+
+/** Product-owned internal state definitions for one exact ticket type. */
+export const ticketTypeInternalStates = sqliteTable(
+  "ticket_type_internal_states",
+  {
+    id: text("id").primaryKey(),
+    ticketTypeId: text("ticket_type_id").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    kind: text("kind").$type<TicketInternalStateKind>().notNull(),
+    options: text("options"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    archivedAt: text("archived_at"),
+    archivedBy: text("archived_by"),
+    createdBy: text("created_by"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    index("ticket_type_internal_states_type_idx").on(t.ticketTypeId),
+    uniqueIndex("ticket_type_internal_states_name_uq").on(t.ticketTypeId, t.name),
+  ]
+);
+
 /** Optional team mapping; resolution walks from the selected type to its ancestors. */
 export const ticketTypeRoutes = sqliteTable("ticket_type_routes", {
   ticketTypeId: text("ticket_type_id").primaryKey(),
@@ -380,6 +427,22 @@ export const tickets = sqliteTable(
     index("tickets_customer_idx").on(t.customerEmail, t.productId),
     index("tickets_customer_id_idx").on(t.customerId),
     index("tickets_updated_idx").on(t.updatedAt),
+  ]
+);
+
+/** Current internal-state values; every mutation also writes ticket history. */
+export const ticketInternalStateValues = sqliteTable(
+  "ticket_internal_state_values",
+  {
+    ticketId: text("ticket_id").notNull(),
+    stateId: text("state_id").notNull(),
+    value: text("value").notNull(),
+    updatedBy: text("updated_by"),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.ticketId, t.stateId] }),
+    index("ticket_internal_state_values_state_idx").on(t.stateId),
   ]
 );
 
@@ -875,6 +938,9 @@ export type TicketRow = typeof tickets.$inferSelect;
 export type ReplyRow = typeof replies.$inferSelect;
 export type TemplateRow = typeof templates.$inferSelect;
 export type TicketTypeRow = typeof ticketTypes.$inferSelect;
+export type TicketTypePresetRow = typeof ticketTypePresets.$inferSelect;
+export type TicketTypeInternalStateRow = typeof ticketTypeInternalStates.$inferSelect;
+export type TicketInternalStateValueRow = typeof ticketInternalStateValues.$inferSelect;
 export type TicketTypeRouteRow = typeof ticketTypeRoutes.$inferSelect;
 export type TicketTemplateRow = typeof ticketTemplates.$inferSelect;
 export type TicketTemplateVersionRow = typeof ticketTemplateVersions.$inferSelect;

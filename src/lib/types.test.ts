@@ -72,4 +72,12 @@ describe("RBAC permission matrix", () => {
     expect(hasPermission(Role.ProductAdmin, "ai.knowledge")).toBe(true);
     expect(hasPermission(Role.TeamAdmin, "ai.knowledge")).toBe(false);
   });
+
+  it("tenant admins maintain type presets while product admins can only apply them", () => {
+    expect(hasPermission(Role.SuperAdmin, "ticket_type.preset.write")).toBe(true);
+    expect(hasPermission(Role.TenantAdmin, "ticket_type.preset.write")).toBe(true);
+    expect(hasPermission(Role.ProductAdmin, "ticket_type.preset.write")).toBe(false);
+    expect(hasPermission(Role.ProductAdmin, "ticket_type.preset.read")).toBe(true);
+    expect(hasPermission(Role.TeamAdmin, "ticket_type.preset.read")).toBe(false);
+  });
 });
