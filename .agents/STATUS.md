@@ -9,6 +9,7 @@ Updated: 2026-07-18
 - Tickets pin the selected type, exact form version, and submission-time type path. ToB details render historical custom fields with the pinned schema, while ToC exposes an expandable type tree and hides template selection.
 - Every product has a protected hidden `unclassified` type for AI failure. Legacy template/category rows remain read-only and are backfilled into archived historical form versions.
 - Inbound email now applies local deterministic spam checks, an optional tenant-over-global HTTPS classifier, and one AI prescreening call for support judgment, type selection, and insights. Filtered messages enter an audited quarantine that administrators can release.
+- Inbound replies resolve RFC `In-Reply-To` and `References` values against both sent outbound mail and processed inbound mail, prefer verified thread headers over stale subject markers, and append only after product and customer-email validation.
 
 - Notifications now separate user-owned receiving endpoints from product-owned delivery policy. Product rules select events, recipient scopes, and channel types; mandatory requirements both drive delivery and report missing endpoint compliance.
 - Personal endpoints support email, PushDeer, Bark, ntfy, Telegram, Discord, Slack, Microsoft Teams, Feishu, DingTalk, and WeCom through a centralized provider registry. Secrets are sealed and omitted from browser responses.
@@ -36,6 +37,7 @@ Updated: 2026-07-18
 - AI provider credentials are managed in a reusable credential pool. Each AI function has an ordered credential/model route; provider failures automatically fall through to the next available credential and temporarily cool down failed credentials when a fallback exists.
 - Embeddings use a fixed 1024-dimension contract and product-scoped Cloudflare Vectorize namespaces. Knowledge mutations synchronize vectors and AI workflows use semantic retrieval with a D1 fallback.
 - ToB management lists use compact equal-height panels, stable empty states, explicit empty product selectors, and edit flows for all mutable entities, including API key names.
+- The admin sidebar normalizes the management-domain root and trailing slashes so Dashboard is selected immediately on `/`, `/admin`, and `/admin/`, while nested navigation remains boundary-safe.
 - Inbound normalization keeps a non-blank HTML body when the plain-text field is blank. Provider adapters fail fast on empty AI completions instead of persisting unusable answers.
 - Customer records may be identified by `externalId` without an email; ToB labels, ticket lists, and search use the external identity without rendering or linking `null`.
 - SLA deadlines follow ticket state: unassigned tickets do not start reply SLA, assignment/escalation starts or resets it, public agent replies clear it, and dashboards only count deadlines valid for the current state.
@@ -60,7 +62,7 @@ A fresh local D1 successfully applied migrations `0000` through `0013`. A separa
 ## Verification
 
 - `pnpm lint`: passing.
-- `pnpm test`: 43 files, 182 tests passing, including ticket type paths and inherited routing, immutable form versions, non-empty legacy migration, archived-template recovery, concurrent and closed-thread quarantine release, customer projection privacy, unclassified fallback, external spam protocol safety, notification membership and delivery, redirect rejection, AI failover, proxy isolation, resolver limits, SLA state transitions, and RBAC scope.
+- `pnpm test`: 44 files, 187 tests passing, including admin navigation normalization, outbound and inbound email thread recovery, stale subject-marker precedence, ticket type paths and inherited routing, immutable form versions, non-empty legacy migration, archived-template recovery, concurrent and closed-thread quarantine release, customer projection privacy, unclassified fallback, external spam protocol safety, notification membership and delivery, redirect rejection, AI failover, proxy isolation, resolver limits, SLA state transitions, and RBAC scope.
 - `pnpm build:worker`: passing with OpenNext Cloudflare 1.20.1, Next 16.2.10, Wrangler 4.110.0, and Wrangler-generated workerd runtime types.
 - `pnpm cf-typegen --check`: passing with generated `CloudflareEnv`; `wrangler.types.env` keeps secret typing deterministic without storing values.
 - `pnpm exec drizzle-kit check`: passing.

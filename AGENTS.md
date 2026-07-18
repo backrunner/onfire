@@ -845,7 +845,7 @@ pnpm deploy
 
 ## Current Predeployment Verification
 
-As of 2026-07-18, generated binding checks, TypeScript, 43 test files / 182 tests, Drizzle consistency, fresh local application of migrations `0000`-`0013`, and a non-empty legacy-data migration regression pass. Production D1 is migrated through `0013_big_psynapse.sql` with no pending migration or foreign-key violation, and Worker version `c683cfd6-7d5f-42d9-a161-4f1a587773fe` is live on both Custom Domains. The public ToC health probe returns 200, the ToC-to-ToB surface guard returns 404, the ticket-type API returns JSON 401 without customer credentials, and Cloudflare Access returns its expected 302 login redirect for unauthenticated ToB probes. The remaining build warnings are expected: Vectorize has no local simulator, and OpenNext 1.20.1 still requires `src/middleware.ts` instead of Next 16 `proxy.ts`.
+As of 2026-07-18, generated binding checks, TypeScript, 44 test files / 187 tests, Drizzle consistency, fresh local application of migrations `0000`-`0013`, and a non-empty legacy-data migration regression pass. Production D1 is migrated through `0013_big_psynapse.sql` with no pending migration or foreign-key violation, and Worker version `c683cfd6-7d5f-42d9-a161-4f1a587773fe` is live on both Custom Domains. The public ToC health probe returns 200, the ToC-to-ToB surface guard returns 404, the ticket-type API returns JSON 401 without customer credentials, and Cloudflare Access returns its expected 302 login redirect for unauthenticated ToB probes. The remaining build warnings are expected: Vectorize has no local simulator, and OpenNext 1.20.1 still requires `src/middleware.ts` instead of Next 16 `proxy.ts`.
 
 ## Contribution Convention
 

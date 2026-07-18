@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { useMe } from "@/lib/hooks/use-me";
 import type { Permission } from "@/lib/types";
+import { isAdminNavItemActive } from "./admin-navigation";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -90,7 +91,7 @@ export function AdminSidebar({
   const { can, isLoading } = useMe();
 
   const isActive = (item: NavItem) =>
-    item.exact ? pathname === item.href : pathname.startsWith(item.href);
+    isAdminNavItemActive(pathname, item.href, item.exact);
 
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,

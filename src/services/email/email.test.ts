@@ -18,7 +18,7 @@ describe("email content and threading", () => {
   it("normalizes message-id forms used by different providers", () => {
     expect(
       extractThreadMessageIds(
-        "<reply@example.com>",
+        "<reply@example.com> (provider comment)",
         "<first@example.com> <second@example.com>"
       )
     ).toEqual(

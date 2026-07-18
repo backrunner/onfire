@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { Database } from "@/lib/db";
 import {
@@ -125,27 +125,70 @@ async function quarantine(
 async function resolveReplyTicketId(
   db: Database,
   productId: string,
+  fromEmail: string,
   subject: string,
   inReplyTo?: string | null,
   references?: string | null
 ): Promise<string | null> {
-  const marker = subject.match(/\[Ticket #([a-zA-Z0-9-]+)\]/)?.[1];
-  if (marker) return marker;
   const threadIds = extractThreadMessageIds(inReplyTo ?? undefined, references ?? undefined);
-  if (threadIds.length === 0) return null;
-  const sent = await db
-    .select({ ticketId: outboundEmails.ticketId })
-    .from(outboundEmails)
+  const threadMatches: Array<{ ticketId: string | null; createdAt: string }> = [];
+  if (threadIds.length > 0) {
+    const sent = await db
+      .select({
+        ticketId: outboundEmails.ticketId,
+        createdAt: outboundEmails.createdAt,
+      })
+      .from(outboundEmails)
+      .where(
+        and(
+          eq(outboundEmails.productId, productId),
+          eq(outboundEmails.status, "sent"),
+          isNotNull(outboundEmails.ticketId),
+          inArray(outboundEmails.providerMessageId, threadIds)
+        )
+      )
+      .orderBy(desc(outboundEmails.createdAt))
+      .limit(10);
+    const received = await db
+      .select({
+        ticketId: inboundEmails.ticketId,
+        createdAt: inboundEmails.createdAt,
+      })
+      .from(inboundEmails)
+      .where(
+        and(
+          eq(inboundEmails.productId, productId),
+          eq(inboundEmails.processingStatus, "processed"),
+          isNotNull(inboundEmails.ticketId),
+          inArray(inboundEmails.messageId, threadIds)
+        )
+      )
+      .orderBy(desc(inboundEmails.createdAt))
+      .limit(10);
+    threadMatches.push(...sent, ...received);
+  }
+
+  const candidateIds = threadMatches
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    .map((match) => match.ticketId)
+    .filter((id): id is string => Boolean(id));
+  const marker = subject.match(/\[Ticket\s+#([a-zA-Z0-9-]+)\]/i)?.[1];
+  if (marker) candidateIds.push(marker);
+  const uniqueIds = [...new Set(candidateIds)];
+  if (uniqueIds.length === 0) return null;
+
+  const matchingTickets = await db
+    .select({ id: tickets.id })
+    .from(tickets)
     .where(
       and(
-        eq(outboundEmails.productId, productId),
-        eq(outboundEmails.status, "sent"),
-        inArray(outboundEmails.providerMessageId, threadIds)
+        eq(tickets.productId, productId),
+        inArray(tickets.id, uniqueIds),
+        sql`lower(${tickets.customerEmail}) = ${fromEmail.toLowerCase()}`
       )
-    )
-    .orderBy(desc(outboundEmails.createdAt))
-    .limit(1);
-  return sent[0]?.ticketId ?? null;
+    );
+  const validIds = new Set(matchingTickets.map((ticket) => ticket.id));
+  return uniqueIds.find((id) => validIds.has(id)) ?? null;
 }
 
 async function addEmailReply(
@@ -477,6 +520,7 @@ export async function processInboundEmail(
     const replyTicketId = await resolveReplyTicketId(
       db,
       config.productId,
+      normalizedFrom,
       normalizedSubject,
       payload.inReplyTo,
       payload.references
@@ -590,7 +634,14 @@ export async function releaseQuarantinedEmail(
   const context = await loadStoredContext(db, row);
   const release = { actorId: input.actorId, reason: input.reason };
   const candidateTicketId = row.candidateTicketId ??
-    (await resolveReplyTicketId(db, row.productId, row.subject ?? "", row.inReplyTo, row.references));
+    (await resolveReplyTicketId(
+      db,
+      row.productId,
+      row.fromEmail,
+      row.subject ?? "",
+      row.inReplyTo,
+      row.references
+    ));
   const claimed = await db
     .update(inboundEmails)
     .set({ processingStatus: "releasing", errorMessage: null })
@@ -666,14 +717,24 @@ export function extractThreadMessageIds(
   inReplyTo?: string,
   references?: string
 ): string[] {
-  const values = [inReplyTo, ...(references?.match(/<[^>]+>/g) ?? [])].filter(
-    (value): value is string => Boolean(value?.trim())
-  );
+  const extract = (header?: string): string[] => {
+    const trimmed = header?.trim();
+    if (!trimmed) return [];
+    const bracketed = trimmed.match(/<[^<>\r\n]{1,998}>/g);
+    if (bracketed?.length) return bracketed;
+    return trimmed.length <= 998 && !/[<>\s\r\n]/.test(trimmed)
+      ? [trimmed]
+      : [];
+  };
+  const values = [
+    ...extract(inReplyTo),
+    ...extract(references).slice(-49),
+  ].slice(0, 50);
   const variants = new Set<string>();
   for (const value of values) {
     const trimmed = value.trim();
     const bare = trimmed.replace(/^</, "").replace(/>$/, "");
-    variants.add(trimmed);
+    if (!bare || bare.length > 998 || /[<>\s\r\n]/.test(bare)) continue;
     variants.add(bare);
     variants.add(`<${bare}>`);
   }
