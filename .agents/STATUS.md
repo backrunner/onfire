@@ -29,7 +29,7 @@ Updated: 2026-07-18
 - Worker edge routing now rejects `/api/tob/*` on ToC/unknown hosts and `/api/toc/*` on ToB hosts; domain-level Zero Trust policies can therefore be applied without leaving the opposite API surface public.
 - Current deployment target is one OpenNext Worker attached to `onfire.alkinum.com` (ToB) and `support.alkinum.io` (ToC) as Custom Domains. Two physically independent Workers are intentionally not enabled yet; they require separate Wrangler environments/build entries and single-owner coordination for cron/email.
 - The fallback `workers.dev` hostname is disabled in production; traffic enters through the two configured Custom Domains only.
-- Worker version `67bfbd90-50fa-4040-b16e-05c2ea50c81e` is deployed with both Custom Domains, the `*/5 * * * *` SLA cron, and all configured D1/R2/Vectorize/Email/service bindings. The public ToC health endpoint returns 200, the ToC-to-ToB cross-surface probe returns 404, unauthenticated ticket-type requests return JSON 401, and Cloudflare Access intercepts unauthenticated ToB probes with its expected 302 login redirect.
+- Worker version `713f38cb-188f-40fb-88c6-3815f56cc294` is deployed at 100% traffic with both Custom Domains, the `*/5 * * * *` SLA cron, and all configured D1/R2/Vectorize/Email/service bindings. Deployment reported 29 ms startup time. The public ToC health endpoint returns 200, the ToC-to-ToB cross-surface probe returns 404, unauthenticated ticket-type requests return JSON 401, and Cloudflare Access intercepts unauthenticated ToB probes with its expected 302 login redirect.
 - Production `AUTH_SECRET` and `TURNSTILE_SECRET` are set as Worker secrets. The database remains intentionally uninitialized at the application level (`needsInstall: true`) until the first SuperAdmin completes `/admin/install`.
 - RBAC combines role permissions with tenant, product, and team scope. ProductAdmin scope comes from `user_products`; support-agent membership remains separate.
 - Product lifecycle and product settings are separate permissions. ProductAdmin can update scoped SLA, auto-close, and team associations without creating or deleting products.
@@ -60,7 +60,7 @@ Updated: 2026-07-18
 - `0013_big_psynapse.sql`: product ticket-type trees, inherited routes, immutable form versions, historical snapshots, external spam configuration, and recoverable inbound quarantine.
 - `0014_thick_edwin_jarvis.sql`: tenant ticket-type preset trees, product ticket-type internal-state definitions, and audited per-ticket internal-state values.
 
-A fresh local D1 successfully applied migrations `0000` through `0014`. A separate non-empty legacy fixture also verifies unique migrated type keys, invalid legacy metadata tolerance, pinned version backfill, and historical path snapshots. Production D1 currently has migrations `0000` through `0013` applied; `0014` is staged for the authorized rollout.
+A fresh local D1 successfully applied migrations `0000` through `0014`. A separate non-empty legacy fixture also verifies unique migrated type keys, invalid legacy metadata tolerance, pinned version backfill, and historical path snapshots. Production D1 also has migrations `0000` through `0014` applied.
 
 ## Verification
 
@@ -80,7 +80,7 @@ A fresh local D1 successfully applied migrations `0000` through `0014`. A separa
 ## Deployment Prerequisites
 
 - Target Cloudflare account is `Alkinum` (`b6754402d59fc29ee8b62119014fec89`). On 2026-07-13, the APAC `onfire-d1` D1 database (`3f3294ab-8c05-4935-93c0-677ee18641dd`), APAC Standard `onfire-storage` R2 bucket, and 1024-dimension cosine `onfire-knowledge` Vectorize index were created.
-- `wrangler.jsonc` contains the production D1 ID. Migrations `0000` through `0013` are applied remotely; `0014` is pending the authorized rollout. Existing production tables are queryable and `PRAGMA foreign_key_check` returns no violations.
+- `wrangler.jsonc` contains the production D1 ID. Migrations `0000` through `0014` are applied remotely, Wrangler reports no pending migration, the new preset/internal-state tables are queryable, and `PRAGMA foreign_key_check` returns no violations.
 - `wrangler deploy --dry-run` resolves all DB, R2, Vectorize, Email, service, and asset bindings against the production configuration.
 - Vectorize has no local simulator. Use a selected Cloudflare account and temporary remote binding only when remote development is intended; do not commit an account ID.
 - Enable Cloudflare Email Sending for the sender domain and route inbound email to the Worker. The current Wrangler OAuth token lacks `email_sending:write` and `email_routing:write`, so this remains pending a refreshed login.
