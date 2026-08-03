@@ -1,6 +1,6 @@
 # OnFire Project Status
 
-Updated: 2026-07-18
+Updated: 2026-08-03
 
 ## Current State
 
@@ -66,13 +66,13 @@ A fresh local D1 successfully applied migrations `0000` through `0014`. A separa
 
 - `pnpm lint`: passing.
 - `pnpm test`: 45 files, 193 tests passing, including tenant preset scope/depth/cycle/copy independence, internal-state validation/archive/history audit, admin navigation normalization, outbound and inbound email thread recovery, stale subject-marker precedence, ticket type paths and inherited routing, immutable form versions, non-empty legacy migration, archived-template recovery, concurrent and closed-thread quarantine release, customer projection privacy, unclassified fallback, external spam protocol safety, notification membership and delivery, redirect rejection, AI failover, proxy isolation, resolver limits, SLA state transitions, and RBAC scope.
-- `pnpm build:worker`: passing with OpenNext Cloudflare 1.20.1, Next 16.2.10, Wrangler 4.110.0, and Wrangler-generated workerd runtime types.
+- `pnpm build:worker`: passing with OpenNext Cloudflare 1.20.2, Next 16.2.12, Wrangler 4.118.0, and Wrangler-generated workerd runtime types.
 - `pnpm cf-typegen --check`: passing with generated `CloudflareEnv`; `wrangler.types.env` keeps secret typing deterministic without storing values.
 - `pnpm exec drizzle-kit check`: passing.
 - `pnpm install --frozen-lockfile`: passing on the tracked pnpm lockfile.
-- `pnpm audit --prod`: no known vulnerabilities after scoped esbuild/PostCSS overrides in `pnpm-workspace.yaml`.
+- `pnpm audit --prod`: no known vulnerabilities after scoped esbuild/PostCSS/Sharp overrides in `pnpm-workspace.yaml`.
 - `wrangler deploy --dry-run`: passing with all D1, R2, Vectorize, Email, service, and asset bindings detected.
-- `wrangler check startup`: passing; final local CPU profile span was approximately 824 ms (the generated profile was removed after inspection).
+- `wrangler check startup`: passing; final local profile window was approximately 241 ms with 19 ms active CPU time (the generated profile was removed after inspection).
 - Wrangler local workerd smoke: admin-domain rewrite returns 200, ToC `/admin` access redirects with 307, and API bypass returns 200.
 - Playwright desktop/mobile visual regression: passed in light and dark at 1440x900 and 390x844 for tenant preset dialogs, responsive internal-state management, live ticket state updates and history rendering, product ticket-type trees, parent/child ToC selection, form-version history, the responsive form editor, type routing, external spam settings, notification summaries, fixed-footer policy dialogs, inline validation, metadata/endpoint errors, batched compliance details, personal endpoint rows, and endpoint testing.
 - Local Wrangler reverse-proxy smoke: `/support` HTML and prefixed CSS/JS load successfully; ToB paths below `/support` return 404; cross-origin preflight receives no CORS allow headers; the portal has no browser console errors.

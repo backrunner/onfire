@@ -24,7 +24,7 @@ if (typeof window !== "undefined") {
       if (label === "html" || label === "handlebars" || label === "razor") {
         return new Worker(
           new URL(
-            "monaco-editor/esm/vs/language/html/html.worker.js",
+            "monaco-editor/language/html/html.worker.js",
             import.meta.url
           ),
           { type: "module" }
@@ -32,7 +32,7 @@ if (typeof window !== "undefined") {
       }
       return new Worker(
         new URL(
-          "monaco-editor/esm/vs/editor/editor.worker.js",
+          "monaco-editor/editor/editor.worker.js",
           import.meta.url
         ),
         { type: "module" }
