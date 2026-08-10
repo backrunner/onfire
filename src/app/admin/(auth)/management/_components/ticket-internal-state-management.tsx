@@ -29,14 +29,14 @@ interface InternalStateView {
   archivedAt: string | null;
 }
 
-export function TicketInternalStateManagement() {
+export function TicketInternalStateManagement({ productId: fixedProductId }: { productId?: string }) {
   const { t } = useI18n();
   const m = t.management.internalStates;
   const { data: products } = useSWR<ProductRef[]>("/api/tob/meta/products", swrFetcher);
   const { data: types, error: typeError, isLoading: typeLoading, mutate: mutateTypes } = useSWR<TicketTypeAdminView[]>("/api/tob/admin/ticket-types", swrFetcher);
   const [productId, setProductId] = useState("");
   const [typeId, setTypeId] = useState("");
-  const selectedProductId = productId || products?.[0]?.id || "";
+  const selectedProductId = fixedProductId || productId || products?.[0]?.id || "";
   const productTypes = (types ?? []).filter((type) => type.productId === selectedProductId && !type.systemKey && !type.archivedAt);
   const selectedTypeId = typeId && productTypes.some((type) => type.id === typeId) ? typeId : productTypes[0]?.id ?? "";
   const { data, error, isLoading, mutate } = useSWR<InternalStateView[]>(selectedTypeId ? `/api/tob/admin/ticket-types/${selectedTypeId}/internal-states` : null, swrFetcher);
@@ -83,7 +83,7 @@ export function TicketInternalStateManagement() {
     <>
       <ManagerPanel title={m.title} description={m.description} actions={<Button size="sm" className="h-8" onClick={openCreate} disabled={!selectedTypeId}><Plus className="mr-1.5 size-3.5" />{m.create}</Button>}>
         <div className="mb-4 grid gap-3 sm:grid-cols-2">
-          <FormField label={m.product}><Select value={selectedProductId} onValueChange={(value) => { setProductId(value); setTypeId(""); }}><SelectTrigger><SelectValue placeholder={m.selectProduct} /></SelectTrigger><SelectContent>{products?.map((product) => <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>)}</SelectContent></Select></FormField>
+          {!fixedProductId && <FormField label={m.product}><Select value={selectedProductId} onValueChange={(value) => { setProductId(value); setTypeId(""); }}><SelectTrigger><SelectValue placeholder={m.selectProduct} /></SelectTrigger><SelectContent>{products?.map((product) => <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>)}</SelectContent></Select></FormField>}
           <FormField label={m.ticketType}><Select value={selectedTypeId} onValueChange={setTypeId} disabled={!productTypes.length}><SelectTrigger><SelectValue placeholder={productTypes.length ? m.selectType : m.noTypes} /></SelectTrigger><SelectContent>{productTypes.map((type) => <SelectItem key={type.id} value={type.id}>{ticketTypePathLabel(type, byId)}</SelectItem>)}</SelectContent></Select></FormField>
         </div>
         {typeLoading || isLoading ? <TableSkeleton /> : typeError || error ? <ErrorState onRetry={() => { void mutateTypes(); void mutate(); }} /> : !selectedTypeId || !data?.length ? <EmptyState message={selectedTypeId ? m.empty : m.noTypes} /> : (

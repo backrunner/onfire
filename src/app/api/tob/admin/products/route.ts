@@ -32,7 +32,7 @@ const optionalIdentityUrl = z
 
 const createProductSchema = z.object({
   name: z.string().trim().min(1).max(100),
-  tenantId: z.string().optional(),
+  tenantId: z.string().trim().min(1).optional(),
   homepageUrl: optionalHttpUrl,
   portalReturnUrl: optionalHttpUrl,
   identityEnabled: z.boolean().optional(),

@@ -1,7 +1,12 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { users, tenants, teams } from "@/drizzle/schema";
+import {
+  notificationEndpoints,
+  users,
+  tenants,
+  teams,
+} from "@/drizzle/schema";
 import { Role } from "@/lib/types";
 import { ok, badRequest, conflict } from "@/lib/api/response";
 import { withPublic, parseBody } from "@/lib/api/handler";
@@ -14,6 +19,7 @@ import {
   acquireInstallLock,
   releaseInstallLock,
 } from "@/lib/auth/install-lock";
+import { createDefaultEmailEndpoint } from "@/lib/notifications/default-email-endpoint";
 
 function isMissingUsersTable(error: unknown): boolean {
   const message = String(error).toLowerCase();
@@ -113,6 +119,9 @@ export const POST = withPublic(async (req: NextRequest, ctx) => {
           tenantId,
           role: Role.SuperAdmin,
         }),
+        db
+          .insert(notificationEndpoints)
+          .values(createDefaultEmailEndpoint(authUser.id, authUser.email)),
       ]);
     } catch (error) {
       try {

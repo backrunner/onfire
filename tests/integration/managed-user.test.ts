@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import {
   account,
+  passkey,
   session,
+  twoFactor,
   user as authUser,
 } from "@/drizzle/schema";
 import type { Database } from "@/lib/db";
@@ -18,10 +20,8 @@ vi.mock("@/lib/auth", () => ({
   }),
 }));
 
-const {
-  createManagedAuthUser,
-  deleteManagedAuthUser,
-} = await import("@/lib/auth/managed-user");
+const { createManagedAuthUser, deleteManagedAuthUser } =
+  await import("@/lib/auth/managed-user");
 
 let db: Database;
 
@@ -83,7 +83,7 @@ describe("managed Better Auth users", () => {
         email: "existing@example.com",
         password: "temporary-password",
         name: "Existing",
-      })
+      }),
     ).rejects.toMatchObject({ status: 409 });
     expect(authMocks.signUpEmail).not.toHaveBeenCalled();
   });
@@ -103,7 +103,7 @@ describe("managed Better Auth users", () => {
         email: "duplicate@example.com",
         password: "temporary-password",
         name: "Duplicate",
-      })
+      }),
     ).rejects.toMatchObject({ status: 409 });
   });
 
@@ -126,17 +126,49 @@ describe("managed Better Auth users", () => {
       createdAt: seeded.now,
       updatedAt: seeded.now,
     });
+    await db.insert(passkey).values({
+      id: uid("passkey"),
+      name: "Laptop",
+      publicKey: "public-key",
+      userId: seeded.id,
+      credentialID: uid("credential"),
+      counter: 0,
+      deviceType: "singleDevice",
+      backedUp: false,
+      createdAt: seeded.now,
+    });
+    await db.insert(twoFactor).values({
+      id: uid("two-factor"),
+      secret: "sealed-secret",
+      backupCodes: "sealed-backup-codes",
+      userId: seeded.id,
+      verified: true,
+    });
 
     await deleteManagedAuthUser(db, seeded.id);
 
     expect(
-      await db.query.user.findFirst({ where: eq(authUser.id, seeded.id) })
+      await db.query.user.findFirst({ where: eq(authUser.id, seeded.id) }),
     ).toBeUndefined();
     expect(
-      await db.query.account.findFirst({ where: eq(account.userId, seeded.id) })
+      await db.query.account.findFirst({
+        where: eq(account.userId, seeded.id),
+      }),
     ).toBeUndefined();
     expect(
-      await db.query.session.findFirst({ where: eq(session.userId, seeded.id) })
+      await db.query.session.findFirst({
+        where: eq(session.userId, seeded.id),
+      }),
+    ).toBeUndefined();
+    expect(
+      await db.query.passkey.findFirst({
+        where: eq(passkey.userId, seeded.id),
+      }),
+    ).toBeUndefined();
+    expect(
+      await db.query.twoFactor.findFirst({
+        where: eq(twoFactor.userId, seeded.id),
+      }),
     ).toBeUndefined();
   });
 });

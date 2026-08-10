@@ -10,7 +10,6 @@ import {
   Settings,
   Mail,
   Bell,
-  Sparkles,
   Flame,
   PanelLeftClose,
   PanelLeftOpen,
@@ -37,7 +36,7 @@ import {
 interface NavItem {
   href: string;
   icon: typeof LayoutDashboard;
-  labelKey: "dashboard" | "tickets" | "customers" | "admin" | "email" | "notifications" | "ai";
+  labelKey: "dashboard" | "tickets" | "customers" | "admin" | "email" | "notifications";
   permission?: Permission;
   exact?: boolean;
 }
@@ -67,7 +66,6 @@ const NAV_GROUPS: NavGroup[] = [
       },
       { href: "/admin/email", icon: Mail, labelKey: "email", permission: "email.config" },
       { href: "/admin/notifications", icon: Bell, labelKey: "notifications", permission: "notification.manage" },
-      { href: "/admin/ai", icon: Sparkles, labelKey: "ai", permission: "ai.knowledge" },
     ],
   },
 ];

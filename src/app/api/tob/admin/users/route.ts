@@ -8,6 +8,7 @@ import {
   products,
   tenants,
   userProducts,
+  notificationEndpoints,
 } from "@/drizzle/schema";
 import { ok, badRequest, forbidden } from "@/lib/api/response";
 import { withAuth, parseBody } from "@/lib/api/handler";
@@ -18,6 +19,7 @@ import {
   createManagedAuthUser,
   deleteManagedAuthUser,
 } from "@/lib/auth/managed-user";
+import { createDefaultEmailEndpoint } from "@/lib/notifications/default-email-endpoint";
 
 const createUserSchema = z.object({
   email: z.string().trim().email().max(320),
@@ -137,15 +139,19 @@ export const POST = withAuth({ permission: "user.manage" }, async (req: NextRequ
       role: body.role,
       tenantId,
     });
+    const insertDefaultEmailEndpoint = ctx.db
+      .insert(notificationEndpoints)
+      .values(createDefaultEmailEndpoint(authUser.id, authUser.email));
     if (body.role === Role.ProductAdmin) {
       await ctx.db.batch([
         insertUser,
+        insertDefaultEmailEndpoint,
         ctx.db.insert(userProducts).values(
           productIds.map((productId) => ({ userId: authUser.id, productId }))
         ),
       ]);
     } else {
-      await insertUser;
+      await ctx.db.batch([insertUser, insertDefaultEmailEndpoint]);
     }
   } catch (error) {
     try {

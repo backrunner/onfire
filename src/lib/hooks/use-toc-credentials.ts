@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import {
   type TocCredentials,
   TOC_SESSION_EXPIRED_EVENT,
@@ -40,6 +40,9 @@ interface CredentialState {
   missingFields: TocMissingField[];
 }
 
+const useClientLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 /**
  * ToC portal credentials.
  *
@@ -60,7 +63,9 @@ export function useTocCredentials(): TocCredentialsResult {
     missingFields: [],
   });
 
-  useEffect(() => {
+  // Credential bootstrap is local URL/session state. Resolve it before the
+  // first client paint so malformed links can go straight to the error view.
+  useClientLayoutEffect(() => {
     const url = new URL(window.location.href);
     const fragment = new URLSearchParams(url.hash.replace(/^#/, ""));
     const token = fragment.get("token") ?? url.searchParams.get("token");

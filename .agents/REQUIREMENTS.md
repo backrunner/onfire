@@ -11,6 +11,14 @@
 - AI assistant ticket context must pass `assertTicketVisible` before reaching a model.
 - Reject deletion of a tenant, product, or team with dependent records using HTTP 409.
 - Validate every submitted tenant/product/team association on create and update. SuperAdmin bypasses visibility scope, never tenant-integrity checks.
+- Product creation may omit `tenantId`; the API assigns the creator's tenant as the default. An explicitly submitted tenant remains subject to the same existence, permission, and tenant-integrity validation.
+
+## Account Security
+
+- The account page exposes one security-settings entry. Password changes, Passkey management, and authenticator TOTP management live inside that modal instead of separate page forms.
+- ToB login supports password and Passkey. Password sign-in for a TOTP-enabled account must complete the Better Auth second-factor challenge before a session is created; recovery codes remain available as the fallback.
+- Passkeys use the exact `BETTER_AUTH_URL` hostname as the WebAuthn RP ID and its origin as the allowed origin. Registration requires an authenticated session, and users may list, rename, and delete only their own credentials.
+- TOTP enrollment requires the current password and a verified first code. Recovery codes are shown only when generated, trusted-device state lasts 30 days, and disabling or regenerating TOTP credentials requires the current password.
 
 ## Ticket Lifecycle And SLA
 
@@ -38,6 +46,7 @@
 - Prefetch primary admin routes and suggested tickets. Avoid server navigation for local tab-only state.
 - Product selectors render a clear disabled state when no product exists.
 - Mutable rows require discoverable edit actions; destructive actions remain separated in the row menu.
+- Management form save handlers must rerun their field validators and submit only validator-normalized payloads; button state and native input constraints are not sufficient validation.
 - Grid siblings and empty/error/loading states use stable equal heights.
 - Discarding unsaved email settings restores the persisted product snapshot; revisiting the settings tab must not report a transient initialization difference as unsaved.
 - Keep title-to-content spacing compact in management, email, and AI forms.
@@ -98,6 +107,7 @@
 ## Notifications
 
 - Users own their notification endpoints and secrets. Products never store recipient email addresses, device keys, bot tokens, chat IDs, or webhook URLs.
+- Every system user starts with an enabled email endpoint configured from their account email. Existing users without an email endpoint are backfilled, while later endpoint changes remain user-controlled.
 - Product delivery rules select events, channel types, and recipients from current assignee, current ticket team, all product agents, a specific team, or a specific agent.
 - Product requirements select events and mandatory channel types for all product agents, a team, or a specific agent. A matching requirement is a mandatory delivery overlay, not only a compliance warning.
 - Resolve policies to active support agents and then to their enabled personal endpoints. Deduplicate overlapping rules and requirements by recipient plus endpoint.

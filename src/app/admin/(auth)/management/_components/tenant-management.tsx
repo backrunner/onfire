@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Settings, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
 import { api, swrFetcher } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,7 @@ interface Team {
 const NONE = "__none__";
 
 export function TenantManagement() {
+  const router = useRouter();
   const { t } = useI18n();
   const m = t.management;
 
@@ -179,6 +181,11 @@ export function TenantManagement() {
                   <TableCell className="text-right">
                     <RowActions
                       actions={[
+                        {
+                          label: m.manage,
+                          icon: Settings,
+                          onSelect: () => router.push(`/admin/management/tenants/${tenant.id}`),
+                        },
                         {
                           label: t.common.edit,
                           icon: Pencil,

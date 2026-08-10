@@ -8,6 +8,7 @@ OnFire is a minimalist modern ticket system designed to enable users to quickly 
 - **Framework**: Next.js 16 (App Router) + OpenNext/Cloudflare
 - **Database**: Cloudflare D1 (SQLite) + Drizzle ORM
 - **Authentication**: Better Auth (ToB) / JWT + API Key (ToC)
+- **ToB Account Security**: Password + Passkey login, with optional authenticator TOTP, trusted devices, and recovery codes
 - **Frontend**: React 19 + TypeScript
 - **UI Components**: shadcn/ui (zinc theme)
 - **Styling**: Tailwind CSS 4
@@ -307,6 +308,7 @@ Product notification rules and requirements can match these events:
 ### Delivery Model
 
 - Every system user owns their receiving endpoints. Endpoint credentials and destinations are configured from the user's account and are not stored on products.
+- Every system user starts with an enabled email endpoint configured from their account email. Backfill only users who have no email endpoint, and preserve later user changes to endpoint state.
 - A product delivery rule selects trigger events, channel types, and recipients: current assignee, current ticket team, all product agents, a specific team, or a specific agent.
 - A product requirement declares mandatory channel types for all product agents, a team, or a specific agent on selected events. Requirements participate directly in delivery and also expose compliance gaps.
 - Rules and requirements resolve to active support agents, then send through each matching enabled personal endpoint. Overlapping policies deduplicate the same endpoint.
@@ -472,6 +474,12 @@ GET  /me                  - Get current user info and permissions
 POST /auth/email/sign-in  - Email login
 POST /auth/email/sign-up  - Email registration
 POST /auth/change-password - Change password
+
+# Better Auth Account Security
+POST /auth/sign-in/email                 - Password sign-in; may return a TOTP challenge
+GET  /auth/passkey/list-user-passkeys   - List current user's Passkeys
+POST /auth/passkey/*                     - Register, rename, delete, or authenticate a Passkey
+POST /auth/two-factor/*                  - Enable, verify, disable TOTP, or manage recovery codes
 
 # Installation
 GET  /install/status      - Check if initialization is needed
@@ -667,6 +675,8 @@ const portalUrl =
 | teams | Teams |
 | product_teams | Product-Team association (many-to-many) |
 | users | System users |
+| passkey | Better Auth WebAuthn credentials owned by authentication users |
+| two_factor | Better Auth encrypted TOTP secrets, recovery codes, and lockout state |
 | agents | Support agents |
 | agent_teams | Agent-Team association (many-to-many) |
 | user_products | ProductAdmin-Product scope association (many-to-many) |

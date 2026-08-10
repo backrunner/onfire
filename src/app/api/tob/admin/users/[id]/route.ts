@@ -13,9 +13,11 @@ import {
   notificationEndpoints,
   notificationRequirements,
   notificationRules,
+  passkey,
   products,
   tickets,
   userProducts,
+  twoFactor,
 } from "@/drizzle/schema";
 import type { BatchItem } from "drizzle-orm/batch";
 import { ok, notFound, forbidden, conflict } from "@/lib/api/response";
@@ -38,150 +40,175 @@ async function loadAccessibleUser(ctx: AuthedContext, id: string) {
   return user;
 }
 
-export const GET = withAuth({ permission: "user.manage" }, async (_req: NextRequest, ctx) => {
-  const user = await loadAccessibleUser(ctx, ctx.params.id);
+export const GET = withAuth(
+  { permission: "user.manage" },
+  async (_req: NextRequest, ctx) => {
+    const user = await loadAccessibleUser(ctx, ctx.params.id);
 
-  const agent = await ctx.db.query.agents.findFirst({
-    where: eq(agents.userId, user.id),
-  });
-  const teamRows = await ctx.db
-    .select({ teamId: agentTeams.teamId })
-    .from(agentTeams)
-    .where(eq(agentTeams.userId, user.id));
-  const productRows = await ctx.db
-    .select({ productId: userProducts.productId })
-    .from(userProducts)
-    .where(eq(userProducts.userId, user.id));
+    const agent = await ctx.db.query.agents.findFirst({
+      where: eq(agents.userId, user.id),
+    });
+    const teamRows = await ctx.db
+      .select({ teamId: agentTeams.teamId })
+      .from(agentTeams)
+      .where(eq(agentTeams.userId, user.id));
+    const productRows = await ctx.db
+      .select({ productId: userProducts.productId })
+      .from(userProducts)
+      .where(eq(userProducts.userId, user.id));
 
-  return ok({
-    ...user,
-    isAgent: !!agent,
-    agentLevel: agent?.level,
-    agentActive: agent?.active,
-    teamIds: teamRows.map((r) => r.teamId),
-    productIds: productRows.map((r) => r.productId),
-  });
-});
+    return ok({
+      ...user,
+      isAgent: !!agent,
+      agentLevel: agent?.level,
+      agentActive: agent?.active,
+      teamIds: teamRows.map((r) => r.teamId),
+      productIds: productRows.map((r) => r.productId),
+    });
+  },
+);
 
-export const PATCH = withAuth({ permission: "user.manage" }, async (req: NextRequest, ctx) => {
-  const user = await loadAccessibleUser(ctx, ctx.params.id);
-  const body = await parseBody(req, updateUserSchema);
+export const PATCH = withAuth(
+  { permission: "user.manage" },
+  async (req: NextRequest, ctx) => {
+    const user = await loadAccessibleUser(ctx, ctx.params.id);
+    const body = await parseBody(req, updateUserSchema);
 
-  // A manager may not mutate a peer or superior, even through a harmless-
-  // looking field such as displayName.
-  if (!canManageRole(ctx.role, user.role)) {
-    throw forbidden("Cannot modify user with equal or higher role");
-  }
-  if (body.role !== undefined) {
-    if (!hasPermission(ctx.role, "role.manage")) {
-      throw forbidden("Role management permission is required to change roles");
+    // A manager may not mutate a peer or superior, even through a harmless-
+    // looking field such as displayName.
+    if (!canManageRole(ctx.role, user.role)) {
+      throw forbidden("Cannot modify user with equal or higher role");
     }
-    if (!canManageRole(ctx.role, body.role)) {
-      throw forbidden("Cannot assign equal or higher role");
+    if (body.role !== undefined) {
+      if (!hasPermission(ctx.role, "role.manage")) {
+        throw forbidden(
+          "Role management permission is required to change roles",
+        );
+      }
+      if (!canManageRole(ctx.role, body.role)) {
+        throw forbidden("Cannot assign equal or higher role");
+      }
     }
-  }
 
-  const nextRole = body.role ?? user.role;
-  const productIds = [...new Set(body.productIds ?? [])];
-  if (nextRole === Role.ProductAdmin && body.productIds !== undefined) {
-    if (productIds.length === 0) {
+    const nextRole = body.role ?? user.role;
+    const productIds = [...new Set(body.productIds ?? [])];
+    if (nextRole === Role.ProductAdmin && body.productIds !== undefined) {
+      if (productIds.length === 0) {
+        throw forbidden("ProductAdmin requires at least one product");
+      }
+      const productRows = await ctx.db
+        .select({ id: products.id, tenantId: products.tenantId })
+        .from(products)
+        .where(inArray(products.id, productIds));
+      if (
+        productRows.length !== productIds.length ||
+        productRows.some((product) => product.tenantId !== user.tenantId)
+      ) {
+        throw forbidden("Products must belong to the user's tenant");
+      }
+    }
+    if (
+      nextRole === Role.ProductAdmin &&
+      body.productIds === undefined &&
+      user.role !== Role.ProductAdmin
+    ) {
       throw forbidden("ProductAdmin requires at least one product");
     }
-    const productRows = await ctx.db
-      .select({ id: products.id, tenantId: products.tenantId })
-      .from(products)
-      .where(inArray(products.id, productIds));
-    if (
-      productRows.length !== productIds.length ||
-      productRows.some((product) => product.tenantId !== user.tenantId)
-    ) {
-      throw forbidden("Products must belong to the user's tenant");
-    }
-  }
-  if (
-    nextRole === Role.ProductAdmin &&
-    body.productIds === undefined &&
-    user.role !== Role.ProductAdmin
-  ) {
-    throw forbidden("ProductAdmin requires at least one product");
-  }
 
-  const statements: BatchItem<"sqlite">[] = [
-    ctx.db
-      .update(users)
-      .set({
-        ...(body.displayName !== undefined && { displayName: body.displayName }),
-        ...(body.role !== undefined && { role: body.role }),
-      })
-      .where(eq(users.id, user.id)),
-  ];
-  if (body.displayName !== undefined) {
-    statements.push(
+    const statements: BatchItem<"sqlite">[] = [
       ctx.db
-        .update(authUser)
-        .set({ name: body.displayName, updatedAt: new Date() })
-        .where(eq(authUser.id, user.id))
-    );
-  }
-  if (body.productIds !== undefined || nextRole !== Role.ProductAdmin) {
-    statements.push(
-      ctx.db.delete(userProducts).where(eq(userProducts.userId, user.id))
-    );
-    if (nextRole === Role.ProductAdmin && productIds.length > 0) {
+        .update(users)
+        .set({
+          ...(body.displayName !== undefined && {
+            displayName: body.displayName,
+          }),
+          ...(body.role !== undefined && { role: body.role }),
+        })
+        .where(eq(users.id, user.id)),
+    ];
+    if (body.displayName !== undefined) {
       statements.push(
-        ctx.db.insert(userProducts).values(
-          productIds.map((productId) => ({ userId: user.id, productId }))
-        )
+        ctx.db
+          .update(authUser)
+          .set({ name: body.displayName, updatedAt: new Date() })
+          .where(eq(authUser.id, user.id)),
       );
     }
-  }
-  await ctx.db.batch(
-    statements as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]
-  );
+    if (body.productIds !== undefined || nextRole !== Role.ProductAdmin) {
+      statements.push(
+        ctx.db.delete(userProducts).where(eq(userProducts.userId, user.id)),
+      );
+      if (nextRole === Role.ProductAdmin && productIds.length > 0) {
+        statements.push(
+          ctx.db
+            .insert(userProducts)
+            .values(
+              productIds.map((productId) => ({ userId: user.id, productId })),
+            ),
+        );
+      }
+    }
+    await ctx.db.batch(
+      statements as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]],
+    );
 
-  const updated = await ctx.db.query.users.findFirst({ where: eq(users.id, user.id) });
-  return ok(updated);
-});
+    const updated = await ctx.db.query.users.findFirst({
+      where: eq(users.id, user.id),
+    });
+    return ok(updated);
+  },
+);
 
-export const DELETE = withAuth({ permission: "user.manage" }, async (_req: NextRequest, ctx) => {
-  const user = await loadAccessibleUser(ctx, ctx.params.id);
-  if (!canManageRole(ctx.role, user.role)) {
-    throw forbidden("Cannot delete user with equal or higher role");
-  }
+export const DELETE = withAuth(
+  { permission: "user.manage" },
+  async (_req: NextRequest, ctx) => {
+    const user = await loadAccessibleUser(ctx, ctx.params.id);
+    if (!canManageRole(ctx.role, user.role)) {
+      throw forbidden("Cannot delete user with equal or higher role");
+    }
 
-  const [assignedTicket] = await ctx.db
-    .select({ id: tickets.id })
-    .from(tickets)
-    .where(eq(tickets.assigneeId, user.id))
-    .limit(1);
-  if (assignedTicket) {
-    throw conflict("Reassign this user's tickets before deleting the account");
-  }
+    const [assignedTicket] = await ctx.db
+      .select({ id: tickets.id })
+      .from(tickets)
+      .where(eq(tickets.assigneeId, user.id))
+      .limit(1);
+    if (assignedTicket) {
+      throw conflict(
+        "Reassign this user's tickets before deleting the account",
+      );
+    }
 
-  const notificationReferences = await Promise.all([
-    ctx.db.query.notificationRules.findFirst({
-      where: eq(notificationRules.recipientUserId, user.id),
-    }),
-    ctx.db.query.notificationRequirements.findFirst({
-      where: eq(notificationRequirements.scopeUserId, user.id),
-    }),
-  ]);
-  if (notificationReferences.some(Boolean)) {
-    throw conflict("Remove notification rules and requirements for this user first");
-  }
+    const notificationReferences = await Promise.all([
+      ctx.db.query.notificationRules.findFirst({
+        where: eq(notificationRules.recipientUserId, user.id),
+      }),
+      ctx.db.query.notificationRequirements.findFirst({
+        where: eq(notificationRequirements.scopeUserId, user.id),
+      }),
+    ]);
+    if (notificationReferences.some(Boolean)) {
+      throw conflict(
+        "Remove notification rules and requirements for this user first",
+      );
+    }
 
-  await ctx.db.batch([
-    ctx.db.delete(notificationEndpoints).where(eq(notificationEndpoints.userId, user.id)),
-    ctx.db.delete(agentTeams).where(eq(agentTeams.userId, user.id)),
-    ctx.db.delete(userProducts).where(eq(userProducts.userId, user.id)),
-    ctx.db.delete(agentProfiles).where(eq(agentProfiles.userId, user.id)),
-    ctx.db.delete(agents).where(eq(agents.userId, user.id)),
-    ctx.db.delete(aiChatMessages).where(eq(aiChatMessages.userId, user.id)),
-    ctx.db.delete(users).where(eq(users.id, user.id)),
-    ctx.db.delete(session).where(eq(session.userId, user.id)),
-    ctx.db.delete(account).where(eq(account.userId, user.id)),
-    ctx.db.delete(authUser).where(eq(authUser.id, user.id)),
-  ]);
+    await ctx.db.batch([
+      ctx.db
+        .delete(notificationEndpoints)
+        .where(eq(notificationEndpoints.userId, user.id)),
+      ctx.db.delete(agentTeams).where(eq(agentTeams.userId, user.id)),
+      ctx.db.delete(userProducts).where(eq(userProducts.userId, user.id)),
+      ctx.db.delete(agentProfiles).where(eq(agentProfiles.userId, user.id)),
+      ctx.db.delete(agents).where(eq(agents.userId, user.id)),
+      ctx.db.delete(aiChatMessages).where(eq(aiChatMessages.userId, user.id)),
+      ctx.db.delete(users).where(eq(users.id, user.id)),
+      ctx.db.delete(passkey).where(eq(passkey.userId, user.id)),
+      ctx.db.delete(twoFactor).where(eq(twoFactor.userId, user.id)),
+      ctx.db.delete(session).where(eq(session.userId, user.id)),
+      ctx.db.delete(account).where(eq(account.userId, user.id)),
+      ctx.db.delete(authUser).where(eq(authUser.id, user.id)),
+    ]);
 
-  return ok({ deleted: true });
-});
+    return ok({ deleted: true });
+  },
+);

@@ -104,11 +104,12 @@ const DOC_STATUS_STYLES: Record<DocumentStatus, string> = {
   error: "bg-red-500/10 text-red-700 ring-red-500/20 dark:text-red-400",
 };
 
-export function KnowledgeTab() {
+export function KnowledgeTab({ productId: fixedProductId }: { productId?: string }) {
   const { t } = useI18n();
   const k = t.aiKnowledge;
   const { data: products, isLoading: productsLoading } = useProducts();
-  const [productId, setProductId] = useState("");
+  const [selectedProductId, setProductId] = useState("");
+  const productId = fixedProductId ?? selectedProductId;
 
   const entriesKey = productId
     ? `/api/tob/admin/ai/knowledge${qs({ productId })}`
@@ -252,13 +253,13 @@ export function KnowledgeTab() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">{k.subtitle}</p>
-        <ProductSelect
+        {!fixedProductId && <ProductSelect
           value={productId}
           onChange={setProductId}
           placeholder={k.selectProduct}
           emptyLabel={k.noProducts}
           autoSelectFirst
-        />
+        />}
       </div>
 
       {!productId ? (

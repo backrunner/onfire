@@ -54,7 +54,7 @@ function pathLabel(item: PresetView, byId: Map<string, PresetView>) {
   return names.join(" / ");
 }
 
-export function TicketTypePresetManagement() {
+export function TicketTypePresetManagement({ tenantId }: { tenantId?: string }) {
   const { t } = useI18n();
   const m = t.management.ticketTypePresets;
   const { me, can } = useMe();
@@ -77,12 +77,13 @@ export function TicketTypePresetManagement() {
   const visible = useMemo(() => {
     const query = search.trim().toLowerCase();
     return (data ?? [])
+      .filter((item) => !tenantId || item.tenantId === tenantId)
       .map((item) => ({ item, path: pathLabel(item, byId) }))
       .filter(({ path }) => !query || path.toLowerCase().includes(query))
       .sort((a, b) => a.item.tenantId.localeCompare(b.item.tenantId) || a.path.localeCompare(b.path));
-  }, [byId, data, search]);
+  }, [byId, data, search, tenantId]);
   const tenantNames = useMemo(() => new Map((tenants ?? []).map((tenant) => [tenant.id, tenant.name])), [tenants]);
-  const effectiveTenantId = form.tenantId || me?.user.tenantId || "";
+  const effectiveTenantId = tenantId || form.tenantId || me?.user.tenantId || "";
   const parents = (data ?? []).filter((item) => {
     if (item.tenantId !== effectiveTenantId || item.archivedAt || item.level >= 3 || item.id === editing?.id) return false;
     if (!editing) return true;
@@ -101,7 +102,7 @@ export function TicketTypePresetManagement() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ tenantId: me?.user.tenantId ?? tenants?.[0]?.id ?? "", parentId: ROOT, name: "", description: "", sortOrder: "0" });
+    setForm({ tenantId: tenantId ?? me?.user.tenantId ?? tenants?.[0]?.id ?? "", parentId: ROOT, name: "", description: "", sortOrder: "0" });
     setDialogOpen(true);
   };
   const openEdit = (item: PresetView) => {
@@ -110,7 +111,7 @@ export function TicketTypePresetManagement() {
     setDialogOpen(true);
   };
   const openApply = () => {
-    const productId = products?.[0]?.id ?? "";
+    const productId = products?.find((item) => !tenantId || item.tenantId === tenantId)?.id ?? "";
     const product = products?.find((item) => item.id === productId);
     const presetId = (data ?? []).find((item) => !item.archivedAt && item.tenantId === product?.tenantId)?.id ?? "";
     setApplyForm({ presetId, productId, parentId: ROOT });
@@ -161,11 +162,11 @@ export function TicketTypePresetManagement() {
       }>
         {isLoading ? <TableSkeleton /> : error ? <ErrorState onRetry={() => void mutate()} /> : visible.length === 0 ? <EmptyState message={m.empty} /> : (
           <Table>
-            <TableHeader><TableRow><TableHead>{m.path}</TableHead>{canManageTenants && <TableHead className="hidden md:table-cell">{m.tenant}</TableHead>}<TableHead className="hidden sm:table-cell">{m.status}</TableHead>{canWrite && <TableHead className="w-12" />}</TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>{m.path}</TableHead>{canManageTenants && !tenantId && <TableHead className="hidden md:table-cell">{m.tenant}</TableHead>}<TableHead className="hidden sm:table-cell">{m.status}</TableHead>{canWrite && <TableHead className="w-12" />}</TableRow></TableHeader>
             <TableBody>{visible.map(({ item, path }) => (
               <TableRow key={item.id}>
                 <TableCell><div className="flex items-center gap-2"><p className="text-sm font-medium">{path}</p><Badge variant="outline" className={`sm:hidden ${item.archivedAt ? "text-muted-foreground" : "border-emerald-500/30 text-emerald-700 dark:text-emerald-400"}`}>{item.archivedAt ? m.archived : m.active}</Badge></div>{item.description && <p className="line-clamp-1 text-xs text-muted-foreground">{item.description}</p>}{canManageTenants && <p className="mt-0.5 text-[11px] text-muted-foreground md:hidden">{tenantNames.get(item.tenantId) ?? item.tenantId}</p>}</TableCell>
-                {canManageTenants && <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{tenantNames.get(item.tenantId) ?? item.tenantId}</TableCell>}
+                {canManageTenants && !tenantId && <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{tenantNames.get(item.tenantId) ?? item.tenantId}</TableCell>}
                 <TableCell className="hidden sm:table-cell"><Badge variant="outline" className={item.archivedAt ? "text-muted-foreground" : "border-emerald-500/30 text-emerald-700 dark:text-emerald-400"}>{item.archivedAt ? m.archived : m.active}</Badge></TableCell>
                 {canWrite && <TableCell><RowActions actions={[{ label: m.edit, icon: Pencil, onSelect: () => openEdit(item) }, { label: item.archivedAt ? m.restore : m.archive, icon: item.archivedAt ? ArchiveRestore : Archive, destructive: !item.archivedAt, separatorBefore: true, onSelect: () => void setArchived(item, Boolean(item.archivedAt)) }]} /></TableCell>}
               </TableRow>

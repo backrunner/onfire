@@ -3,7 +3,6 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.18.0+sha512.33d83c77da82f49fba836925c6f1b841181ec3132b670639bd012f7075f5c7cf634c5f870147c19aae7478fac01df09d8892e880454896edd23ee9b33757563c",
   "engines": {
     "node": ">=22.0.0"
   },
@@ -29,6 +28,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@better-auth/passkey": "1.6.25",
     "@marsidev/react-turnstile": "^1.5.4",
     "@monaco-editor/react": "^4.7.0",
     "@opennextjs/cloudflare": "^1.20.2",
@@ -41,10 +41,10 @@
     "monaco-editor": "^0.56.0",
     "next": "^16.2.12",
     "postal-mime": "^2.7.5",
+    "qrcode": "1.5.4",
     "radix-ui": "^1.6.7",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "shadcn": "^4.16.1",
     "sonner": "^2.0.7",
     "swr": "^2.4.2",
     "tailwind-merge": "^3.6.0",
@@ -55,14 +55,16 @@
     "@libsql/client": "^0.17.4",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^26.1.2",
+    "@types/qrcode": "1.5.6",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "concurrently": "^10.0.4",
     "drizzle-kit": "^0.31.10",
+    "shadcn": "^4.16.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
     "vite": "^8.2.0",
     "vitest": "^4.1.10",
-    "wrangler": "^4.118.0"
+    "wrangler": "^4.120.1"
   }
 }

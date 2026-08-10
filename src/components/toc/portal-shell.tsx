@@ -6,7 +6,6 @@ import { tocApi } from "@/lib/api/toc-client";
 import type { TocWhoAmI } from "@/lib/toc/portal";
 import { CredentialError } from "./credential-error";
 import { TocHeader } from "./toc-header";
-import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * Shared ToC page chrome: gates on stored credentials (sessionStorage),
@@ -48,14 +47,10 @@ export function TocPortalShell({ children }: { children: ReactNode }) {
   }, [isValid]);
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-muted/40 dark:bg-background">
-        <div className="mx-auto max-w-2xl space-y-4 px-4 py-6">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-48 w-full" />
-        </div>
-      </div>
-    );
+    // URL/session inspection is local and normally completes before paint.
+    // Keep the SSR fallback visually neutral so invalid bootstrap links do
+    // not flash a misleading application skeleton before the error screen.
+    return <div className="min-h-screen bg-muted/40 dark:bg-background" />;
   }
 
   if (isExpired) {

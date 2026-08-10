@@ -21,9 +21,56 @@ export const user = sqliteTable("user", {
     .notNull()
     .default(false),
   image: text("image"),
+  twoFactorEnabled: integer("two_factor_enabled", { mode: "boolean" })
+    .notNull()
+    .default(false),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
+
+export const twoFactor = sqliteTable(
+  "two_factor",
+  {
+    id: text("id").primaryKey(),
+    secret: text("secret").notNull(),
+    backupCodes: text("backup_codes").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id),
+    verified: integer("verified", { mode: "boolean" }).notNull().default(true),
+    failedVerificationCount: integer("failed_verification_count")
+      .notNull()
+      .default(0),
+    lockedUntil: integer("locked_until", { mode: "timestamp" }),
+  },
+  (t) => [
+    index("two_factor_secret_idx").on(t.secret),
+    index("two_factor_user_idx").on(t.userId),
+  ],
+);
+
+export const passkey = sqliteTable(
+  "passkey",
+  {
+    id: text("id").primaryKey(),
+    name: text("name"),
+    publicKey: text("public_key").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id),
+    credentialID: text("credential_id").notNull(),
+    counter: integer("counter").notNull(),
+    deviceType: text("device_type").notNull(),
+    backedUp: integer("backed_up", { mode: "boolean" }).notNull(),
+    transports: text("transports"),
+    createdAt: integer("created_at", { mode: "timestamp" }),
+    aaguid: text("aaguid"),
+  },
+  (t) => [
+    index("passkey_user_idx").on(t.userId),
+    uniqueIndex("passkey_credential_id_unique").on(t.credentialID),
+  ],
+);
 
 export const session = sqliteTable("session", {
   id: text("id").primaryKey(),
@@ -133,7 +180,7 @@ export const customers = sqliteTable(
     uniqueIndex("customers_product_email_uq").on(t.productId, t.email),
     uniqueIndex("customers_product_external_uq").on(t.productId, t.externalId),
     index("customers_tenant_idx").on(t.tenantId),
-  ]
+  ],
 );
 
 export const productKeys = sqliteTable(
@@ -148,7 +195,7 @@ export const productKeys = sqliteTable(
     lastUsedAt: text("last_used_at"),
     revoked: integer("revoked", { mode: "boolean" }).default(false),
   },
-  (t) => [index("product_keys_product_idx").on(t.productId)]
+  (t) => [index("product_keys_product_idx").on(t.productId)],
 );
 
 export const teams = sqliteTable("teams", {
@@ -164,7 +211,7 @@ export const productTeams = sqliteTable(
     productId: text("product_id").notNull(),
     teamId: text("team_id").notNull(),
   },
-  (t) => [primaryKey({ columns: [t.productId, t.teamId] })]
+  (t) => [primaryKey({ columns: [t.productId, t.teamId] })],
 );
 
 export const users = sqliteTable(
@@ -176,7 +223,7 @@ export const users = sqliteTable(
     tenantId: text("tenant_id").notNull(),
     role: text("role").$type<Role>().notNull(),
   },
-  (t) => [index("users_tenant_idx").on(t.tenantId)]
+  (t) => [index("users_tenant_idx").on(t.tenantId)],
 );
 
 export const agents = sqliteTable("agents", {
@@ -194,7 +241,7 @@ export const agentTeams = sqliteTable(
   (t) => [
     primaryKey({ columns: [t.userId, t.teamId] }),
     index("agent_teams_team_idx").on(t.teamId),
-  ]
+  ],
 );
 
 /** Product administration scope, independent from support-agent membership. */
@@ -207,7 +254,7 @@ export const userProducts = sqliteTable(
   (t) => [
     primaryKey({ columns: [t.userId, t.productId] }),
     index("user_products_product_idx").on(t.productId),
-  ]
+  ],
 );
 
 export const agentProfiles = sqliteTable("agent_profiles", {
@@ -239,7 +286,7 @@ export const ticketTypes = sqliteTable(
   (t) => [
     index("ticket_types_product_parent_idx").on(t.productId, t.parentId),
     uniqueIndex("ticket_types_product_system_uq").on(t.productId, t.systemKey),
-  ]
+  ],
 );
 
 export type TicketInternalStateKind = "boolean" | "select";
@@ -263,7 +310,7 @@ export const ticketTypePresets = sqliteTable(
   },
   (t) => [
     index("ticket_type_presets_tenant_parent_idx").on(t.tenantId, t.parentId),
-  ]
+  ],
 );
 
 /** Product-owned internal state definitions for one exact ticket type. */
@@ -285,8 +332,11 @@ export const ticketTypeInternalStates = sqliteTable(
   },
   (t) => [
     index("ticket_type_internal_states_type_idx").on(t.ticketTypeId),
-    uniqueIndex("ticket_type_internal_states_name_uq").on(t.ticketTypeId, t.name),
-  ]
+    uniqueIndex("ticket_type_internal_states_name_uq").on(
+      t.ticketTypeId,
+      t.name,
+    ),
+  ],
 );
 
 /** Optional team mapping; resolution walks from the selected type to its ancestors. */
@@ -327,10 +377,10 @@ export const ticketTemplateVersions = sqliteTable(
   (t) => [
     uniqueIndex("ticket_template_versions_template_version_uq").on(
       t.templateId,
-      t.version
+      t.version,
     ),
     index("ticket_template_versions_template_idx").on(t.templateId),
-  ]
+  ],
 );
 
 /** Legacy template rows retained read-only for migration and historical audit. */
@@ -343,7 +393,7 @@ export const templates = sqliteTable(
     categories: text("categories").notNull(),
     formSchema: text("form_schema").notNull(),
   },
-  (t) => [index("templates_product_idx").on(t.productId)]
+  (t) => [index("templates_product_idx").on(t.productId)],
 );
 
 export const categoryRoutes = sqliteTable(
@@ -360,9 +410,9 @@ export const categoryRoutes = sqliteTable(
     uniqueIndex("category_routes_product_category_subcategory_uq").on(
       t.productId,
       t.category,
-      t.subcategory
+      t.subcategory,
     ),
-  ]
+  ],
 );
 
 export const tickets = sqliteTable(
@@ -389,18 +439,18 @@ export const tickets = sqliteTable(
     metadata: text("metadata"),
     slaAcceptDeadline: text("sla_accept_deadline"),
     slaReplyDeadline: text("sla_reply_deadline"),
-    slaAcceptBreached: integer("sla_accept_breached", { mode: "boolean" }).default(
-      false
-    ),
-    slaReplyBreached: integer("sla_reply_breached", { mode: "boolean" }).default(
-      false
-    ),
+    slaAcceptBreached: integer("sla_accept_breached", {
+      mode: "boolean",
+    }).default(false),
+    slaReplyBreached: integer("sla_reply_breached", {
+      mode: "boolean",
+    }).default(false),
     // Pre-breach warning sent flags (dedupe ticket_expiring notifications)
     slaAcceptWarned: integer("sla_accept_warned", { mode: "boolean" }).default(
-      false
+      false,
     ),
     slaReplyWarned: integer("sla_reply_warned", { mode: "boolean" }).default(
-      false
+      false,
     ),
     // AI-related fields
     aiScreeningStatus: text("ai_screening_status").$type<
@@ -427,7 +477,7 @@ export const tickets = sqliteTable(
     index("tickets_customer_idx").on(t.customerEmail, t.productId),
     index("tickets_customer_id_idx").on(t.customerId),
     index("tickets_updated_idx").on(t.updatedAt),
-  ]
+  ],
 );
 
 /** Current internal-state values; every mutation also writes ticket history. */
@@ -443,7 +493,7 @@ export const ticketInternalStateValues = sqliteTable(
   (t) => [
     primaryKey({ columns: [t.ticketId, t.stateId] }),
     index("ticket_internal_state_values_state_idx").on(t.stateId),
-  ]
+  ],
 );
 
 export const replies = sqliteTable(
@@ -461,7 +511,7 @@ export const replies = sqliteTable(
     emailSent: integer("email_sent", { mode: "boolean" }).default(false),
     createdAt: text("created_at").notNull(),
   },
-  (t) => [index("replies_ticket_idx").on(t.ticketId)]
+  (t) => [index("replies_ticket_idx").on(t.ticketId)],
 );
 
 export const history = sqliteTable(
@@ -474,7 +524,7 @@ export const history = sqliteTable(
     snapshot: text("snapshot"),
     createdAt: text("created_at").notNull(),
   },
-  (t) => [index("history_ticket_idx").on(t.ticketId)]
+  (t) => [index("history_ticket_idx").on(t.ticketId)],
 );
 
 // ==================== AI Feature Tables ====================
@@ -518,7 +568,7 @@ export const aiCredentials = sqliteTable(
   (t) => [
     index("ai_credentials_provider_idx").on(t.provider),
     index("ai_credentials_available_idx").on(t.enabled, t.blockedUntil),
-  ]
+  ],
 );
 
 export const aiConfigs = sqliteTable("ai_configs", {
@@ -544,14 +594,11 @@ export const aiTaskCredentials = sqliteTable(
   (t) => [
     uniqueIndex("ai_task_credentials_task_credential_unique").on(
       t.taskType,
-      t.credentialId
+      t.credentialId,
     ),
-    index("ai_task_credentials_task_priority_idx").on(
-      t.taskType,
-      t.priority
-    ),
+    index("ai_task_credentials_task_priority_idx").on(t.taskType, t.priority),
     index("ai_task_credentials_credential_idx").on(t.credentialId),
-  ]
+  ],
 );
 
 export type DocumentStatus = "pending" | "processing" | "ready" | "error";
@@ -671,14 +718,14 @@ export const emailConfigs = sqliteTable(
     productId: text("product_id").notNull().unique(),
     // Inbound settings
     inboundEnabled: integer("inbound_enabled", { mode: "boolean" }).default(
-      false
+      false,
     ),
     inboundProvider: text("inbound_provider").$type<InboundEmailProvider>(),
     inboundAddress: text("inbound_address"),
     inboundWebhookSecret: text("inbound_webhook_secret"),
     // Outbound settings
     outboundEnabled: integer("outbound_enabled", { mode: "boolean" }).default(
-      false
+      false,
     ),
     outboundProvider: text("outbound_provider").$type<EmailProvider>(),
     outboundApiKey: text("outbound_api_key"),
@@ -691,7 +738,7 @@ export const emailConfigs = sqliteTable(
     outboundReplyTo: text("outbound_reply_to"),
     // AI filtering settings
     aiFilterEnabled: integer("ai_filter_enabled", { mode: "boolean" }).default(
-      true
+      true,
     ),
     aiFilterStrictness: text("ai_filter_strictness")
       .$type<AIFilterStrictness>()
@@ -699,9 +746,7 @@ export const emailConfigs = sqliteTable(
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
-  (t) => [
-    uniqueIndex("email_configs_inbound_address_uq").on(t.inboundAddress),
-  ]
+  (t) => [uniqueIndex("email_configs_inbound_address_uq").on(t.inboundAddress)],
 );
 
 export const emailTemplates = sqliteTable(
@@ -717,8 +762,11 @@ export const emailTemplates = sqliteTable(
     updatedAt: text("updated_at").notNull(),
   },
   (t) => [
-    uniqueIndex("email_templates_product_type_uq").on(t.productId, t.templateType),
-  ]
+    uniqueIndex("email_templates_product_type_uq").on(
+      t.productId,
+      t.templateType,
+    ),
+  ],
 );
 
 export const inboundEmails = sqliteTable(
@@ -729,51 +777,54 @@ export const inboundEmails = sqliteTable(
     messageId: text("message_id").notNull(),
     inReplyTo: text("in_reply_to"),
     references: text("references_header"),
-  provider: text("provider").$type<InboundEmailProvider>().notNull(),
-  // Sender info
-  fromEmail: text("from_email").notNull(),
-  fromName: text("from_name"),
-  toEmail: text("to_email").notNull(),
-  // Content
-  subject: text("subject"),
-  bodyPlain: text("body_plain"),
-  bodyHtml: text("body_html"),
-  autoSubmitted: text("auto_submitted"),
-  precedence: text("precedence"),
-  listId: text("list_id"),
-  returnPath: text("return_path"),
-  // Processing result
-  processingStatus: text("processing_status")
-    .$type<EmailProcessingStatus>()
-    .notNull()
-    .default("pending"),
-  filterResult: text("filter_result"),
-  filterStage: text("filter_stage"),
-  filterProvider: text("filter_provider"),
-  filterVerdict: text("filter_verdict").$type<SpamFilterVerdict>(),
-  filterScore: real("filter_score"),
-  filterReason: text("filter_reason"),
-  candidateTicketId: text("candidate_ticket_id"),
-  ticketId: text("ticket_id"),
-  replyId: text("reply_id"),
-  errorMessage: text("error_message"),
-  // Security checks
-  spfResult: text("spf_result"),
-  dkimResult: integer("dkim_result", { mode: "boolean" }),
-  isSpam: integer("is_spam", { mode: "boolean" }),
-  // Raw payload
-  rawPayload: text("raw_payload"),
-  releasedAt: text("released_at"),
-  releasedBy: text("released_by"),
-  releaseReason: text("release_reason"),
-  releaseTicketTypeId: text("release_ticket_type_id"),
-  createdAt: text("created_at").notNull(),
-  processedAt: text("processed_at"),
+    provider: text("provider").$type<InboundEmailProvider>().notNull(),
+    // Sender info
+    fromEmail: text("from_email").notNull(),
+    fromName: text("from_name"),
+    toEmail: text("to_email").notNull(),
+    // Content
+    subject: text("subject"),
+    bodyPlain: text("body_plain"),
+    bodyHtml: text("body_html"),
+    autoSubmitted: text("auto_submitted"),
+    precedence: text("precedence"),
+    listId: text("list_id"),
+    returnPath: text("return_path"),
+    // Processing result
+    processingStatus: text("processing_status")
+      .$type<EmailProcessingStatus>()
+      .notNull()
+      .default("pending"),
+    filterResult: text("filter_result"),
+    filterStage: text("filter_stage"),
+    filterProvider: text("filter_provider"),
+    filterVerdict: text("filter_verdict").$type<SpamFilterVerdict>(),
+    filterScore: real("filter_score"),
+    filterReason: text("filter_reason"),
+    candidateTicketId: text("candidate_ticket_id"),
+    ticketId: text("ticket_id"),
+    replyId: text("reply_id"),
+    errorMessage: text("error_message"),
+    // Security checks
+    spfResult: text("spf_result"),
+    dkimResult: integer("dkim_result", { mode: "boolean" }),
+    isSpam: integer("is_spam", { mode: "boolean" }),
+    // Raw payload
+    rawPayload: text("raw_payload"),
+    releasedAt: text("released_at"),
+    releasedBy: text("released_by"),
+    releaseReason: text("release_reason"),
+    releaseTicketTypeId: text("release_ticket_type_id"),
+    createdAt: text("created_at").notNull(),
+    processedAt: text("processed_at"),
   },
   (t) => [
-    uniqueIndex("inbound_emails_product_message_uq").on(t.productId, t.messageId),
+    uniqueIndex("inbound_emails_product_message_uq").on(
+      t.productId,
+      t.messageId,
+    ),
     index("inbound_emails_product_created_idx").on(t.productId, t.createdAt),
-  ]
+  ],
 );
 
 export const outboundEmails = sqliteTable(
@@ -794,7 +845,10 @@ export const outboundEmails = sqliteTable(
     // Delivery info
     provider: text("provider").$type<EmailProvider>().notNull(),
     providerMessageId: text("provider_message_id"),
-    status: text("status").$type<EmailDeliveryStatus>().notNull().default("pending"),
+    status: text("status")
+      .$type<EmailDeliveryStatus>()
+      .notNull()
+      .default("pending"),
     errorMessage: text("error_message"),
     createdAt: text("created_at").notNull(),
     sentAt: text("sent_at"),
@@ -802,7 +856,7 @@ export const outboundEmails = sqliteTable(
   (t) => [
     index("outbound_emails_product_created_idx").on(t.productId, t.createdAt),
     index("outbound_emails_ticket_idx").on(t.ticketId),
-  ]
+  ],
 );
 
 // ==================== Notification Feature Tables ====================
@@ -842,7 +896,9 @@ export const notificationEndpoints = sqliteTable(
   {
     id: text("id").primaryKey(),
     userId: text("user_id").notNull(),
-    channelType: text("channel_type").$type<NotificationChannelType>().notNull(),
+    channelType: text("channel_type")
+      .$type<NotificationChannelType>()
+      .notNull(),
     name: text("name").notNull(),
     enabled: integer("enabled", { mode: "boolean" }).default(true),
     config: text("config").notNull(),
@@ -852,7 +908,7 @@ export const notificationEndpoints = sqliteTable(
   (t) => [
     index("notification_endpoints_user_idx").on(t.userId),
     index("notification_endpoints_user_type_idx").on(t.userId, t.channelType),
-  ]
+  ],
 );
 
 /** Product-owned routing rules: event -> recipients -> allowed endpoint types. */
@@ -873,7 +929,7 @@ export const notificationRules = sqliteTable(
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
-  (t) => [index("notification_rules_product_idx").on(t.productId)]
+  (t) => [index("notification_rules_product_idx").on(t.productId)],
 );
 
 /** Compliance requirements for endpoint types at product, team, or user scope. */
@@ -894,7 +950,7 @@ export const notificationRequirements = sqliteTable(
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
-  (t) => [index("notification_requirements_product_idx").on(t.productId)]
+  (t) => [index("notification_requirements_product_idx").on(t.productId)],
 );
 
 export const notificationLogs = sqliteTable(
@@ -906,10 +962,17 @@ export const notificationLogs = sqliteTable(
     requirementId: text("requirement_id"),
     endpointId: text("endpoint_id"),
     recipientUserId: text("recipient_user_id").notNull(),
-    channelType: text("channel_type").$type<NotificationChannelType>().notNull(),
+    channelType: text("channel_type")
+      .$type<NotificationChannelType>()
+      .notNull(),
     ticketId: text("ticket_id").notNull(),
-    triggerEvent: text("trigger_event").$type<NotificationTriggerEvent>().notNull(),
-    status: text("status").$type<NotificationStatus>().notNull().default("pending"),
+    triggerEvent: text("trigger_event")
+      .$type<NotificationTriggerEvent>()
+      .notNull(),
+    status: text("status")
+      .$type<NotificationStatus>()
+      .notNull()
+      .default("pending"),
     errorMessage: text("error_message"),
     createdAt: text("created_at").notNull(),
     sentAt: text("sent_at"),
@@ -917,7 +980,7 @@ export const notificationLogs = sqliteTable(
   (t) => [
     index("notification_logs_product_created_idx").on(t.productId, t.createdAt),
     index("notification_logs_ticket_idx").on(t.ticketId),
-  ]
+  ],
 );
 
 // ==================== Rate Limiting ====================
@@ -939,11 +1002,14 @@ export type ReplyRow = typeof replies.$inferSelect;
 export type TemplateRow = typeof templates.$inferSelect;
 export type TicketTypeRow = typeof ticketTypes.$inferSelect;
 export type TicketTypePresetRow = typeof ticketTypePresets.$inferSelect;
-export type TicketTypeInternalStateRow = typeof ticketTypeInternalStates.$inferSelect;
-export type TicketInternalStateValueRow = typeof ticketInternalStateValues.$inferSelect;
+export type TicketTypeInternalStateRow =
+  typeof ticketTypeInternalStates.$inferSelect;
+export type TicketInternalStateValueRow =
+  typeof ticketInternalStateValues.$inferSelect;
 export type TicketTypeRouteRow = typeof ticketTypeRoutes.$inferSelect;
 export type TicketTemplateRow = typeof ticketTemplates.$inferSelect;
-export type TicketTemplateVersionRow = typeof ticketTemplateVersions.$inferSelect;
+export type TicketTemplateVersionRow =
+  typeof ticketTemplateVersions.$inferSelect;
 export type ProductKeyRow = typeof productKeys.$inferSelect;
 export type CustomerRow = typeof customers.$inferSelect;
 export type CategoryRouteRow = typeof categoryRoutes.$inferSelect;
@@ -964,5 +1030,6 @@ export type SpamFilterConfigRow = typeof spamFilterConfigs.$inferSelect;
 
 export type NotificationEndpointRow = typeof notificationEndpoints.$inferSelect;
 export type NotificationRuleRow = typeof notificationRules.$inferSelect;
-export type NotificationRequirementRow = typeof notificationRequirements.$inferSelect;
+export type NotificationRequirementRow =
+  typeof notificationRequirements.$inferSelect;
 export type NotificationLogRow = typeof notificationLogs.$inferSelect;

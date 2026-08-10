@@ -69,7 +69,7 @@ interface TemplateDetail {
   versions: VersionView[];
 }
 
-export function TicketTemplateVersionManagement() {
+export function TicketTemplateVersionManagement({ productId }: { productId?: string }) {
   const { t } = useI18n();
   const m = t.management.ticketTemplates;
   const { data: types, error: typesError, isLoading: typesLoading } = useSWR<TicketTypeAdminView[]>(
@@ -85,10 +85,10 @@ export function TicketTemplateVersionManagement() {
   const byId = useMemo(() => new Map((types ?? []).map((item) => [item.id, item])), [types]);
   const options = useMemo(
     () => (types ?? [])
-      .filter((item) => !item.systemKey && !item.archivedAt)
+      .filter((item) => !item.systemKey && !item.archivedAt && (!productId || item.productId === productId))
       .map((item) => ({ id: item.id, label: ticketTypePathLabel(item, byId) }))
       .sort((a, b) => a.label.localeCompare(b.label)),
-    [types, byId]
+    [types, byId, productId]
   );
   const current = detail?.versions.find((version) => version.id === detail.template.currentVersionId) ?? null;
 

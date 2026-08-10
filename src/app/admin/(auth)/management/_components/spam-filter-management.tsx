@@ -28,7 +28,7 @@ interface SpamConfigView {
 
 const GLOBAL = "__global__";
 
-export function SpamFilterManagement() {
+export function SpamFilterManagement({ tenantId }: { tenantId?: string }) {
   const { t } = useI18n();
   const m = t.management.spamFilter;
   const { can } = useMe();
@@ -37,7 +37,7 @@ export function SpamFilterManagement() {
     isSuperAdmin ? "/api/tob/admin/tenants" : null,
     swrFetcher
   );
-  const [scope, setScope] = useState(GLOBAL);
+  const [scope, setScope] = useState(tenantId ?? GLOBAL);
   const configKey = `/api/tob/admin/spam-filter${qs({
     tenantId: scope === GLOBAL ? undefined : scope,
   })}`;
@@ -82,7 +82,7 @@ export function SpamFilterManagement() {
       actions={<Button size="sm" className="h-8" onClick={() => void save()} disabled={pending || !data}><Save className="mr-1.5 size-3.5" />{pending ? t.common.loading : t.common.save}</Button>}
     >
       <div className="grid max-w-2xl gap-4 sm:grid-cols-2">
-        {isSuperAdmin && (
+        {isSuperAdmin && !tenantId && (
           <FormField label={m.scope}>
             <Select value={scope} onValueChange={setScope}>
               <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
@@ -111,4 +111,3 @@ export function SpamFilterManagement() {
     </ManagerPanel>
   );
 }
-

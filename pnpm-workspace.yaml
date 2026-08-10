@@ -11,14 +11,15 @@ minimumReleaseAgeExclude:
   - '@ai-sdk/provider-utils@5.0.5'
   - '@ai-sdk/provider@4.0.2'
   - ai@7.0.14
-  - miniflare@4.20260701.0
-  - wrangler@4.110.0
+  - miniflare@4.20260701.0 || 5.20260804.0-alpha
+  - wrangler@4.110.0 || 4.120.1
   - shadcn@4.13.0
   - '@cloudflare/workers-types@5.20260712.1'
   - postcss@8.5.17
 
 overrides:
   '@esbuild-kit/core-utils>esbuild': 0.25.12
-  dompurify: 3.4.12
-  'next>postcss': 8.5.18
+  dompurify: 3.4.13
+  nanoid: 3.3.17
+  'next>postcss': 8.5.23
   sharp: 0.35.0

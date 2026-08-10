@@ -44,7 +44,7 @@ import {
   type TicketTypeAdminView,
 } from "./ticket-type-management";
 
-export function TicketTypeRouteManagement() {
+export function TicketTypeRouteManagement({ productId }: { productId?: string }) {
   const { t } = useI18n();
   const m = t.management.ticketTypeRoutes;
   const { data, error, isLoading, mutate } = useSWR<TicketTypeAdminView[]>(
@@ -62,11 +62,12 @@ export function TicketTypeRouteManagement() {
       .filter(
         (item) =>
           !item.archivedAt &&
+          (!productId || item.productId === productId) &&
           (!item.systemKey || item.systemKey === "unclassified")
       )
       .map((item) => ({ item, path: item.systemKey === "unclassified" ? m.unclassified : ticketTypePathLabel(item, byId) }))
       .sort((a, b) => a.path.localeCompare(b.path)),
-    [data, byId, m.unclassified]
+    [data, byId, m.unclassified, productId]
   );
 
   const inherited = (item: TicketTypeAdminView) => {

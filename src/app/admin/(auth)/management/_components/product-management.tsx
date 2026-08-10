@@ -3,11 +3,17 @@
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Settings, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
 import { api, swrFetcher } from "@/lib/api/client";
 import { useMe } from "@/lib/hooks/use-me";
 import type { ProductView } from "@/lib/api/types";
+import {
+  type ProductFormValues,
+  type ProductSlaField,
+  validateProductForm,
+} from "@/lib/product-form-validation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,42 +58,9 @@ interface Tenant {
   name: string;
 }
 
-type SlaField =
-  | "slaHighAccept"
-  | "slaHighReply"
-  | "slaMediumAccept"
-  | "slaMediumReply"
-  | "slaLowAccept"
-  | "slaLowReply";
+const DEFAULT_TENANT = "__default__";
 
-const SLA_FIELDS: SlaField[] = [
-  "slaHighAccept",
-  "slaHighReply",
-  "slaMediumAccept",
-  "slaMediumReply",
-  "slaLowAccept",
-  "slaLowReply",
-];
-
-interface ProductForm {
-  name: string;
-  tenantId: string;
-  homepageUrl: string;
-  portalReturnUrl: string;
-  identityEnabled: boolean;
-  identityEndpointUrl: string;
-  identityAuthSecret: string;
-  identitySecretConfigured: boolean;
-  slaHighAccept: string;
-  slaHighReply: string;
-  slaMediumAccept: string;
-  slaMediumReply: string;
-  slaLowAccept: string;
-  slaLowReply: string;
-  autoCloseMinutes: string;
-}
-
-const emptyForm = (): ProductForm => ({
+const emptyForm = (): ProductFormValues => ({
   name: "",
   tenantId: "",
   homepageUrl: "",
@@ -105,14 +78,8 @@ const emptyForm = (): ProductForm => ({
   autoCloseMinutes: "",
 });
 
-/** "" → undefined; otherwise a validated positive integer (or NaN). */
-function parsePositiveInt(value: string): number | undefined {
-  if (value.trim() === "") return undefined;
-  const n = Number(value);
-  return Number.isInteger(n) && n > 0 ? n : Number.NaN;
-}
-
 export function ProductManagement() {
+  const router = useRouter();
   const { t } = useI18n();
   const m = t.management;
   const { can } = useMe();
@@ -134,8 +101,10 @@ export function ProductManagement() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ProductView | null>(null);
   const [deleting, setDeleting] = useState<ProductView | null>(null);
-  const [form, setForm] = useState<ProductForm>(emptyForm());
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [form, setForm] = useState<ProductFormValues>(emptyForm());
+  const [formErrors, setFormErrors] = useState<
+    Partial<Record<keyof ProductFormValues, string>>
+  >({});
   const [pending, setPending] = useState(false);
 
   const tenantNames = useMemo(
@@ -180,82 +149,26 @@ export function ProductManagement() {
   };
 
   const handleSubmit = async () => {
-    const errors: Record<string, string> = {};
-    if (!form.name.trim()) errors.name = m.products.nameRequired;
-    for (const field of ["homepageUrl", "portalReturnUrl"] as const) {
-      const value = form[field].trim();
-      if (value && !/^https?:\/\//i.test(value)) {
-        errors[field] = m.products.urlInvalid;
-      }
-    }
-    if (form.identityEnabled) {
-      if (!/^https:\/\/[^/]+\./i.test(form.identityEndpointUrl.trim())) {
-        errors.identityEndpointUrl = m.products.identityUrlInvalid;
-      }
-      if (
-        !form.identitySecretConfigured &&
-        form.identityAuthSecret.trim().length < 16
-      ) {
-        errors.identityAuthSecret = m.products.identitySecretRequired;
-      }
-    }
-    if (
-      form.identityAuthSecret &&
-      form.identityAuthSecret.trim().length < 16
-    ) {
-      errors.identityAuthSecret = m.products.identitySecretRequired;
-    }
-    for (const field of [...SLA_FIELDS, "autoCloseMinutes"] as const) {
-      const parsed = parsePositiveInt(form[field]);
-      if (parsed !== undefined && Number.isNaN(parsed)) {
-        errors[field] = m.invalidNumber;
-      }
-    }
+    const { errors, payload } = validateProductForm(form, {
+      editing: editing !== null,
+      includeTenant: isSuperAdmin,
+      messages: {
+        nameRequired: m.products.nameRequired,
+        urlInvalid: m.products.urlInvalid,
+        identityUrlInvalid: m.products.identityUrlInvalid,
+        identitySecretRequired: m.products.identitySecretRequired,
+        invalidNumber: m.invalidNumber,
+      },
+    });
     setFormErrors(errors);
-    if (Object.keys(errors).length > 0) return;
+    if (!payload) return;
 
     setPending(true);
     try {
       if (editing) {
-        const payload: Record<string, unknown> = {
-          name: form.name.trim(),
-          homepageUrl: form.homepageUrl.trim() || null,
-          portalReturnUrl: form.portalReturnUrl.trim() || null,
-          identityEnabled: form.identityEnabled,
-          identityEndpointUrl: form.identityEndpointUrl.trim() || null,
-        };
-        if (form.identityAuthSecret.trim()) {
-          payload.identityAuthSecret = form.identityAuthSecret.trim();
-        }
-        for (const field of SLA_FIELDS) {
-          payload[field] = parsePositiveInt(form[field]) ?? null;
-        }
-        payload.autoCloseMinutes =
-          parsePositiveInt(form.autoCloseMinutes) ?? null;
         await api.patch(`/api/tob/admin/products/${editing.id}`, payload);
         toast.success(m.toastUpdated);
       } else {
-        const payload: Record<string, unknown> = {
-          name: form.name.trim(),
-        };
-        if (isSuperAdmin && form.tenantId) payload.tenantId = form.tenantId;
-        if (form.homepageUrl.trim()) payload.homepageUrl = form.homepageUrl.trim();
-        if (form.portalReturnUrl.trim()) {
-          payload.portalReturnUrl = form.portalReturnUrl.trim();
-        }
-        payload.identityEnabled = form.identityEnabled;
-        if (form.identityEndpointUrl.trim()) {
-          payload.identityEndpointUrl = form.identityEndpointUrl.trim();
-        }
-        if (form.identityAuthSecret.trim()) {
-          payload.identityAuthSecret = form.identityAuthSecret.trim();
-        }
-        for (const field of SLA_FIELDS) {
-          const value = parsePositiveInt(form[field]);
-          if (value !== undefined) payload[field] = value;
-        }
-        const autoClose = parsePositiveInt(form.autoCloseMinutes);
-        if (autoClose !== undefined) payload.autoCloseMinutes = autoClose;
         await api.post("/api/tob/admin/products", payload);
         toast.success(m.toastCreated);
       }
@@ -295,8 +208,8 @@ export function ProductManagement() {
 
   const slaRow = (
     label: string,
-    acceptField: SlaField,
-    replyField: SlaField
+    acceptField: ProductSlaField,
+    replyField: ProductSlaField
   ) => (
     <div className="grid grid-cols-[72px_1fr_1fr] items-center gap-2">
       <span className="text-sm text-muted-foreground">{label}</span>
@@ -404,6 +317,11 @@ export function ProductManagement() {
                       <RowActions
                         actions={[
                           {
+                            label: m.manage,
+                            icon: Settings,
+                            onSelect: () => router.push(`/admin/management/products/${product.id}`),
+                          },
+                          {
                             label: t.common.edit,
                             icon: Pencil,
                             onSelect: () => openEdit(product),
@@ -452,13 +370,21 @@ export function ProductManagement() {
             {isSuperAdmin && !editing && (
               <FormField label={m.products.tenant}>
                 <Select
-                  value={form.tenantId}
-                  onValueChange={(v) => setForm((f) => ({ ...f, tenantId: v }))}
+                  value={form.tenantId || DEFAULT_TENANT}
+                  onValueChange={(v) =>
+                    setForm((f) => ({
+                      ...f,
+                      tenantId: v === DEFAULT_TENANT ? "" : v,
+                    }))
+                  }
                 >
                   <SelectTrigger className="h-8">
                     <SelectValue placeholder={m.products.selectTenant} />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value={DEFAULT_TENANT}>
+                      {m.products.defaultTenant}
+                    </SelectItem>
                     {(tenants ?? []).map((tenant) => (
                       <SelectItem key={tenant.id} value={tenant.id}>
                         {tenant.name}

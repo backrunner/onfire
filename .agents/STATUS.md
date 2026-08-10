@@ -1,6 +1,6 @@
 # OnFire Project Status
 
-Updated: 2026-08-03
+Updated: 2026-08-11
 
 ## Current State
 
@@ -15,6 +15,8 @@ Updated: 2026-08-03
 
 - Notifications now separate user-owned receiving endpoints from product-owned delivery policy. Product rules select events, recipient scopes, and channel types; mandatory requirements both drive delivery and report missing endpoint compliance.
 - Personal endpoints support email, PushDeer, Bark, ntfy, Telegram, Discord, Slack, Microsoft Teams, Feishu, DingTalk, and WeCom through a centralized provider registry. Secrets are sealed and omitted from browser responses.
+- Installation and administrator-created users receive an enabled account-email endpoint by default; migration `0015_default_user_email_endpoint.sql` backfills existing users who have no email endpoint without overriding existing endpoint preferences.
+- Account security is consolidated behind one modal entry with password changes, Passkey add/rename/delete management, and authenticator TOTP enrollment, recovery-code regeneration, and disable actions. Login supports password, Passkey, TOTP challenges, trusted devices, and recovery-code fallback.
 - Personal endpoints expose an owner-only test action. Email tests select a visible product and reuse its outbound provider; other channels test their stored provider configuration directly.
 - Notification administration now has explicit metadata and endpoint load failures, fixed-action dialogs with inline validation and discard confirmation, compact policy summaries, and searchable/batched compliance details.
 - Recipient resolution supports current assignee, ticket team, all product agents, specific teams, and specific agents. Overlapping policies deduplicate endpoints, while missing selected methods create failed delivery logs.
@@ -33,6 +35,7 @@ Updated: 2026-08-03
 - Production `AUTH_SECRET` and `TURNSTILE_SECRET` are set as Worker secrets. The database remains intentionally uninitialized at the application level (`needsInstall: true`) until the first SuperAdmin completes `/admin/install`.
 - RBAC combines role permissions with tenant, product, and team scope. ProductAdmin scope comes from `user_products`; support-agent membership remains separate.
 - Product lifecycle and product settings are separate permissions. ProductAdmin can update scoped SLA, auto-close, and team associations without creating or deleting products.
+- Product creation can explicitly use the creator's default tenant without selecting a tenant. The product form validates and normalizes every persisted field again at save time, including return URLs, remote identity settings, SLA values, and auto-close values.
 - Tenant/product/team writes reject cross-tenant associations, including SuperAdmin requests, and dependency-protected deletes return HTTP 409.
 - Global search provides scoped ticket suggestions. Clicking opens the ticket; Enter opens the full search page.
 - OpenAI language tasks select Responses API or Chat Completions. Embeddings are independent and support OpenAI, Qwen, Jina, Cohere, and Google.
@@ -59,20 +62,22 @@ Updated: 2026-08-03
 - `0012_normal_old_lace.sql`: distinguish mandatory requirement deliveries from ordinary rule deliveries in notification logs.
 - `0013_big_psynapse.sql`: product ticket-type trees, inherited routes, immutable form versions, historical snapshots, external spam configuration, and recoverable inbound quarantine.
 - `0014_thick_edwin_jarvis.sql`: tenant ticket-type preset trees, product ticket-type internal-state definitions, and audited per-ticket internal-state values.
+- `0015_default_user_email_endpoint.sql`: enabled account-email notification endpoints for existing users who do not already have one.
+- `0016_amused_joseph.sql`: Better Auth Passkey credentials, TOTP secrets and lockout state, plus the authentication-user two-factor flag.
 
-A fresh local D1 successfully applied migrations `0000` through `0014`. A separate non-empty legacy fixture also verifies unique migrated type keys, invalid legacy metadata tolerance, pinned version backfill, and historical path snapshots. Production D1 also has migrations `0000` through `0014` applied.
+A fresh local D1 successfully applied migrations `0000` through `0016`. A separate non-empty legacy fixture also verifies unique migrated type keys, invalid legacy metadata tolerance, pinned version backfill, and historical path snapshots. Production D1 has migrations `0000` through `0014` applied; `0015` and `0016` remain pending deployment approval.
 
 ## Verification
 
 - `pnpm lint`: passing.
-- `pnpm test`: 45 files, 193 tests passing, including tenant preset scope/depth/cycle/copy independence, internal-state validation/archive/history audit, admin navigation normalization, outbound and inbound email thread recovery, stale subject-marker precedence, ticket type paths and inherited routing, immutable form versions, non-empty legacy migration, archived-template recovery, concurrent and closed-thread quarantine release, customer projection privacy, unclassified fallback, external spam protocol safety, notification membership and delivery, redirect rejection, AI failover, proxy isolation, resolver limits, SLA state transitions, and RBAC scope.
-- `pnpm build:worker`: passing with OpenNext Cloudflare 1.20.2, Next 16.2.12, Wrangler 4.118.0, and Wrangler-generated workerd runtime types.
+- `pnpm test`: 48 files, 199 tests passing, including tenant preset scope/depth/cycle/copy independence, internal-state validation/archive/history audit, admin navigation normalization, outbound and inbound email thread recovery, stale subject-marker precedence, ticket type paths and inherited routing, immutable form versions, non-empty legacy migration, archived-template recovery, concurrent and closed-thread quarantine release, customer projection privacy, unclassified fallback, external spam protocol safety, notification membership and delivery, default account-email endpoints, Passkey RP configuration, managed-user credential cleanup, redirect rejection, AI failover, proxy isolation, resolver limits, SLA state transitions, and RBAC scope.
+- `pnpm build:worker`: passing with OpenNext Cloudflare 1.20.2, Next 16.2.12, Wrangler 4.120.1, and Wrangler-generated workerd runtime types.
 - `pnpm cf-typegen --check`: passing with generated `CloudflareEnv`; `wrangler.types.env` keeps secret typing deterministic without storing values.
 - `pnpm exec drizzle-kit check`: passing.
 - `pnpm install --frozen-lockfile`: passing on the tracked pnpm lockfile.
 - `pnpm audit --prod`: no known vulnerabilities after scoped esbuild/PostCSS/Sharp overrides in `pnpm-workspace.yaml`.
 - `wrangler deploy --dry-run`: passing with all D1, R2, Vectorize, Email, service, and asset bindings detected.
-- `wrangler check startup`: passing; final local profile window was approximately 241 ms with 19 ms active CPU time (the generated profile was removed after inspection).
+- `wrangler check startup`: passing; final local profile window was approximately 270 ms with 26 ms active CPU time (the generated profile was removed after inspection).
 - Wrangler local workerd smoke: admin-domain rewrite returns 200, ToC `/admin` access redirects with 307, and API bypass returns 200.
 - Playwright desktop/mobile visual regression: passed in light and dark at 1440x900 and 390x844 for tenant preset dialogs, responsive internal-state management, live ticket state updates and history rendering, product ticket-type trees, parent/child ToC selection, form-version history, the responsive form editor, type routing, external spam settings, notification summaries, fixed-footer policy dialogs, inline validation, metadata/endpoint errors, batched compliance details, personal endpoint rows, and endpoint testing.
 - Local Wrangler reverse-proxy smoke: `/support` HTML and prefixed CSS/JS load successfully; ToB paths below `/support` return 404; cross-origin preflight receives no CORS allow headers; the portal has no browser console errors.

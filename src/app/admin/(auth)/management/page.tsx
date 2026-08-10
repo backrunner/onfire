@@ -12,27 +12,21 @@ import { ProductManagement } from "./_components/product-management";
 import { TeamManagement } from "./_components/team-management";
 import { UserManagement } from "./_components/user-management";
 import { AgentManagement } from "./_components/agent-management";
-import { TicketTypeManagement } from "./_components/ticket-type-management";
-import { TicketTypeRouteManagement } from "./_components/ticket-type-route-management";
-import { TicketTemplateVersionManagement } from "./_components/ticket-template-version-management";
-import { SpamFilterManagement } from "./_components/spam-filter-management";
-import { ProductKeyManagement } from "./_components/product-key-management";
 import { TicketTypePresetManagement } from "./_components/ticket-type-preset-management";
-import { TicketInternalStateManagement } from "./_components/ticket-internal-state-management";
+import { SpamFilterManagement } from "./_components/spam-filter-management";
+import { CredentialsTab } from "@/components/admin/ai/credentials-tab";
+import { RoutingTab } from "@/components/admin/ai/routing-tab";
 
 type TabKey =
   | "tenants"
   | "products"
   | "teams"
-  | "ticketTypes"
   | "ticketTypePresets"
-  | "internalStates"
-  | "templates"
   | "users"
   | "agents"
-  | "ticketTypeRoutes"
   | "spamFilter"
-  | "apiKeys";
+  | "aiCredentials"
+  | "aiRouting";
 
 interface TabDef {
   value: TabKey;
@@ -44,19 +38,20 @@ const TABS: TabDef[] = [
   { value: "tenants", permission: "tenant.manage", render: () => <TenantManagement /> },
   { value: "products", permission: "product.settings", render: () => <ProductManagement /> },
   { value: "teams", permission: "team.manage", render: () => <TeamManagement /> },
-  { value: "ticketTypes", permission: "ticket_type.write", render: () => <TicketTypeManagement /> },
-  { value: "ticketTypePresets", permission: "ticket_type.preset.read", render: () => <TicketTypePresetManagement /> },
-  { value: "internalStates", permission: "ticket_type.write", render: () => <TicketInternalStateManagement /> },
-  { value: "templates", permission: "ticket_template.read", render: () => <TicketTemplateVersionManagement /> },
+  {
+    value: "ticketTypePresets",
+    permission: "ticket_type.preset.read",
+    render: () => <TicketTypePresetManagement />,
+  },
   { value: "users", permission: "user.manage", render: () => <UserManagement /> },
   { value: "agents", permission: "user.manage", render: () => <AgentManagement /> },
   {
-    value: "ticketTypeRoutes",
-    permission: "ticket_type.route",
-    render: () => <TicketTypeRouteManagement />,
+    value: "spamFilter",
+    permission: "spam.config",
+    render: () => <SpamFilterManagement />,
   },
-  { value: "apiKeys", permission: "product.settings", render: () => <ProductKeyManagement /> },
-  { value: "spamFilter", permission: "spam.config", render: () => <SpamFilterManagement /> },
+  { value: "aiCredentials", permission: "ai.config", render: () => <CredentialsTab /> },
+  { value: "aiRouting", permission: "ai.config", render: () => <RoutingTab /> },
 ];
 
 function ManagementPageSkeleton() {
@@ -124,9 +119,7 @@ export default function AdminManagementPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold">
-          {t.management.title}
-        </h1>
+        <h1 className="text-xl font-semibold">{t.management.title}</h1>
         <p className="text-sm text-muted-foreground">{t.management.subtitle}</p>
       </div>
 

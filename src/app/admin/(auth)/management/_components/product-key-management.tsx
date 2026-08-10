@@ -89,11 +89,11 @@ interface SecretReveal {
 
 const ALL = "all";
 
-export function ProductKeyManagement() {
+export function ProductKeyManagement({ productId }: { productId?: string }) {
   const { t } = useI18n();
   const m = t.management;
 
-  const [productFilter, setProductFilter] = useState<string>(ALL);
+  const [productFilter, setProductFilter] = useState<string>(productId ?? ALL);
 
   const {
     data: keys,
@@ -132,7 +132,7 @@ export function ProductKeyManagement() {
 
   const openCreate = () => {
     setForm({
-      productId: productFilter === ALL ? "" : productFilter,
+      productId: productId ?? (productFilter === ALL ? "" : productFilter),
       name: "",
     });
     setFormErrors({});
@@ -244,7 +244,7 @@ export function ProductKeyManagement() {
         description={m.apiKeys.description}
         actions={
           <>
-            <Select value={productFilter} onValueChange={setProductFilter}>
+            {!productId && <Select value={productFilter} onValueChange={setProductFilter}>
               <SelectTrigger className="h-8 w-44 text-sm">
                 <SelectValue placeholder={m.apiKeys.allProducts} />
               </SelectTrigger>
@@ -256,7 +256,7 @@ export function ProductKeyManagement() {
                   </SelectItem>
                 ))}
               </SelectContent>
-            </Select>
+            </Select>}
             <Button
               size="sm"
               className="h-8"
@@ -280,7 +280,7 @@ export function ProductKeyManagement() {
             <TableHeader>
               <TableRow>
                 <TableHead>{m.apiKeys.name}</TableHead>
-                <TableHead>{m.apiKeys.product}</TableHead>
+                {!productId && <TableHead>{m.apiKeys.product}</TableHead>}
                 <TableHead>{m.apiKeys.createdAt}</TableHead>
                 <TableHead>{m.apiKeys.lastUsed}</TableHead>
                 <TableHead>{t.common.status}</TableHead>
@@ -298,9 +298,9 @@ export function ProductKeyManagement() {
                         {key.id}
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    {!productId && <TableCell className="text-sm text-muted-foreground">
                       {productNames.get(key.productId) ?? key.productId}
-                    </TableCell>
+                    </TableCell>}
                     <TableCell className="text-sm tabular-nums text-muted-foreground">
                       {formatDateTime(key.createdAt)}
                     </TableCell>
@@ -371,7 +371,7 @@ export function ProductKeyManagement() {
             <DialogTitle>{m.apiKeys.create}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <FormField
+            {!productId && <FormField
               label={m.apiKeys.product}
               required
               error={formErrors.productId}
@@ -391,7 +391,7 @@ export function ProductKeyManagement() {
                   ))}
                 </SelectContent>
               </Select>
-            </FormField>
+            </FormField>}
 
             <FormField label={m.apiKeys.name} htmlFor="key-name">
               <Input

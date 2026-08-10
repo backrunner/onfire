@@ -106,6 +106,20 @@
       "when": 1784360493421,
       "tag": "0014_thick_edwin_jarvis",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1786425600000,
+      "tag": "0015_default_user_email_endpoint",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1786425601000,
+      "tag": "0016_amused_joseph",
+      "breakpoints": true
     }
   ]
 }

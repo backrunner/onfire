@@ -1,7 +1,10 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
+import { twoFactor } from "better-auth/plugins";
+import { passkey } from "@better-auth/passkey";
 import { getDb, getEnv } from "@/lib/db";
+import { getPasskeyRelyingParty } from "@/lib/auth/passkey-config";
 import * as schema from "@/drizzle/schema";
 
 export const getAuth = () => {
@@ -16,6 +19,8 @@ export const getAuth = () => {
         session: schema.session,
         account: schema.account,
         verification: schema.verification,
+        twoFactor: schema.twoFactor,
+        passkey: schema.passkey,
       },
     }),
     secret: env.AUTH_SECRET,
@@ -35,7 +40,11 @@ export const getAuth = () => {
       // Do not create a session for the newly provisioned user.
       autoSignIn: false,
     },
-    plugins: [nextCookies()],
+    plugins: [
+      twoFactor({ issuer: "OnFire" }),
+      passkey(getPasskeyRelyingParty(env.BETTER_AUTH_URL)),
+      nextCookies(),
+    ],
   });
 };
 

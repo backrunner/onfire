@@ -78,7 +78,7 @@ export function ticketTypePathLabel(type: TicketTypeAdminView, byId: Map<string,
   return names.join(" / ");
 }
 
-export function TicketTypeManagement() {
+export function TicketTypeManagement({ productId }: { productId?: string }) {
   const { t } = useI18n();
   const m = t.management.ticketTypes;
   const { data, error, isLoading, mutate } = useSWR<TicketTypeAdminView[]>(
@@ -106,15 +106,15 @@ export function TicketTypeManagement() {
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return (data ?? [])
-      .filter((item) => !item.systemKey)
+      .filter((item) => !item.systemKey && (!productId || item.productId === productId))
       .map((item) => ({ item, path: ticketTypePathLabel(item, byId) }))
       .filter(({ path }) => !q || path.toLowerCase().includes(q))
       .sort((a, b) => a.path.localeCompare(b.path));
-  }, [data, byId, search]);
+  }, [data, byId, productId, search]);
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ productId: products?.[0]?.id ?? "", parentId: ROOT, name: "", description: "", sortOrder: "0" });
+    setForm({ productId: productId ?? products?.[0]?.id ?? "", parentId: ROOT, name: "", description: "", sortOrder: "0" });
     setDialogOpen(true);
   };
   const openEdit = (item: TicketTypeAdminView) => {
@@ -206,7 +206,7 @@ export function TicketTypeManagement() {
             <TableHeader>
               <TableRow>
                 <TableHead>{m.path}</TableHead>
-                <TableHead>{m.product}</TableHead>
+                {!productId && <TableHead>{m.product}</TableHead>}
                 <TableHead>{m.template}</TableHead>
                 <TableHead>{m.status}</TableHead>
                 <TableHead className="w-12" />
@@ -219,7 +219,7 @@ export function TicketTypeManagement() {
                     <p className="text-sm font-medium">{path}</p>
                     {item.description && <p className="line-clamp-1 text-xs text-muted-foreground">{item.description}</p>}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{productNames.get(item.productId) ?? item.productId}</TableCell>
+                  {!productId && <TableCell className="text-sm text-muted-foreground">{productNames.get(item.productId) ?? item.productId}</TableCell>}
                   <TableCell className="text-sm">
                     {item.currentVersion ? `v${item.currentVersion.version}` : m.noTemplate}
                   </TableCell>
@@ -247,12 +247,12 @@ export function TicketTypeManagement() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>{editing ? m.edit : m.create}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
-            <FormField label={m.product} required>
+            {!productId && <FormField label={m.product} required>
               <Select value={form.productId} onValueChange={(value) => setForm((f) => ({ ...f, productId: value, parentId: ROOT }))} disabled={Boolean(editing)}>
                 <SelectTrigger className="h-8"><SelectValue placeholder={m.selectProduct} /></SelectTrigger>
                 <SelectContent>{(products ?? []).map((product) => <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>)}</SelectContent>
               </Select>
-            </FormField>
+            </FormField>}
             <FormField label={m.parent}>
               <Select value={form.parentId} onValueChange={(value) => setForm((f) => ({ ...f, parentId: value }))}>
                 <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>

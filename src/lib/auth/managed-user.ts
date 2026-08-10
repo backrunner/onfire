@@ -1,6 +1,12 @@
 import { eq } from "drizzle-orm";
 import { getAuth } from "@/lib/auth";
-import { account, session, user as authUser } from "@/drizzle/schema";
+import {
+  account,
+  passkey,
+  session,
+  twoFactor,
+  user as authUser,
+} from "@/drizzle/schema";
 import type { Database } from "@/lib/db";
 import { ApiError } from "@/lib/api/response";
 
@@ -23,7 +29,7 @@ export interface ManagedAuthUser {
  */
 export async function createManagedAuthUser(
   db: Database,
-  input: ManagedUserInput
+  input: ManagedUserInput,
 ): Promise<ManagedAuthUser> {
   const email = input.email.trim().toLowerCase();
   const name = input.name.trim();
@@ -62,9 +68,11 @@ export async function createManagedAuthUser(
 /** Remove every Better Auth record owned by an account. */
 export async function deleteManagedAuthUser(
   db: Database,
-  userId: string
+  userId: string,
 ): Promise<void> {
   await db.batch([
+    db.delete(passkey).where(eq(passkey.userId, userId)),
+    db.delete(twoFactor).where(eq(twoFactor.userId, userId)),
     db.delete(session).where(eq(session.userId, userId)),
     db.delete(account).where(eq(account.userId, userId)),
     db.delete(authUser).where(eq(authUser.id, userId)),
