@@ -53,6 +53,7 @@ export function middleware(request: NextRequest) {
   // Skip API routes, static files, and Next.js internals
   if (
     pathname.startsWith("/api") ||
+    pathname === "/mcp" ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
     pathname.includes(".")

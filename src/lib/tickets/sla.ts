@@ -76,6 +76,30 @@ export function restartReplySla(
   };
 }
 
+/** Compute the reply-SLA side effects of a manual status transition. */
+export function statusTransitionSlaUpdate(
+  ticket: Pick<
+    typeof tickets.$inferSelect,
+    "assigneeId" | "priority" | "status"
+  >,
+  nextStatus: TicketStatus,
+  product: ProductRow | null | undefined,
+  from: Date = new Date(),
+): Partial<typeof tickets.$inferInsert> {
+  if (nextStatus === TicketStatus.Replied) {
+    return { slaReplyDeadline: null };
+  }
+  if (
+    product &&
+    ticket.assigneeId &&
+    ticket.status === TicketStatus.New &&
+    nextStatus === TicketStatus.Processing
+  ) {
+    return restartReplySla(product, ticket.priority, from);
+  }
+  return {};
+}
+
 /** SQL predicate for currently active SLA breaches (not historical flags). */
 export function activeSlaOverdueCondition(
   now = new Date().toISOString()

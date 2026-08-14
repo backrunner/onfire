@@ -1,10 +1,18 @@
-import { betterAuth } from "better-auth";
+import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { twoFactor } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
+import { oauthProvider } from "@better-auth/oauth-provider";
 import { getDb, getEnv } from "@/lib/db";
 import { getPasskeyRelyingParty } from "@/lib/auth/passkey-config";
+import { wrapMcpOAuthAdapter } from "@/lib/auth/mcp-adapter";
+import {
+  MCP_ACCESS_TOKEN_PREFIX,
+  MCP_OAUTH_SCOPE,
+  MCP_REFRESH_TOKEN_PREFIX,
+  getMcpResourceUrl,
+} from "@/lib/mcp/oauth";
 import * as schema from "@/drizzle/schema";
 
 export const getAuth = () => {
@@ -12,17 +20,27 @@ export const getAuth = () => {
   const env = getEnv();
 
   return betterAuth({
-    database: drizzleAdapter(db, {
-      provider: "sqlite",
-      schema: {
-        user: schema.user,
-        session: schema.session,
-        account: schema.account,
-        verification: schema.verification,
-        twoFactor: schema.twoFactor,
-        passkey: schema.passkey,
-      },
-    }),
+    database: (options: BetterAuthOptions) =>
+      wrapMcpOAuthAdapter(
+        drizzleAdapter(db, {
+          provider: "sqlite",
+          schema: {
+            user: schema.user,
+            session: schema.session,
+            account: schema.account,
+            verification: schema.verification,
+            twoFactor: schema.twoFactor,
+            passkey: schema.passkey,
+            oauthClient: schema.oauthClient,
+            oauthResource: schema.oauthResource,
+            oauthClientResource: schema.oauthClientResource,
+            oauthRefreshToken: schema.oauthRefreshToken,
+            oauthAccessToken: schema.oauthAccessToken,
+            oauthConsent: schema.oauthConsent,
+            oauthClientAssertion: schema.oauthClientAssertion,
+          },
+        })(options),
+      ),
     secret: env.AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
     basePath: "/api/tob/auth",
@@ -43,6 +61,38 @@ export const getAuth = () => {
     plugins: [
       twoFactor({ issuer: "OnFire" }),
       passkey(getPasskeyRelyingParty(env.BETTER_AUTH_URL)),
+      oauthProvider({
+        loginPage: "/admin/login",
+        consentPage: "/admin/oauth/authorize",
+        scopes: [MCP_OAUTH_SCOPE, "offline_access"],
+        advertisedMetadata: {
+          scopes_supported: [MCP_OAUTH_SCOPE, "offline_access"],
+        },
+        resources: [
+          {
+            identifier: getMcpResourceUrl(),
+            name: "OnFire MCP",
+            allowedScopes: [MCP_OAUTH_SCOPE, "offline_access"],
+          },
+        ],
+        enforcePerClientResources: true,
+        clientRegistrationDefaultResources: [getMcpResourceUrl()],
+        clientRegistrationAllowedResources: [getMcpResourceUrl()],
+        grantTypes: ["authorization_code", "refresh_token"],
+        allowDynamicClientRegistration: true,
+        allowUnauthenticatedClientRegistration: true,
+        clientRegistrationDefaultScopes: [MCP_OAUTH_SCOPE],
+        clientRegistrationAllowedScopes: [MCP_OAUTH_SCOPE, "offline_access"],
+        disableJwtPlugin: true,
+        storeTokens: "hashed",
+        refreshTokenReuseInterval: 0,
+        prefix: {
+          opaqueAccessToken: MCP_ACCESS_TOKEN_PREFIX,
+          refreshToken: MCP_REFRESH_TOKEN_PREFIX,
+        },
+        clientPrivileges: () => false,
+        silenceWarnings: { oauthAuthServerConfig: true },
+      }),
       nextCookies(),
     ],
   });

@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import {
   account,
+  mcpOauthAuthorizations,
+  mcpOauthGrants,
+  oauthClient,
   passkey,
   session,
   twoFactor,
@@ -170,5 +173,62 @@ describe("managed Better Auth users", () => {
         where: eq(twoFactor.userId, seeded.id),
       }),
     ).toBeUndefined();
+  });
+
+  it("deletes MCP grants and authorization bindings owned by the user", async () => {
+    const seeded = await seedAuthUser();
+    const clientId = uid("oauth-client");
+    const grantId = uid("mcp-grant");
+    const grantVersion = uid("mcp-grant-version");
+    const authorizationCodeId = uid("authorization-code-hash");
+
+    await db.insert(oauthClient).values({
+      id: uid("oauth-client-row"),
+      clientId,
+      userId: seeded.id,
+      redirectUris: ["http://127.0.0.1:9876/callback"],
+      createdAt: seeded.now,
+      updatedAt: seeded.now,
+    });
+    await db.insert(mcpOauthGrants).values({
+      id: grantId,
+      userId: seeded.id,
+      clientId,
+      permissions: ["tickets:read"],
+      resourceMode: "all",
+      tenantIds: [],
+      productIds: [],
+      version: grantVersion,
+      createdAt: seeded.now.toISOString(),
+      updatedAt: seeded.now.toISOString(),
+    });
+    await db.insert(mcpOauthAuthorizations).values({
+      authorizationCodeId,
+      userId: seeded.id,
+      clientId,
+      grantVersion,
+      createdAt: seeded.now.toISOString(),
+    });
+
+    await deleteManagedAuthUser(db, seeded.id);
+
+    expect(
+      await db.query.mcpOauthGrants.findFirst({
+        where: eq(mcpOauthGrants.id, grantId),
+      }),
+    ).toBeUndefined();
+    expect(
+      await db.query.mcpOauthAuthorizations.findFirst({
+        where: eq(
+          mcpOauthAuthorizations.authorizationCodeId,
+          authorizationCodeId,
+        ),
+      }),
+    ).toBeUndefined();
+    expect(
+      await db.query.oauthClient.findFirst({
+        where: eq(oauthClient.clientId, clientId),
+      }),
+    ).toMatchObject({ userId: null });
   });
 });

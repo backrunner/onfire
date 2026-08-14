@@ -13,6 +13,12 @@ import {
   notificationEndpoints,
   notificationRequirements,
   notificationRules,
+  mcpOauthAuthorizations,
+  mcpOauthGrants,
+  oauthAccessToken,
+  oauthClient,
+  oauthConsent,
+  oauthRefreshToken,
   passkey,
   products,
   tickets,
@@ -193,6 +199,23 @@ export const DELETE = withAuth(
     }
 
     await ctx.db.batch([
+      ctx.db
+        .delete(oauthAccessToken)
+        .where(eq(oauthAccessToken.userId, user.id)),
+      ctx.db
+        .delete(oauthRefreshToken)
+        .where(eq(oauthRefreshToken.userId, user.id)),
+      ctx.db.delete(oauthConsent).where(eq(oauthConsent.userId, user.id)),
+      ctx.db
+        .delete(mcpOauthAuthorizations)
+        .where(eq(mcpOauthAuthorizations.userId, user.id)),
+      ctx.db
+        .delete(mcpOauthGrants)
+        .where(eq(mcpOauthGrants.userId, user.id)),
+      ctx.db
+        .update(oauthClient)
+        .set({ userId: null })
+        .where(eq(oauthClient.userId, user.id)),
       ctx.db
         .delete(notificationEndpoints)
         .where(eq(notificationEndpoints.userId, user.id)),

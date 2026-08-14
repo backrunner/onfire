@@ -25,6 +25,12 @@ interface NextRouteContext {
   params: Promise<RouteParams>;
 }
 
+export interface DelegatedResourceScope {
+  mode: "selected";
+  tenantIds: string[];
+  productIds: string[];
+}
+
 export interface AuthedContext {
   db: Database;
   user: typeof users.$inferSelect;
@@ -34,6 +40,8 @@ export interface AuthedContext {
   tenantIds: string[];
   teamIds: string[];
   productIds: string[];
+  /** Optional OAuth delegation; always intersects the live role scope. */
+  delegatedResourceScope?: DelegatedResourceScope;
   params: RouteParams;
 }
 
@@ -47,7 +55,7 @@ export interface CustomerContext {
   params: RouteParams;
 }
 
-async function resolveAuthedContext(
+export async function resolveAuthedContext(
   db: Database,
   userId: string,
   params: RouteParams

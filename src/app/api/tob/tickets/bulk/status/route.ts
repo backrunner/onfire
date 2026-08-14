@@ -10,7 +10,7 @@ import {
   assertManualStatusTarget,
   canTransition,
 } from "@/lib/tickets/state-machine";
-import { restartReplySla } from "@/lib/tickets/sla";
+import { statusTransitionSlaUpdate } from "@/lib/tickets/sla";
 
 const bulkStatusSchema = z.object({
   ticketIds: z.array(z.string().min(1)).min(1).max(100),
@@ -62,18 +62,12 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
       continue;
     }
 
-    let slaUpdate: Partial<typeof tickets.$inferInsert> = {};
-    if (
-      ticket.status === TicketStatus.New &&
-      body.status === TicketStatus.Processing
-    ) {
-      const product = productsById.get(ticket.productId);
-      if (product) {
-        slaUpdate = restartReplySla(product, ticket.priority, new Date(now));
-      }
-    } else if (body.status === TicketStatus.Replied) {
-      slaUpdate = { slaReplyDeadline: null };
-    }
+    const slaUpdate = statusTransitionSlaUpdate(
+      ticket,
+      body.status,
+      productsById.get(ticket.productId),
+      new Date(now),
+    );
 
     await ctx.db.batch([
       ctx.db

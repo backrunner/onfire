@@ -1,11 +1,14 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
-import { tickets, history, agents, agentTeams, teams, products, users } from "@/drizzle/schema";
-import { Role, TicketStatus, hasPermission } from "@/lib/types";
+import { tickets, history, agents, agentTeams, products, users } from "@/drizzle/schema";
+import { TicketStatus, hasPermission } from "@/lib/types";
 import { ok, notFound, badRequest, forbidden } from "@/lib/api/response";
 import { withAuth, parseBody } from "@/lib/api/handler";
-import { assertTicketVisible } from "@/lib/api/scope";
+import {
+  assertAgentMayReassign,
+  assertTicketVisible,
+} from "@/lib/api/scope";
 import { serializeTicket } from "@/lib/tickets/serialize";
 import { isOpen } from "@/lib/tickets/state-machine";
 import { computeSlaDeadlines, restartReplySla } from "@/lib/tickets/sla";
@@ -46,17 +49,7 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
     }
   } else {
     if (!hasPermission(ctx.role, "ticket.reassign")) {
-      // Agents may reassign within their own team when the team allows it.
-      const team = await ctx.db.query.teams.findFirst({
-        where: eq(teams.id, ticket.teamId),
-      });
-      const agentMayReassign =
-        ctx.role === Role.Agent &&
-        team?.allowReassign === true &&
-        ctx.teamIds.includes(ticket.teamId);
-      if (!agentMayReassign) {
-        throw forbidden("Reassignment is not allowed for your role");
-      }
+      await assertAgentMayReassign(ctx, ticket.teamId);
     }
     if (ticket.assigneeId === body.assigneeId) {
       throw badRequest("Ticket is already assigned to this agent");

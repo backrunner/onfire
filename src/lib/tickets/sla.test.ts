@@ -5,6 +5,7 @@ import {
   isTicketSlaOverdue,
   restartReplySla,
   slaViewOf,
+  statusTransitionSlaUpdate,
 } from "@/lib/tickets/sla";
 import { TicketPriority, TicketStatus } from "@/lib/types";
 import type { products } from "@/drizzle/schema";
@@ -70,6 +71,49 @@ describe("computeSlaDeadlines", () => {
       slaReplyBreached: false,
       slaReplyWarned: false,
     });
+  });
+
+  it("starts a status-transition reply SLA only for assigned tickets", () => {
+    const base = {
+      status: TicketStatus.New,
+      priority: TicketPriority.High,
+    };
+
+    expect(
+      statusTransitionSlaUpdate(
+        { ...base, assigneeId: null },
+        TicketStatus.Processing,
+        product(),
+        from,
+      ),
+    ).toEqual({});
+    expect(
+      statusTransitionSlaUpdate(
+        { ...base, assigneeId: "agent-1" },
+        TicketStatus.Processing,
+        product(),
+        from,
+      ),
+    ).toEqual({
+      slaReplyDeadline: "2026-01-01T01:00:00.000Z",
+      slaReplyBreached: false,
+      slaReplyWarned: false,
+    });
+  });
+
+  it("clears the active reply deadline when status becomes replied", () => {
+    expect(
+      statusTransitionSlaUpdate(
+        {
+          status: TicketStatus.Processing,
+          priority: TicketPriority.High,
+          assigneeId: "agent-1",
+        },
+        TicketStatus.Replied,
+        product(),
+        from,
+      ),
+    ).toEqual({ slaReplyDeadline: null });
   });
 });
 

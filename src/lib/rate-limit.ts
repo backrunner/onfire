@@ -90,3 +90,26 @@ export async function enforceRateLimit(
     });
   }
 }
+
+/** Security-sensitive public endpoints fail closed when D1 cannot count. */
+export async function enforceStrictRateLimit(
+  db: Database,
+  request: NextRequest,
+  scope: string,
+  options: RateLimitOptions,
+  identity?: string,
+): Promise<void> {
+  const id = identity ?? clientIp(request);
+  let result: RateLimitResult;
+  try {
+    result = await checkRateLimit(db, `${scope}:${id}`, options);
+  } catch (error) {
+    console.error("Strict rate limit check failed:", error);
+    throw new ApiError(503, "Service temporarily unavailable");
+  }
+  if (!result.allowed) {
+    throw new ApiError(429, "Too many requests", {
+      retryAfter: result.retryAfter,
+    });
+  }
+}

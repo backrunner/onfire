@@ -43,8 +43,46 @@ export function classifySurface(
   return "toc";
 }
 
+function requiredSurface(pathname: string): Surface | null {
+  if (pathname.startsWith("/api/tob")) return "tob";
+  if (pathname.startsWith("/api/toc")) return "toc";
+  if (
+    pathname === "/mcp" ||
+    pathname.startsWith("/mcp/") ||
+    pathname.startsWith("/.well-known/oauth-protected-resource") ||
+    pathname.startsWith("/.well-known/oauth-authorization-server")
+  ) {
+    return "tob";
+  }
+  return null;
+}
+
+function normalizedPathCandidates(pathname: string): string[] | null {
+  if (!pathname.startsWith("/")) return null;
+  const candidates = new Set<string>();
+  let current = pathname;
+  for (let depth = 0; depth < 3; depth += 1) {
+    candidates.add(current);
+    try {
+      candidates.add(new URL(current, "https://onfire.invalid").pathname);
+      const decoded = decodeURIComponent(current);
+      if (decoded === current) break;
+      current = decoded;
+    } catch {
+      return null;
+    }
+  }
+  candidates.add(current);
+  candidates.add(new URL(current, "https://onfire.invalid").pathname);
+  return [...candidates];
+}
+
 export function isApiAllowedOnSurface(pathname: string, surface: Surface): boolean {
-  if (pathname.startsWith("/api/tob")) return surface === "tob";
-  if (pathname.startsWith("/api/toc")) return surface === "toc";
+  const candidates = normalizedPathCandidates(pathname);
+  if (!candidates) return false;
+  for (const candidate of candidates) {
+    const required = requiredSurface(candidate);
+    if (required && required !== surface) return false;
+  }
   return true;
 }

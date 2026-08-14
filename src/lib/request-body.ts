@@ -2,7 +2,7 @@ import { ApiError } from "@/lib/api/response";
 
 /** Read a request body without allowing an unbounded Worker allocation. */
 export async function readBodyBytes(
-  request: Request,
+  request: Pick<Request, "headers" | "body">,
   maxBytes: number
 ): Promise<Uint8Array<ArrayBuffer>> {
   const contentLength = request.headers.get("content-length");
