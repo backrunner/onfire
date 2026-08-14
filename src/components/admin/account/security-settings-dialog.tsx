@@ -207,18 +207,25 @@ export function SecuritySettingsDialog({
       const result = await authClient.twoFactor.enable({
         password: otpPassword,
       });
-      if (result.error || !result.data) throw new Error(result.error?.message);
-      const qrCode = await QRCode.toDataURL(result.data.totpURI, {
+      if (
+        result.error ||
+        !result.data ||
+        result.data.method !== "totp"
+      ) {
+        throw new Error(result.error?.message ?? "TOTP enrollment data missing");
+      }
+      const { totpURI, backupCodes } = result.data;
+      const qrCode = await QRCode.toDataURL(totpURI, {
         margin: 1,
         width: 224,
         color: { dark: "#18181b", light: "#ffffff" },
       });
       setEnrollment({
-        uri: result.data.totpURI,
+        uri: totpURI,
         qrCode,
-        backupCodes: result.data.backupCodes,
+        backupCodes,
       });
-      setBackupCodes(result.data.backupCodes);
+      setBackupCodes(backupCodes);
     } catch {
       toast.error(t.account.otpEnableFailed);
     } finally {
@@ -327,10 +334,14 @@ export function SecuritySettingsDialog({
                   autoComplete="new-password"
                   minLength={8}
                 />
-                <Button type="submit" disabled={busy === "password"}>
-                  {busy === "password" && <Loader2 className="animate-spin" />}
-                  {t.account.updatePassword}
-                </Button>
+                <div className="flex justify-end">
+                  <Button type="submit" disabled={busy === "password"}>
+                    {busy === "password" && (
+                      <Loader2 className="animate-spin" />
+                    )}
+                    {t.account.updatePassword}
+                  </Button>
+                </div>
               </form>
             </TabsContent>
 
@@ -344,6 +355,7 @@ export function SecuritySettingsDialog({
                 />
                 <Button
                   type="button"
+                  className="self-end"
                   onClick={addPasskey}
                   disabled={busy === "add-passkey"}
                 >
@@ -484,15 +496,17 @@ export function SecuritySettingsDialog({
                     codes={enrollment.backupCodes}
                     title={t.account.backupCodesTitle}
                   />
-                  <Button
-                    type="submit"
-                    disabled={busy === "verify-otp" || otpCode.length !== 6}
-                  >
-                    {busy === "verify-otp" && (
-                      <Loader2 className="animate-spin" />
-                    )}
-                    {t.account.verifyAndEnable}
-                  </Button>
+                  <div className="flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={busy === "verify-otp" || otpCode.length !== 6}
+                    >
+                      {busy === "verify-otp" && (
+                        <Loader2 className="animate-spin" />
+                      )}
+                      {t.account.verifyAndEnable}
+                    </Button>
+                  </div>
                 </form>
               ) : twoFactorEnabled ? (
                 <form onSubmit={disableOtp} className="space-y-4">
@@ -520,7 +534,7 @@ export function SecuritySettingsDialog({
                       title={t.account.backupCodesTitle}
                     />
                   )}
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap justify-end gap-2">
                     <Button
                       type="button"
                       variant="outline"
@@ -564,15 +578,17 @@ export function SecuritySettingsDialog({
                     onChange={setOtpPassword}
                     autoComplete="current-password"
                   />
-                  <Button
-                    type="submit"
-                    disabled={!otpPassword || busy === "enable-otp"}
-                  >
-                    {busy === "enable-otp" && (
-                      <Loader2 className="animate-spin" />
-                    )}
-                    {t.account.enableOtp}
-                  </Button>
+                  <div className="flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={!otpPassword || busy === "enable-otp"}
+                    >
+                      {busy === "enable-otp" && (
+                        <Loader2 className="animate-spin" />
+                      )}
+                      {t.account.enableOtp}
+                    </Button>
+                  </div>
                 </form>
               )}
             </TabsContent>

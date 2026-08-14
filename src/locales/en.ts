@@ -890,6 +890,101 @@ export const en: Translations = {
     backupCodesFailed: 'Failed to generate recovery codes'
   },
 
+  // OAuth / MCP
+  oauth: {
+    loadFailed: 'Unable to load authorization request',
+    invalidRequest: 'The authorization request is invalid or has expired.',
+    retry: 'Retry',
+    requestTitle: '{{client}} wants to access OnFire',
+    requestSubtitle: 'Choose what it can do and which business resources it can access.',
+    unnamedApplication: 'Unnamed application',
+    callbackHost: 'Authorization result will return to',
+    loopbackCallbackWarning: 'This callback is on your local device. Continue only if you started this connection from the named application.',
+    permissionsTitle: 'Grant permissions',
+    permissionsHint: 'You can only grant permissions your account currently has.',
+    readOnlyPreset: 'Read only',
+    fullAccessPreset: 'Full access',
+    permissionGroups: {
+      tickets: 'Tickets',
+      settings: 'Product settings'
+    },
+    permissions: {
+      'tickets:read': {
+        label: 'Read tickets',
+        description: 'View tickets, replies, history, and internal states.'
+      },
+      'tickets:reply': {
+        label: 'Reply to tickets',
+        description: 'Send public replies or add internal notes.'
+      },
+      'tickets:update_status': {
+        label: 'Update ticket status',
+        description: 'Move tickets through allowed workflow states.'
+      },
+      'tickets:update_priority': {
+        label: 'Update priority',
+        description: 'Change priority and recompute SLA deadlines.'
+      },
+      'tickets:assign': {
+        label: 'Assign tickets',
+        description: 'Assign unassigned tickets to team agents.'
+      },
+      'tickets:reassign': {
+        label: 'Reassign tickets',
+        description: 'Change the assignee and reset active SLA timers.'
+      },
+      'tickets:escalate': {
+        label: 'Escalate tickets',
+        description: 'Escalate to a higher-level agent in the team.'
+      },
+      'tickets:close': {
+        label: 'Close tickets',
+        description: 'Close tickets and record a reason.'
+      },
+      'settings:read': {
+        label: 'Read product settings',
+        description: 'View non-secret product, SLA, and portal settings.'
+      },
+      'settings:write': {
+        label: 'Update product settings',
+        description: 'Change non-secret product settings and SLA policies.'
+      }
+    },
+    fullAccessWarningTitle: 'This application will receive every grantable capability',
+    fullAccessWarningDescription: 'It can reply, assign, escalate, and close tickets and update product settings within the selected resources. Access is still dynamically narrowed by your current RBAC permissions.',
+    resourcesTitle: 'Business scope',
+    resourcesHint: 'Permissions only apply to the tenants and products selected here.',
+    allResources: 'All accessible resources',
+    allResourcesDescription: 'Includes tenants and products you can access now or gain access to later through your current role.',
+    selectedResources: 'Specific tenants or products',
+    selectedResourcesDescription: 'Selecting a tenant includes every product in it that you can access now or later.',
+    noResources: 'This account has no resources available to delegate',
+    productCount: '{{count}} products',
+    deny: 'Deny',
+    allow: 'Allow access',
+    submitFailed: 'Unable to complete authorization. Please try again.',
+    connectedTitle: 'Connected applications',
+    connectedSummary: 'Review and revoke MCP applications connected to your account through OAuth.',
+    connectedLoadFailed: 'Failed to load connected applications',
+    noConnectedApps: 'No connected applications',
+    noConnectedAppsHint: 'MCP applications you authorize will appear here.',
+    revoke: 'Revoke access',
+    revokeTitle: 'Revoke application access',
+    revokeMessage: "Revoking access immediately invalidates {{client}}'s access and refresh tokens.",
+    revoked: 'Application access revoked',
+    revokeFailed: 'Failed to revoke application access',
+    lastUsed: 'Last used: {{time}}',
+    neverUsed: 'Never used',
+    allResourceAccess: 'All accessible resources',
+    selectedResourceAccess: '{{tenants}}, {{products}}',
+    tenantCountOne: '{{count}} tenant',
+    tenantCountOther: '{{count}} tenants',
+    productCountOne: '{{count}} product',
+    productCountOther: '{{count}} products',
+    permissionCountOne: '{{count}} permission',
+    permissionCountOther: '{{count}} permissions'
+  },
+
   // Login
   login: {
     title: 'Welcome Back',

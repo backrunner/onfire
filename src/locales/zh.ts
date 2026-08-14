@@ -888,6 +888,101 @@ export const zh = {
     backupCodesFailed: '恢复码生成失败'
   },
 
+  // OAuth / MCP
+  oauth: {
+    loadFailed: '无法加载授权请求',
+    invalidRequest: '授权请求无效或已过期。',
+    retry: '重试',
+    requestTitle: '{{client}} 想要访问 OnFire',
+    requestSubtitle: '请确认它可以执行的操作以及可以访问的业务范围。',
+    unnamedApplication: '未命名应用',
+    callbackHost: '授权结果将返回到',
+    loopbackCallbackWarning: '此回调位于你的本机。仅当你确实从上方应用发起连接时才继续。',
+    permissionsTitle: '授予权限',
+    permissionsHint: '仅可授予当前账户本身拥有的权限。',
+    readOnlyPreset: '只读',
+    fullAccessPreset: '完全访问',
+    permissionGroups: {
+      tickets: '工单',
+      settings: '产品设置'
+    },
+    permissions: {
+      'tickets:read': {
+        label: '读取工单',
+        description: '查看工单、回复、历史与内部状态。'
+      },
+      'tickets:reply': {
+        label: '回复工单',
+        description: '发送公开回复或添加内部备注。'
+      },
+      'tickets:update_status': {
+        label: '修改工单状态',
+        description: '在允许的工单状态之间流转。'
+      },
+      'tickets:update_priority': {
+        label: '修改优先级',
+        description: '调整优先级并重新计算 SLA。'
+      },
+      'tickets:assign': {
+        label: '分配工单',
+        description: '把未分配工单指派给团队客服。'
+      },
+      'tickets:reassign': {
+        label: '重新分配工单',
+        description: '更换当前处理人并重置有效 SLA。'
+      },
+      'tickets:escalate': {
+        label: '升级工单',
+        description: '升级给同一团队中的更高级客服。'
+      },
+      'tickets:close': {
+        label: '关闭工单',
+        description: '关闭工单并记录原因。'
+      },
+      'settings:read': {
+        label: '读取产品设置',
+        description: '查看非敏感的产品、SLA 与门户设置。'
+      },
+      'settings:write': {
+        label: '修改产品设置',
+        description: '修改非密钥类产品设置与 SLA。'
+      }
+    },
+    fullAccessWarningTitle: '此应用将获得全部可授予能力',
+    fullAccessWarningDescription: '它可以在选定范围内回复、分配、升级和关闭工单，并修改产品设置。授权范围仍会随你当前的 RBAC 权限动态收窄。',
+    resourcesTitle: '业务范围',
+    resourcesHint: '权限只会在这里选定的租户和产品中生效。',
+    allResources: '全部可访问资源',
+    allResourcesDescription: '包含你现在以及以后通过当前角色获得访问权的租户和产品。',
+    selectedResources: '指定租户或产品',
+    selectedResourcesDescription: '租户选择会覆盖该租户下你当前及以后仍可访问的全部产品。',
+    noResources: '当前账户没有可授权的资源',
+    productCount: '{{count}} 个产品',
+    deny: '拒绝',
+    allow: '允许访问',
+    submitFailed: '无法完成授权，请稍后重试。',
+    connectedTitle: '已连接应用',
+    connectedSummary: '查看和撤销通过 OAuth 连接到你账户的 MCP 应用。',
+    connectedLoadFailed: '已连接应用加载失败',
+    noConnectedApps: '没有已连接应用',
+    noConnectedAppsHint: '你授权的 MCP 应用会显示在这里。',
+    revoke: '撤销访问',
+    revokeTitle: '撤销应用访问权限',
+    revokeMessage: '撤销后，{{client}} 的访问令牌与刷新令牌会立即失效。',
+    revoked: '应用访问权限已撤销',
+    revokeFailed: '撤销访问权限失败',
+    lastUsed: '上次使用：{{time}}',
+    neverUsed: '尚未使用',
+    allResourceAccess: '全部可访问资源',
+    selectedResourceAccess: '{{tenants}}，{{products}}',
+    tenantCountOne: '{{count}} 个租户',
+    tenantCountOther: '{{count}} 个租户',
+    productCountOne: '{{count}} 个产品',
+    productCountOther: '{{count}} 个产品',
+    permissionCountOne: '{{count}} 项权限',
+    permissionCountOther: '{{count}} 项权限'
+  },
+
   // Login
   login: {
     title: '欢迎回来',

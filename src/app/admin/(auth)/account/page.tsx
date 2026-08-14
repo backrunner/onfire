@@ -6,9 +6,11 @@ import { toast } from "sonner";
 import {
   BellRing,
   KeyRound,
+  Loader2,
   MoreHorizontal,
   Pencil,
   Plus,
+  Power,
   RefreshCw,
   TestTube2,
   Trash2,
@@ -23,12 +25,12 @@ import {
 import { EndpointDialog } from "@/components/admin/notifications/endpoint-dialog";
 import { EndpointTestDialog } from "@/components/admin/notifications/endpoint-test-dialog";
 import { SecuritySettingsDialog } from "@/components/admin/account/security-settings-dialog";
+import { ConnectedApplicationsCard } from "@/components/admin/oauth/connected-applications-card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -190,6 +192,8 @@ export default function AdminAccountPage() {
           </CardContent>
         </Card>
 
+        <ConnectedApplicationsCard />
+
         <Card className="gap-0 rounded-lg py-0">
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 px-4 py-4">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -252,68 +256,102 @@ export default function AdminAccountPage() {
                           {t.notifChannels.types[endpoint.channelType]}
                         </p>
                       </div>
-                      <Switch
-                        checked={endpoint.enabled ?? false}
-                        disabled={busyEndpointIds.has(endpoint.id)}
-                        onCheckedChange={(checked) =>
-                          void toggleEndpoint(endpoint, checked)
-                        }
-                        aria-label={t.notifChannels.enabled}
-                      />
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="size-8"
-                            onClick={() => {
-                              setEditingEndpoint(endpoint);
-                              setEndpointDialogOpen(true);
-                            }}
-                            aria-label={t.common.edit}
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>{t.common.edit}</TooltipContent>
-                      </Tooltip>
-                      <DropdownMenu>
+                      <div className="flex shrink-0 items-center gap-1">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="size-8"
-                                aria-label={t.notifChannels.moreActions}
-                              >
-                                <MoreHorizontal className="size-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-8"
+                              disabled={busyEndpointIds.has(endpoint.id)}
+                              aria-label={
+                                endpoint.enabled
+                                  ? t.common.disable
+                                  : t.common.enable
+                              }
+                              aria-pressed={endpoint.enabled ?? false}
+                              onClick={() =>
+                                void toggleEndpoint(
+                                  endpoint,
+                                  !(endpoint.enabled ?? false),
+                                )
+                              }
+                            >
+                              {busyEndpointIds.has(endpoint.id) ? (
+                                <Loader2 className="size-4 animate-spin" />
+                              ) : (
+                                <Power
+                                  className={
+                                    endpoint.enabled
+                                      ? "size-4 text-emerald-600 dark:text-emerald-400"
+                                      : "size-4"
+                                  }
+                                />
+                              )}
+                            </Button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            {t.notifChannels.moreActions}
+                            {endpoint.enabled
+                              ? t.common.disable
+                              : t.common.enable}
                           </TooltipContent>
                         </Tooltip>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onSelect={() => setTestingEndpoint(endpoint)}
-                          >
-                            <TestTube2 className="size-4" />
-                            {t.notifChannels.testEndpoint}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onSelect={() => setDeletingEndpoint(endpoint)}
-                          >
-                            <Trash2 className="size-4" />
-                            {t.common.delete}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-8"
+                              onClick={() => {
+                                setEditingEndpoint(endpoint);
+                                setEndpointDialogOpen(true);
+                              }}
+                              aria-label={t.common.edit}
+                            >
+                              <Pencil className="size-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>{t.common.edit}</TooltipContent>
+                        </Tooltip>
+                        <DropdownMenu>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="size-8"
+                                  aria-label={t.notifChannels.moreActions}
+                                >
+                                  <MoreHorizontal className="size-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {t.notifChannels.moreActions}
+                            </TooltipContent>
+                          </Tooltip>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onSelect={() => setTestingEndpoint(endpoint)}
+                            >
+                              <TestTube2 className="size-4" />
+                              {t.notifChannels.testEndpoint}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onSelect={() => setDeletingEndpoint(endpoint)}
+                            >
+                              <Trash2 className="size-4" />
+                              {t.common.delete}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
                   );
                 })}

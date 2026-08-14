@@ -42,6 +42,11 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { DeleteConfirmDialog } from "./delete-confirm-dialog";
 import {
   EmptyState,
@@ -277,7 +282,7 @@ export function ProductManagement() {
                 {isSuperAdmin && <TableHead>{m.products.tenant}</TableHead>}
                 <TableHead>{m.products.slaPolicy}</TableHead>
                 <TableHead>{m.products.autoClose}</TableHead>
-                <TableHead className="w-12" />
+                <TableHead className="w-20" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -313,28 +318,47 @@ export function ProductManagement() {
                         </span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <RowActions
-                        actions={[
-                          {
-                            label: m.manage,
-                            icon: Settings,
-                            onSelect: () => router.push(`/admin/management/products/${product.id}`),
-                          },
-                          {
-                            label: t.common.edit,
-                            icon: Pencil,
-                            onSelect: () => openEdit(product),
-                          },
-                          ...(canManageProducts ? [{
-                            label: t.common.delete,
-                            icon: Trash2,
-                            destructive: true,
-                            separatorBefore: true,
-                            onSelect: () => setDeleting(product),
-                          }] : []),
-                        ]}
-                      />
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-8"
+                              aria-label={m.manage}
+                              onClick={() =>
+                                router.push(
+                                  `/admin/management/products/${product.id}`
+                                )
+                              }
+                            >
+                              <Settings className="size-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>{m.manage}</TooltipContent>
+                        </Tooltip>
+                        <RowActions
+                          actions={[
+                            {
+                              label: t.common.edit,
+                              icon: Pencil,
+                              onSelect: () => openEdit(product),
+                            },
+                            ...(canManageProducts
+                              ? [
+                                  {
+                                    label: t.common.delete,
+                                    icon: Trash2,
+                                    destructive: true,
+                                    separatorBefore: true,
+                                    onSelect: () => setDeleting(product),
+                                  },
+                                ]
+                              : []),
+                          ]}
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 );

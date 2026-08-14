@@ -10,6 +10,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { authClient, signIn } from "@/lib/auth";
+import { safeSameOriginRedirect } from "@/lib/auth/redirect";
 import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,6 +34,21 @@ export default function AdminLoginPage() {
   const [otpCode, setOtpCode] = useState("");
   const [useBackupCode, setUseBackupCode] = useState(false);
   const [trustDevice, setTrustDevice] = useState(false);
+
+  const finishSignIn = (data: unknown) => {
+    const returnedUrl =
+      data &&
+      typeof data === "object" &&
+      "url" in data &&
+      typeof data.url === "string"
+        ? data.url
+        : null;
+    // Use a fresh document request so the protected server layout reads the
+    // session cookie written by the sign-in response immediately.
+    window.location.assign(
+      safeSameOriginRedirect(returnedUrl, window.location.origin),
+    );
+  };
 
   useEffect(() => {
     async function checkInstallStatus() {
@@ -71,9 +87,7 @@ export default function AdminLoginPage() {
       ) {
         setTwoFactorPending(true);
       } else {
-        // Use a fresh document request so the protected server layout reads
-        // the session cookie written by the sign-in response immediately.
-        window.location.assign("/admin");
+        finishSignIn(result.data);
       }
     } catch {
       setError(t.login.loginFailed);
@@ -96,7 +110,7 @@ export default function AdminLoginPage() {
         }
         return;
       }
-      window.location.assign("/admin");
+      finishSignIn(result.data);
     } catch {
       setError(t.login.passkeyFailed);
     } finally {
@@ -122,7 +136,7 @@ export default function AdminLoginPage() {
         setError(t.login.otpFailed);
         return;
       }
-      window.location.assign("/admin");
+      finishSignIn(result.data);
     } catch {
       setError(t.login.otpFailed);
     } finally {
