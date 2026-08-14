@@ -20,6 +20,89 @@
 - Passkeys use the exact `BETTER_AUTH_URL` hostname as the WebAuthn RP ID and its origin as the allowed origin. Registration requires an authenticated session, and users may list, rename, and delete only their own credentials.
 - TOTP enrollment requires the current password and a verified first code. Recovery codes are shown only when generated, trusted-device state lasts 30 days, and disabling or regenerating TOTP credentials requires the current password.
 
+## MCP OAuth Delegation
+
+- Serve MCP only on the ToB surface at the canonical `BETTER_AUTH_URL` `/mcp`
+  resource. Publish RFC 9728 protected-resource metadata and RFC 8414
+  authorization-server metadata from that same origin. Derive every advertised
+  issuer and endpoint locally; malformed canonical configuration or provider
+  metadata must fail closed with a non-cacheable 503.
+- Use OAuth 2.1 authorization code flow for public clients with mandatory PKCE
+  S256, optional refresh tokens through `offline_access`, refresh rotation,
+  dynamic client registration, and token revocation. Do not expose OAuth
+  userinfo, introspection, privileged client-administration, or internal consent
+  endpoints through the public auth catch-all.
+- Keep protocol scopes separate from business delegation. `onfire:mcp` permits
+  access to the MCP resource; the durable application grant separately records
+  atomic OnFire permissions and selected business resources. `offline_access`
+  requests refresh-token issuance; it is not a protected-resource scope and
+  must not appear in the MCP `WWW-Authenticate` challenge.
+- Support `tickets:read`, `tickets:reply`, `tickets:update_status`,
+  `tickets:update_priority`, `tickets:assign`, `tickets:reassign`,
+  `tickets:escalate`, `tickets:close`, `settings:read`, and `settings:write`.
+  Register only tools allowed by the effective atomic permissions, and require
+  the matching atomic permission again inside every operation before any
+  database read or mutation.
+- A user may grant only permissions available to their current role. Every MCP
+  request recomputes effective permissions from the stored grant and live RBAC;
+  ticket and product access must also pass the normal live tenant, product, and
+  team scope checks. Agent reassignment must query the current agent-team
+  membership and team policy immediately before use instead of trusting the
+  request-start team snapshot.
+- Resource mode is either all currently accessible resources or an explicit
+  union of selected tenants and products. A selected tenant covers only products
+  the user can access in that tenant, including later accessible products; a
+  selected product covers only that product. Unknown persisted modes and empty
+  selected grants fail closed.
+- Reauthorization must invalidate every prior access and refresh token for the
+  user/client before replacing its grant in the same D1 batch. Account-side
+  revocation must invalidate both token types, delete protocol consent, and mark
+  the application grant revoked in one batch.
+- Bind authorization codes, access tokens, and refresh-token families to the
+  exact application-grant version approved by the user. Unbound or stale
+  families fail closed. Browser logout must not revoke a valid delegated token;
+  live user existence, RBAC, and business scope are still checked per request.
+- Every interactive authorization request must reopen the OnFire consent page,
+  even when protocol consent already covers the same scopes and resource, so
+  users can replace atomic permissions and resource selections. Preserve
+  `prompt=none` as non-interactive and never inject consent into it.
+- Require one exact canonical `/mcp` resource indicator on authorization and
+  token requests and in explicit DCR resource metadata. Bound DCR metadata,
+  callback count, string lengths, request bodies, methods, media types, and
+  public request rates before the OAuth plugin persists or processes input.
+  Revalidate the provider-signed consent query's response type/mode, scopes,
+  resource, callback shape, parameter cardinality, and PKCE S256 structure in
+  the OnFire consent API. Access tokens must contain only unique `onfire:mcp`
+  and optional `offline_access` scopes.
+- Accept OAuth callbacks only over HTTPS or exact HTTP loopback hosts
+  `localhost`, `127.0.0.1`, and `[::1]`; reject private-use schemes,
+  non-loopback HTTP, credentials, fragments, and noncanonical loopback aliases.
+  Revalidate every persisted callback whenever a client is used. Native clients
+  may vary the port of an otherwise exact HTTP loopback callback; other
+  callbacks require exact registered-string matching.
+- Validate the `Origin` header on every `/mcp` method before rate limiting or
+  bearer lookup. A missing header remains valid for native clients; a present
+  header must equal the canonical ToB origin or receive HTTP 403.
+- Evaluate encoded and normalized path variants in the Worker surface guard so
+  encoded API, discovery, and MCP paths cannot cross the ToB/ToC boundary.
+- Continue using dynamic client registration as the public-client fallback.
+  Do not enable Client ID Metadata Documents until the Workers transport can
+  pin an approved DNS result for the full fetch and reject redirects; ordinary
+  `fetch` leaves a DNS-rebinding SSRF gap.
+- The ToB consent page must use existing zinc theme, light/dark and bilingual
+  controls, responsive spacing, atomic permission checkboxes, read-only/full
+  presets, tenant/product selection, an explicit full-access warning, and the
+  validated callback hostname. Loopback callbacks require an additional local
+  device warning. The account page must list effective connected-application
+  access and support confirmed immediate revocation.
+- OAuth authorize/token/register/revoke, `/mcp`, consent-context, and connected-
+  application responses must use `Cache-Control: no-store` and
+  `Pragma: no-cache` on both success and failure paths.
+- When Cloudflare Access protects the ToB hostname, create narrowly scoped path
+  exceptions for OAuth discovery, DCR/token/revoke, and `/mcp`; standard clients
+  cannot complete machine-to-machine protocol calls through an interactive
+  Access challenge. Keep `/admin/*` and the remaining `/api/tob/*` protected.
+
 ## Ticket Lifecycle And SLA
 
 - New tickets start only the accept SLA. Reply SLA begins when an agent is assigned and resets on reassignment or escalation.

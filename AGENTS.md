@@ -7,7 +7,7 @@ OnFire is a minimalist modern ticket system designed to enable users to quickly 
 - **Runtime**: Node.js 22+ + Cloudflare Workers
 - **Framework**: Next.js 16 (App Router) + OpenNext/Cloudflare
 - **Database**: Cloudflare D1 (SQLite) + Drizzle ORM
-- **Authentication**: Better Auth (ToB) / JWT + API Key (ToC)
+- **Authentication**: Better Auth + OAuth 2.1 (ToB/MCP) / JWT + API Key (ToC)
 - **ToB Account Security**: Password + Passkey login, with optional authenticator TOTP, trusted devices, and recovery codes
 - **Frontend**: React 19 + TypeScript
 - **UI Components**: shadcn/ui (zinc theme)
@@ -99,6 +99,14 @@ Ticket submission and query system for end users, including:
 
 Both systems are served by a single Cloudflare Worker via OpenNext, with multi-domain routing handled by Next.js middleware.
 
+### MCP - Delegated Automation
+
+OnFire exposes a stateless Streamable HTTP MCP server at `/mcp` on the ToB
+hostname. MCP clients authenticate through OAuth 2.1 authorization code flow
+with PKCE S256. The user grants atomic ticket and product-setting capabilities,
+then limits them to all currently accessible resources or selected tenants and
+products. Protocol and integration details live in `.agents/MCP_INTEGRATION.md`.
+
 For this deployment, ToC is `support.alkinum.io` and ToB is `onfire.alkinum.com`.
 Attach the Worker to both hostnames as Custom Domains and configure the matching
 `ADMIN_DOMAINS` and `TOC_DOMAINS` values. Cloudflare Access can protect the admin hostname;
@@ -181,6 +189,64 @@ Tenant
 - Administrators can also become support agents; the ability to reply to tickets is independent of RBAC permissions
 - `product.manage` controls product lifecycle operations such as creation and deletion. `product.settings` controls scoped product configuration such as SLA, auto-close, and team associations.
 - ProductAdmin access is limited by `user_products`; IDs submitted for tenant, product, or team associations must belong to the same tenant even for SuperAdmin requests.
+
+---
+
+## MCP OAuth Delegation
+
+- The protocol scopes are `onfire:mcp` and optional `offline_access`. The latter
+  requests a refresh token; it is not a protected-resource challenge scope.
+  Business authority is stored separately as an OnFire grant and is never
+  inferred from either protocol scope alone.
+- Atomic permissions are `tickets:read`, `tickets:reply`,
+  `tickets:update_status`, `tickets:update_priority`, `tickets:assign`,
+  `tickets:reassign`, `tickets:escalate`, `tickets:close`, `settings:read`, and
+  `settings:write`.
+- Effective authority is the intersection of the stored grant, the user's live
+  RBAC permissions, the user's live tenant/product/team scope, and the selected
+  delegated tenant/product resources. Role or membership loss narrows access
+  immediately without waiting for token expiry.
+- Selecting a tenant delegates accessible products in that tenant, including
+  products gained later while the role still permits them. Selecting a product
+  delegates only that product. "All accessible resources" follows the user's
+  live role scope.
+- Tools are registered only when their atomic permission is effective. Ticket
+  and settings operations also recheck that permission before database access.
+  Ticket mutations reuse the normal state machine, SLA, assignment, event, and
+  notification behavior; settings tools expose no stored secrets. Agent
+  reassignment rechecks current team membership and policy at mutation time.
+- Reauthorization replaces the old grant and invalidates its access and refresh
+  tokens in one D1 batch. Account-side revocation also removes OAuth consent so
+  the next connection requires a fresh authorization decision.
+- Authorization codes and both token types are bound to the exact grant version
+  approved by the user. Browser logout does not revoke delegated tokens, while
+  live user, RBAC, tenant, product, and team scope continue to apply immediately.
+- Interactive authorization always revisits the fine-grained consent page so a
+  user can change atomic permissions or delegated resources. OAuth
+  `prompt=none` remains non-interactive.
+- OAuth discovery follows RFC 8414 and RFC 9728. Public clients use dynamic
+  client registration, authorization code plus refresh token grants, opaque
+  bearer tokens, and mandatory PKCE S256. The exact resource indicator is the
+  canonical ToB `BETTER_AUTH_URL` plus `/mcp`. CIMD is intentionally disabled
+  until Workers can pin a validated DNS result across the metadata fetch; DCR
+  remains the supported fallback without exposing a DNS-rebinding SSRF path.
+- Authorization-server discovery endpoints are derived only from canonical
+  configuration. Signed consent requests are independently revalidated for
+  exact resource, supported unique scopes, code/query response, callback shape,
+  parameter cardinality, and PKCE S256. Bearer tokens reject unknown or repeated
+  scopes.
+- OAuth callbacks use HTTPS or exact HTTP loopback hosts only: `localhost`,
+  `127.0.0.1`, and `[::1]`. Private-use schemes and non-loopback HTTP are
+  rejected, persisted client metadata is revalidated at use time, and only
+  native HTTP loopback callbacks may vary their registered port.
+- `/mcp` allows requests without `Origin` for native clients, but any present
+  `Origin` must exactly match the canonical ToB origin before rate limiting or
+  bearer lookup. OAuth, MCP, consent, and connected-application responses are
+  never cacheable. The consent page displays the validated callback hostname
+  and warns for local loopback callbacks.
+- Invalid canonical MCP/OAuth configuration fails before D1 or provider access.
+  The Worker also checks decoded and normalized path variants when enforcing the
+  ToB/ToC API, discovery, and MCP boundary.
 
 ---
 
@@ -481,6 +547,16 @@ GET  /auth/passkey/list-user-passkeys   - List current user's Passkeys
 POST /auth/passkey/*                     - Register, rename, delete, or authenticate a Passkey
 POST /auth/two-factor/*                  - Enable, verify, disable TOTP, or manage recovery codes
 
+# MCP OAuth Provider
+GET  /auth/oauth2/authorize              - Authorization code request (PKCE S256)
+POST /auth/oauth2/token                  - Authorization code or refresh exchange
+POST /auth/oauth2/register               - Dynamic public-client registration
+POST /auth/oauth2/revoke                 - Access or refresh token revocation
+GET  /oauth/authorize                    - Load scoped consent context
+POST /oauth/authorize                    - Accept or deny scoped consent
+GET  /oauth/grants                       - List current user's connected MCP applications
+DELETE /oauth/grants/:id                 - Revoke a connected MCP application
+
 # Installation
 GET  /install/status      - Check if initialization is needed
 POST /install/finalize    - Complete initialization setup
@@ -586,6 +662,16 @@ POST /webhooks/maileroo   - Maileroo inbound email webhook
 POST /webhooks/inbound    - Generic inbound email webhook (requires auth)
 ```
 
+### MCP API
+
+Authentication: OAuth Bearer token issued for the canonical `/mcp` resource.
+
+```text
+GET  /.well-known/oauth-protected-resource/mcp
+GET  /.well-known/oauth-authorization-server/api/tob/auth
+POST /mcp                  - Stateless MCP Streamable HTTP JSON-RPC
+```
+
 ---
 
 ## SDK Usage
@@ -677,6 +763,12 @@ const portalUrl =
 | users | System users |
 | passkey | Better Auth WebAuthn credentials owned by authentication users |
 | two_factor | Better Auth encrypted TOTP secrets, recovery codes, and lockout state |
+| oauth_client | Dynamically registered OAuth public clients |
+| oauth_access_token | Hashed opaque MCP access-token records |
+| oauth_refresh_token | Hashed opaque refresh-token records and rotation state |
+| oauth_consent | OAuth protocol consent state |
+| mcp_oauth_grants | Atomic permissions and delegated tenant/product resources per user and client |
+| mcp_oauth_authorizations | Grant-version binding for authorization code and token families |
 | agents | Support agents |
 | agent_teams | Agent-Team association (many-to-many) |
 | user_products | ProductAdmin-Product scope association (many-to-many) |
@@ -755,6 +847,8 @@ Using shadcn/ui as the base component library, including:
 - Collapsible left navigation bar
 - Fixed top header bar
 - Split view for ticket list (list + details)
+- Focused OAuth consent page with atomic permission and tenant/product selectors
+- Connected MCP application review and revocation on the account page
 - Responsive design
 
 **ToC Customer Portal**:
@@ -773,6 +867,13 @@ Using shadcn/ui as the base component library, including:
    - Turnstile CAPTCHA protection for public endpoints
    - `TURNSTILE_SECRET` and `NEXT_PUBLIC_TURNSTILE_SITE_KEY` configured together; a secret without a site key fails closed
    - D1-backed fixed-window rate limiting on public ToC endpoints (token issuance, ticket create/reply/escalate, inbound webhooks)
+   - OAuth authorization requires PKCE S256 and the exact canonical MCP resource;
+     DCR, token, revocation, and MCP requests are size-, media-type-, method-,
+     and rate-limited; MCP uses both pre-authentication IP and post-authentication
+     grant buckets
+   - Cloudflare Access must leave the exact OAuth discovery, DCR/token/revoke,
+     and `/mcp` machine paths reachable by standard clients while continuing to
+     protect the remaining ToB surface
 
 2. **Code Standards**
    - TypeScript strict mode
@@ -802,6 +903,7 @@ TURNSTILE_SECRET=xxx     # Cloudflare Turnstile secret (unset = CAPTCHA disabled
 ### Vars (wrangler.jsonc)
 
 ```env
+BETTER_AUTH_URL=https://onfire.alkinum.com  # Canonical ToB, OAuth issuer, and MCP origin
 JWT_ISSUER=onfire        # Customer JWT issuer
 JWT_AUDIENCE=onfire-toc  # Customer JWT audience
 ```
