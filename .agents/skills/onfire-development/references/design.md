@@ -8,6 +8,7 @@
 - Grid siblings: `h-full`, stretch alignment, and equal minimum heights for loading/empty/error states.
 - Paired modules keep equal outer and empty-body heights across breakpoints.
 - Empty Select: show a disabled, labeled state instead of an empty menu.
+- Tabs hug their labels (`w-fit` / max-content). Do not stretch the tab list to the container or give triggers equal flex width.
 - Actions: icons for familiar tools, labeled create/save commands, row menu for secondary/destructive actions.
 - Color: zinc base plus restrained emerald/amber/red/sky and small orange brand accents.
 - Effects: shallow shadows, subtle borders, rare small gradients; no decorative blobs or glass-heavy panels.

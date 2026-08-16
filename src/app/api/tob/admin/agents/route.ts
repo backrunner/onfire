@@ -6,26 +6,35 @@ import { ok, notFound, badRequest, forbidden } from "@/lib/api/response";
 import { withAuth, parseBody, parseQuery } from "@/lib/api/handler";
 import { tenantCondition } from "@/lib/api/scope";
 import { canManageRole } from "@/lib/api-utils";
+import { Role } from "@/lib/types";
+import {
+  STAFF_SCOPES,
+  assertCanManageStaff,
+  listScopedTeamIds,
+  parseStaffScope,
+} from "@/lib/staff-scope";
 
 const listQuerySchema = z.object({
   teamId: z.string().optional(),
   active: z.string().optional(),
+  scope: z.enum(STAFF_SCOPES).optional(),
+  tenantId: z.string().optional(),
+  productId: z.string().optional(),
 });
 
-const createAgentSchema = z.object({
-  userId: z.string().min(1),
-  level: z.number().int().min(1).max(10).optional(),
-  teamIds: z.array(z.string()).optional(),
-});
-
-export const GET = withAuth({ permission: "user.manage" }, async (req: NextRequest, ctx) => {
+export const GET = withAuth({ permission: "team.manage" }, async (req: NextRequest, ctx) => {
   const query = parseQuery(req, listQuerySchema);
+  const ref = await assertCanManageStaff(ctx, parseStaffScope(query));
   const activeOnly = query.active === "true";
+  const scopedTeamIds = await listScopedTeamIds(ctx, ref);
 
-  const tenantUsers = await ctx.db
-    .select()
-    .from(users)
-    .where(tenantCondition(ctx, users.tenantId));
+  const userFilter =
+    ref.scope === "system"
+      ? undefined
+      : ctx.isSuperAdmin && ref.tenantId
+        ? eq(users.tenantId, ref.tenantId)
+        : tenantCondition(ctx, users.tenantId);
+  const tenantUsers = await ctx.db.select().from(users).where(userFilter);
   const userIds = tenantUsers.map((u) => u.id);
   if (userIds.length === 0) return ok([]);
 
@@ -58,14 +67,27 @@ export const GET = withAuth({ permission: "user.manage" }, async (req: NextReque
     teamAssignmentMap.set(ta.userId, existing);
   }
 
-  let filteredAgentList = agentList;
+  const scopedMembers = new Set(
+    allTeamAssignments
+      .filter((ta) => scopedTeamIds.includes(ta.teamId))
+      .map((ta) => ta.userId)
+  );
+  let filteredAgentList =
+    ref.scope === "tenant"
+      ? agentList
+      : agentList.filter((a) => scopedMembers.has(a.userId));
   if (query.teamId) {
+    if (!scopedTeamIds.includes(query.teamId)) {
+      return ok([]);
+    }
     const teamMemberIds = new Set(
       allTeamAssignments
         .filter((ta) => ta.teamId === query.teamId)
         .map((ta) => ta.userId)
     );
-    filteredAgentList = agentList.filter((a) => teamMemberIds.has(a.userId));
+    filteredAgentList = filteredAgentList.filter((a) =>
+      teamMemberIds.has(a.userId)
+    );
   }
 
   const userMap = new Map(tenantUsers.map((u) => [u.id, u]));
@@ -80,49 +102,88 @@ export const GET = withAuth({ permission: "user.manage" }, async (req: NextReque
       displayName: profile?.displayName || user?.displayName,
       email: profile?.email || user?.email,
       avatarUrl: profile?.avatarUrl,
-      teamIds: teamAssignmentMap.get(agent.userId) || [],
+      teamIds: (teamAssignmentMap.get(agent.userId) || []).filter((id) =>
+        scopedTeamIds.includes(id)
+      ),
     };
   });
 
   return ok(enrichedAgents);
 });
 
-export const POST = withAuth({ permission: "user.manage" }, async (req: NextRequest, ctx) => {
+const createAgentSchema = z.object({
+  userId: z.string().min(1),
+  level: z.number().int().min(1).max(10).optional(),
+  teamIds: z.array(z.string()).optional(),
+  scope: z.enum(STAFF_SCOPES).optional(),
+  tenantId: z.string().optional(),
+  productId: z.string().optional(),
+});
+
+export const POST = withAuth({ permission: "team.manage" }, async (req: NextRequest, ctx) => {
   const body = await parseBody(req, createAgentSchema);
+  const ref = await assertCanManageStaff(
+    ctx,
+    parseStaffScope({
+      scope: body.scope,
+      tenantId: body.tenantId,
+      productId: body.productId,
+    })
+  );
+  const scopedTeamIds = new Set(await listScopedTeamIds(ctx, ref));
 
   const user = await ctx.db.query.users.findFirst({ where: eq(users.id, body.userId) });
-  if (!user || (!ctx.isSuperAdmin && !ctx.tenantIds.includes(user.tenantId))) {
+  if (
+    !user ||
+    (ref.scope !== "system" && ref.tenantId && user.tenantId !== ref.tenantId)
+  ) {
     throw notFound("User not found");
   }
-  if (!canManageRole(ctx.role, user.role)) {
+  if (!ctx.isSuperAdmin && !canManageRole(ctx.role, user.role)) {
     throw forbidden("Cannot manage an agent for an equal or higher role");
   }
 
   const existing = await ctx.db.query.agents.findFirst({
     where: eq(agents.userId, body.userId),
   });
-  if (existing) throw badRequest("User is already an agent");
 
   const teamIds = [...new Set(body.teamIds ?? [])];
+  if (teamIds.some((id) => !scopedTeamIds.has(id))) {
+    throw badRequest("Teams must belong to the current staff scope");
+  }
   if (teamIds.length > 0) {
     const teamRows = await ctx.db
       .select({ id: teams.id, tenantId: teams.tenantId })
       .from(teams)
       .where(inArray(teams.id, teamIds));
-    const foundTeamIds = new Set(teamRows.map((t) => t.id));
-
-    const invalidTeamIds = teamIds.filter((id) => !foundTeamIds.has(id));
-    if (invalidTeamIds.length > 0) {
-      throw badRequest("Invalid team IDs: " + invalidTeamIds.join(", "));
-    }
-    if (teamRows.some((team) => team.tenantId !== user.tenantId)) {
+    if (teamRows.some((team) => team.tenantId && team.tenantId !== user.tenantId)) {
       throw forbidden("Agents can only join teams in their own tenant");
     }
   }
 
+  if (existing) {
+    if (teamIds.length === 0) throw badRequest("User is already an agent");
+    const current = await ctx.db
+      .select({ teamId: agentTeams.teamId })
+      .from(agentTeams)
+      .where(eq(agentTeams.userId, body.userId));
+    const currentIds = new Set(current.map((row) => row.teamId));
+    const added = teamIds.filter((id) => !currentIds.has(id));
+    if (added.length > 0) {
+      await ctx.db
+        .insert(agentTeams)
+        .values(added.map((teamId) => ({ userId: body.userId, teamId })));
+    }
+    return ok({ userId: body.userId, attached: true });
+  }
+
+  if (ctx.role === Role.ProductAdmin && body.level !== undefined) {
+    throw forbidden("Product staff can only change product team memberships");
+  }
+
   const insertAgent = ctx.db.insert(agents).values({
     userId: body.userId,
-    level: body.level ?? 1,
+    level: ref.scope === "product" ? 1 : (body.level ?? 1),
     active: true,
   });
 

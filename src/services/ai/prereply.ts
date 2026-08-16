@@ -42,18 +42,21 @@ export async function generatePrereply(
   db: Database,
   options: PrereplyOptions
 ): Promise<PrereplyResult | null> {
-  const provider = await getAIProvider(db, "prereply");
-  if (!provider) {
-    console.log("Prereply AI not configured");
-    return null;
-  }
-
   const ticket = await db.query.tickets.findFirst({
     where: eq(tickets.id, options.ticketId),
   });
 
   if (!ticket) {
     throw new Error(`Ticket not found: ${options.ticketId}`);
+  }
+
+  const provider = await getAIProvider(db, "prereply", {
+    tenantId: ticket.tenantId,
+    productId: ticket.productId,
+  });
+  if (!provider) {
+    console.log("Prereply AI not configured");
+    return null;
   }
 
   // Get previous replies for context

@@ -1,6 +1,6 @@
 # OnFire Project Status
 
-Updated: 2026-08-14
+Updated: 2026-08-16
 
 ## Current State
 
@@ -70,7 +70,14 @@ Updated: 2026-08-14
 - Each ticket type owns one immediately active, immutable form-version series. Saving creates `N+1`, prior versions remain submit-capable until explicitly invalidated, rollback copies old content into a new version, and archive/restore never removes history.
 - Tickets pin the selected type, exact form version, and submission-time type path. ToB details render historical custom fields with the pinned schema, while ToC exposes an expandable type tree and hides template selection.
 - Every product has a protected hidden `unclassified` type for AI failure. Legacy template/category rows remain read-only and are backfilled into archived historical form versions.
-- Inbound email now applies local deterministic spam checks, an optional tenant-over-global HTTPS classifier, and one AI prescreening call for support judgment, type selection, and insights. Filtered messages enter an audited quarantine that administrators can release.
+- Inbound email now applies local deterministic spam checks, an optional tenant-over-global external classifier, and one AI prescreening call for support judgment, type selection, and insights. Filtered messages enter an audited quarantine that administrators can release. The classifier can use Postmark SpamCheck, Akismet, OOPSpam, Stop Forum Spam, or a custom `onfire-spam-v1` HTTPS endpoint.
+- Product email settings, templates, and logs live on the product configuration page. The former first-level Email sidebar item is gone; `/admin/email` redirects to the product list or a product email tab.
+- Product notification rules, requirements, and compliance live on the same product page. The former first-level Notifications sidebar item is gone; `/admin/notifications` redirects to the product notifications tab.
+- Teams now have system, tenant, and product scope. SuperAdmin manages system staff from system administration. TenantAdmin is sent to their tenant page (products, users, teams, agents, presets, spam) and never sees the global tenant list. ProductAdmin sees only assigned products, with product-scope teams/agents and no tenant tabs. TeamAdmin and Agent have no management entry. Product staff edits change only product-team memberships.
+- SuperAdmin and TenantAdmin can start a read-only preview identity of a lower-role user. `/me` and all ToB APIs overlay that user's live role and scope; mutations return 403 except start/stop preview. The sidebar brand area shows an amber preview indicator with an exit action.
+- Local debugging uses `pnpm db:reset` to wipe local D1, apply migrations, and seed a demo tenant/product, ticket types/forms, and `admin@local.onfire` / `admin`. `pnpm db:seed:tickets` inserts more sample tickets. These scripts never touch remote D1.
+- AI-dependent features cannot be turned on without a matching enabled credential route. Email AI filtering requires prescreening credentials, knowledge writes require embedding credentials, and an AI task itself cannot be enabled without at least one assigned credential.
+- AI credentials and routes can be defined at system, tenant, and product scope. A child scope can inherit the parent route or pick parent credentials. Every model call writes a usage event and updates daily token rollups for system, tenant, and product dimensions. Retention defaults to permanent and can be set in days.
 - Inbound replies resolve RFC `In-Reply-To` and `References` values against both sent outbound mail and processed inbound mail, prefer verified thread headers over stale subject markers, and append only after product and customer-email validation.
 
 - Notifications now separate user-owned receiving endpoints from product-owned delivery policy. Product rules select events, recipient scopes, and channel types; mandatory requirements both drive delivery and report missing endpoint compliance.
@@ -131,6 +138,13 @@ Updated: 2026-08-14
 - `0018_broad_la_nuit.sql`: MCP grant versions and authorization-code/token
   family bindings. Existing unbound `0017` grants fail closed and require a
   fresh authorization after the matching Worker is deployed.
+- `0019_bright_vision.sql`: named spam-filter provider on global/tenant
+  configs so built-in APIs can be selected alongside a custom HTTPS endpoint.
+- `0020_natural_selene.sql`: scoped AI credentials and routes, usage events,
+  daily token rollups, and retention settings.
+- `0021_cynical_kid_colt.sql`: nullable `teams.tenant_id`, `teams.product_id`,
+  `teams.scope` (`system` | `tenant` | `product`, existing rows backfill as
+  tenant), and `teams_scope_idx`.
 
 A fresh local D1 applied all 19 migrations from `0000` through `0018`, with no
 foreign-key violations, and confirmed the Better Auth 1.7 OAuth/resource
@@ -138,7 +152,7 @@ tables, `account.issuer`, MCP grant version, and authorization binding table.
 A separate non-empty legacy fixture also verifies unique migrated type keys,
 invalid legacy metadata tolerance, pinned version backfill, and historical path
 snapshots. Production D1 remains at migrations `0000` through `0016`; `0017`
-and `0018` have not been applied remotely.
+through `0020` have not been applied remotely.
 
 ## Verification
 

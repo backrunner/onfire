@@ -1,10 +1,12 @@
 "use client";
 
-import { Suspense } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { Suspense, useEffect } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
 import { useMe } from "@/lib/hooks/use-me";
+import { managementEntryHref } from "@/lib/staff-access";
 import type { Permission } from "@/lib/types";
+import { Role } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TenantManagement } from "./_components/tenant-management";
@@ -16,6 +18,7 @@ import { TicketTypePresetManagement } from "./_components/ticket-type-preset-man
 import { SpamFilterManagement } from "./_components/spam-filter-management";
 import { CredentialsTab } from "@/components/admin/ai/credentials-tab";
 import { RoutingTab } from "@/components/admin/ai/routing-tab";
+import { UsageTab } from "@/components/admin/ai/usage-tab";
 
 type TabKey =
   | "tenants"
@@ -26,7 +29,8 @@ type TabKey =
   | "agents"
   | "spamFilter"
   | "aiCredentials"
-  | "aiRouting";
+  | "aiRouting"
+  | "aiUsage";
 
 interface TabDef {
   value: TabKey;
@@ -37,14 +41,14 @@ interface TabDef {
 const TABS: TabDef[] = [
   { value: "tenants", permission: "tenant.manage", render: () => <TenantManagement /> },
   { value: "products", permission: "product.settings", render: () => <ProductManagement /> },
-  { value: "teams", permission: "team.manage", render: () => <TeamManagement /> },
+  { value: "teams", permission: "team.manage", render: () => <TeamManagement scope="system" /> },
   {
     value: "ticketTypePresets",
     permission: "ticket_type.preset.read",
     render: () => <TicketTypePresetManagement />,
   },
   { value: "users", permission: "user.manage", render: () => <UserManagement /> },
-  { value: "agents", permission: "user.manage", render: () => <AgentManagement /> },
+  { value: "agents", permission: "user.manage", render: () => <AgentManagement scope="system" /> },
   {
     value: "spamFilter",
     permission: "spam.config",
@@ -52,6 +56,7 @@ const TABS: TabDef[] = [
   },
   { value: "aiCredentials", permission: "ai.config", render: () => <CredentialsTab /> },
   { value: "aiRouting", permission: "ai.config", render: () => <RoutingTab /> },
+  { value: "aiUsage", permission: "ai.config", render: () => <UsageTab /> },
 ];
 
 function ManagementPageSkeleton() {
@@ -65,15 +70,37 @@ function ManagementPageSkeleton() {
 
 function ManagementTabs() {
   const { t } = useI18n();
-  const { can, isLoading } = useMe();
+  const { me, can, isLoading } = useMe();
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const entryHref = me ? managementEntryHref(me) : null;
 
-  const visibleTabs = TABS.filter((tab) => can(tab.permission));
+  useEffect(() => {
+    if (isLoading || !entryHref || entryHref === "/admin/management") return;
+    const tab = searchParams.get("tab");
+    const productTab =
+      tab === "aiCredentials" || tab === "aiRouting" || tab === "aiUsage"
+        ? "knowledge"
+        : tab;
+    const next =
+      tab && entryHref.includes("/tenants/")
+        ? `${entryHref}?tab=${encodeURIComponent(tab)}`
+        : tab && entryHref.includes("/products/")
+          ? `${entryHref}?tab=${encodeURIComponent(productTab ?? tab)}`
+          : entryHref;
+    router.replace(next);
+  }, [entryHref, isLoading, router, searchParams]);
 
-  if (isLoading) {
+  if (isLoading || (entryHref && entryHref !== "/admin/management")) {
     return <ManagementPageSkeleton />;
   }
+
+  const visibleTabs = TABS.filter((tab) => {
+    if (me?.role === Role.ProductAdmin) return tab.value === "products";
+    if (me?.role !== Role.SuperAdmin) return false;
+    return can(tab.permission);
+  });
 
   if (visibleTabs.length === 0) {
     return (
@@ -96,9 +123,9 @@ function ManagementTabs() {
 
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange}>
-      <TabsList className="w-full max-w-full justify-start overflow-x-auto">
+      <TabsList>
         {visibleTabs.map((tab) => (
-          <TabsTrigger key={tab.value} value={tab.value} className="flex-none shrink-0">
+          <TabsTrigger key={tab.value} value={tab.value}>
             {t.management.tabs[tab.value]}
           </TabsTrigger>
         ))}
@@ -115,12 +142,22 @@ function ManagementTabs() {
 
 export default function AdminManagementPage() {
   const { t } = useI18n();
+  const { me, isLoading } = useMe();
+  const isProductAdmin = me?.role === Role.ProductAdmin;
+  const title = isProductAdmin ? t.management.productTitle : t.management.title;
+  const subtitle = isProductAdmin
+    ? t.management.productSubtitle
+    : t.management.subtitle;
 
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold">{t.management.title}</h1>
-        <p className="text-sm text-muted-foreground">{t.management.subtitle}</p>
+        <h1 className="text-xl font-semibold">
+          {isLoading ? t.management.title : title}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {isLoading ? t.management.subtitle : subtitle}
+        </p>
       </div>
 
       {/* useSearchParams requires a Suspense boundary in the App Router. */}

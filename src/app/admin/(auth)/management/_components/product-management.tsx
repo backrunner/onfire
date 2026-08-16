@@ -83,13 +83,14 @@ const emptyForm = (): ProductFormValues => ({
   autoCloseMinutes: "",
 });
 
-export function ProductManagement() {
+export function ProductManagement({ tenantId }: { tenantId?: string } = {}) {
   const router = useRouter();
   const { t } = useI18n();
   const m = t.management;
   const { can } = useMe();
   const isSuperAdmin = can("tenant.manage");
   const canManageProducts = can("product.manage");
+  const showTenantColumn = isSuperAdmin && !tenantId;
 
   const {
     data: products,
@@ -118,14 +119,16 @@ export function ProductManagement() {
   );
 
   const filtered = useMemo(() => {
-    const list = products ?? [];
+    const list = (products ?? []).filter(
+      (product) => !tenantId || product.tenantId === tenantId
+    );
     const q = search.trim().toLowerCase();
     return q ? list.filter((p) => p.name.toLowerCase().includes(q)) : list;
-  }, [products, search]);
+  }, [products, search, tenantId]);
 
   const openCreate = () => {
     setEditing(null);
-    setForm(emptyForm());
+    setForm({ ...emptyForm(), tenantId: tenantId ?? "" });
     setFormErrors({});
     setDialogOpen(true);
   };
@@ -156,7 +159,7 @@ export function ProductManagement() {
   const handleSubmit = async () => {
     const { errors, payload } = validateProductForm(form, {
       editing: editing !== null,
-      includeTenant: isSuperAdmin,
+      includeTenant: isSuperAdmin && !tenantId,
       messages: {
         nameRequired: m.products.nameRequired,
         urlInvalid: m.products.urlInvalid,
@@ -167,6 +170,7 @@ export function ProductManagement() {
     });
     setFormErrors(errors);
     if (!payload) return;
+    if (tenantId) payload.tenantId = tenantId;
 
     setPending(true);
     try {
@@ -279,7 +283,7 @@ export function ProductManagement() {
             <TableHeader>
               <TableRow>
                 <TableHead>{m.products.name}</TableHead>
-                {isSuperAdmin && <TableHead>{m.products.tenant}</TableHead>}
+                {showTenantColumn && <TableHead>{m.products.tenant}</TableHead>}
                 <TableHead>{m.products.slaPolicy}</TableHead>
                 <TableHead>{m.products.autoClose}</TableHead>
                 <TableHead className="w-20" />
@@ -293,7 +297,7 @@ export function ProductManagement() {
                     <TableCell className="text-sm font-medium">
                       {product.name}
                     </TableCell>
-                    {isSuperAdmin && (
+                    {showTenantColumn && (
                       <TableCell className="text-sm text-muted-foreground">
                         {tenantNames.get(product.tenantId) ?? product.tenantId}
                       </TableCell>
@@ -391,7 +395,7 @@ export function ProductManagement() {
               />
             </FormField>
 
-            {isSuperAdmin && !editing && (
+            {showTenantColumn && !editing && (
               <FormField label={m.products.tenant}>
                 <Select
                   value={form.tenantId || DEFAULT_TENANT}

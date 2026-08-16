@@ -40,18 +40,21 @@ export async function prescreenTicket(
   db: Database,
   ticketId: string
 ): Promise<PrescreeningResult | null> {
-  const provider = await getAIProvider(db, "prescreening");
-  if (!provider) {
-    console.log("Prescreening AI not configured");
-    return null;
-  }
-
   const ticket = await db.query.tickets.findFirst({
     where: eq(tickets.id, ticketId),
   });
 
   if (!ticket) {
     throw new Error(`Ticket not found: ${ticketId}`);
+  }
+
+  const provider = await getAIProvider(db, "prescreening", {
+    tenantId: ticket.tenantId,
+    productId: ticket.productId,
+  });
+  if (!provider) {
+    console.log("Prescreening AI not configured");
+    return null;
   }
 
   // Update status to processing

@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Glasses, Pencil, Plus, Trash2 } from "lucide-react";
+import { usePreviewIdentity } from "@/lib/hooks/use-preview-identity";
 import { useI18n } from "@/lib/i18n";
 import { api, swrFetcher } from "@/lib/api/client";
 import { useMe } from "@/lib/hooks/use-me";
@@ -80,12 +81,14 @@ const ROLE_BADGE: Record<Role, "default" | "secondary" | "destructive" | "outlin
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function UserManagement() {
+export function UserManagement({ tenantId }: { tenantId?: string } = {}) {
   const { t } = useI18n();
   const m = t.management;
   const { me, can } = useMe();
+  const { start } = usePreviewIdentity();
   const myRole = me?.role;
   const isSuperAdmin = can("tenant.manage");
+  const showTenantColumn = isSuperAdmin && !tenantId;
 
   const roleLabels: Record<Role, string> = {
     [Role.SuperAdmin]: m.users.roles.superAdmin,
@@ -150,7 +153,9 @@ export function UserManagement() {
     !!myRole && canManageRole(myRole, user.role);
 
   const filtered = useMemo(() => {
-    const list = users ?? [];
+    const list = (users ?? []).filter(
+      (user) => !tenantId || user.tenantId === tenantId
+    );
     const q = search.trim().toLowerCase();
     return q
       ? list.filter(
@@ -159,7 +164,7 @@ export function UserManagement() {
             u.displayName.toLowerCase().includes(q)
         )
       : list;
-  }, [users, search]);
+  }, [users, search, tenantId]);
 
   const openCreate = () => {
     setEditing(null);
@@ -168,7 +173,7 @@ export function UserManagement() {
       temporaryPassword: "",
       displayName: "",
       role: "",
-      tenantId: "",
+      tenantId: tenantId ?? "",
       productIds: [],
     });
     setFormErrors({});
@@ -226,7 +231,9 @@ export function UserManagement() {
           ...(form.role === Role.ProductAdmin && {
             productIds: form.productIds,
           }),
-          ...(isSuperAdmin && form.tenantId ? { tenantId: form.tenantId } : {}),
+          ...(isSuperAdmin && (form.tenantId || tenantId)
+            ? { tenantId: form.tenantId || tenantId }
+            : {}),
         });
         toast.success(m.toastCreated);
       }
@@ -281,7 +288,7 @@ export function UserManagement() {
                 <TableHead>{m.users.email}</TableHead>
                 <TableHead>{m.users.role}</TableHead>
                 <TableHead>{m.users.products}</TableHead>
-                {isSuperAdmin && <TableHead>{m.users.tenant}</TableHead>}
+                {showTenantColumn && <TableHead>{m.users.tenant}</TableHead>}
                 <TableHead>{m.tabs.agents}</TableHead>
                 <TableHead className="w-12" />
               </TableRow>
@@ -309,7 +316,7 @@ export function UserManagement() {
                             .join(", ") || "-"
                         : "-"}
                     </TableCell>
-                    {isSuperAdmin && (
+                    {showTenantColumn && (
                       <TableCell className="text-sm text-muted-foreground">
                         {tenantNames.get(user.tenantId) ?? user.tenantId}
                       </TableCell>
@@ -334,6 +341,19 @@ export function UserManagement() {
                       {manageable && (
                         <RowActions
                           actions={[
+                            {
+                              label: t.preview.startThis,
+                              icon: Glasses,
+                              onSelect: () => {
+                                void start(user.id).catch((error) =>
+                                  toast.error(
+                                    error instanceof Error
+                                      ? error.message
+                                      : t.preview.startFailed
+                                  )
+                                );
+                              },
+                            },
                             {
                               label: t.common.edit,
                               icon: Pencil,
@@ -485,7 +505,7 @@ export function UserManagement() {
               </FormField>
             )}
 
-            {isSuperAdmin && !editing && (
+            {showTenantColumn && !editing && (
               <FormField label={m.users.tenant}>
                 <Select
                   value={form.tenantId}

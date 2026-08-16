@@ -27,6 +27,7 @@
 - Track `pnpm-lock.yaml`. pnpm 11 dependency overrides belong in `pnpm-workspace.yaml`, should be as narrow as possible, and require a full reinstall, audit, tests, and Worker build.
 - Generate `CloudflareEnv` with `pnpm cf-typegen`. Keep `wrangler.types.env` value-free and never hand-write binding interfaces.
 - Do not present placeholder processing as complete.
+- Use `pnpm db:reset` and `pnpm db:seed:tickets` for local D1 only. Never point those scripts at remote D1.
 
 ## Verification Gates
 

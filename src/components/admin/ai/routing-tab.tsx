@@ -33,6 +33,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { aiScopeQuery } from "./scope";
 
 interface TaskAssignmentView {
   id: string;
@@ -48,10 +49,14 @@ interface TaskAssignmentView {
 }
 
 interface TaskRoutingView {
-  id: string;
+  id: string | null;
   taskType: AITaskTypeValue;
   enabled: boolean;
+  inherit: boolean;
   assignments: TaskAssignmentView[];
+  inheritedFrom: "system" | "tenant" | "product" | null;
+  inheritedEnabled: boolean;
+  inheritedAssignments: TaskAssignmentView[];
 }
 
 interface AssignmentDraft {
@@ -61,14 +66,23 @@ interface AssignmentDraft {
   enabled: boolean;
 }
 
-export function RoutingTab() {
+export function RoutingTab({
+  scope = "system",
+  tenantId,
+  productId,
+}: {
+  scope?: "system" | "tenant" | "product";
+  tenantId?: string;
+  productId?: string;
+}) {
   const { t } = useI18n();
+  const scopeQuery = aiScopeQuery({ scope, tenantId, productId });
   const routing = useSWR<TaskRoutingView[]>(
-    "/api/tob/admin/ai/config",
+    `/api/tob/admin/ai/config${scopeQuery}`,
     swrFetcher
   );
   const credentials = useSWR<AiCredentialView[]>(
-    "/api/tob/admin/ai/credentials",
+    `/api/tob/admin/ai/credentials${aiScopeQuery({ scope, tenantId, productId, includeInherited: true })}`,
     swrFetcher
   );
 
@@ -109,6 +123,9 @@ export function RoutingTab() {
         <TaskRoutingCard
           key={taskType}
           taskType={taskType}
+          scope={scope}
+          tenantId={tenantId}
+          productId={productId}
           config={routing.data?.find((item) => item.taskType === taskType) ?? null}
           credentials={credentials.data ?? []}
           onSaved={() => void routing.mutate()}
@@ -120,11 +137,17 @@ export function RoutingTab() {
 
 function TaskRoutingCard({
   taskType,
+  scope,
+  tenantId,
+  productId,
   config,
   credentials,
   onSaved,
 }: {
   taskType: AITaskTypeValue;
+  scope: "system" | "tenant" | "product";
+  tenantId?: string;
+  productId?: string;
   config: TaskRoutingView | null;
   credentials: AiCredentialView[];
   onSaved: () => void;
@@ -132,6 +155,7 @@ function TaskRoutingCard({
   const { t } = useI18n();
   const r = t.aiConfig.routing;
   const [enabled, setEnabled] = useState(true);
+  const [inherit, setInherit] = useState(scope !== "system");
   const [assignments, setAssignments] = useState<AssignmentDraft[]>([]);
   const [pending, setPending] = useState(false);
 
@@ -145,6 +169,7 @@ function TaskRoutingCard({
 
   useEffect(() => {
     setEnabled(config?.enabled ?? true);
+    setInherit(config?.inherit ?? scope !== "system");
     setAssignments(
       config?.assignments.map((assignment) => ({
         id: assignment.id,
@@ -196,8 +221,27 @@ function TaskRoutingCard({
     });
   };
 
+  const canEnable = inherit || assignments.some((assignment) => assignment.enabled);
+  const inheritedFrom = config?.inheritedFrom ?? (scope === "product" ? "tenant" : "system");
+  const inheritedAssignments = config?.inheritedAssignments ?? [];
+
+  const startOverride = () => {
+    setInherit(false);
+    if (assignments.length === 0 && inheritedAssignments.length > 0) {
+      setAssignments(
+        inheritedAssignments.map((assignment) => ({
+          id: crypto.randomUUID(),
+          credentialId: assignment.credentialId,
+          model: assignment.model,
+          enabled: assignment.enabled,
+        }))
+      );
+    }
+    if (config) setEnabled(config.inheritedEnabled);
+  };
+
   const save = async () => {
-    if (enabled && assignments.filter((assignment) => assignment.enabled).length === 0) {
+    if (enabled && !inherit && !canEnable) {
       toast.error(r.routeRequired);
       return;
     }
@@ -208,14 +252,17 @@ function TaskRoutingCard({
 
     setPending(true);
     try {
-      await api.post("/api/tob/admin/ai/config", {
+      await api.post(`/api/tob/admin/ai/config${aiScopeQuery({ scope, tenantId, productId })}`, {
         taskType,
         enabled,
-        assignments: assignments.map((assignment) => ({
-          credentialId: assignment.credentialId,
-          model: assignment.model.trim(),
-          enabled: assignment.enabled,
-        })),
+        inherit,
+        assignments: inherit
+          ? []
+          : assignments.map((assignment) => ({
+              credentialId: assignment.credentialId,
+              model: assignment.model.trim(),
+              enabled: assignment.enabled,
+            })),
       });
       toast.success(r.saved);
       onSaved();
@@ -242,19 +289,65 @@ function TaskRoutingCard({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <Switch
-              id={`task-enabled-${taskType}`}
-              checked={enabled}
-              onCheckedChange={setEnabled}
-            />
-            <Label htmlFor={`task-enabled-${taskType}`} className="sr-only">
-              {t.aiConfig.enabled}
-            </Label>
+            {!inherit && (
+              <>
+                <Switch
+                  id={`task-enabled-${taskType}`}
+                  checked={enabled && canEnable}
+                  disabled={pending || !canEnable}
+                  onCheckedChange={(next) => {
+                    if (next && !canEnable) {
+                      toast.error(r.routeRequired);
+                      return;
+                    }
+                    setEnabled(next);
+                  }}
+                />
+                <Label htmlFor={`task-enabled-${taskType}`} className="sr-only">
+                  {t.aiConfig.enabled}
+                </Label>
+              </>
+            )}
           </div>
         </div>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-4 px-4 pb-4">
-        {assignments.length === 0 ? (
+        {inherit ? (
+          <div className="flex min-h-40 flex-1 flex-col gap-3">
+            <div className="rounded-md border border-dashed px-3 py-3">
+              <p className="text-sm font-medium">
+                {r.usingParent.replace(
+                  "{{scope}}",
+                  t.aiConfig.scopes[inheritedFrom === "tenant" ? "tenant" : "system"]
+                )}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{r.inheritHint}</p>
+              {inheritedAssignments.length === 0 ? (
+                <p className="mt-3 text-xs text-muted-foreground">{r.parentEmpty}</p>
+              ) : (
+                <ul className="mt-3 space-y-1.5">
+                  {inheritedAssignments.map((assignment, index) => (
+                    <li key={assignment.id} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="truncate">
+                        {index + 1}. {assignment.credentialName}
+                      </span>
+                      <span className="shrink-0 text-muted-foreground">{assignment.model}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 self-start"
+              onClick={startOverride}
+              disabled={pending}
+            >
+              {r.override}
+            </Button>
+          </div>
+        ) : assignments.length === 0 ? (
           <div className="flex min-h-40 flex-1 flex-col items-center justify-center gap-2 rounded-md border border-dashed px-6 text-center">
             <GitBranch className="size-6 text-muted-foreground/45" />
             <p className="text-sm font-medium">{r.empty}</p>
@@ -350,7 +443,9 @@ function TaskRoutingCard({
                               value={item.id}
                               disabled={usedByOthers.has(item.id)}
                             >
-                              {item.name}
+                              {item.inherited
+                                ? `${item.name} (${t.aiConfig.scopes[item.scope ?? "system"]})`
+                                : item.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -386,16 +481,33 @@ function TaskRoutingCard({
         )}
 
         <div className="mt-auto flex items-center justify-between border-t pt-3">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8"
-            onClick={addAssignment}
-            disabled={compatibleCredentials.length === 0}
-          >
-            <Plus className="size-4" />
-            {r.addFallback}
-          </Button>
+          {inherit ? (
+            <span />
+          ) : (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={addAssignment}
+                disabled={compatibleCredentials.length === 0}
+              >
+                <Plus className="size-4" />
+                {r.addFallback}
+              </Button>
+              {scope !== "system" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8"
+                  onClick={() => setInherit(true)}
+                  disabled={pending}
+                >
+                  {r.useParent}
+                </Button>
+              )}
+            </div>
+          )}
           <Button size="sm" className="h-8" onClick={save} disabled={pending}>
             {pending && <Loader2 className="size-4 animate-spin" />}
             {t.aiConfig.save}

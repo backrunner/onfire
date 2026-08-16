@@ -59,12 +59,12 @@ export default function TocHomePage() {
   return (
     <TocPortalShell>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-4 grid h-11 w-full grid-cols-2 rounded-full p-1">
-          <TabsTrigger value="submit" className="gap-1.5 rounded-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="submit" className="gap-1.5">
             <PlusCircle className="size-4" />
             {t.toc.tabs.submit}
           </TabsTrigger>
-          <TabsTrigger value="list" className="gap-1.5 rounded-full">
+          <TabsTrigger value="list" className="gap-1.5">
             <List className="size-4" />
             {t.toc.tabs.list}
           </TabsTrigger>

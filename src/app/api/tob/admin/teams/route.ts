@@ -1,70 +1,68 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { eq, inArray } from "drizzle-orm";
-import { productTeams, teams, tenants } from "@/drizzle/schema";
-import { ok, badRequest, notFound } from "@/lib/api/response";
-import { withAuth, parseBody } from "@/lib/api/handler";
-import { assertProductAccess, tenantCondition } from "@/lib/api/scope";
-import { Role } from "@/lib/types";
+import { eq } from "drizzle-orm";
+import { productTeams, teams } from "@/drizzle/schema";
+import { ok, badRequest } from "@/lib/api/response";
+import { withAuth, parseBody, parseQuery } from "@/lib/api/handler";
+import { assertProductAccess } from "@/lib/api/scope";
+import { STAFF_SCOPES, assertCanManageStaff, parseStaffScope, teamScopeFilter } from "@/lib/staff-scope";
+
+const listQuerySchema = z.object({
+  scope: z.enum(STAFF_SCOPES).optional(),
+  tenantId: z.string().optional(),
+  productId: z.string().optional(),
+});
 
 const createTeamSchema = z.object({
   name: z.string().trim().min(1).max(100),
   tenantId: z.string().optional(),
+  productId: z.string().optional(),
+  scope: z.enum(STAFF_SCOPES).optional(),
   allowReassign: z.boolean().optional(),
   productIds: z.array(z.string().min(1)).optional(),
 });
 
-export const GET = withAuth({ permission: "team.manage" }, async (_req: NextRequest, ctx) => {
-  if (ctx.role === Role.ProductAdmin) {
-    if (ctx.productIds.length === 0) return ok([]);
-    const associations = await ctx.db
-      .select({ teamId: productTeams.teamId })
-      .from(productTeams)
-      .where(inArray(productTeams.productId, ctx.productIds));
-    const teamIds = [...new Set(associations.map((row) => row.teamId))];
-    if (teamIds.length === 0) return ok([]);
-    const teamList = await ctx.db
-      .select()
-      .from(teams)
-      .where(inArray(teams.id, teamIds));
-    return ok(teamList);
+export const GET = withAuth({ permission: "team.manage" }, async (req: NextRequest, ctx) => {
+  const query = parseQuery(req, listQuerySchema);
+  if (ctx.isSuperAdmin && !query.scope && !query.tenantId && !query.productId) {
+    return ok(await ctx.db.select().from(teams));
   }
-
-  const teamList = await ctx.db
-    .select()
-    .from(teams)
-    .where(tenantCondition(ctx, teams.tenantId));
+  const ref = await assertCanManageStaff(ctx, parseStaffScope(query));
+  const teamList = await ctx.db.select().from(teams).where(teamScopeFilter(ref));
   return ok(teamList);
 });
 
 export const POST = withAuth({ permission: "team.manage" }, async (req: NextRequest, ctx) => {
   const body = await parseBody(req, createTeamSchema);
+  const ref = await assertCanManageStaff(
+    ctx,
+    parseStaffScope({
+      scope: body.scope,
+      tenantId: body.tenantId,
+      productId: body.productId,
+    })
+  );
 
-  // SuperAdmin may create a team in any tenant; others only in their own.
-  const tenantId = body.tenantId ?? ctx.user.tenantId;
-  if (!ctx.isSuperAdmin && !ctx.tenantIds.includes(tenantId)) {
-    throw badRequest("Invalid tenantId");
-  }
-  const tenant = await ctx.db.query.tenants.findFirst({
-    where: eq(tenants.id, tenantId),
-  });
-  if (!tenant) throw notFound("Tenant not found");
-  const productIds = [...new Set(body.productIds ?? [])];
-  if (ctx.role === Role.ProductAdmin && productIds.length === 0) {
-    throw badRequest("ProductAdmin must attach a new team to a product");
-  }
+  const productIds =
+    ref.scope === "product" && ref.productId
+      ? [ref.productId]
+      : [...new Set(body.productIds ?? [])];
   const selectedProducts = await Promise.all(
     productIds.map((id) => assertProductAccess(ctx, id))
   );
-  if (selectedProducts.some((product) => product.tenantId !== tenantId)) {
+  if (
+    ref.tenantId &&
+    selectedProducts.some((product) => product.tenantId !== ref.tenantId)
+  ) {
     throw badRequest("Products must belong to the team's tenant");
   }
 
   const id = crypto.randomUUID();
-
   const insertTeam = ctx.db.insert(teams).values({
     id,
-    tenantId,
+    tenantId: ref.scope === "system" ? null : ref.tenantId ?? null,
+    productId: ref.scope === "product" ? ref.productId ?? null : null,
+    scope: ref.scope,
     name: body.name,
     allowReassign: body.allowReassign ?? true,
   });

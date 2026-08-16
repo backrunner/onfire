@@ -19,6 +19,7 @@ import {
 import { conflict, ok, badRequest, forbidden } from "@/lib/api/response";
 import { withAuth, parseBody, type AuthedContext } from "@/lib/api/handler";
 import { assertProductAccess, assertTeamAccess } from "@/lib/api/scope";
+import { assertCanMutateTeam } from "@/lib/staff-scope";
 import { Role } from "@/lib/types";
 
 const updateTeamSchema = z.object({
@@ -59,6 +60,7 @@ export const GET = withAuth({ permission: "team.manage" }, async (_req: NextRequ
 
 export const PATCH = withAuth({ permission: "team.manage" }, async (req: NextRequest, ctx) => {
   const team = await loadAccessibleTeam(ctx, ctx.params.id);
+  assertCanMutateTeam(ctx, team);
   const body = await parseBody(req, updateTeamSchema);
 
   const productIds = body.productIds
@@ -99,7 +101,10 @@ export const PATCH = withAuth({ permission: "team.manage" }, async (req: NextReq
     const selectedProducts = await Promise.all(
       productIds.map((id) => assertProductAccess(ctx, id))
     );
-    if (selectedProducts.some((product) => product.tenantId !== team.tenantId)) {
+    if (
+      team.tenantId &&
+      selectedProducts.some((product) => product.tenantId !== team.tenantId)
+    ) {
       throw badRequest("Products must belong to the team's tenant");
     }
 
@@ -167,7 +172,7 @@ export const PATCH = withAuth({ permission: "team.manage" }, async (req: NextReq
     ]);
     if (
       userRows.length !== memberIds.length ||
-      userRows.some((user) => user.tenantId !== team.tenantId) ||
+      userRows.some((user) => Boolean(team.tenantId) && user.tenantId !== team.tenantId) ||
       agentRows.length !== memberIds.length
     ) {
       throw badRequest("Every team member must be an agent in the same tenant");
@@ -215,6 +220,7 @@ export const PATCH = withAuth({ permission: "team.manage" }, async (req: NextReq
 
 export const DELETE = withAuth({ permission: "team.manage" }, async (_req: NextRequest, ctx) => {
   const team = await loadAccessibleTeam(ctx, ctx.params.id);
+  assertCanMutateTeam(ctx, team);
 
   const dependencies = await Promise.all([
     ctx.db.query.tickets.findFirst({ where: eq(tickets.teamId, team.id) }),

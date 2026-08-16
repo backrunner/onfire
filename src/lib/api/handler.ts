@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { eq, inArray } from "drizzle-orm";
-import { getDb, type Database } from "@/lib/db";
+import { getDb, getEnv, type Database } from "@/lib/db";
 import { getAuth } from "@/lib/auth";
 import {
   agentTeams,
@@ -12,6 +12,16 @@ import {
   users,
 } from "@/drizzle/schema";
 import { hasPermission, Role, type Permission } from "@/lib/types";
+import {
+  PREVIEW_COOKIE_NAME,
+  PREVIEW_READONLY_CODE,
+  PREVIEW_READONLY_MESSAGE,
+  assertCanPreview,
+  isPreviewControlPath,
+  isWriteMethod,
+  previewCookieOptions,
+  verifyPreviewCookie,
+} from "@/lib/preview-identity";
 import { ApiError, err } from "./response";
 import { readBodyBytes } from "@/lib/request-body";
 import {
@@ -42,6 +52,8 @@ export interface AuthedContext {
   productIds: string[];
   /** Optional OAuth delegation; always intersects the live role scope. */
   delegatedResourceScope?: DelegatedResourceScope;
+  /** Browser-only preview overlay. Actor session stays the Better Auth user. */
+  preview?: { actorId: string; targetUserId: string };
   params: RouteParams;
 }
 
@@ -99,6 +111,53 @@ export async function resolveAuthedContext(
   };
 }
 
+async function applyPreviewOverlay(
+  req: NextRequest,
+  actor: AuthedContext
+): Promise<{ ctx: AuthedContext; clearCookie: boolean }> {
+  const raw = req.cookies.get(PREVIEW_COOKIE_NAME)?.value;
+  if (!raw) return { ctx: actor, clearCookie: false };
+  const secret = getEnv().AUTH_SECRET;
+  const payload = await verifyPreviewCookie(raw, secret);
+  if (!payload || payload.actorId !== actor.user.id) {
+    return { ctx: actor, clearCookie: true };
+  }
+  const targetUser = await actor.db.query.users.findFirst({
+    where: eq(users.id, payload.targetUserId),
+  });
+  if (!targetUser) return { ctx: actor, clearCookie: true };
+  try {
+    assertCanPreview(actor, {
+      id: targetUser.id,
+      role: targetUser.role,
+      tenantId: targetUser.tenantId,
+    });
+  } catch {
+    return { ctx: actor, clearCookie: true };
+  }
+  const previewed = await resolveAuthedContext(
+    actor.db,
+    targetUser.id,
+    actor.params
+  );
+  if (!previewed) return { ctx: actor, clearCookie: true };
+  return {
+    ctx: {
+      ...previewed,
+      preview: { actorId: actor.user.id, targetUserId: targetUser.id },
+    },
+    clearCookie: false,
+  };
+}
+
+function attachClearedPreviewCookie(response: NextResponse, req: NextRequest) {
+  response.cookies.set(
+    PREVIEW_COOKIE_NAME,
+    "",
+    previewCookieOptions(0, req.nextUrl.protocol === "https:")
+  );
+}
+
 function toResponse(error: unknown, route: string): NextResponse {
   if (error instanceof ApiError) {
     return err(error.message, error.status, error.details);
@@ -129,14 +188,36 @@ export function withAuth(
 
       const db = getDb();
       const params = route?.params ? await route.params : {};
-      const ctx = await resolveAuthedContext(db, session.user.id, params);
-      if (!ctx) return err("User profile not found", 404);
+      const actor = await resolveAuthedContext(db, session.user.id, params);
+      if (!actor) return err("User profile not found", 404);
+
+      const pathname = new URL(req.url).pathname;
+      if (isPreviewControlPath(pathname)) {
+        if (options.permission && !hasPermission(actor.role, options.permission)) {
+          return err("Forbidden", 403);
+        }
+        return await handler(req, actor);
+      }
+
+      const previewed = await applyPreviewOverlay(req, actor);
+      const ctx = previewed.ctx;
+      if (
+        ctx.preview &&
+        isWriteMethod(req.method) &&
+        !isPreviewControlPath(pathname)
+      ) {
+        return err(PREVIEW_READONLY_MESSAGE, 403, {
+          code: PREVIEW_READONLY_CODE,
+        });
+      }
 
       if (options.permission && !hasPermission(ctx.role, options.permission)) {
         return err("Forbidden", 403);
       }
 
-      return await handler(req, ctx);
+      const response = await handler(req, ctx);
+      if (previewed.clearCookie) attachClearedPreviewCookie(response, req);
+      return response;
     } catch (error) {
       return toResponse(error, new URL(req.url).pathname);
     }

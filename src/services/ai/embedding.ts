@@ -4,13 +4,15 @@ import { productKnowledge, tickets } from "@/drizzle/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import { EMBEDDING_DIMENSIONS } from "@/lib/ai-config";
 import { getAIProvider } from "./config";
+import type { AIRuntimeContext } from "@/lib/ai-scope";
 
 export async function generateEmbedding(
   db: Database,
   text: string,
-  inputType: "document" | "query" = "document"
+  inputType: "document" | "query" = "document",
+  context: AIRuntimeContext = {}
 ): Promise<number[] | null> {
-  const provider = await getAIProvider(db, "embedding");
+  const provider = await getAIProvider(db, "embedding", context);
   if (!provider) return null;
 
   try {
@@ -38,7 +40,9 @@ export async function embedKnowledge(
 
   const embedding = await generateEmbedding(
     db,
-    `${knowledge.title}\n\n${knowledge.content}`
+    `${knowledge.title}\n\n${knowledge.content}`,
+    "document",
+    { productId: knowledge.productId }
   );
   if (!embedding) return false;
 
@@ -77,7 +81,9 @@ export async function embedTicket(
 
   const embedding = await generateEmbedding(
     db,
-    `${ticket.subject}\n\n${ticket.content}`
+    `${ticket.subject}\n\n${ticket.content}`,
+    "document",
+    { tenantId: ticket.tenantId, productId: ticket.productId }
   );
   if (!embedding) return false;
 
@@ -111,7 +117,9 @@ export async function searchSimilar(
     limit?: number;
   } = {}
 ): Promise<Array<{ id: string; score: number; type: string }>> {
-  const embedding = await generateEmbedding(db, query, "query");
+  const embedding = await generateEmbedding(db, query, "query", {
+    productId: options.productId,
+  });
   if (!embedding) return [];
 
   const limit = Math.min(Math.max(options.limit ?? 5, 1), 20);

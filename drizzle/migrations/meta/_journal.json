@@ -134,6 +134,27 @@
       "when": 1786640562379,
       "tag": "0018_broad_la_nuit",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1786820024184,
+      "tag": "0019_bright_vision",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1786821327553,
+      "tag": "0020_natural_selene",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1786822584918,
+      "tag": "0021_cynical_kid_colt",
+      "breakpoints": true
     }
   ]
 }

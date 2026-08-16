@@ -39,7 +39,15 @@ export async function chatWithAgent(
   db: Database,
   options: AgentChatOptions
 ): Promise<AgentChatResult | null> {
-  const provider = await getAIProvider(db, "agent");
+  const ticket = options.ticketId
+    ? await db.query.tickets.findFirst({
+        where: eq(tickets.id, options.ticketId),
+      })
+    : null;
+  const provider = await getAIProvider(db, "agent", {
+    tenantId: ticket?.tenantId,
+    productId: ticket?.productId,
+  });
   if (!provider) {
     console.log("Agent AI not configured");
     return null;
@@ -62,12 +70,7 @@ export async function chatWithAgent(
   let contextInfo = "";
 
   // Add ticket context if provided
-  if (options.ticketId) {
-    const ticket = await db.query.tickets.findFirst({
-      where: eq(tickets.id, options.ticketId),
-    });
-
-    if (ticket) {
+  if (ticket) {
       contextInfo += `\n\nCurrent Ticket Context:
 - ID: ${ticket.id}
 - Subject: ${ticket.subject}
@@ -80,7 +83,7 @@ export async function chatWithAgent(
       const ticketReplies = await db
         .select()
         .from(replies)
-        .where(eq(replies.ticketId, options.ticketId))
+        .where(eq(replies.ticketId, ticket.id))
         .orderBy(desc(replies.createdAt))
         .limit(3);
 
@@ -104,7 +107,6 @@ export async function chatWithAgent(
         contextInfo += "\n\nRelevant Knowledge:\n" +
           knowledge.map((k) => `- ${k.title}: ${k.content.substring(0, 200)}`).join("\n");
       }
-    }
   }
 
   // Build messages array

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import {
   aiConfigs,
@@ -13,6 +13,14 @@ import {
   AI_TASK_TYPES,
   isProviderAllowedForTask,
 } from "@/lib/ai-config";
+import {
+  type AIScope,
+  type AIScopeRef,
+  aiScopeKey,
+  fillAiScopeRef,
+  parseAiScopeKey,
+  resolveAiScopeChain,
+} from "@/lib/ai-scope";
 
 const assignmentSchema = z.object({
   credentialId: z.string().min(1),
@@ -31,6 +39,7 @@ const assignmentsSchema = z
 export const taskRoutingSchema = z.object({
   taskType: z.enum(AI_TASK_TYPES),
   enabled: z.boolean(),
+  inherit: z.boolean().optional(),
   assignments: assignmentsSchema,
 });
 
@@ -38,53 +47,123 @@ export const taskRoutingUpdateSchema = taskRoutingSchema.omit({ taskType: true }
 
 export type TaskAssignmentInput = z.infer<typeof assignmentSchema>;
 
-export async function listTaskRouting(db: Database) {
+const assignmentSelect = {
+  id: aiTaskCredentials.id,
+  taskType: aiTaskCredentials.taskType,
+  credentialId: aiTaskCredentials.credentialId,
+  model: aiTaskCredentials.model,
+  priority: aiTaskCredentials.priority,
+  enabled: aiTaskCredentials.enabled,
+  credentialName: aiCredentials.name,
+  provider: aiCredentials.provider,
+  credentialEnabled: aiCredentials.enabled,
+  blockedUntil: aiCredentials.blockedUntil,
+  credentialScope: aiCredentials.scope,
+};
+
+async function loadScopeAssignments(db: Database, scopeKey: string, taskType: AITaskType) {
+  return db
+    .select(assignmentSelect)
+    .from(aiTaskCredentials)
+    .innerJoin(
+      aiCredentials,
+      eq(aiTaskCredentials.credentialId, aiCredentials.id)
+    )
+    .where(
+      and(
+        eq(aiTaskCredentials.scopeKey, scopeKey),
+        eq(aiTaskCredentials.taskType, taskType)
+      )
+    )
+    .orderBy(asc(aiTaskCredentials.priority));
+}
+
+async function loadInheritedRoute(
+  db: Database,
+  ref: AIScopeRef,
+  taskType: AITaskType
+): Promise<{
+  inheritedFrom: AIScope | null;
+  inheritedEnabled: boolean;
+  inheritedAssignments: Awaited<ReturnType<typeof loadScopeAssignments>>;
+}> {
+  if (ref.scope === "system") {
+    return { inheritedFrom: null, inheritedEnabled: true, inheritedAssignments: [] };
+  }
+  const chain = await resolveAiScopeChain(db, {
+    tenantId: ref.tenantId,
+    productId: ref.productId,
+  });
+  for (const scopeKey of chain.slice(1)) {
+    const config = await db.query.aiConfigs.findFirst({
+      where: and(eq(aiConfigs.scopeKey, scopeKey), eq(aiConfigs.taskType, taskType)),
+    });
+    if (!config || config.inherit) continue;
+    return {
+      inheritedFrom: parseAiScopeKey(scopeKey).scope,
+      inheritedEnabled: config.enabled,
+      inheritedAssignments: await loadScopeAssignments(db, scopeKey, taskType),
+    };
+  }
+  return {
+    inheritedFrom: "system",
+    inheritedEnabled: true,
+    inheritedAssignments: [],
+  };
+}
+
+export async function listTaskRouting(db: Database, ref: AIScopeRef) {
+  const filled = await fillAiScopeRef(db, ref);
+  const scopeKey = aiScopeKey(filled);
   const [configs, routes] = await Promise.all([
-    db.select().from(aiConfigs),
+    db.select().from(aiConfigs).where(eq(aiConfigs.scopeKey, scopeKey)),
     db
-      .select({
-        id: aiTaskCredentials.id,
-        taskType: aiTaskCredentials.taskType,
-        credentialId: aiTaskCredentials.credentialId,
-        model: aiTaskCredentials.model,
-        priority: aiTaskCredentials.priority,
-        enabled: aiTaskCredentials.enabled,
-        credentialName: aiCredentials.name,
-        provider: aiCredentials.provider,
-        credentialEnabled: aiCredentials.enabled,
-        blockedUntil: aiCredentials.blockedUntil,
-      })
+      .select(assignmentSelect)
       .from(aiTaskCredentials)
       .innerJoin(
         aiCredentials,
         eq(aiTaskCredentials.credentialId, aiCredentials.id)
       )
+      .where(eq(aiTaskCredentials.scopeKey, scopeKey))
       .orderBy(asc(aiTaskCredentials.taskType), asc(aiTaskCredentials.priority)),
   ]);
 
-  return configs.map((config) => ({
-    ...config,
-    assignments: routes.filter((route) => route.taskType === config.taskType),
-  }));
+  return Promise.all(
+    AI_TASK_TYPES.map(async (taskType) => {
+      const config = configs.find((item) => item.taskType === taskType);
+      const inherited = await loadInheritedRoute(db, filled, taskType);
+      return {
+        id: config?.id ?? null,
+        scopeKey,
+        taskType,
+        enabled: config?.enabled ?? true,
+        inherit: config?.inherit ?? ref.scope !== "system",
+        assignments: routes.filter((route) => route.taskType === taskType),
+        ...inherited,
+      };
+    })
+  );
 }
 
-export async function saveTaskRouting(
+async function assertAssignableCredentials(
   db: Database,
+  ref: AIScopeRef,
   taskType: AITaskType,
-  enabled: boolean,
   assignments: TaskAssignmentInput[]
-): Promise<void> {
-  if (enabled && assignments.filter((assignment) => assignment.enabled ?? true).length === 0) {
-    throw badRequest("An enabled AI task requires at least one credential");
-  }
-
+) {
+  const filled = await fillAiScopeRef(db, ref);
   const credentialIds = assignments.map((assignment) => assignment.credentialId);
-  const credentials = credentialIds.length
-    ? await db
-        .select({ id: aiCredentials.id, provider: aiCredentials.provider })
-        .from(aiCredentials)
-        .where(inArray(aiCredentials.id, credentialIds))
-    : [];
+  if (credentialIds.length === 0) return;
+  const credentials = await db
+    .select({
+      id: aiCredentials.id,
+      provider: aiCredentials.provider,
+      scope: aiCredentials.scope,
+      tenantId: aiCredentials.tenantId,
+      productId: aiCredentials.productId,
+    })
+    .from(aiCredentials)
+    .where(inArray(aiCredentials.id, credentialIds));
   if (credentials.length !== credentialIds.length) {
     throw badRequest("One or more AI credentials do not exist");
   }
@@ -92,34 +171,75 @@ export async function saveTaskRouting(
     if (!isProviderAllowedForTask(taskType, credential.provider)) {
       throw badRequest("Credential provider is not supported for this AI task");
     }
+    const allowed =
+      credential.scope === "system" ||
+      (filled.scope !== "system" &&
+        credential.scope === "tenant" &&
+        credential.tenantId === filled.tenantId) ||
+      (filled.scope === "product" &&
+        credential.scope === "product" &&
+        credential.productId === filled.productId);
+    if (!allowed) {
+      throw badRequest("Credential is outside the inheritable scope");
+    }
+  }
+}
+
+export async function saveTaskRouting(
+  db: Database,
+  taskType: AITaskType,
+  enabled: boolean,
+  assignments: TaskAssignmentInput[],
+  ref: AIScopeRef = { scope: "system" },
+  inherit = false
+): Promise<void> {
+  const filled = await fillAiScopeRef(db, ref);
+  const scopeKey = aiScopeKey(filled);
+  if (scopeKey === "system" && inherit) {
+    throw badRequest("System AI routing cannot inherit");
+  }
+  if (!inherit && enabled && assignments.filter((assignment) => assignment.enabled ?? true).length === 0) {
+    throw badRequest("An enabled AI task requires at least one credential");
+  }
+  if (!inherit) {
+    await assertAssignableCredentials(db, filled, taskType, assignments);
   }
 
   const now = new Date().toISOString();
   const existing = await db.query.aiConfigs.findFirst({
-    where: eq(aiConfigs.taskType, taskType),
+    where: and(eq(aiConfigs.scopeKey, scopeKey), eq(aiConfigs.taskType, taskType)),
   });
+  const nextAssignments = inherit ? [] : assignments;
   const statements: BatchItem<"sqlite">[] = [
     existing
       ? db
           .update(aiConfigs)
-          .set({ enabled, updatedAt: now })
+          .set({ enabled, inherit, updatedAt: now })
           .where(eq(aiConfigs.id, existing.id))
       : db.insert(aiConfigs).values({
           id: crypto.randomUUID(),
+          scopeKey,
           taskType,
           enabled,
+          inherit,
           createdAt: now,
           updatedAt: now,
         }),
     db
       .delete(aiTaskCredentials)
-      .where(eq(aiTaskCredentials.taskType, taskType)),
+      .where(
+        and(
+          eq(aiTaskCredentials.scopeKey, scopeKey),
+          eq(aiTaskCredentials.taskType, taskType)
+        )
+      ),
   ];
 
-  assignments.forEach((assignment, priority) => {
+  nextAssignments.forEach((assignment, priority) => {
     statements.push(
       db.insert(aiTaskCredentials).values({
         id: crypto.randomUUID(),
+        scopeKey,
         taskType,
         credentialId: assignment.credentialId,
         model: assignment.model,
@@ -138,12 +258,21 @@ export async function saveTaskRouting(
 
 export async function deleteTaskRouting(
   db: Database,
-  taskType: AITaskType
+  taskType: AITaskType,
+  ref: AIScopeRef = { scope: "system" }
 ): Promise<void> {
+  const scopeKey = aiScopeKey(await fillAiScopeRef(db, ref));
   await db.batch([
     db
       .delete(aiTaskCredentials)
-      .where(eq(aiTaskCredentials.taskType, taskType)),
-    db.delete(aiConfigs).where(eq(aiConfigs.taskType, taskType)),
+      .where(
+        and(
+          eq(aiTaskCredentials.scopeKey, scopeKey),
+          eq(aiTaskCredentials.taskType, taskType)
+        )
+      ),
+    db
+      .delete(aiConfigs)
+      .where(and(eq(aiConfigs.scopeKey, scopeKey), eq(aiConfigs.taskType, taskType))),
   ]);
 }

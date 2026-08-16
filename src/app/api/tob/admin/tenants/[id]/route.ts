@@ -2,8 +2,9 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { customers, products, teams, tenants, tickets, users } from "@/drizzle/schema";
-import { badRequest, conflict, ok, notFound } from "@/lib/api/response";
+import { badRequest, conflict, forbidden, ok, notFound } from "@/lib/api/response";
 import { withAuth, parseBody, type AuthedContext } from "@/lib/api/handler";
+import { Role } from "@/lib/types";
 
 const updateTenantSchema = z.object({
   name: z.string().trim().min(1).max(100).optional(),
@@ -16,8 +17,13 @@ async function loadTenant(ctx: AuthedContext, id: string) {
   return tenant;
 }
 
-// "tenant.manage" is granted to SuperAdmin only, so no extra scoping is needed.
-export const GET = withAuth({ permission: "tenant.manage" }, async (_req: NextRequest, ctx) => {
+export const GET = withAuth({}, async (_req: NextRequest, ctx) => {
+  if (
+    !ctx.isSuperAdmin &&
+    !(ctx.role === Role.TenantAdmin && ctx.user.tenantId === ctx.params.id)
+  ) {
+    throw forbidden("Tenant is outside your scope");
+  }
   const tenant = await loadTenant(ctx, ctx.params.id);
   return ok(tenant);
 });
@@ -30,8 +36,8 @@ export const PATCH = withAuth({ permission: "tenant.manage" }, async (req: NextR
     const team = await ctx.db.query.teams.findFirst({
       where: eq(teams.id, body.defaultTeamId),
     });
-    if (!team || team.tenantId !== tenant.id) {
-      throw badRequest("Default team must belong to this tenant");
+    if (!team || team.tenantId !== tenant.id || team.scope !== "tenant") {
+      throw badRequest("Default team must be a tenant-scope team of this tenant");
     }
   }
 

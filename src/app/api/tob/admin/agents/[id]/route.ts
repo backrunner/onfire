@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import {
   users,
@@ -13,8 +13,15 @@ import {
   tickets,
 } from "@/drizzle/schema";
 import { ok, notFound, forbidden, conflict } from "@/lib/api/response";
-import { withAuth, parseBody, type AuthedContext } from "@/lib/api/handler";
+import { withAuth, parseBody, parseQuery, type AuthedContext } from "@/lib/api/handler";
 import { canManageRole } from "@/lib/api-utils";
+import { Role } from "@/lib/types";
+import {
+  STAFF_SCOPES,
+  assertCanManageStaff,
+  listScopedTeamIds,
+  parseStaffScope,
+} from "@/lib/staff-scope";
 
 const updateAgentSchema = z.object({
   level: z.number().int().min(1).max(10).optional(),
@@ -23,6 +30,15 @@ const updateAgentSchema = z.object({
   email: z.string().trim().email().max(320).optional(),
   avatarUrl: z.string().url().max(2_048).nullable().optional(),
   teamIds: z.array(z.string()).optional(),
+  scope: z.enum(STAFF_SCOPES).optional(),
+  tenantId: z.string().optional(),
+  productId: z.string().optional(),
+});
+
+const staffQuerySchema = z.object({
+  scope: z.enum(STAFF_SCOPES).optional(),
+  tenantId: z.string().optional(),
+  productId: z.string().optional(),
 });
 
 async function loadAccessibleAgent(ctx: AuthedContext, id: string) {
@@ -37,8 +53,10 @@ async function loadAccessibleAgent(ctx: AuthedContext, id: string) {
   return { agent, user };
 }
 
-export const GET = withAuth({ permission: "user.manage" }, async (_req: NextRequest, ctx) => {
+export const GET = withAuth({ permission: "team.manage" }, async (req: NextRequest, ctx) => {
+  const ref = await assertCanManageStaff(ctx, parseStaffScope(parseQuery(req, staffQuerySchema)));
   const { agent, user } = await loadAccessibleAgent(ctx, ctx.params.id);
+  const scopedTeamIds = new Set(await listScopedTeamIds(ctx, ref));
 
   const profile = await ctx.db.query.agentProfiles.findFirst({
     where: eq(agentProfiles.userId, agent.userId),
@@ -55,31 +73,39 @@ export const GET = withAuth({ permission: "user.manage" }, async (_req: NextRequ
     displayName: profile?.displayName || user.displayName,
     email: profile?.email || user.email,
     avatarUrl: profile?.avatarUrl,
-    teamIds: teamRows.map((r) => r.teamId),
+    teamIds: teamRows.map((r) => r.teamId).filter((id) => scopedTeamIds.has(id)),
   });
 });
 
-export const PATCH = withAuth({ permission: "user.manage" }, async (req: NextRequest, ctx) => {
-  const { agent, user } = await loadAccessibleAgent(ctx, ctx.params.id);
+export const PATCH = withAuth({ permission: "team.manage" }, async (req: NextRequest, ctx) => {
   const body = await parseBody(req, updateAgentSchema);
+  const ref = await assertCanManageStaff(
+    ctx,
+    parseStaffScope({
+      scope: body.scope,
+      tenantId: body.tenantId,
+      productId: body.productId,
+    })
+  );
+  const { agent, user } = await loadAccessibleAgent(ctx, ctx.params.id);
+  const scopedTeamIds = new Set(await listScopedTeamIds(ctx, ref));
 
-  if (!canManageRole(ctx.role, user.role)) {
+  if (!ctx.isSuperAdmin && !canManageRole(ctx.role, user.role)) {
     throw forbidden("Cannot manage an agent for an equal or higher role");
   }
+  if (
+    ctx.role === Role.ProductAdmin &&
+    (body.level !== undefined ||
+      body.active !== undefined ||
+      body.displayName !== undefined ||
+      body.email !== undefined ||
+      body.avatarUrl !== undefined)
+  ) {
+    throw forbidden("Product staff can only change product team memberships");
+  }
 
-  if (body.teamIds && body.teamIds.length > 0) {
-    const teamIds = [...new Set(body.teamIds)];
-    const accessibleTeams = await ctx.db
-      .select({ id: teams.id, tenantId: teams.tenantId })
-      .from(teams)
-      .where(inArray(teams.id, teamIds));
-    const accessibleTeamIds = new Set(accessibleTeams.map((t) => t.id));
-    if (
-      teamIds.some((teamId) => !accessibleTeamIds.has(teamId)) ||
-      accessibleTeams.some((team) => team.tenantId !== user.tenantId)
-    ) {
-      throw forbidden("Agents can only join teams in their own tenant");
-    }
+  if (body.teamIds && body.teamIds.some((id) => !scopedTeamIds.has(id))) {
+    throw forbidden("Teams must belong to the current staff scope");
   }
 
   const statements: BatchItem<"sqlite">[] = [];
@@ -126,7 +152,14 @@ export const PATCH = withAuth({ permission: "user.manage" }, async (req: NextReq
   }
 
   if (body.teamIds !== undefined) {
-    const teamIds = [...new Set(body.teamIds)];
+    const current = await ctx.db
+      .select({ teamId: agentTeams.teamId })
+      .from(agentTeams)
+      .where(eq(agentTeams.userId, agent.userId));
+    const kept = current
+      .map((row) => row.teamId)
+      .filter((id) => !scopedTeamIds.has(id));
+    const teamIds = [...new Set([...kept, ...body.teamIds])];
     statements.push(
       ctx.db.delete(agentTeams).where(eq(agentTeams.userId, agent.userId))
     );
@@ -146,8 +179,20 @@ export const PATCH = withAuth({ permission: "user.manage" }, async (req: NextReq
   return ok({ updated: true });
 });
 
-export const DELETE = withAuth({ permission: "user.manage" }, async (_req: NextRequest, ctx) => {
+export const DELETE = withAuth({ permission: "team.manage" }, async (req: NextRequest, ctx) => {
+  const ref = await assertCanManageStaff(ctx, parseStaffScope(parseQuery(req, staffQuerySchema)));
   const { agent, user } = await loadAccessibleAgent(ctx, ctx.params.id);
+  if (ref.scope === "product") {
+    const scopedTeamIds = await listScopedTeamIds(ctx, ref);
+    if (scopedTeamIds.length > 0) {
+      await ctx.db
+        .delete(agentTeams)
+        .where(
+          and(eq(agentTeams.userId, agent.userId), inArray(agentTeams.teamId, scopedTeamIds))
+        );
+    }
+    return ok({ detached: true });
+  }
   if (!canManageRole(ctx.role, user.role)) {
     throw forbidden("Cannot manage an agent for an equal or higher role");
   }

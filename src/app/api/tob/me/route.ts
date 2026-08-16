@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
-import { agents } from "@/drizzle/schema";
-import { rolePermissions } from "@/lib/types";
+import { agents, users } from "@/drizzle/schema";
+import { Role, rolePermissions } from "@/lib/types";
 import { ok } from "@/lib/api/response";
 import { withAuth } from "@/lib/api/handler";
 
@@ -9,6 +9,29 @@ export const GET = withAuth({}, async (_req: NextRequest, ctx) => {
   const agent = await ctx.db.query.agents.findFirst({
     where: eq(agents.userId, ctx.user.id),
   });
+
+  let preview = null;
+  if (ctx.preview) {
+    const actor = await ctx.db.query.users.findFirst({
+      where: eq(users.id, ctx.preview.actorId),
+    });
+    if (actor) {
+      preview = {
+        actor: {
+          id: actor.id,
+          displayName: actor.displayName,
+          email: actor.email,
+          role: actor.role as Role,
+        },
+        target: {
+          id: ctx.user.id,
+          displayName: ctx.user.displayName,
+          email: ctx.user.email,
+          role: ctx.role,
+        },
+      };
+    }
+  }
 
   return ok({
     user: ctx.user,
@@ -27,5 +50,7 @@ export const GET = withAuth({}, async (_req: NextRequest, ctx) => {
           teamIds: ctx.teamIds,
         }
       : undefined,
+    preview,
   });
 });
+

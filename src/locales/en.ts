@@ -44,6 +44,22 @@ export const en: Translations = {
     agent: 'Agent'
   },
 
+  preview: {
+    start: 'Preview identity',
+    startThis: 'Preview this identity',
+    started: 'Now previewing this identity',
+    stopped: 'Left preview identity',
+    startFailed: 'Could not start preview identity',
+    stopFailed: 'Could not leave preview identity',
+    hint: 'View the system read-only with that user\'s role and scope to confirm configuration.',
+    searchUser: 'Search name or email',
+    noUsers: 'No identities available to preview',
+    active: 'Previewing',
+    exit: 'Exit',
+    badge: 'Preview',
+    accountLocked: 'Account security, receiving endpoints, and connected applications are unavailable while previewing.'
+  },
+
   // Navigation
   nav: {
     dashboard: 'Dashboard',
@@ -63,7 +79,7 @@ export const en: Translations = {
   // Topbar
   topbar: {
     title: 'OnFire Support',
-    searchPlaceholder: 'Search subject/ID',
+    searchPlaceholder: 'Search ticket subject/ID',
     viewAllResults: 'View all search results',
     pending: 'Pending',
     overdue: 'Overdue',
@@ -220,6 +236,7 @@ export const en: Translations = {
       title: 'AI Filter',
       description: 'Use AI to filter spam and non-support emails',
       enabled: 'Enable AI filter',
+      requiresCredential: 'Configure the Ticket Prescreening task with an AI credential before enabling this filter.',
       strictness: 'Filter Strictness',
       low: 'Low - More permissive',
       medium: 'Medium - Balanced',
@@ -592,6 +609,13 @@ export const en: Translations = {
       noCompatible: 'No compatible credential is available',
       allAssigned: 'All compatible credentials are already assigned',
       routeRequired: 'An enabled function requires at least one active credential',
+      inherit: 'Inherit parent',
+      inheritTitle: 'Using the parent scope route',
+      inheritHint: 'This function follows the parent route until you override it.',
+      usingParent: 'Using {{scope}} route',
+      parentEmpty: 'The parent scope has no credential route yet.',
+      override: 'Override',
+      useParent: 'Use parent settings',
       moveUp: 'Move credential up',
       moveDown: 'Move credential down',
       coolingDown: 'Currently cooling down',
@@ -608,6 +632,30 @@ export const en: Translations = {
       prereplyHint: 'Generate suggested replies for agents',
       embedding: 'Vector Embedding',
       embeddingHint: 'Knowledge base vector retrieval'
+    },
+    scopes: {
+      system: 'System',
+      tenant: 'Tenant',
+      product: 'Product'
+    },
+    usage: {
+      title: 'Token usage',
+      range: '{{from}} – {{to}}',
+      requests: 'Requests',
+      promptTokens: 'Prompt tokens',
+      totalTokens: 'Total tokens',
+      day: 'Day',
+      task: 'Task',
+      empty: 'No usage in this range',
+      loadFailed: 'Failed to load usage',
+      retentionTitle: 'Usage retention',
+      retentionHint: 'Detail events and daily rollups older than this window are deleted. Permanent keeps everything.',
+      retention: 'Keep for',
+      forever: 'Permanent',
+      days: '{{days}} days',
+      inheritRetention: 'Inherit parent retention',
+      saved: 'Usage settings saved',
+      saveFailed: 'Failed to save usage settings'
     },
     providers: {
       openai: 'OpenAI',
@@ -1047,6 +1095,8 @@ export const en: Translations = {
   management: {
     title: 'System Management',
     subtitle: 'Manage tenants, products, teams, ticket types, templates, routing and access',
+    productTitle: 'Product Management',
+    productSubtitle: 'Configure the products assigned to you',
     perPage: 'per page',
     noAccess: 'No {{type}} management access',
     noData: 'No {{type}} data',
@@ -1060,8 +1110,8 @@ export const en: Translations = {
     toastDeleted: 'Deleted successfully',
     toastCopied: 'Copied to clipboard',
     manage: 'Manage configuration',
-    productConfiguration: 'Product-level ticket, access and AI configuration',
-    tenantConfiguration: 'Tenant-level shared configuration and defaults',
+    productConfiguration: 'Product-level ticket, email, notification, staff and AI configuration',
+    tenantConfiguration: 'Tenant-level products, staff, shared configuration and defaults',
 
     tabs: {
       tenants: 'Tenants',
@@ -1077,8 +1127,12 @@ export const en: Translations = {
       ticketTypeRoutes: 'Type Routing',
       spamFilter: 'Spam Filter',
       apiKeys: 'API Keys',
+      email: 'Email',
+      notifications: 'Notifications',
       aiCredentials: 'AI Credentials',
-      aiRouting: 'AI Routing'
+      aiRouting: 'AI Routing',
+      aiUsage: 'AI Usage',
+      aiKnowledge: 'Knowledge'
     },
 
     tenants: {
@@ -1313,18 +1367,58 @@ export const en: Translations = {
 
     spamFilter: {
       title: 'External Spam Filter',
-      description: 'Configure the optional HTTPS classifier used before AI prescreening',
+      description: 'Optional classifier used before AI prescreening. Built-in APIs or a custom HTTPS endpoint.',
       scope: 'Configuration Scope',
       global: 'Global Default',
       mode: 'Mode',
       inherit: 'Inherit global',
       disabled: 'Disabled',
+      enabled: 'Use a service',
       custom: 'Custom service',
+      provider: 'Service',
       endpoint: 'HTTPS Endpoint',
+      siteUrl: 'Registered site URL',
+      siteUrlHint: 'The public HTTPS site URL registered with this Akismet key',
       secret: 'Bearer Secret',
+      apiKey: 'API key',
       secretHint: 'Required for a custom service',
+      apiKeyHint: 'Required for this service',
+      apiKeyOptional: 'Optional; leave blank for the public lookup limit',
       secretConfigured: 'Configured; leave blank to retain',
-      timeout: 'Timeout (ms)'
+      timeout: 'Timeout (ms)',
+      docs: 'API documentation',
+      protocolTitle: 'Custom endpoint contract',
+      protocolHint: 'POST JSON to your endpoint. verdict must be allow, suspect, or spam. score is 0–1. Optional fields: autoSubmitted, precedence, listId, returnPath.',
+      headersExample: 'Request headers',
+      requestExample: 'Request body',
+      responseExample: 'Response body',
+      providers: {
+        postmark: {
+          name: 'Postmark SpamCheck',
+          description: 'Free SpamAssassin score for the message. No API key.',
+          mapping: 'Score ≥ 5 is spam, ≥ 3 is suspect.'
+        },
+        akismet: {
+          name: 'Akismet',
+          description: 'Automattic form and comment classifier.',
+          mapping: 'true or X-akismet-pro-tip: discard becomes spam.'
+        },
+        oopspam: {
+          name: 'OOPSpam',
+          description: 'Content and sender-email spam score API.',
+          mapping: 'Score 5–6 is spam, 3–4 is suspect.'
+        },
+        stopforumspam: {
+          name: 'Stop Forum Spam',
+          description: 'Looks up the sender email in a public spam database.',
+          mapping: 'Confidence ≥ 90 is spam, ≥ 40 is suspect.'
+        },
+        custom: {
+          name: 'Custom HTTPS',
+          description: 'Your endpoint must speak the OnFire JSON contract below.',
+          mapping: ''
+        }
+      }
     },
 
     apiKeys: {

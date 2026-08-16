@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { asc, count, eq } from "drizzle-orm";
+import { and, asc, count, eq, or } from "drizzle-orm";
 import { aiCredentials, aiTaskCredentials } from "@/drizzle/schema";
-import { withAuth, parseBody } from "@/lib/api/handler";
+import { withAuth, parseBody, parseQuery } from "@/lib/api/handler";
 import { ok } from "@/lib/api/response";
 import {
   ALL_AI_PROVIDERS,
@@ -12,6 +12,8 @@ import {
 import { getEnv } from "@/lib/db";
 import { sealSecret } from "@/lib/secret-storage";
 import { AI_CREDENTIAL_SECRET_PURPOSE } from "@/services/ai/config";
+import { assertCanManageAiScope } from "@/lib/ai-scope";
+import { parseFilledAiScope } from "../scope-query";
 
 const baseUrlSchema = z.preprocess(
   (value) => (typeof value === "string" && value.trim() === "" ? null : value),
@@ -38,9 +40,48 @@ const createCredentialSchema = z.object({
   cooldownSeconds: z.number().int().min(0).max(86_400).optional(),
 });
 
-export const GET = withAuth(
-  { permission: "ai.config" },
-  async (_req: NextRequest, ctx) => {
+const listQuerySchema = z.object({
+  includeInherited: z.enum(["1", "true"]).optional(),
+});
+
+export const GET = withAuth({}, async (req: NextRequest, ctx) => {
+    const ref = await parseFilledAiScope(req, ctx.db);
+    await assertCanManageAiScope(ctx, ref);
+    const { includeInherited } = parseQuery(req, listQuerySchema);
+    const inherited = Boolean(includeInherited);
+    const owned =
+      ref.scope === "product"
+        ? and(
+            eq(aiCredentials.scope, "product"),
+            eq(aiCredentials.productId, ref.productId ?? "")
+          )
+        : ref.scope === "tenant"
+          ? and(
+              eq(aiCredentials.scope, "tenant"),
+              eq(aiCredentials.tenantId, ref.tenantId ?? "")
+            )
+          : eq(aiCredentials.scope, "system");
+    const inheritedFilters = [
+      eq(aiCredentials.scope, "system"),
+      ...(ref.tenantId
+        ? [
+            and(
+              eq(aiCredentials.scope, "tenant"),
+              eq(aiCredentials.tenantId, ref.tenantId)
+            )!,
+          ]
+        : []),
+      ...(ref.scope === "product" && ref.productId
+        ? [
+            and(
+              eq(aiCredentials.scope, "product"),
+              eq(aiCredentials.productId, ref.productId)
+            )!,
+          ]
+        : []),
+    ];
+    const visibility = inherited ? or(...inheritedFilters) : owned;
+
     const rows = await ctx.db
       .select({
         id: aiCredentials.id,
@@ -49,6 +90,9 @@ export const GET = withAuth(
         apiMode: aiCredentials.apiMode,
         apiKey: aiCredentials.apiKey,
         baseUrl: aiCredentials.baseUrl,
+        scope: aiCredentials.scope,
+        tenantId: aiCredentials.tenantId,
+        productId: aiCredentials.productId,
         enabled: aiCredentials.enabled,
         cooldownSeconds: aiCredentials.cooldownSeconds,
         blockedUntil: aiCredentials.blockedUntil,
@@ -66,6 +110,7 @@ export const GET = withAuth(
         aiTaskCredentials,
         eq(aiTaskCredentials.credentialId, aiCredentials.id)
       )
+      .where(visibility)
       .groupBy(aiCredentials.id)
       .orderBy(asc(aiCredentials.name));
 
@@ -73,14 +118,15 @@ export const GET = withAuth(
       rows.map(({ apiKey, ...row }) => ({
         ...row,
         hasKey: Boolean(apiKey),
+        inherited: row.scope !== ref.scope,
       }))
     );
   }
 );
 
-export const POST = withAuth(
-  { permission: "ai.config" },
-  async (req: NextRequest, ctx) => {
+export const POST = withAuth({}, async (req: NextRequest, ctx) => {
+    const ref = await parseFilledAiScope(req, ctx.db);
+    await assertCanManageAiScope(ctx, ref);
     const body = await parseBody(req, createCredentialSchema);
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -95,6 +141,9 @@ export const POST = withAuth(
       apiKey,
       secretPurpose: purpose,
       baseUrl: body.baseUrl ?? null,
+      scope: ref.scope,
+      tenantId: ref.scope === "system" ? null : ref.tenantId ?? null,
+      productId: ref.scope === "product" ? ref.productId ?? null : null,
       enabled: body.enabled ?? true,
       cooldownSeconds: body.cooldownSeconds ?? 60,
       createdAt: now,

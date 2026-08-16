@@ -5,7 +5,7 @@ import useSWR from "swr";
 import { toast } from "sonner";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { api, swrFetcher } from "@/lib/api/client";
+import { api, qs, swrFetcher } from "@/lib/api/client";
 import type { AgentView, TeamView } from "@/lib/api/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -73,18 +73,31 @@ function parseLevel(value: string): number | null {
   return Number.isInteger(n) && n >= 1 && n <= 10 ? n : null;
 }
 
-export function AgentManagement() {
+export function AgentManagement({
+  scope = "system",
+  tenantId,
+  productId,
+}: {
+  scope?: "system" | "tenant" | "product";
+  tenantId?: string;
+  productId?: string;
+}) {
   const { t } = useI18n();
   const m = t.management;
+  const canEditAgentFields = scope !== "product";
+  const scopeQuery = qs({ scope, tenantId, productId });
 
   const {
     data: agents,
     error,
     isLoading,
     mutate,
-  } = useSWR<AgentView[]>("/api/tob/admin/agents", swrFetcher);
-  const { data: teams } = useSWR<TeamView[]>("/api/tob/meta/teams", swrFetcher);
-  const { data: users } = useSWR<UserRow[]>("/api/tob/admin/users", swrFetcher);
+  } = useSWR<AgentView[]>(`/api/tob/admin/agents${scopeQuery}`, swrFetcher);
+  const { data: teams } = useSWR<TeamView[]>(`/api/tob/admin/teams${scopeQuery}`, swrFetcher);
+  const { data: users } = useSWR<UserRow[]>(
+    `/api/tob/admin/agents/eligible${scopeQuery}`,
+    swrFetcher
+  );
 
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -101,10 +114,10 @@ export function AgentManagement() {
   );
 
   /** Users that can still be promoted to agents. */
-  const eligibleUsers = useMemo(
-    () => (users ?? []).filter((user) => !user.isAgent),
-    [users]
-  );
+  const eligibleUsers = useMemo(() => {
+    const inScope = new Set((agents ?? []).map((agent) => agent.userId));
+    return (users ?? []).filter((user) => !inScope.has(user.id));
+  }, [agents, users]);
 
   const filtered = useMemo(() => {
     const list = agents ?? [];
@@ -144,7 +157,9 @@ export function AgentManagement() {
     const errors: Record<string, string> = {};
     if (!editing && !form.userId) errors.userId = m.agents.selectUser;
     const level = parseLevel(form.level);
-    if (level === null) errors.level = m.agents.levelInvalid;
+    if (canEditAgentFields && level === null) {
+      errors.level = m.agents.levelInvalid;
+    }
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
@@ -152,15 +167,20 @@ export function AgentManagement() {
     try {
       if (editing) {
         await api.patch(`/api/tob/admin/agents/${editing.userId}`, {
-          level,
-          active: form.active,
+          ...(canEditAgentFields ? { level, active: form.active } : {}),
           teamIds: form.teamIds,
+          scope,
+          tenantId,
+          productId,
         });
         toast.success(m.toastUpdated);
       } else {
         await api.post("/api/tob/admin/agents", {
           userId: form.userId,
-          level,
+          ...(canEditAgentFields ? { level } : {}),
+          scope,
+          tenantId,
+          productId,
           ...(form.teamIds.length > 0 ? { teamIds: form.teamIds } : {}),
         });
         toast.success(m.toastCreated);
@@ -177,7 +197,12 @@ export function AgentManagement() {
   const handleToggleActive = async (agent: AgentView, active: boolean) => {
     setTogglingId(agent.userId);
     try {
-      await api.patch(`/api/tob/admin/agents/${agent.userId}`, { active });
+      await api.patch(`/api/tob/admin/agents/${agent.userId}`, {
+        active,
+        scope,
+        tenantId,
+        productId,
+      });
       toast.success(m.toastUpdated);
       await mutate();
     } catch (err) {
@@ -190,7 +215,7 @@ export function AgentManagement() {
   const handleRemove = async () => {
     if (!removing) return;
     try {
-      await api.delete(`/api/tob/admin/agents/${removing.userId}`);
+      await api.delete(`/api/tob/admin/agents/${removing.userId}${scopeQuery}`);
       toast.success(m.toastDeleted);
       setRemoving(null);
       await mutate();
@@ -273,7 +298,9 @@ export function AgentManagement() {
                   <TableCell>
                     <Switch
                       checked={agent.active}
-                      disabled={togglingId === agent.userId}
+                      disabled={
+                        !canEditAgentFields || togglingId === agent.userId
+                      }
                       onCheckedChange={(checked) =>
                         void handleToggleActive(agent, checked)
                       }
@@ -337,6 +364,7 @@ export function AgentManagement() {
               </FormField>
             )}
 
+            {canEditAgentFields && (
             <FormField
               label={m.agents.level}
               htmlFor="agent-level"
@@ -354,6 +382,7 @@ export function AgentManagement() {
                 className="h-8"
               />
             </FormField>
+            )}
 
             <FormField label={m.agents.teams}>
               {!teams || teams.length === 0 ? (
@@ -380,7 +409,7 @@ export function AgentManagement() {
               )}
             </FormField>
 
-            {editing && (
+            {editing && canEditAgentFields && (
               <div className="flex items-center justify-between rounded-md border px-3 py-2">
                 <span className="text-sm">{m.agents.active}</span>
                 <Switch

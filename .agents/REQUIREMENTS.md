@@ -5,6 +5,9 @@
 - Keep SuperAdmin > TenantAdmin > ProductAdmin > TeamAdmin > Agent.
 - Enforce permission and data scope at every API boundary; UI hiding is never authorization.
 - SuperAdmin is global, TenantAdmin tenant-scoped, ProductAdmin limited by `user_products`, TeamAdmin and Agent team-scoped.
+- SuperAdmin and TenantAdmin may start a read-only preview of a strictly lower-role user in their scope. The browser session stays the actor; APIs overlay the target's live role and tenant/product/team scope. Mutations stay blocked except starting or leaving preview. MCP tokens never inherit preview. The sidebar shows a persistent preview indicator.
+- Teams exist at system, tenant, and product scope. SuperAdmin manages system staff; TenantAdmin manages tenant-scope teams and agents; ProductAdmin manages only product-scope teams and memberships. The configuration landing is role-specific: SuperAdmin sees system administration, TenantAdmin is sent to their tenant page, and ProductAdmin sees only assigned products with no tenant tabs. TeamAdmin and Agent have no management entry.
+- Product notification policies live on the product configuration page. There is no first-level Notifications menu.
 - Split product lifecycle from product configuration: `product.manage` creates/deletes products, while `product.settings` reads and updates SLA, auto-close, and team associations. ProductAdmin receives only `product.settings` within `user_products` scope.
 - Agents may escalate because escalation is required by the lifecycle. They may reassign only within their team when `allowReassign` is enabled.
 - AI credentials are SuperAdmin-only. TenantAdmin and ProductAdmin may maintain knowledge within product scope.
@@ -168,9 +171,13 @@
 - All embedding adapters output exactly 1024 dimensions and distinguish document/query input where supported.
 - Store and query vectors in product namespaces, with a scoped D1 fallback.
 - Every language provider treats a successful HTTP response with an empty completion as a protocol error; do not store or display an empty model answer as success.
+- A feature that depends on an AI task cannot be enabled until that task has at least one enabled credential route. Email AI filtering requires configured prescreening credentials; knowledge mutations require configured embedding credentials. Enabling an AI task itself requires at least one assigned credential.
+- AI credentials and task routes exist at system, tenant, and product scope. Tenant and product routes default to the parent scope and can independently override it, including selecting parent-scope credentials. Runtime resolution walks product → tenant → system.
+- Every AI call writes a detail usage event and increments daily token rollups for the system, tenant, and product dimensions of that request, regardless of which scope owns the key. Retention is configurable in days and defaults to permanent; expired detail and daily rows are purged by the scheduled scan.
 
 ## Email
 
+- Per-product inbound, outbound, template, and log settings live on the product configuration page. There is no separate first-level Email menu.
 - Configuration and custom templates are per product.
 - Missing custom templates use system defaults. Custom templates support email-safe HTML and documented variables.
 - Template authoring uses a locally bundled Monaco HTML editor. The editor loads only when a template is opened, starts with formatted HTML, and offers format/minify toolbar actions plus keyboard shortcuts. Quick variables insert at the current selection, template tokens are highlighted, and the editor must not depend on a CDN at runtime.
@@ -182,7 +189,7 @@
 - Cloudflare Email Sending uses `SEND_EMAIL` and sends HTML plus text.
 - Outbound replies propagate `In-Reply-To` and `References` through every provider. Maileroo uses the v2 structured email API and stores its returned reference ID.
 - Run deterministic local spam checks before external or AI work: duplicates, empty content, upstream spam verdicts, strict SPF/DKIM failures, automated/bounce/list mail, and sender rate limits.
-- Support one optional generic HTTPS JSON spam classifier at global or tenant scope. Tenant configuration overrides or disables the global default; failures continue to AI instead of dropping mail.
+- Support an optional external spam classifier at global or tenant scope. Built-in adapters cover Postmark SpamCheck, Akismet, OOPSpam, and Stop Forum Spam; a custom HTTPS endpoint must speak the onfire-spam-v1 JSON contract shown in the settings UI. Tenant configuration overrides or disables the global default; failures continue to AI instead of dropping mail.
 - External spam endpoints are sealed-credential outbound fetch sinks: public HTTPS/443 only, no redirects, bounded timeout/body, and strict response validation.
 - New inbound email uses one AI prescreening call for spam/support judgment, type selection, and ticket insights. Invalid or low-confidence type choices fall back to the product's `unclassified` type.
 - Spam and non-support results enter a recoverable quarantine with stage, provider, score, reason, and release audit. Releasing a new thread requires an explicit ticket type; replies retain the original ticket type.
@@ -199,7 +206,7 @@
 - A user may send a test through only their own saved endpoint. Email endpoint tests require a product visible to that user so delivery uses that product's outbound provider; test sends do not create ticket notification logs.
 - Supported endpoint types are email, PushDeer, Bark, ntfy, Telegram, Discord, Slack, Microsoft Teams, Feishu, DingTalk, and WeCom. Keep provider definitions and factories centralized so new channels do not change product policy storage.
 - Email endpoints send through the event product's outbound provider. Slack, Teams, Discord, Feishu, DingTalk, and WeCom endpoints use bounded HTTPS webhook requests; Feishu and DingTalk support optional signed-robot secrets.
-- Notification administration requires `notification.manage` plus product scope. Every authenticated user may maintain only their own endpoints.
+- Notification administration requires `notification.manage` plus product scope and is edited from the product configuration page. Every authenticated user may maintain only their own endpoints. `/admin/notifications` redirects to that product tab.
 
 ## Customer Session Expiry
 

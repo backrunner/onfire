@@ -138,9 +138,11 @@ SuperAdmin
 ```
 Tenant
     ├── TicketTypePreset (up to 3 levels; copied into products)
-    ├── Product ←→ Team  [Many-to-Many]
+    ├── Team (tenant scope) → Agent membership
+    ├── Product ←→ Team  [Many-to-Many; tenant or product teams]
     │       │
-    │       └── TicketType (up to 3 levels)
+    │       ├── Team (product scope) → Agent membership
+    │       ├── TicketType (up to 3 levels)
     │               ├── InternalState (ToB-only boolean/select)
     │               └── TicketTemplate
     │                       └── TemplateVersion (immutable)
@@ -149,6 +151,8 @@ Tenant
     └── Team
             └── Agent (Support Agent)
 ```
+
+System-scope teams exist outside any tenant and are SuperAdmin-only.
 
 ### Permission List
 
@@ -189,6 +193,9 @@ Tenant
 - Administrators can also become support agents; the ability to reply to tickets is independent of RBAC permissions
 - `product.manage` controls product lifecycle operations such as creation and deletion. `product.settings` controls scoped product configuration such as SLA, auto-close, and team associations.
 - ProductAdmin access is limited by `user_products`; IDs submitted for tenant, product, or team associations must belong to the same tenant even for SuperAdmin requests.
+- Configuration landing is role-specific. SuperAdmin sees system administration. TenantAdmin is sent to their tenant page and never sees the global tenant list. ProductAdmin sees only assigned products and never tenant tabs. TeamAdmin and Agent have no management entry.
+- SuperAdmin and TenantAdmin can preview a strictly lower-role user in their scope. The session stays the actor; APIs overlay the target's live role and scope. Writes are blocked except starting or leaving preview. The sidebar shows a persistent preview indicator.
+- Tenant and product administrators manage teams and agents in their own scope. Product administrators may attach existing tenant users to product teams but cannot change global agent level or active state.
 
 ---
 
@@ -380,6 +387,7 @@ Product notification rules and requirements can match these events:
 - Rules and requirements resolve to active support agents, then send through each matching enabled personal endpoint. Overlapping policies deduplicate the same endpoint.
 - Missing required or selected endpoints are recorded as failed notification logs instead of being silently skipped.
 - Email endpoints use the event product's configured outbound email provider. Other endpoint types use their provider-specific APIs or webhooks.
+- Product notification rules, requirements, and compliance live on the product configuration page. `/admin/notifications` redirects there and is not a first-level sidebar destination.
 
 ---
 
@@ -403,6 +411,10 @@ AI Classification → Support request → Create ticket
                   → Non-support → Log, don't create ticket
 ```
 
+Optional external spam classification runs after local checks and before AI.
+Built-in adapters are Postmark SpamCheck, Akismet, OOPSpam, and Stop Forum Spam.
+A custom HTTPS endpoint must speak the `onfire-spam-v1` JSON contract.
+
 ### Outbound Email Providers
 
 | Provider | Type | Description |
@@ -418,12 +430,17 @@ Outbound replies preserve email threading with `In-Reply-To` and `References` he
 
 ### Email Configuration
 
+Each product's inbound, outbound, template, and log settings live on that
+product's configuration page. `/admin/email` redirects there and is not a
+first-level sidebar destination.
+
 Each product can be independently configured:
 - **Inbound Address**: Address for receiving support emails
 - **Outbound Provider**: Choose email sending service
 - **Sender Info**: Sender name and email
 - **Email Templates**: Customize notification email content
-- **AI Filtering**: Enable/disable smart filtering and strictness level
+- **AI Filtering**: Enable only after the Ticket Prescreening task has an
+  enabled AI credential route
 
 ### Customer Portal Return URLs
 
@@ -520,7 +537,9 @@ Custom product templates use the same escaped variable renderer for preview and 
 - Each task has an ordered credential route and a model per route entry. Provider failures fall through to the next available credential; failed credentials enter their configured cooldown only when another route entry is available.
 - All adapters request 1024 dimensions. Vectorize uses a 1024-dimension cosine index with product namespaces.
 - Knowledge mutations synchronize Vectorize. AI assistant and pre-reply use semantic retrieval with scoped D1 fallback.
-- AI credentials require `ai.config`; product knowledge requires `ai.knowledge` plus product scope.
+- System AI credentials and routes require SuperAdmin. Tenant and product scopes can manage their own credentials, inherit the parent route, or select parent-scope keys. Product knowledge requires `ai.knowledge` plus product scope.
+- Every AI call records token usage events and daily rollups at system, tenant, and product dimensions. Retention is configurable in days and defaults to permanent.
+- Credentials and task routes are scoped to system, tenant, or product. Product and tenant routes may inherit the parent route or select parent-scope credentials. Usage events and daily token rollups are recorded for system, tenant, and product dimensions and rotate by the configured retention.
 - Successful HTTP responses with empty provider completions are treated as protocol failures across all language adapters.
 
 ---
@@ -535,6 +554,8 @@ Authentication: Better Auth (Bearer Token)
 # System
 GET  /health              - Health check
 GET  /me                  - Get current user info and permissions
+POST /preview             - Start a read-only preview of a lower-role user
+DELETE /preview           - Leave preview identity
 
 # Authentication
 POST /auth/email/sign-in  - Email login
@@ -791,7 +812,7 @@ const portalUrl =
 | email_configs | Email configuration (per product) |
 | email_templates | Email templates |
 | inbound_emails | Inbound email logs |
-| spam_filter_configs | Global and tenant external spam-filter configuration |
+| spam_filter_configs | Global and tenant external spam-filter configuration (built-in or custom) |
 | outbound_emails | Outbound email logs |
 | notification_endpoints | User-owned notification destinations and sealed credentials |
 | notification_rules | Product event, recipient, and channel routing rules |
@@ -847,6 +868,7 @@ Using shadcn/ui as the base component library, including:
 - Collapsible left navigation bar
 - Fixed top header bar
 - Split view for ticket list (list + details)
+- Product configuration hosts per-product email, ticket-type, access, and knowledge settings
 - Focused OAuth consent page with atomic permission and tenant/product selectors
 - Connected MCP application review and revocation on the account page
 - Responsive design
@@ -955,6 +977,13 @@ pnpm test
 pnpm db:generate        # Generate migration from schema
 pnpm db:migrate:local   # Apply migrations (local)
 pnpm db:migrate:remote  # Apply migrations (remote)
+
+# Local demo data (never run against remote D1)
+pnpm db:reset           # Wipe local D1, migrate, seed tenant/product/admin, add sample tickets
+pnpm db:seed            # Seed demo tenant/product/admin if missing
+pnpm db:seed:tickets    # Insert more sample tickets (`--count 20` optional)
+
+# Local ToB login after reset/seed: admin@local.onfire / admin
 
 # First-deploy local validation (no remote mutation)
 pnpm exec drizzle-kit check

@@ -3,8 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { Clock3, Menu, Search, LogOut, UserRound } from "lucide-react";
+import { Clock3, Glasses, Menu, Search, LogOut, UserRound } from "lucide-react";
+import { toast } from "sonner";
 import { signOut } from "@/lib/auth";
+import { usePreviewIdentity } from "@/lib/hooks/use-preview-identity";
+import { PreviewIdentityDialog } from "./preview-identity-dialog";
+import { Badge } from "@/components/ui/badge";
 import { swrFetcher, qs } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 import { useMe } from "@/lib/hooks/use-me";
@@ -42,6 +46,8 @@ export function AdminHeader({ onMobileMenu }: { onMobileMenu: () => void }) {
   const router = useRouter();
   const { t } = useI18n();
   const { me } = useMe();
+  const { preview, canStart, stop } = usePreviewIdentity();
+  const [previewOpen, setPreviewOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -204,20 +210,57 @@ export function AdminHeader({ onMobileMenu }: { onMobileMenu: () => void }) {
                 {me?.user.email}
               </div>
               {me?.role && (
-                <div className="pt-0.5 text-[11px] font-normal text-muted-foreground">
-                  {t.roles[me.role] ?? me.role}
+                <div className="flex items-center gap-1.5 pt-0.5 text-[11px] font-normal text-muted-foreground">
+                  <span>{t.roles[me.role] ?? me.role}</span>
+                  {preview && (
+                    <Badge
+                      variant="outline"
+                      className="border-amber-500/40 px-1 py-0 text-[10px] text-amber-700 dark:text-amber-400"
+                    >
+                      {t.preview.badge}
+                    </Badge>
+                  )}
                 </div>
               )}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push("/admin/account")}>
-              <UserRound className="size-4" />
-              {t.nav.account}
-            </DropdownMenuItem>
+            {canStart && (
+              <DropdownMenuItem onClick={() => setPreviewOpen(true)}>
+                <Glasses className="size-4" />
+                {t.preview.start}
+              </DropdownMenuItem>
+            )}
+            {preview && (
+              <DropdownMenuItem
+                onClick={() => {
+                  void stop().catch((error) =>
+                    toast.error(
+                      error instanceof Error ? error.message : t.preview.stopFailed
+                    )
+                  );
+                }}
+              >
+                <Glasses className="size-4" />
+                {t.preview.exit}
+              </DropdownMenuItem>
+            )}
+            {!preview && (
+              <DropdownMenuItem onClick={() => router.push("/admin/account")}>
+                <UserRound className="size-4" />
+                {t.nav.account}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
               onClick={async () => {
+                if (preview) {
+                  try {
+                    await stop({ silent: true });
+                  } catch {
+                    // Sign-out should still proceed if preview cleanup fails.
+                  }
+                }
                 await signOut();
                 router.push("/admin/login");
               }}
@@ -228,6 +271,7 @@ export function AdminHeader({ onMobileMenu }: { onMobileMenu: () => void }) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      <PreviewIdentityDialog open={previewOpen} onOpenChange={setPreviewOpen} />
     </header>
   );
 }

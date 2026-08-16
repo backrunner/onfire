@@ -430,12 +430,22 @@ export const productKeys = sqliteTable(
   (t) => [index("product_keys_product_idx").on(t.productId)],
 );
 
-export const teams = sqliteTable("teams", {
-  id: text("id").primaryKey(),
-  tenantId: text("tenant_id").notNull(),
-  name: text("name").notNull(),
-  allowReassign: integer("allow_reassign", { mode: "boolean" }).default(true),
-});
+export type TeamScope = "system" | "tenant" | "product";
+
+export const teams = sqliteTable(
+  "teams",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id"),
+    productId: text("product_id"),
+    scope: text("scope").$type<TeamScope>().notNull().default("tenant"),
+    name: text("name").notNull(),
+    allowReassign: integer("allow_reassign", { mode: "boolean" }).default(true),
+  },
+  (t) => [
+    index("teams_scope_idx").on(t.scope, t.tenantId, t.productId),
+  ],
+);
 
 export const productTeams = sqliteTable(
   "product_teams",
@@ -825,6 +835,8 @@ export type AIProvider =
   | "jina"
   | "cohere";
 export type OpenAIApiMode = "responses" | "chat";
+export type AICredentialScope = "system" | "tenant" | "product";
+export type AIUsageDimension = "system" | "tenant" | "product";
 
 export const aiCredentials = sqliteTable(
   "ai_credentials",
@@ -839,6 +851,9 @@ export const aiCredentials = sqliteTable(
     apiKey: text("api_key").notNull(),
     secretPurpose: text("secret_purpose").notNull(),
     baseUrl: text("base_url"),
+    scope: text("scope").$type<AICredentialScope>().notNull().default("system"),
+    tenantId: text("tenant_id"),
+    productId: text("product_id"),
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
     cooldownSeconds: integer("cooldown_seconds").notNull().default(60),
     blockedUntil: text("blocked_until"),
@@ -853,21 +868,29 @@ export const aiCredentials = sqliteTable(
   (t) => [
     index("ai_credentials_provider_idx").on(t.provider),
     index("ai_credentials_available_idx").on(t.enabled, t.blockedUntil),
+    index("ai_credentials_scope_idx").on(t.scope, t.tenantId, t.productId),
   ],
 );
 
-export const aiConfigs = sqliteTable("ai_configs", {
-  id: text("id").primaryKey(),
-  taskType: text("task_type").$type<AITaskType>().notNull().unique(),
-  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-});
+export const aiConfigs = sqliteTable(
+  "ai_configs",
+  {
+    id: text("id").primaryKey(),
+    scopeKey: text("scope_key").notNull().default("system"),
+    taskType: text("task_type").$type<AITaskType>().notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    inherit: integer("inherit", { mode: "boolean" }).notNull().default(false),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [uniqueIndex("ai_configs_scope_task_unique").on(t.scopeKey, t.taskType)],
+);
 
 export const aiTaskCredentials = sqliteTable(
   "ai_task_credentials",
   {
     id: text("id").primaryKey(),
+    scopeKey: text("scope_key").notNull().default("system"),
     taskType: text("task_type").$type<AITaskType>().notNull(),
     credentialId: text("credential_id").notNull(),
     model: text("model").notNull(),
@@ -877,14 +900,77 @@ export const aiTaskCredentials = sqliteTable(
     updatedAt: text("updated_at").notNull(),
   },
   (t) => [
-    uniqueIndex("ai_task_credentials_task_credential_unique").on(
+    uniqueIndex("ai_task_credentials_scope_task_credential_unique").on(
+      t.scopeKey,
       t.taskType,
       t.credentialId,
     ),
-    index("ai_task_credentials_task_priority_idx").on(t.taskType, t.priority),
+    index("ai_task_credentials_task_priority_idx").on(
+      t.scopeKey,
+      t.taskType,
+      t.priority,
+    ),
     index("ai_task_credentials_credential_idx").on(t.credentialId),
   ],
 );
+
+export const aiUsageEvents = sqliteTable(
+  "ai_usage_events",
+  {
+    id: text("id").primaryKey(),
+    credentialId: text("credential_id").notNull(),
+    taskType: text("task_type").$type<AITaskType>().notNull(),
+    tenantId: text("tenant_id"),
+    productId: text("product_id"),
+    model: text("model").notNull(),
+    provider: text("provider").$type<AIProvider>().notNull(),
+    promptTokens: integer("prompt_tokens").notNull().default(0),
+    completionTokens: integer("completion_tokens").notNull().default(0),
+    totalTokens: integer("total_tokens").notNull().default(0),
+    success: integer("success", { mode: "boolean" }).notNull().default(true),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    index("ai_usage_events_created_idx").on(t.createdAt),
+    index("ai_usage_events_tenant_created_idx").on(t.tenantId, t.createdAt),
+    index("ai_usage_events_product_created_idx").on(t.productId, t.createdAt),
+    index("ai_usage_events_credential_created_idx").on(
+      t.credentialId,
+      t.createdAt,
+    ),
+  ],
+);
+
+export const aiUsageDaily = sqliteTable(
+  "ai_usage_daily",
+  {
+    id: text("id").primaryKey(),
+    bucketKey: text("bucket_key").notNull().unique(),
+    day: text("day").notNull(),
+    dimension: text("dimension").$type<AIUsageDimension>().notNull(),
+    tenantId: text("tenant_id"),
+    productId: text("product_id"),
+    credentialId: text("credential_id").notNull(),
+    taskType: text("task_type").$type<AITaskType>().notNull(),
+    promptTokens: integer("prompt_tokens").notNull().default(0),
+    completionTokens: integer("completion_tokens").notNull().default(0),
+    totalTokens: integer("total_tokens").notNull().default(0),
+    requestCount: integer("request_count").notNull().default(0),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    index("ai_usage_daily_dimension_day_idx").on(t.dimension, t.day),
+    index("ai_usage_daily_tenant_day_idx").on(t.tenantId, t.day),
+    index("ai_usage_daily_product_day_idx").on(t.productId, t.day),
+  ],
+);
+
+export const aiUsageSettings = sqliteTable("ai_usage_settings", {
+  scopeKey: text("scope_key").primaryKey(),
+  retentionDays: integer("retention_days"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
 
 export type DocumentStatus = "pending" | "processing" | "ready" | "error";
 
@@ -980,15 +1066,25 @@ export type EmailDeliveryStatus =
 export type AIFilterStrictness = "low" | "medium" | "high";
 export type SpamFilterScope = "global" | "tenant";
 export type SpamFilterMode = "inherit" | "disabled" | "custom";
+export type SpamFilterProvider =
+  | "custom"
+  | "akismet"
+  | "oopspam"
+  | "postmark"
+  | "stopforumspam";
 export type SpamFilterVerdict = "allow" | "suspect" | "spam";
 
-/** Optional global or tenant override for a generic HTTPS spam classifier. */
+/** Optional global or tenant override for a built-in or custom HTTPS spam classifier. */
 export const spamFilterConfigs = sqliteTable("spam_filter_configs", {
   id: text("id").primaryKey(),
   scopeKey: text("scope_key").notNull().unique(),
   scope: text("scope").$type<SpamFilterScope>().notNull(),
   tenantId: text("tenant_id"),
   mode: text("mode").$type<SpamFilterMode>().notNull().default("inherit"),
+  provider: text("provider")
+    .$type<SpamFilterProvider>()
+    .notNull()
+    .default("custom"),
   endpointUrl: text("endpoint_url"),
   authSecret: text("auth_secret"),
   timeoutMs: integer("timeout_ms").notNull().default(3000),
@@ -1302,6 +1398,9 @@ export type CategoryRouteRow = typeof categoryRoutes.$inferSelect;
 export type AIConfigRow = typeof aiConfigs.$inferSelect;
 export type AICredentialRow = typeof aiCredentials.$inferSelect;
 export type AITaskCredentialRow = typeof aiTaskCredentials.$inferSelect;
+export type AIUsageEventRow = typeof aiUsageEvents.$inferSelect;
+export type AIUsageDailyRow = typeof aiUsageDaily.$inferSelect;
+export type AIUsageSettingsRow = typeof aiUsageSettings.$inferSelect;
 export type ProductDocumentRow = typeof productDocuments.$inferSelect;
 export type ProductKnowledgeRow = typeof productKnowledge.$inferSelect;
 export type AIChatMessageRow = typeof aiChatMessages.$inferSelect;

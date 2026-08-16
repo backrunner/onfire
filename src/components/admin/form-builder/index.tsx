@@ -224,7 +224,7 @@ export function FormBuilder({ initialSchema, onSave }: FormBuilderProps) {
         {/* Center - Canvas */}
         <div className="flex min-h-80 w-full flex-col overflow-hidden p-3 md:min-h-0 md:min-w-0 md:flex-1 md:p-4">
           <Tabs defaultValue="edit" className="flex min-h-0 flex-1 flex-col">
-            <TabsList className="w-fit">
+            <TabsList>
               <TabsTrigger value="edit">{fb.editTab}</TabsTrigger>
               <TabsTrigger value="preview">{fb.previewTab}</TabsTrigger>
             </TabsList>

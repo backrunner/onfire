@@ -51,7 +51,7 @@ export async function hasAgentReassignmentTeam(
     .where(
       and(
         eq(agentTeams.userId, ctx.user.id),
-        eq(teams.tenantId, ctx.user.tenantId),
+        or(eq(teams.scope, "system"), eq(teams.tenantId, ctx.user.tenantId)),
         eq(teams.allowReassign, true),
       ),
     )
@@ -76,7 +76,7 @@ export async function assertAgentMayReassign(
       and(
         eq(agentTeams.userId, ctx.user.id),
         eq(agentTeams.teamId, teamId),
-        eq(teams.tenantId, ctx.user.tenantId),
+        or(eq(teams.scope, "system"), eq(teams.tenantId, ctx.user.tenantId)),
         eq(teams.allowReassign, true),
       ),
     )
@@ -253,8 +253,11 @@ export async function assertTeamAccess(
   teamId: string
 ): Promise<typeof teams.$inferSelect> {
   const team = await ctx.db.query.teams.findFirst({ where: eq(teams.id, teamId) });
-  if (!team || (!ctx.isSuperAdmin && !ctx.tenantIds.includes(team.tenantId))) {
-    throw notFound("Team not found");
+  if (!team) throw notFound("Team not found");
+  if (!ctx.isSuperAdmin) {
+    if (!team.tenantId || !ctx.tenantIds.includes(team.tenantId)) {
+      throw notFound("Team not found");
+    }
   }
   if (ctx.role === Role.ProductAdmin) {
     if (ctx.productIds.length === 0) throw notFound("Team not found");
@@ -274,7 +277,7 @@ export async function assertTeamAccess(
     throw notFound("Team not found");
   }
   const delegated = ctx.delegatedResourceScope;
-  if (delegated && !delegated.tenantIds.includes(team.tenantId)) {
+  if (delegated && !(team.tenantId && delegated.tenantIds.includes(team.tenantId))) {
     if (delegated.productIds.length === 0) throw notFound("Team not found");
     const delegatedAssociation = await ctx.db
       .select({ teamId: productTeams.teamId })

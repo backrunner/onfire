@@ -580,7 +580,8 @@ export async function processInboundEmail(
       ? await classifyInboundEmail(
           db,
           { fromEmail: normalizedFrom, subject: normalizedSubject, content },
-          candidates
+          candidates,
+          { tenantId: context.tenant.id, productId: context.product.id }
         )
       : null;
     if (analysis && shouldRejectEmail(analysis, config.aiFilterStrictness ?? "medium")) {

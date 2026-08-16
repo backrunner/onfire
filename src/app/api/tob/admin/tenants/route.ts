@@ -2,18 +2,27 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { tenants } from "@/drizzle/schema";
-import { badRequest, ok } from "@/lib/api/response";
+import { badRequest, forbidden, ok } from "@/lib/api/response";
 import { withAuth, parseBody } from "@/lib/api/handler";
+import { Role } from "@/lib/types";
 
 const createTenantSchema = z.object({
   name: z.string().trim().min(1).max(100),
   defaultTeamId: z.string().optional(),
 });
 
-// "tenant.manage" is granted to SuperAdmin only, so no extra scoping is needed.
-export const GET = withAuth({ permission: "tenant.manage" }, async (_req: NextRequest, ctx) => {
-  const tenantList = await ctx.db.select().from(tenants);
-  return ok(tenantList);
+export const GET = withAuth({}, async (_req: NextRequest, ctx) => {
+  if (ctx.isSuperAdmin) {
+    return ok(await ctx.db.select().from(tenants));
+  }
+  if (ctx.role === Role.TenantAdmin) {
+    const tenantList = await ctx.db
+      .select()
+      .from(tenants)
+      .where(eq(tenants.id, ctx.user.tenantId));
+    return ok(tenantList);
+  }
+  throw forbidden("Tenant list is outside your scope");
 });
 
 export const POST = withAuth({ permission: "tenant.manage" }, async (req: NextRequest, ctx) => {

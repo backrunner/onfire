@@ -11,7 +11,7 @@ import {
   type AIProvider as AIProviderType,
   type OpenAIApiMode,
 } from "@/drizzle/schema";
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import {
   createProvider,
   type AICompletionOptions,
@@ -24,6 +24,11 @@ import {
 import { openStoredSecret } from "@/lib/secret-storage";
 import { getEnv } from "@/lib/db";
 import { safeAIBaseUrl } from "@/lib/ai-config";
+import {
+  type AIRuntimeContext,
+  resolveAiScopeChain,
+} from "@/lib/ai-scope";
+import { recordAiUsage } from "./usage";
 
 export const AI_CREDENTIAL_SECRET_PURPOSE = (credentialId: string) =>
   `ai-credential:${credentialId}`;
@@ -58,10 +63,66 @@ function normalizedBaseUrl(value: string | null): string | null {
   return safeAIBaseUrl(value);
 }
 
+export async function resolveEffectiveAiScopeKey(
+  db: Database,
+  taskType: AITaskType,
+  context: AIRuntimeContext = {}
+): Promise<string | null> {
+  const chain = await resolveAiScopeChain(db, context);
+  for (const scopeKey of chain) {
+    const config = await db.query.aiConfigs.findFirst({
+      where: and(eq(aiConfigs.scopeKey, scopeKey), eq(aiConfigs.taskType, taskType)),
+    });
+    if (!config || config.inherit) continue;
+    return config.enabled ? scopeKey : null;
+  }
+  return "system";
+}
+
+export async function hasConfiguredAITask(
+  db: Database,
+  taskType: AITaskType,
+  context: AIRuntimeContext = {}
+): Promise<boolean> {
+  const scopeKey = await resolveEffectiveAiScopeKey(db, taskType, context);
+  if (!scopeKey) return false;
+  const rows = await db
+    .select({
+      taskEnabled: aiConfigs.enabled,
+      routeEnabled: aiTaskCredentials.enabled,
+      credentialEnabled: aiCredentials.enabled,
+    })
+    .from(aiTaskCredentials)
+    .innerJoin(
+      aiCredentials,
+      eq(aiTaskCredentials.credentialId, aiCredentials.id)
+    )
+    .innerJoin(
+      aiConfigs,
+      and(
+        eq(aiTaskCredentials.taskType, aiConfigs.taskType),
+        eq(aiTaskCredentials.scopeKey, aiConfigs.scopeKey)
+      )
+    )
+    .where(
+      and(
+        eq(aiTaskCredentials.taskType, taskType),
+        eq(aiTaskCredentials.scopeKey, scopeKey)
+      )
+    );
+
+  return rows.some(
+    (row) => row.taskEnabled && row.routeEnabled && row.credentialEnabled
+  );
+}
+
 async function listAvailableCredentials(
   db: Database,
-  taskType: AITaskType
+  taskType: AITaskType,
+  context: AIRuntimeContext = {}
 ): Promise<RoutedCredential[]> {
+  const scopeKey = await resolveEffectiveAiScopeKey(db, taskType, context);
+  if (!scopeKey) return [];
   const rows = await db
     .select({
       taskEnabled: aiConfigs.enabled,
@@ -84,8 +145,19 @@ async function listAvailableCredentials(
       aiCredentials,
       eq(aiTaskCredentials.credentialId, aiCredentials.id)
     )
-    .innerJoin(aiConfigs, eq(aiTaskCredentials.taskType, aiConfigs.taskType))
-    .where(eq(aiTaskCredentials.taskType, taskType))
+    .innerJoin(
+      aiConfigs,
+      and(
+        eq(aiTaskCredentials.taskType, aiConfigs.taskType),
+        eq(aiTaskCredentials.scopeKey, aiConfigs.scopeKey)
+      )
+    )
+    .where(
+      and(
+        eq(aiTaskCredentials.taskType, taskType),
+        eq(aiTaskCredentials.scopeKey, scopeKey)
+      )
+    )
     .orderBy(asc(aiTaskCredentials.priority), asc(aiCredentials.lastUsedAt));
 
   const now = Date.now();
@@ -221,12 +293,32 @@ export async function runWithCredentialFailover<T>(
   throw lastError;
 }
 
+function usageFromResult(result: unknown): {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+} {
+  if (!result || typeof result !== "object" || !("usage" in result)) {
+    return { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+  }
+  const usage = (result as { usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number } }).usage;
+  const promptTokens = usage?.promptTokens ?? 0;
+  const completionTokens = usage?.completionTokens ?? 0;
+  return {
+    promptTokens,
+    completionTokens,
+    totalTokens: usage?.totalTokens ?? promptTokens + completionTokens,
+  };
+}
+
 class FailoverAIProvider implements AIProvider {
   name = "credential-pool";
 
   constructor(
     private readonly db: Database,
-    private readonly candidates: readonly RoutedCredential[]
+    private readonly candidates: readonly RoutedCredential[],
+    private readonly taskType: AITaskType,
+    private readonly context: AIRuntimeContext
   ) {}
 
   complete(options: AICompletionOptions): Promise<AICompletionResult> {
@@ -243,19 +335,57 @@ class FailoverAIProvider implements AIProvider {
   private execute<T>(operation: (provider: AIProvider) => Promise<T>): Promise<T> {
     return runWithCredentialFailover(
       this.candidates,
-      async (candidate) => operation(await buildProvider(candidate)),
+      async (candidate) => {
+        const result = await operation(await buildProvider(candidate));
+        const tokens = usageFromResult(result);
+        try {
+          await recordAiUsage(this.db, {
+            credentialId: candidate.id,
+            taskType: this.taskType,
+            tenantId: this.context.tenantId,
+            productId: this.context.productId,
+            model: candidate.model,
+            provider: candidate.provider,
+            promptTokens: tokens.promptTokens,
+            completionTokens: tokens.completionTokens,
+            totalTokens: tokens.totalTokens,
+            success: true,
+          });
+        } catch (error) {
+          console.error("Failed to record AI usage:", error);
+        }
+        return result;
+      },
       (candidate) => recordSuccess(this.db, candidate.id),
-      (candidate, error, hasFallback) =>
-        recordFailure(this.db, candidate, error, hasFallback)
+      async (candidate, error, hasFallback) => {
+        await recordFailure(this.db, candidate, error, hasFallback);
+        try {
+          await recordAiUsage(this.db, {
+            credentialId: candidate.id,
+            taskType: this.taskType,
+            tenantId: this.context.tenantId,
+            productId: this.context.productId,
+            model: candidate.model,
+            provider: candidate.provider,
+            promptTokens: 0,
+            completionTokens: 0,
+            totalTokens: 0,
+            success: false,
+          });
+        } catch (recordError) {
+          console.error("Failed to record failed AI usage:", recordError);
+        }
+      }
     );
   }
 }
 
 export async function getAIConfig(
   db: Database,
-  taskType: AITaskType
+  taskType: AITaskType,
+  context: AIRuntimeContext = {}
 ): Promise<AIConfig | null> {
-  const candidates = await listAvailableCredentials(db, taskType);
+  const candidates = await listAvailableCredentials(db, taskType, context);
   for (const candidate of candidates) {
     try {
       const apiKey = await openStoredSecret(
@@ -286,10 +416,13 @@ export async function getAIConfig(
 
 export async function getAIProvider(
   db: Database,
-  taskType: AITaskType
+  taskType: AITaskType,
+  context: AIRuntimeContext = {}
 ): Promise<AIProvider | null> {
-  const candidates = await listAvailableCredentials(db, taskType);
-  return candidates.length > 0 ? new FailoverAIProvider(db, candidates) : null;
+  const candidates = await listAvailableCredentials(db, taskType, context);
+  return candidates.length > 0
+    ? new FailoverAIProvider(db, candidates, taskType, context)
+    : null;
 }
 
 export function clearConfigCache(_taskType?: AITaskType): void {

@@ -124,6 +124,17 @@ export default function AdminAccountPage() {
     }
   };
 
+  if (me?.preview) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-4">
+        <div>
+          <h1 className="text-xl font-semibold">{t.account.title}</h1>
+          <p className="text-sm text-muted-foreground">{t.preview.accountLocked}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <TooltipProvider>
       <div className="mx-auto max-w-3xl space-y-6">

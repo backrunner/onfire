@@ -42,6 +42,22 @@ export const zh = {
     agent: '客服'
   },
 
+  preview: {
+    start: '体验身份',
+    startThis: '体验此身份',
+    started: '已进入体验身份',
+    stopped: '已退出体验身份',
+    startFailed: '无法进入体验身份',
+    stopFailed: '无法退出体验身份',
+    hint: '以所选用户的角色和范围只读查看系统，用来确认配置是否正确。',
+    searchUser: '搜索姓名或邮箱',
+    noUsers: '没有可体验的用户',
+    active: '体验中',
+    exit: '退出',
+    badge: '体验',
+    accountLocked: '体验身份下不能管理账号、通知接收方式或已连接应用。'
+  },
+
   // Navigation
   nav: {
     dashboard: 'Dashboard',
@@ -61,7 +77,7 @@ export const zh = {
   // Topbar
   topbar: {
     title: 'OnFire 客服工作台',
-    searchPlaceholder: '搜索主题/ID',
+    searchPlaceholder: '搜索工单主题/ID',
     viewAllResults: '查看全部搜索结果',
     pending: '待处理',
     overdue: '超时',
@@ -218,6 +234,7 @@ export const zh = {
       title: 'AI 过滤',
       description: '使用 AI 过滤垃圾邮件和非工单邮件',
       enabled: '启用 AI 过滤',
+      requiresCredential: '请先在系统管理中为「工单预审」配置 AI 凭据，再开启此过滤。',
       strictness: '过滤严格度',
       low: '低 - 更宽松',
       medium: '中 - 平衡',
@@ -590,6 +607,13 @@ export const zh = {
       noCompatible: '暂无兼容该功能的凭据',
       allAssigned: '所有兼容凭据均已添加',
       routeRequired: '启用功能时至少需要一份已启用的凭据',
+      inherit: '继承上级',
+      inheritTitle: '使用上级路由',
+      inheritHint: '默认沿用上级设置，需要时再独立覆盖。',
+      usingParent: '正在使用{{scope}}路由',
+      parentEmpty: '上级尚未配置凭据路由。',
+      override: '覆盖',
+      useParent: '改回上级设置',
       moveUp: '上移凭据',
       moveDown: '下移凭据',
       coolingDown: '当前处于冷却期',
@@ -606,6 +630,30 @@ export const zh = {
       prereplyHint: '为客服生成建议回复',
       embedding: '向量嵌入',
       embeddingHint: '知识库向量化检索'
+    },
+    scopes: {
+      system: '系统',
+      tenant: '租户',
+      product: '产品'
+    },
+    usage: {
+      title: 'Token 用量',
+      range: '{{from}} – {{to}}',
+      requests: '请求次数',
+      promptTokens: '提示 tokens',
+      totalTokens: '总 tokens',
+      day: '日期',
+      task: '任务',
+      empty: '该时间范围内暂无用量',
+      loadFailed: '用量加载失败',
+      retentionTitle: '用量保留',
+      retentionHint: '超过窗口的明细和按日归总会被删除。永久则全部保留。',
+      retention: '保留时间',
+      forever: '永久',
+      days: '{{days}} 天',
+      inheritRetention: '继承上级保留策略',
+      saved: '用量设置已保存',
+      saveFailed: '用量设置保存失败'
     },
     providers: {
       openai: 'OpenAI',
@@ -1045,6 +1093,8 @@ export const zh = {
   management: {
     title: '系统管理',
     subtitle: '管理租户、产品、团队、工单类型、模板、路由与访问凭据',
+    productTitle: '产品管理',
+    productSubtitle: '配置你负责的产品',
     perPage: '条/页',
     noAccess: '无{{type}}管理权限',
     noData: '暂无{{type}}数据',
@@ -1058,8 +1108,8 @@ export const zh = {
     toastDeleted: '删除成功',
     toastCopied: '已复制到剪贴板',
     manage: '管理配置',
-    productConfiguration: '产品级工单、访问与 AI 配置',
-    tenantConfiguration: '租户级共享配置与默认策略',
+    productConfiguration: '产品级工单、邮件、通知、坐席与 AI 配置',
+    tenantConfiguration: '租户级产品、坐席、共享配置与默认策略',
 
     tabs: {
       tenants: '租户',
@@ -1075,8 +1125,12 @@ export const zh = {
       ticketTypeRoutes: '类型路由',
       spamFilter: '反垃圾',
       apiKeys: 'API Key',
+      email: '邮件',
+      notifications: '通知',
       aiCredentials: 'AI 凭据',
-      aiRouting: 'AI 路由'
+      aiRouting: 'AI 路由',
+      aiUsage: 'AI 用量',
+      aiKnowledge: '知识库'
     },
 
     tenants: {
@@ -1311,18 +1365,58 @@ export const zh = {
 
     spamFilter: {
       title: '外部反垃圾服务',
-      description: '配置在 AI 预筛之前调用的可选 HTTPS 分类服务',
+      description: '在 AI 预筛之前调用的可选分类服务，可选用内置 API 或自定义 HTTPS 端点',
       scope: '配置范围',
       global: '全局默认',
       mode: '模式',
       inherit: '继承全局',
       disabled: '禁用',
+      enabled: '使用服务',
       custom: '自定义服务',
+      provider: '服务',
       endpoint: 'HTTPS 地址',
+      siteUrl: '已登记站点 URL',
+      siteUrlHint: '该 Akismet 密钥登记的公开 HTTPS 站点地址',
       secret: 'Bearer 密钥',
+      apiKey: 'API 密钥',
       secretHint: '自定义服务必须配置',
+      apiKeyHint: '此服务必须配置',
+      apiKeyOptional: '可选；留空则使用公开查询额度',
       secretConfigured: '已配置；留空保留',
-      timeout: '超时（毫秒）'
+      timeout: '超时（毫秒）',
+      docs: '接口文档',
+      protocolTitle: '自定义端点约定',
+      protocolHint: '向你的端点 POST JSON。verdict 必须是 allow、suspect 或 spam。score 为 0–1。可选字段：autoSubmitted、precedence、listId、returnPath。',
+      headersExample: '请求头',
+      requestExample: '请求体',
+      responseExample: '响应体',
+      providers: {
+        postmark: {
+          name: 'Postmark SpamCheck',
+          description: '免费 SpamAssassin 评分，无需 API 密钥。',
+          mapping: '分数 ≥ 5 为垃圾，≥ 3 为可疑。'
+        },
+        akismet: {
+          name: 'Akismet',
+          description: 'Automattic 表单/评论分类服务。',
+          mapping: '返回 true 或 X-akismet-pro-tip: discard 视为垃圾。'
+        },
+        oopspam: {
+          name: 'OOPSpam',
+          description: '按正文和发件人邮箱打分。',
+          mapping: '分数 5–6 为垃圾，3–4 为可疑。'
+        },
+        stopforumspam: {
+          name: 'Stop Forum Spam',
+          description: '只查询发件人邮箱是否出现在公开垃圾库。',
+          mapping: '置信度 ≥ 90 为垃圾，≥ 40 为可疑。'
+        },
+        custom: {
+          name: '自定义 HTTPS',
+          description: '你的端点必须遵循下方 OnFire JSON 约定。',
+          mapping: ''
+        }
+      }
     },
 
     apiKeys: {

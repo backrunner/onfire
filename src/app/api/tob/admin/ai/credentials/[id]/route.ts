@@ -13,6 +13,7 @@ import {
 import { getEnv } from "@/lib/db";
 import { sealSecret } from "@/lib/secret-storage";
 import { AI_CREDENTIAL_SECRET_PURPOSE } from "@/services/ai/config";
+import { assertCanManageAiScope } from "@/lib/ai-scope";
 
 const baseUrlSchema = z.preprocess(
   (value) => (typeof value === "string" && value.trim() === "" ? null : value),
@@ -45,11 +46,16 @@ async function findCredential(ctx: AuthedContext) {
     where: eq(aiCredentials.id, ctx.params.id),
   });
   if (!credential) throw notFound();
+  await assertCanManageAiScope(ctx, {
+    scope: credential.scope,
+    tenantId: credential.tenantId,
+    productId: credential.productId,
+  });
   return credential;
 }
 
 export const PATCH = withAuth(
-  { permission: "ai.config" },
+  {},
   async (req: NextRequest, ctx) => {
     const existing = await findCredential(ctx);
     const body = await parseBody(req, updateCredentialSchema);
@@ -109,7 +115,7 @@ export const PATCH = withAuth(
 );
 
 export const DELETE = withAuth(
-  { permission: "ai.config" },
+  {},
   async (_req: NextRequest, ctx) => {
     const existing = await findCredential(ctx);
     await ctx.db.batch([

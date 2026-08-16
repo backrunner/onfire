@@ -13,6 +13,12 @@ describe("admin sidebar navigation", () => {
       true
     );
     expect(isAdminNavItemActive("/admin/tickets", "/admin", true)).toBe(false);
-    expect(isAdminNavItemActive("/admin/emailing", "/admin/email")).toBe(false);
+    expect(isAdminNavItemActive("/admin/notifications-archive", "/admin/notifications")).toBe(false);
+    expect(
+      isAdminNavItemActive("/admin/management/tenants/t1", "/admin/management")
+    ).toBe(true);
+    expect(
+      isAdminNavItemActive("/admin/management/products/p1", "/admin/management")
+    ).toBe(true);
   });
 });

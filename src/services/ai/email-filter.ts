@@ -55,9 +55,10 @@ const REJECT_CONFIDENCE: Record<AIFilterStrictness, number> = {
 export async function classifyInboundEmail(
   db: Database,
   input: { fromEmail: string; subject: string; content: string },
-  candidates: EmailTicketTypeCandidate[] = []
+  candidates: EmailTicketTypeCandidate[] = [],
+  context: { tenantId?: string | null; productId?: string | null } = {}
 ): Promise<EmailClassification | null> {
-  const provider = await getAIProvider(db, "prescreening");
+  const provider = await getAIProvider(db, "prescreening", context);
   if (!provider) return null;
 
   try {

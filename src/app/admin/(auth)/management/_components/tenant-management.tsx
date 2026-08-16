@@ -31,6 +31,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { DeleteConfirmDialog } from "./delete-confirm-dialog";
 import {
   EmptyState,
@@ -50,7 +55,8 @@ interface Tenant {
 
 interface Team {
   id: string;
-  tenantId: string;
+  tenantId: string | null;
+  scope?: "system" | "tenant" | "product";
   name: string;
 }
 
@@ -164,7 +170,7 @@ export function TenantManagement() {
               <TableRow>
                 <TableHead>{m.tenants.name}</TableHead>
                 <TableHead>{m.tenants.defaultTeam}</TableHead>
-                <TableHead className="w-12" />
+                <TableHead className="w-20" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -178,28 +184,41 @@ export function TenantManagement() {
                       ? teamNames.get(tenant.defaultTeamId) ?? tenant.defaultTeamId
                       : m.tenants.noDefaultTeam}
                   </TableCell>
-                  <TableCell className="text-right">
-                    <RowActions
-                      actions={[
-                        {
-                          label: m.manage,
-                          icon: Settings,
-                          onSelect: () => router.push(`/admin/management/tenants/${tenant.id}`),
-                        },
-                        {
-                          label: t.common.edit,
-                          icon: Pencil,
-                          onSelect: () => openEdit(tenant),
-                        },
-                        {
-                          label: t.common.delete,
-                          icon: Trash2,
-                          destructive: true,
-                          separatorBefore: true,
-                          onSelect: () => setDeleting(tenant),
-                        },
-                      ]}
-                    />
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-1">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8"
+                            aria-label={m.manage}
+                            onClick={() =>
+                              router.push(`/admin/management/tenants/${tenant.id}`)
+                            }
+                          >
+                            <Settings className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{m.manage}</TooltipContent>
+                      </Tooltip>
+                      <RowActions
+                        actions={[
+                          {
+                            label: t.common.edit,
+                            icon: Pencil,
+                            onSelect: () => openEdit(tenant),
+                          },
+                          {
+                            label: t.common.delete,
+                            icon: Trash2,
+                            destructive: true,
+                            separatorBefore: true,
+                            onSelect: () => setDeleting(tenant),
+                          },
+                        ]}
+                      />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -230,6 +249,7 @@ export function TenantManagement() {
                 className="h-8"
               />
             </FormField>
+            {editing && (
             <FormField label={m.tenants.defaultTeam}>
               <Select
                 value={form.defaultTeamId}
@@ -240,7 +260,13 @@ export function TenantManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>{m.tenants.noDefaultTeam}</SelectItem>
-                  {(teams ?? []).map((team) => (
+                  {(teams ?? [])
+                    .filter(
+                      (team) =>
+                        team.tenantId === editing.id &&
+                        (team.scope ?? "tenant") === "tenant"
+                    )
+                    .map((team) => (
                     <SelectItem key={team.id} value={team.id}>
                       {team.name}
                     </SelectItem>
@@ -248,6 +274,7 @@ export function TenantManagement() {
                 </SelectContent>
               </Select>
             </FormField>
+            )}
           </div>
           <DialogFooter>
             <Button

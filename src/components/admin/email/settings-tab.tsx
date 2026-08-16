@@ -609,11 +609,20 @@ export function EmailSettingsTab({
             <Switch
               id="ai-filter-enabled"
               checked={form.aiFilterEnabled}
-              onCheckedChange={(v) => set("aiFilterEnabled", v)}
+              disabled={!form.aiFilterEnabled && !config?.aiFilterAvailable}
+              onCheckedChange={(v) => {
+                if (v && !config?.aiFilterAvailable) return;
+                set("aiFilterEnabled", v);
+              }}
             />
           </div>
         </CardHeader>
-        <CardContent className="px-5 pb-4">
+        <CardContent className="px-5 pb-4 space-y-3">
+          {!config?.aiFilterAvailable && (
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              {tc.aiFilter.requiresCredential}
+            </p>
+          )}
           <div className="max-w-xs space-y-1.5">
             <Label className="text-xs">{tc.aiFilter.strictness}</Label>
             <Select

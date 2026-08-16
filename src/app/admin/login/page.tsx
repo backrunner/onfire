@@ -239,7 +239,7 @@ export default function AdminLoginPage() {
               </form>
             ) : (
               <Tabs defaultValue="password" className="gap-4">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList>
                   <TabsTrigger value="password">
                     <KeyRound />
                     {t.login.passwordTab}

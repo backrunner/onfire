@@ -5,6 +5,11 @@ import { spamFilterConfigs, tenants } from "@/drizzle/schema";
 import { parseBody, parseQuery, withAuth } from "@/lib/api/handler";
 import { badRequest, forbidden, notFound, ok } from "@/lib/api/response";
 import { safePublicHttpUrl } from "@/lib/external-url";
+import {
+  SPAM_FILTER_PROVIDERS,
+  normalizeSpamFilterProvider,
+  spamFilterProviderDef,
+} from "@/lib/spam-filter-providers";
 import { Role } from "@/lib/types";
 import { sealSpamFilterSecret } from "@/services/email/spam-filter";
 
@@ -12,6 +17,7 @@ const querySchema = z.object({ tenantId: z.string().optional() });
 const updateSchema = z.object({
   tenantId: z.string().optional(),
   mode: z.enum(["inherit", "disabled", "custom"]),
+  provider: z.enum(SPAM_FILTER_PROVIDERS).optional(),
   endpointUrl: z.string().max(2048).nullable().optional(),
   authSecret: z.string().max(2048).optional(),
   timeoutMs: z.number().int().min(500).max(10_000).default(3000),
@@ -42,6 +48,7 @@ export const GET = withAuth({ permission: "spam.config" }, async (req, ctx) => {
           scope: targetTenant ? "tenant" : "global",
           tenantId: targetTenant,
           mode: targetTenant ? "inherit" : "disabled",
+          provider: "custom",
           endpointUrl: null,
           timeoutMs: 3000,
           secretConfigured: false,
@@ -63,20 +70,42 @@ export const PATCH = withAuth({ permission: "spam.config" }, async (req: NextReq
     if (!tenant) throw notFound("Tenant not found");
   }
   if (!targetTenant && body.mode === "inherit") throw badRequest("Global settings cannot inherit");
-  if (body.mode === "custom" && !safePublicHttpUrl(body.endpointUrl)) {
-    throw badRequest("A public HTTPS URL on port 443 is required");
+  const provider =
+    body.mode === "custom" ? normalizeSpamFilterProvider(body.provider) : "custom";
+  const definition = spamFilterProviderDef(provider);
+  if (
+    body.mode === "custom" &&
+    definition.requiresEndpoint &&
+    !safePublicHttpUrl(body.endpointUrl)
+  ) {
+    throw badRequest(
+      definition.endpointKind === "site"
+        ? "A public HTTPS site URL on port 443 is required"
+        : "A public HTTPS URL on port 443 is required"
+    );
   }
   const scopeKey = targetTenant ? `tenant:${targetTenant}` : "global";
   const existing = await ctx.db.query.spamFilterConfigs.findFirst({
     where: eq(spamFilterConfigs.scopeKey, scopeKey),
   });
-  if (body.mode === "custom" && !body.authSecret && !existing?.authSecret) {
-    throw badRequest("An authentication secret is required for a custom service");
+  if (
+    body.mode === "custom" &&
+    definition.requiresSecret &&
+    !body.authSecret &&
+    !existing?.authSecret
+  ) {
+    throw badRequest("An authentication secret is required for this service");
   }
   const now = new Date().toISOString();
-  const authSecret = body.authSecret
-    ? await sealSpamFilterSecret(scopeKey, body.authSecret)
-    : existing?.authSecret ?? null;
+  const storesSecret =
+    body.mode === "custom" && (definition.requiresSecret || definition.secretOptional);
+  const authSecret = storesSecret
+    ? body.authSecret
+      ? await sealSpamFilterSecret(scopeKey, body.authSecret)
+      : existing?.authSecret ?? null
+    : null;
+  const endpointUrl =
+    body.mode === "custom" && definition.requiresEndpoint ? body.endpointUrl : null;
   await ctx.db
     .insert(spamFilterConfigs)
     .values({
@@ -85,8 +114,9 @@ export const PATCH = withAuth({ permission: "spam.config" }, async (req: NextReq
       scope: targetTenant ? "tenant" : "global",
       tenantId: targetTenant,
       mode: body.mode,
-      endpointUrl: body.mode === "custom" ? body.endpointUrl : null,
-      authSecret: body.mode === "custom" ? authSecret : null,
+      provider,
+      endpointUrl,
+      authSecret,
       timeoutMs: body.timeoutMs,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
@@ -95,8 +125,9 @@ export const PATCH = withAuth({ permission: "spam.config" }, async (req: NextReq
       target: spamFilterConfigs.scopeKey,
       set: {
         mode: body.mode,
-        endpointUrl: body.mode === "custom" ? body.endpointUrl : null,
-        authSecret: body.mode === "custom" ? authSecret : null,
+        provider,
+        endpointUrl,
+        authSecret,
         timeoutMs: body.timeoutMs,
         updatedAt: now,
       },

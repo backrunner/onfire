@@ -113,6 +113,13 @@ export interface TicketInternalStateView {
   updatedBy: string | null;
 }
 
+export interface PreviewIdentityView {
+  id: string;
+  displayName: string;
+  email: string;
+  role: Role;
+}
+
 export interface MeResponse {
   user: { id: string; email: string; displayName: string; tenantId: string };
   role: Role;
@@ -121,11 +128,17 @@ export interface MeResponse {
   productIds: string[];
   teamIds: string[];
   agent?: { level: number; active: boolean } | null;
+  preview?: {
+    actor: PreviewIdentityView;
+    target: PreviewIdentityView;
+  } | null;
 }
 
 export interface TeamView {
   id: string;
-  tenantId: string;
+  tenantId: string | null;
+  productId?: string | null;
+  scope?: "system" | "tenant" | "product";
   name: string;
   allowReassign: boolean | null;
 }

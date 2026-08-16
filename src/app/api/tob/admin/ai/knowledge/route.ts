@@ -2,9 +2,10 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq, inArray, desc } from "drizzle-orm";
 import { productKnowledge, products } from "@/drizzle/schema";
-import { ok } from "@/lib/api/response";
+import { badRequest, ok } from "@/lib/api/response";
 import { withAuth, parseBody } from "@/lib/api/handler";
 import { assertProductAccess, productScopeCondition } from "@/lib/api/scope";
+import { hasConfiguredAITask } from "@/services/ai/config";
 import { embedKnowledge } from "@/services/ai/embedding";
 
 const knowledgeTypeEnum = z.enum([
@@ -60,6 +61,9 @@ export const POST = withAuth({ permission: "ai.knowledge" }, async (req: NextReq
 
   // Verify product access
   await assertProductAccess(ctx, body.productId);
+  if (!(await hasConfiguredAITask(ctx.db, "embedding", { productId: body.productId }))) {
+    throw badRequest("Knowledge entries require a configured embedding credential");
+  }
 
   const now = new Date().toISOString();
   const id = crypto.randomUUID();

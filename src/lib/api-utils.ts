@@ -20,3 +20,7 @@ export function canManageRole(currentRole: Role, targetRole: Role): boolean {
 export function isSuperAdmin(role: Role): boolean {
   return role === Role.SuperAdmin;
 }
+
+export function canStartPreview(role: Role): boolean {
+  return role === Role.SuperAdmin || role === Role.TenantAdmin;
+}

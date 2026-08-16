@@ -5,7 +5,7 @@ import useSWR from "swr";
 import { toast } from "sonner";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { api, swrFetcher } from "@/lib/api/client";
+import { api, qs, swrFetcher } from "@/lib/api/client";
 import { useMe } from "@/lib/hooks/use-me";
 import type { AgentView, TeamView } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
@@ -50,24 +50,33 @@ interface TeamDetail extends TeamView {
   productIds: string[];
 }
 
-export function TeamManagement() {
+export function TeamManagement({
+  scope = "system",
+  tenantId,
+  productId,
+}: {
+  scope?: "system" | "tenant" | "product";
+  tenantId?: string;
+  productId?: string;
+}) {
   const { t } = useI18n();
   const m = t.management;
   const { can } = useMe();
-  const canSeeMembers = can("user.manage");
+  const canSeeMembers = can("user.manage") || scope === "product";
+  const scopeQuery = qs({ scope, tenantId, productId });
 
   const {
     data: teams,
     error,
     isLoading,
     mutate,
-  } = useSWR<TeamView[]>("/api/tob/admin/teams", swrFetcher);
+  } = useSWR<TeamView[]>(`/api/tob/admin/teams${scopeQuery}`, swrFetcher);
   const { data: products } = useSWR<Product[]>(
-    "/api/tob/meta/products",
+    scope === "tenant" ? "/api/tob/meta/products" : null,
     swrFetcher
   );
   const { data: agents } = useSWR<AgentView[]>(
-    canSeeMembers ? "/api/tob/admin/agents" : null,
+    canSeeMembers ? `/api/tob/admin/agents${scopeQuery}` : null,
     swrFetcher
   );
 
@@ -126,14 +135,17 @@ export function TeamManagement() {
         await api.patch(`/api/tob/admin/teams/${editing.id}`, {
           name: form.name.trim(),
           allowReassign: form.allowReassign,
-          productIds: selectedProductIds,
+          ...(scope === "tenant" ? { productIds: selectedProductIds } : {}),
         });
         toast.success(m.toastUpdated);
       } else {
         await api.post<TeamView>("/api/tob/admin/teams", {
           name: form.name.trim(),
           allowReassign: form.allowReassign,
-          productIds: selectedProductIds,
+          scope,
+          tenantId,
+          productId,
+          productIds: scope === "tenant" ? selectedProductIds : undefined,
         });
         toast.success(m.toastCreated);
       }
@@ -284,7 +296,7 @@ export function TeamManagement() {
               />
             </div>
 
-            <FormField label={m.teams.bindProducts}>
+            {scope === "tenant" && <FormField label={m.teams.bindProducts}>
               {!products || products.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   {m.teams.noProducts}
@@ -309,7 +321,7 @@ export function TeamManagement() {
                   </div>
                 </ScrollArea>
               )}
-            </FormField>
+            </FormField>}
           </div>
           <DialogFooter>
             <Button

@@ -1,0 +1,1 @@
+ALTER TABLE `spam_filter_configs` ADD `provider` text DEFAULT 'custom' NOT NULL;

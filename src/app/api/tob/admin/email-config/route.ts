@@ -7,6 +7,7 @@ import { withAuth, parseBody, parseQuery } from "@/lib/api/handler";
 import { assertProductAccess } from "@/lib/api/scope";
 import type { Database } from "@/lib/db";
 import { getEnv } from "@/lib/db";
+import { hasConfiguredAITask } from "@/services/ai/config";
 import { sealEmailConfigFields } from "@/services/email/config-secrets";
 
 const querySchema = z.object({
@@ -65,10 +66,17 @@ export const GET = withAuth({ permission: "email.config" }, async (req: NextRequ
   const { productId } = parseQuery(req, querySchema);
   await assertProductAccess(ctx, productId);
 
-  const config = await ctx.db.query.emailConfigs.findFirst({
-    where: eq(emailConfigs.productId, productId),
-  });
-  return ok(config ? toConfigView(config) : null);
+  const [config, aiFilterAvailable] = await Promise.all([
+    ctx.db.query.emailConfigs.findFirst({
+      where: eq(emailConfigs.productId, productId),
+    }),
+    hasConfiguredAITask(ctx.db, "prescreening", { productId }),
+  ]);
+  return ok(
+    config
+      ? { ...toConfigView(config), aiFilterAvailable }
+      : { aiFilterAvailable }
+  );
 });
 
 /**
@@ -187,6 +195,13 @@ async function validateConfiguration(
     if (!merged.inboundProvider || !merged.inboundAddress) {
       throw badRequest("Inbound provider and address are required when inbound email is enabled");
     }
+  }
+  if (
+    fields.aiFilterEnabled &&
+    !existing?.aiFilterEnabled &&
+    !(await hasConfiguredAITask(db, "prescreening", { productId }))
+  ) {
+    throw badRequest("AI email filtering requires a configured prescreening credential");
   }
 
   if (!merged.outboundEnabled) return;

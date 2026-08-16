@@ -294,7 +294,7 @@ export function SecuritySettingsDialog({
           <DialogDescription>{t.account.securityDescription}</DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="password" className="min-h-0 gap-0">
-          <TabsList variant="line" className="mx-5 mt-3 w-[calc(100%-2.5rem)]">
+          <TabsList variant="line" className="mx-5 mt-3">
             <TabsTrigger value="password">
               <KeyRound />
               {t.account.passwordTab}

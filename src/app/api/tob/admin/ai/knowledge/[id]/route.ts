@@ -2,10 +2,11 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { productKnowledge } from "@/drizzle/schema";
-import { ok, notFound } from "@/lib/api/response";
+import { badRequest, ok, notFound } from "@/lib/api/response";
 import { withAuth, parseBody } from "@/lib/api/handler";
 import type { AuthedContext } from "@/lib/api/handler";
 import { assertProductAccess } from "@/lib/api/scope";
+import { hasConfiguredAITask } from "@/services/ai/config";
 import { deleteEmbeddings, embedKnowledge } from "@/services/ai/embedding";
 
 const knowledgeTypeEnum = z.enum([
@@ -40,6 +41,12 @@ export const GET = withAuth({ permission: "ai.knowledge" }, async (_req: NextReq
 export const PATCH = withAuth({ permission: "ai.knowledge" }, async (req: NextRequest, ctx) => {
   const existing = await findAccessibleKnowledge(ctx);
   const body = await parseBody(req, updateKnowledgeSchema);
+  if (
+    (body.title || body.content) &&
+    !(await hasConfiguredAITask(ctx.db, "embedding", { productId: existing.productId }))
+  ) {
+    throw badRequest("Knowledge entries require a configured embedding credential");
+  }
 
   const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
   if (body.title) updates.title = body.title;

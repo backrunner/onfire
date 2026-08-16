@@ -55,6 +55,8 @@ export interface EmailConfigView {
   outboundReplyTo: string | null;
   aiFilterEnabled: boolean | null;
   aiFilterStrictness: AiFilterStrictness | null;
+  /** True when the global prescreening task has an enabled credential route. */
+  aiFilterAvailable?: boolean;
   createdAt: string;
   updatedAt: string;
 }

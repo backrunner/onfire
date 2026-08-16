@@ -246,5 +246,12 @@ export async function runScheduledScan(db: Database): Promise<ScanReport> {
     }
   }
 
+  try {
+    const { purgeExpiredAiUsage } = await import("@/services/ai/usage");
+    await purgeExpiredAiUsage(db);
+  } catch (error) {
+    console.error("AI usage retention purge failed:", error);
+  }
+
   return report;
 }

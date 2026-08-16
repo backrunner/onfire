@@ -22,6 +22,7 @@ import {
   type OpenAIApiModeValue,
 } from "@/lib/ai-config";
 import { PROVIDER_PRESETS } from "./provider-presets";
+import { aiScopeQuery } from "./scope";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -62,6 +63,8 @@ export interface AiCredentialView {
   lastSuccessAt: string | null;
   lastUsedAt: string | null;
   usageCount: number;
+  scope?: "system" | "tenant" | "product";
+  inherited?: boolean;
 }
 
 type FormState = {
@@ -84,11 +87,20 @@ const EMPTY_FORM: FormState = {
   cooldownSeconds: "60",
 };
 
-export function CredentialsTab() {
+export function CredentialsTab({
+  scope = "system",
+  tenantId,
+  productId,
+}: {
+  scope?: "system" | "tenant" | "product";
+  tenantId?: string;
+  productId?: string;
+}) {
   const { t } = useI18n();
   const c = t.aiConfig.credentials;
+  const scopeQuery = aiScopeQuery({ scope, tenantId, productId });
   const { data, error, isLoading, mutate } = useSWR<AiCredentialView[]>(
-    "/api/tob/admin/ai/credentials",
+    `/api/tob/admin/ai/credentials${scopeQuery}`,
     swrFetcher
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -164,7 +176,7 @@ export function CredentialsTab() {
       };
       if (creating) {
         const result = await api.post<{ id: string }>(
-          "/api/tob/admin/ai/credentials",
+          `/api/tob/admin/ai/credentials${scopeQuery}`,
           payload
         );
         setCreating(false);
