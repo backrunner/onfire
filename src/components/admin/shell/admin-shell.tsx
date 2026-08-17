@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState, type CSSProperties } from "react";
 import { AdminSidebar } from "@/components/admin/shell/admin-sidebar";
 import { AdminHeader } from "@/components/admin/shell/admin-header";
+import { usePreviewIdentity } from "@/lib/hooks/use-preview-identity";
 
 const COLLAPSE_KEY = "onfire-sidebar-collapsed";
 
@@ -13,6 +14,7 @@ const useBeforePaint =
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { preview } = usePreviewIdentity();
 
   useBeforePaint(() => {
     setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "1");
@@ -33,7 +35,12 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
       />
-      <div className="flex min-w-0 flex-1 flex-col">
+      {/* Pages size themselves against the top chrome (header + preview
+          banner) through this variable instead of hardcoding 3.5rem. */}
+      <div
+        className="flex min-w-0 flex-1 flex-col"
+        style={{ "--admin-chrome-h": preview ? "5.5rem" : "3.5rem" } as CSSProperties}
+      >
         <AdminHeader onMobileMenu={() => setMobileOpen(true)} />
         <main className="mx-auto w-full max-w-[1600px] flex-1 p-4 lg:p-6">
           {children}

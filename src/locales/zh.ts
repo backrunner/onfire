@@ -1387,7 +1387,8 @@ export const zh = {
       saveConfirm: '保存会创建并立即启用一个新表单版本，确认继续？',
       restoreConfirm: '将 v{{version}} 复制为新的当前版本？',
       archiveTemplate: '归档表单',
-      restoreTemplate: '恢复表单'
+      restoreTemplate: '恢复表单',
+      archiveConfirm: '归档后客户门户将不再显示该表单，恢复前不可用于新建工单。确定归档吗？'
     },
 
     spamFilter: {

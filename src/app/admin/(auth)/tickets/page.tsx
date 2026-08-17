@@ -128,7 +128,7 @@ function TicketsWorkspace() {
   );
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem-2rem)] flex-col gap-3 lg:h-[calc(100vh-3.5rem-3rem)]">
+    <div className="flex h-[calc(100vh-var(--admin-chrome-h,3.5rem)-2rem)] flex-col gap-3 lg:h-[calc(100vh-var(--admin-chrome-h,3.5rem)-3rem)]">
       <TicketFiltersBar value={filters} onChange={applyFilters} />
 
       {selection.size > 0 && (
@@ -170,6 +170,7 @@ function TicketsWorkspace() {
         >
           {ticketId ? (
             <TicketDetail
+              key={ticketId}
               ticketId={ticketId}
               onBack={() => setParams({ ticket: null })}
               backOnlyMobile
@@ -194,7 +195,7 @@ function TicketsWorkspace() {
 
 function WorkspaceSkeleton() {
   return (
-    <div className="flex h-[calc(100vh-3.5rem-2rem)] flex-col gap-3 lg:h-[calc(100vh-3.5rem-3rem)]">
+    <div className="flex h-[calc(100vh-var(--admin-chrome-h,3.5rem)-2rem)] flex-col gap-3 lg:h-[calc(100vh-var(--admin-chrome-h,3.5rem)-3rem)]">
       <div className="flex gap-2">
         <Skeleton className="h-8 flex-1" />
         {Array.from({ length: 4 }).map((_, i) => (

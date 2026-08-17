@@ -133,7 +133,7 @@ export default function TocTicketDetailPage() {
 
   return (
     <TocPortalShell>
-      <TicketDetailBody ticketId={params.id} />
+      <TicketDetailBody key={params.id} ticketId={params.id} />
     </TocPortalShell>
   );
 }

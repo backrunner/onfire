@@ -91,7 +91,7 @@ export function AdminHeader({ onMobileMenu }: { onMobileMenu: () => void }) {
   return (
     <div className="sticky top-0 z-40">
       {preview && (
-        <div className="flex items-center justify-center gap-2 bg-amber-400 px-4 py-1.5 text-amber-950 shadow-sm dark:bg-amber-500">
+        <div className="flex h-8 items-center justify-center gap-2 bg-amber-400 px-4 text-amber-950 shadow-sm dark:bg-amber-500">
           <Glasses className="size-3.5 shrink-0" />
           <span className="truncate text-xs font-semibold">
             {t.preview.active} · {preview.target.displayName} ·{" "}

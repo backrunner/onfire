@@ -84,6 +84,7 @@ export function TicketTemplateVersionManagement({ ticketTypeId }: { ticketTypeId
   const [cloneTarget, setCloneTarget] = useState<VersionView | null>(null);
   const [invalidateTarget, setInvalidateTarget] = useState<VersionView | null>(null);
   const [invalidateReason, setInvalidateReason] = useState("");
+  const [archiveOpen, setArchiveOpen] = useState(false);
 
   const current = detail?.versions.find((version) => version.id === detail.template.currentVersionId) ?? null;
   const editorBase = detail?.versions.find((version) => version.id === editorBaseId) ?? null;
@@ -146,6 +147,7 @@ export function TicketTemplateVersionManagement({ ticketTypeId }: { ticketTypeId
   };
 
   const setArchived = async (restore: boolean) => {
+    setPending(true);
     try {
       if (restore) await api.post(`/api/tob/admin/ticket-types/${ticketTypeId}/template/restore`);
       else await api.delete(`/api/tob/admin/ticket-types/${ticketTypeId}/template`);
@@ -153,6 +155,9 @@ export function TicketTemplateVersionManagement({ ticketTypeId }: { ticketTypeId
       await mutate();
     } catch (err) {
       toast.error(errorMessage(err, t.management.loadFailed));
+    } finally {
+      setPending(false);
+      setArchiveOpen(false);
     }
   };
 
@@ -173,7 +178,7 @@ export function TicketTemplateVersionManagement({ ticketTypeId }: { ticketTypeId
             {archived ? (
               <Button variant="outline" size="sm" className="h-8" onClick={() => void setArchived(true)}><ArchiveRestore className="mr-1.5 size-3.5" />{m.restoreTemplate}</Button>
             ) : (
-              <Button variant="outline" size="sm" className="h-8" onClick={() => void setArchived(false)}><Archive className="mr-1.5 size-3.5" />{m.archiveTemplate}</Button>
+              <Button variant="outline" size="sm" className="h-8" onClick={() => setArchiveOpen(true)}><Archive className="mr-1.5 size-3.5" />{m.archiveTemplate}</Button>
             )}
             <Button size="sm" className="h-8" onClick={() => openEditor(current)} disabled={archived}>
               {current ? <Pencil className="mr-1.5 size-3.5" /> : <FilePlus2 className="mr-1.5 size-3.5" />}
@@ -222,6 +227,22 @@ export function TicketTemplateVersionManagement({ ticketTypeId }: { ticketTypeId
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Archive confirmation */}
+      <AlertDialog open={archiveOpen} onOpenChange={(open) => { if (!pending) setArchiveOpen(open); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{m.archiveTemplate}</AlertDialogTitle>
+            <AlertDialogDescription>{m.archiveConfirm}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pending}>{t.common.cancel}</AlertDialogCancel>
+            <AlertDialogAction disabled={pending} onClick={(event) => { event.preventDefault(); void setArchived(false); }}>
+              {pending ? t.common.loading : t.common.confirm}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Save confirmation */}
       <AlertDialog open={saveDraft !== null} onOpenChange={(open) => { if (!open && !pending) setSaveDraft(null); }}>

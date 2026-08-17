@@ -2,6 +2,7 @@
 
 import {
   forwardRef,
+  useEffect,
   useImperativeHandle,
   useRef,
   useState,
@@ -78,6 +79,10 @@ export const RichTextEditor = forwardRef<
   const [uploading, setUploading] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
+  // TipTap configures Placeholder once at creation; read through a ref and
+  // force a decoration pass so the hint follows the prop (reply vs. note).
+  const placeholderRef = useRef(placeholder ?? "");
+  placeholderRef.current = placeholder ?? "";
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -87,7 +92,7 @@ export const RichTextEditor = forwardRef<
         heading: false,
       }),
       Image,
-      Placeholder.configure({ placeholder: placeholder ?? "" }),
+      Placeholder.configure({ placeholder: () => placeholderRef.current }),
     ],
     editable: !disabled,
     onUpdate: ({ editor: current }) => emitChange(current, onChange),
@@ -105,6 +110,16 @@ export const RichTextEditor = forwardRef<
       },
     },
   });
+
+  // `editable` is only applied at creation in TipTap v3 — sync it manually.
+  useEffect(() => {
+    editor?.setEditable(!disabled);
+  }, [editor, disabled]);
+
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    editor.view.dispatch(editor.state.tr);
+  }, [editor, placeholder]);
 
   const state = useEditorState({
     editor,

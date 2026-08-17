@@ -1389,7 +1389,8 @@ export const en: Translations = {
       saveConfirm: 'Saving creates and immediately enables a new form version. Continue?',
       restoreConfirm: 'Copy v{{version}} as a new active version?',
       archiveTemplate: 'Archive Form',
-      restoreTemplate: 'Restore Form'
+      restoreTemplate: 'Restore Form',
+      archiveConfirm: 'Archiving hides this form from the customer portal until it is restored. Continue?'
     },
 
     spamFilter: {

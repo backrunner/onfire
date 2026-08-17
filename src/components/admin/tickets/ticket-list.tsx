@@ -124,7 +124,7 @@ export function TicketList({
                   aria-label={ticket.subject}
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <StatusBadge status={ticket.status} />
                     <PriorityBadge priority={ticket.priority} />
                     <SlaBadge
