@@ -272,7 +272,28 @@ Replied
 Closed
 
 Any status → [Escalate] → Escalated
+Closed → [Reopen] → Processing (reply SLA restarts when assigned)
 ```
+
+Moving a ticket to `replied` (single, bulk, or MCP) requires an existing public
+agent reply; otherwise the transition is rejected.
+
+### Rich-Text Replies and Inline Images
+
+- Agent (ToB) and customer (ToC) replies use a shared TipTap editor (bold,
+  italic, strike, lists, quote, code, link, inline image). Markdown is not
+  used; replies persist `content` (plain text) plus sanitized `contentHtml`.
+- All stored reply HTML passes `sanitizeRichHtml` (strict allowlist) at write
+  time — composer payloads, customer portal replies, and inbound mail alike.
+  Views render stored HTML directly; never render unsanitized markup.
+- Inline images upload via `POST /api/tob/tickets/:id/attachments` or
+  `POST /api/toc/tickets/:id/attachments` (PNG/JPEG/GIF/WebP ≤ 5MB, verified
+  by magic bytes; SVG is rejected). Blobs live in R2 and are served publicly
+  at `/api/attachments/[id]` under an unguessable 128-bit key so email clients
+  can load them; outbound mail absolutizes these URLs against the public ToC
+  origin. Non-image email attachments and `cid:` images are filtered out.
+- `{{reply_content}}` injects the sanitized reply HTML verbatim in outbound
+  HTML mail (plain text part uses `content`).
 
 ### Status Descriptions
 
@@ -282,7 +303,7 @@ Any status → [Escalate] → Escalated
 | processing | Agent has accepted, currently processing |
 | replied | Agent has replied, awaiting customer feedback |
 | escalated | Ticket has been escalated to a higher-level agent |
-| closed | Ticket is closed, no longer accepting replies |
+| closed | Ticket is closed, no longer accepting customer replies; agents can still add internal notes and reopen |
 
 ### Priority Levels
 
@@ -804,7 +825,8 @@ const portalUrl =
 | product_keys | API keys |
 | product_identity_configs | Encrypted per-product remote identity resolver configuration |
 | tickets | Tickets |
-| replies | Ticket replies |
+| replies | Ticket replies (plain `content` + sanitized `contentHtml`) |
+| attachments | Inline reply images (unguessable public id, blob in R2) |
 | history | Operation history |
 | customers | Customer information |
 | category_routes | Read-only legacy category routing rules |

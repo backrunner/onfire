@@ -113,6 +113,7 @@ Updated: 2026-08-16
 - Inbound normalization keeps a non-blank HTML body when the plain-text field is blank. Provider adapters fail fast on empty AI completions instead of persisting unusable answers.
 - Customer records may be identified by `externalId` without an email; ToB labels, ticket lists, and search use the external identity without rendering or linking `null`.
 - SLA deadlines follow ticket state: unassigned tickets do not start reply SLA, assignment/escalation starts or resets it, public agent replies clear it, and dashboards only count deadlines valid for the current state.
+- Tickets cannot move to `replied` (single, bulk, or MCP) before a public agent reply exists. Agent and customer replies support sanitized rich text with inline images (TipTap editor, R2-backed attachment uploads verified by magic bytes, public unguessable serving for email clients); inbound mail keeps hosted images and formatting while `cid:` and non-image attachments are filtered out.
 - Public ToC mutations use D1 rate limits and Turnstile. When `TURNSTILE_SECRET` is set, a missing `NEXT_PUBLIC_TURNSTILE_SITE_KEY` fails closed rather than silently presenting an unprotected form.
 
 ## Database
@@ -145,6 +146,8 @@ Updated: 2026-08-16
 - `0021_cynical_kid_colt.sql`: nullable `teams.tenant_id`, `teams.product_id`,
   `teams.scope` (`system` | `tenant` | `product`, existing rows backfill as
   tenant), and `teams_scope_idx`.
+- `0022_talented_virginia_dare.sql`: sanitized `replies.content_html` for rich
+  text and the `attachments` table for inline reply images stored in R2.
 
 A fresh local D1 applied all 19 migrations from `0000` through `0018`, with no
 foreign-key violations, and confirmed the Better Auth 1.7 OAuth/resource
