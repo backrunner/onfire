@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { api, ApiClientError, swrFetcher } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 import type { McpPermission } from "@/lib/mcp/permissions";
+import { formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,7 +48,7 @@ interface ConnectedApplication {
 }
 
 export function ConnectedApplicationsCard() {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const { data, error, isLoading, mutate } = useSWR<ConnectedApplication[]>(
     "/api/tob/oauth/grants",
     swrFetcher,
@@ -79,11 +80,7 @@ export function ConnectedApplicationsCard() {
 
   const formatLastUsed = (value: string | null) => {
     if (!value) return t.oauth.neverUsed;
-    const formatted = new Intl.DateTimeFormat(
-      language === "zh" ? "zh-CN" : "en",
-      { dateStyle: "medium", timeStyle: "short" },
-    ).format(new Date(value));
-    return t.oauth.lastUsed.replace("{{time}}", formatted);
+    return t.oauth.lastUsed.replace("{{time}}", formatDateTime(value));
   };
 
   const formatCount = (

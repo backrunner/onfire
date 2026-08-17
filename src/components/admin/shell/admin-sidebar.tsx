@@ -9,17 +9,14 @@ import {
   Users,
   Settings,
   Flame,
-  Glasses,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { useMe } from "@/lib/hooks/use-me";
 import type { Permission } from "@/lib/types";
 import { canAccessManagement, managementEntryHref } from "@/lib/staff-access";
-import { usePreviewIdentity } from "@/lib/hooks/use-preview-identity";
 import { isAdminNavItemActive } from "./admin-navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -88,10 +85,6 @@ export function AdminSidebar({
   const router = useRouter();
   const { t } = useI18n();
   const { me, can, isLoading } = useMe();
-  const { preview, stop } = usePreviewIdentity();
-  const previewLabel = preview
-    ? `${t.preview.active} · ${preview.target.displayName} · ${t.roles[preview.target.role] ?? preview.target.role}`
-    : "";
 
   const isActive = (item: NavItem) =>
     isAdminNavItemActive(pathname, item.matchHref ?? item.href, item.exact);
@@ -132,8 +125,7 @@ export function AdminSidebar({
           <Link href="/admin" className="flex items-center gap-2 font-semibold">
             <span
               className={cn(
-                "flex size-7 items-center justify-center rounded-md bg-gradient-to-br from-orange-500 to-red-600 text-white shadow-sm shadow-orange-500/20",
-                preview && "ring-2 ring-amber-500 ring-offset-2 ring-offset-sidebar"
+                "flex size-7 items-center justify-center rounded-md bg-gradient-to-br from-orange-500 to-red-600 text-white shadow-sm shadow-orange-500/20"
               )}
             >
               <Flame className="size-4" />
@@ -141,59 +133,6 @@ export function AdminSidebar({
             {!compact && <span className="text-sm">OnFire</span>}
           </Link>
         </div>
-        {preview && (
-          compact ? (
-            <div className="border-b border-amber-500/30 p-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-8 text-amber-700 hover:bg-amber-500/10 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300"
-                    aria-label={`${previewLabel}. ${t.preview.exit}`}
-                    onClick={() => {
-                      void stop().catch((error) =>
-                        toast.error(
-                          error instanceof Error ? error.message : t.preview.stopFailed
-                        )
-                      );
-                    }}
-                  >
-                    <Glasses className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  {previewLabel} · {t.preview.exit}
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 border-b border-amber-500/30 bg-amber-500/8 px-3 py-2">
-              <Glasses className="size-3.5 shrink-0 text-amber-700 dark:text-amber-400" />
-              <div className="min-w-0 flex-1 text-[11px] leading-tight text-amber-800 dark:text-amber-300">
-                <div className="font-medium">{t.preview.active}</div>
-                <div className="truncate">
-                  {preview.target.displayName} ·{" "}
-                  {t.roles[preview.target.role] ?? preview.target.role}
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 shrink-0 px-1.5 text-[11px] text-amber-800 hover:bg-amber-500/15 dark:text-amber-300"
-                onClick={() => {
-                  void stop().catch((error) =>
-                    toast.error(
-                      error instanceof Error ? error.message : t.preview.stopFailed
-                    )
-                  );
-                }}
-              >
-                {t.preview.exit}
-              </Button>
-            </div>
-          )
-        )}
 
         {/* Nav groups */}
         <nav className="flex-1 space-y-5 overflow-y-auto px-2 py-4">
@@ -275,8 +214,7 @@ export function AdminSidebar({
       <aside
         className={cn(
           "hidden shrink-0 border-r border-sidebar-border bg-sidebar transition-[width] duration-200 lg:block",
-          collapsed ? "w-14" : "w-60",
-          preview && "border-l-2 border-l-amber-500"
+          collapsed ? "w-14" : "w-60"
         )}
       >
         <div className="sticky top-0 h-screen">{renderNav(collapsed)}</div>

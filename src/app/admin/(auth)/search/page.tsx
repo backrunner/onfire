@@ -13,7 +13,7 @@ import {
   SearchX,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 import { swrFetcher, qs } from "@/lib/api/client";
 import { TicketStatus, TicketPriority } from "@/lib/types";
 import {
@@ -68,7 +68,7 @@ export default function AdminSearchPage() {
 }
 
 function SearchContent() {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -161,15 +161,6 @@ function SearchContent() {
     setHighlighted(-1);
     setParams({ q: value, page: null });
   };
-
-  const dateFormatter = useMemo(
-    () =>
-      new Intl.DateTimeFormat(language === "zh" ? "zh-CN" : "en-US", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }),
-    [language]
-  );
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
@@ -393,7 +384,7 @@ function SearchContent() {
                   <PriorityBadge priority={ticket.priority} />
                   <SlaBadge breached={Boolean(ticket.isOverdue)} />
                   <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                    {dateFormatter.format(new Date(ticket.createdAt))}
+                    {formatDateTime(ticket.createdAt)}
                   </span>
                 </div>
                 <div className="mt-1.5 truncate text-sm font-medium">

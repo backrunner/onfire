@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useParams, usePathname, useSearchParams } from "next/navigation";
 import useSWR from "swr";
@@ -13,21 +14,70 @@ import type { Permission } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AiScopePanel } from "@/components/admin/ai/ai-scope-panel";
-import { EmailProductPanel } from "@/components/admin/email/email-product-panel";
-import { TicketTypeManagement } from "../../_components/ticket-type-management";
-import { TicketTypeRouteManagement } from "../../_components/ticket-type-route-management";
-import { TicketTemplateVersionManagement } from "../../_components/ticket-template-version-management";
-import { TicketInternalStateManagement } from "../../_components/ticket-internal-state-management";
-import { ProductKeyManagement } from "../../_components/product-key-management";
-import { TeamManagement } from "../../_components/team-management";
-import { AgentManagement } from "../../_components/agent-management";
-import { NotificationProductPanel } from "@/components/admin/notifications/notification-product-panel";
+import { ConfirmDiscardDialog } from "@/components/admin/confirm-discard-dialog";
+
+// Tab panels load lazily so dev compilation and initial render only cover the
+// active tab instead of the whole product configuration module graph (which
+// includes the email, notification, and AI chains).
+const tabFallback = () => <Skeleton className="h-64 w-full" />;
+const AiScopePanel = dynamic(
+  () => import("@/components/admin/ai/ai-scope-panel").then((m) => m.AiScopePanel),
+  { loading: tabFallback }
+);
+const EmailProductPanel = dynamic(
+  () =>
+    import("@/components/admin/email/email-product-panel").then(
+      (m) => m.EmailProductPanel
+    ),
+  { loading: tabFallback }
+);
+const NotificationProductPanel = dynamic(
+  () =>
+    import("@/components/admin/notifications/notification-product-panel").then(
+      (m) => m.NotificationProductPanel
+    ),
+  { loading: tabFallback }
+);
+const TicketTypeManagement = dynamic(
+  () =>
+    import("../../_components/ticket-type-management").then(
+      (m) => m.TicketTypeManagement
+    ),
+  { loading: tabFallback }
+);
+const TicketTypeRouteManagement = dynamic(
+  () =>
+    import("../../_components/ticket-type-route-management").then(
+      (m) => m.TicketTypeRouteManagement
+    ),
+  { loading: tabFallback }
+);
+const TicketInternalStateManagement = dynamic(
+  () =>
+    import("../../_components/ticket-internal-state-management").then(
+      (m) => m.TicketInternalStateManagement
+    ),
+  { loading: tabFallback }
+);
+const ProductKeyManagement = dynamic(
+  () =>
+    import("../../_components/product-key-management").then(
+      (m) => m.ProductKeyManagement
+    ),
+  { loading: tabFallback }
+);
+const TeamManagement = dynamic(
+  () => import("../../_components/team-management").then((m) => m.TeamManagement),
+  { loading: tabFallback }
+);
+const AgentManagement = dynamic(
+  () => import("../../_components/agent-management").then((m) => m.AgentManagement),
+  { loading: tabFallback }
+);
 
 type ProductTab =
   | "types"
   | "routing"
-  | "forms"
   | "states"
   | "email"
   | "notifications"
@@ -41,9 +91,8 @@ const PRODUCT_TABS: Array<{
   permission: Permission;
   label: (t: ReturnType<typeof useI18n>["t"]) => string;
 }> = [
-  { value: "types", permission: "ticket_type.write", label: (t) => t.management.tabs.ticketTypes },
+  { value: "types", permission: "ticket_type.write", label: (t) => t.management.tabs.ticketManagement },
   { value: "routing", permission: "ticket_type.route", label: (t) => t.management.tabs.ticketTypeRoutes },
-  { value: "forms", permission: "ticket_template.read", label: (t) => t.management.tabs.templates },
   { value: "states", permission: "ticket_type.write", label: (t) => t.management.tabs.internalStates },
   { value: "email", permission: "email.config", label: (t) => t.management.tabs.email },
   { value: "notifications", permission: "notification.manage", label: (t) => t.management.tabs.notifications },
@@ -65,21 +114,28 @@ function ProductConfigurationTabs({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [emailDirty, setEmailDirty] = useState(false);
+  const [pendingTab, setPendingTab] = useState<string | null>(null);
   const tabs = PRODUCT_TABS.filter((tab) => can(tab.permission));
   const tabParam = searchParams.get("tab");
-  const activeTab = tabs.some((tab) => tab.value === tabParam)
-    ? (tabParam as ProductTab)
+  // Legacy deep links to the removed forms tab land on the merged types tab.
+  const mappedParam = tabParam === "forms" ? "types" : tabParam;
+  const activeTab = tabs.some((tab) => tab.value === mappedParam)
+    ? (mappedParam as ProductTab)
     : tabs[0]?.value;
 
-  const canLeaveEmail = () =>
-    !emailDirty || window.confirm(t.emailConfig.discardConfirm);
-
-  const handleTabChange = (value: string) => {
-    if (activeTab === "email" && value !== "email" && !canLeaveEmail()) return;
+  const applyTab = (value: string) => {
     setEmailDirty(false);
     const next = new URLSearchParams(searchParams.toString());
     next.set("tab", value);
     window.history.replaceState(null, "", `${pathname}?${next.toString()}`);
+  };
+
+  const handleTabChange = (value: string) => {
+    if (activeTab === "email" && value !== "email" && emailDirty) {
+      setPendingTab(value);
+      return;
+    }
+    applyTab(value);
   };
 
   if (tabs.length === 0 || !activeTab) {
@@ -91,6 +147,7 @@ function ProductConfigurationTabs({
   }
 
   return (
+    <>
     <Tabs value={activeTab} onValueChange={handleTabChange}>
       <TabsList>
         {tabs.map((tab) => (
@@ -104,9 +161,6 @@ function ProductConfigurationTabs({
       </TabsContent>
       <TabsContent value="routing" className="mt-4">
         <TicketTypeRouteManagement productId={productId} />
-      </TabsContent>
-      <TabsContent value="forms" className="mt-4">
-        <TicketTemplateVersionManagement productId={productId} />
       </TabsContent>
       <TabsContent value="states" className="mt-4">
         <TicketInternalStateManagement productId={productId} />
@@ -135,6 +189,19 @@ function ProductConfigurationTabs({
         />
       </TabsContent>
     </Tabs>
+
+      {/* Discard-confirmation for leaving the email tab with unsaved changes */}
+      <ConfirmDiscardDialog
+        open={pendingTab !== null}
+        onOpenChange={(open) => { if (!open) setPendingTab(null); }}
+        onConfirm={() => {
+          const target = pendingTab;
+          setPendingTab(null);
+          if (target) applyTab(target);
+        }}
+        description={t.emailConfig.discardConfirm}
+      />
+    </>
   );
 }
 

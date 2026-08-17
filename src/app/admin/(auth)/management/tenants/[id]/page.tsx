@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useParams, usePathname, useSearchParams } from "next/navigation";
 import useSWR from "swr";
@@ -14,13 +15,44 @@ import { canViewTenantConfiguration } from "@/lib/staff-access";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TicketTypePresetManagement } from "../../_components/ticket-type-preset-management";
-import { SpamFilterManagement } from "../../_components/spam-filter-management";
-import { ProductManagement } from "../../_components/product-management";
-import { UserManagement } from "../../_components/user-management";
-import { TeamManagement } from "../../_components/team-management";
-import { AgentManagement } from "../../_components/agent-management";
-import { AiScopePanel } from "@/components/admin/ai/ai-scope-panel";
+
+// Tab panels load lazily so dev compilation and initial render only cover the
+// active tab instead of the whole tenant configuration module graph.
+const tabFallback = () => <Skeleton className="h-64 w-full" />;
+const TicketTypePresetManagement = dynamic(
+  () =>
+    import("../../_components/ticket-type-preset-management").then(
+      (m) => m.TicketTypePresetManagement
+    ),
+  { loading: tabFallback }
+);
+const SpamFilterManagement = dynamic(
+  () =>
+    import("../../_components/spam-filter-management").then(
+      (m) => m.SpamFilterManagement
+    ),
+  { loading: tabFallback }
+);
+const ProductManagement = dynamic(
+  () => import("../../_components/product-management").then((m) => m.ProductManagement),
+  { loading: tabFallback }
+);
+const UserManagement = dynamic(
+  () => import("../../_components/user-management").then((m) => m.UserManagement),
+  { loading: tabFallback }
+);
+const TeamManagement = dynamic(
+  () => import("../../_components/team-management").then((m) => m.TeamManagement),
+  { loading: tabFallback }
+);
+const AgentManagement = dynamic(
+  () => import("../../_components/agent-management").then((m) => m.AgentManagement),
+  { loading: tabFallback }
+);
+const AiScopePanel = dynamic(
+  () => import("@/components/admin/ai/ai-scope-panel").then((m) => m.AiScopePanel),
+  { loading: tabFallback }
+);
 
 interface Tenant {
   id: string;

@@ -4,9 +4,11 @@ import { useTheme } from "@/components/ui/theme-provider";
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/lib/i18n";
 
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
+  const { t } = useI18n();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -20,7 +22,7 @@ export function ThemeToggle() {
       size="icon"
       className="size-8"
       onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-      aria-label="Toggle theme"
+      aria-label={t.common.toggleTheme}
     >
       {resolvedTheme === "dark" ? (
         <Sun className="size-4" />

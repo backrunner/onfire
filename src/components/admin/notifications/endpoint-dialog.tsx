@@ -12,6 +12,7 @@ import {
   type EndpointView,
 } from "./channel-meta";
 import { Button } from "@/components/ui/button";
+import { ConfirmDiscardDialog } from "@/components/admin/confirm-discard-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -90,9 +91,13 @@ export function EndpointDialog({
   const isDirty =
     open && initialSnapshot.current !== formSnapshot(name, type, enabled, config);
 
+  const [confirmClose, setConfirmClose] = useState(false);
   const requestOpenChange = (next: boolean) => {
     if (pending) return;
-    if (!next && isDirty && !window.confirm(t.notifChannels.discardChanges)) return;
+    if (!next && isDirty) {
+      setConfirmClose(true);
+      return;
+    }
     onOpenChange(next);
   };
 
@@ -159,6 +164,7 @@ export function EndpointDialog({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={requestOpenChange}>
       <DialogContent className="grid max-h-[90dvh] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-w-lg">
         <DialogHeader className="border-b px-6 pt-6 pb-4">
@@ -280,6 +286,16 @@ export function EndpointDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <ConfirmDiscardDialog
+      open={confirmClose}
+      onOpenChange={setConfirmClose}
+      onConfirm={() => {
+        setConfirmClose(false);
+        onOpenChange(false);
+      }}
+      description={t.notifChannels.discardChanges}
+    />
+    </>
   );
 }
 

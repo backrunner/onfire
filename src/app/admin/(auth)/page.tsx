@@ -10,10 +10,12 @@ import {
   Ticket as TicketIcon,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { useMe } from "@/lib/hooks/use-me";
+import { Role } from "@/lib/types";
 import { swrFetcher } from "@/lib/api/client";
 import type { DashboardResponse } from "@/lib/api/types";
 import type { Translations } from "@/locales/zh";
-import { cn } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,27 +29,44 @@ import {
 } from "@/components/ui/table";
 import { StatusBadge, PriorityBadge } from "@/components/admin/status-badges";
 
-function formatRelativeTime(
-  time: Translations["dashboard"]["time"],
-  iso: string
-): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const minutes = Math.floor(diffMs / 60_000);
-  if (minutes < 1) return time.justNow;
-  if (minutes < 60) return time.minutesAgo.replace("{{n}}", String(minutes));
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return time.hoursAgo.replace("{{n}}", String(hours));
-  return time.daysAgo.replace("{{n}}", String(Math.floor(hours / 24)));
-}
-
 export default function AdminDashboardPage() {
   const { t } = useI18n();
+  const { me } = useMe();
   const { data, error, isLoading, mutate } = useSWR<DashboardResponse>(
     "/api/tob/dashboard",
     swrFetcher
   );
 
   const stats = data?.stats;
+
+  // Product count is only meaningful to roles that manage products; team-scoped
+  // agents see their handled-ticket count instead (same scoped data source).
+  const productViewRole =
+    me?.role === Role.SuperAdmin ||
+    me?.role === Role.TenantAdmin ||
+    me?.role === Role.ProductAdmin;
+
+  const fourthCard = productViewRole
+    ? {
+        key: "products",
+        title: t.dashboard.stats.products,
+        hint: t.dashboard.stats.productsHint,
+        value: stats?.products ?? 0,
+        icon: Package,
+        iconClass: "text-sky-600 dark:text-sky-400",
+        iconBg: "bg-sky-500/10",
+        href: "/admin/management",
+      }
+    : {
+        key: "handled",
+        title: t.dashboard.stats.handled,
+        hint: t.dashboard.stats.handledHint,
+        value: stats?.handled ?? 0,
+        icon: TicketIcon,
+        iconClass: "text-emerald-600 dark:text-emerald-400",
+        iconBg: "bg-emerald-500/10",
+        href: "/admin/tickets?status=replied",
+      };
 
   const statCards = [
     {
@@ -80,16 +99,7 @@ export default function AdminDashboardPage() {
       iconBg: "bg-red-500/10",
       href: "/admin/tickets?overdue=true",
     },
-    {
-      key: "products",
-      title: t.dashboard.stats.products,
-      hint: t.dashboard.stats.productsHint,
-      value: stats?.products ?? 0,
-      icon: Package,
-      iconClass: "text-sky-600 dark:text-sky-400",
-      iconBg: "bg-sky-500/10",
-      href: "/admin/management",
-    },
+    fourthCard,
   ];
 
   if (error) {
@@ -227,7 +237,7 @@ export default function AdminDashboardPage() {
                       <PriorityBadge priority={ticket.priority} />
                     </TableCell>
                     <TableCell className="text-right text-xs text-muted-foreground">
-                      {formatRelativeTime(t.dashboard.time, ticket.createdAt)}
+                      {formatDateTime(ticket.createdAt)}
                     </TableCell>
                   </TableRow>
                 ))}

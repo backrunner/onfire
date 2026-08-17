@@ -23,6 +23,7 @@ import {
   toggleSet,
 } from "./policy-checkbox-grid";
 import { Button } from "@/components/ui/button";
+import { ConfirmDiscardDialog } from "@/components/admin/confirm-discard-dialog";
 import {
   Dialog,
   DialogContent,
@@ -119,9 +120,13 @@ export function RuleDialog({
         channels,
       });
 
+  const [confirmClose, setConfirmClose] = useState(false);
   const requestOpenChange = (next: boolean) => {
     if (pending) return;
-    if (!next && isDirty && !window.confirm(t.notifChannels.discardChanges)) return;
+    if (!next && isDirty) {
+      setConfirmClose(true);
+      return;
+    }
     onOpenChange(next);
   };
 
@@ -186,6 +191,7 @@ export function RuleDialog({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={requestOpenChange}>
       <DialogContent className="grid max-h-[90dvh] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-w-xl">
         <DialogHeader className="border-b px-6 pt-6 pb-4">
@@ -315,6 +321,16 @@ export function RuleDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <ConfirmDiscardDialog
+      open={confirmClose}
+      onOpenChange={setConfirmClose}
+      onConfirm={() => {
+        setConfirmClose(false);
+        onOpenChange(false);
+      }}
+      description={t.notifChannels.discardChanges}
+    />
+    </>
   );
 }
 

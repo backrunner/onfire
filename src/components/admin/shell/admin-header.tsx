@@ -89,13 +89,36 @@ export function AdminHeader({ onMobileMenu }: { onMobileMenu: () => void }) {
     .toUpperCase();
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border/70 bg-background/85 px-4 shadow-[0_1px_0_rgb(0_0_0/0.02)] backdrop-blur-xl">
+    <div className="sticky top-0 z-40">
+      {preview && (
+        <div className="flex items-center justify-center gap-2 bg-amber-400 px-4 py-1.5 text-amber-950 shadow-sm dark:bg-amber-500">
+          <Glasses className="size-3.5 shrink-0" />
+          <span className="truncate text-xs font-semibold">
+            {t.preview.active} · {preview.target.displayName} ·{" "}
+            {t.roles[preview.target.role] ?? preview.target.role}
+          </span>
+          <button
+            type="button"
+            className="shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold underline underline-offset-2 hover:bg-amber-950/10"
+            onClick={() => {
+              void stop().catch((error) =>
+                toast.error(
+                  error instanceof Error ? error.message : t.preview.stopFailed
+                )
+              );
+            }}
+          >
+            {t.preview.exit}
+          </button>
+        </div>
+      )}
+      <header className="flex h-14 items-center gap-3 border-b border-border/70 bg-background/85 px-4 shadow-[0_1px_0_rgb(0_0_0/0.02)] backdrop-blur-xl">
       <Button
         variant="ghost"
         size="icon"
         className="size-8 lg:hidden"
         onClick={onMobileMenu}
-        aria-label="Open menu"
+        aria-label={t.common.openMenu}
       >
         <Menu className="size-4" />
       </Button>
@@ -273,5 +296,6 @@ export function AdminHeader({ onMobileMenu }: { onMobileMenu: () => void }) {
       </div>
       <PreviewIdentityDialog open={previewOpen} onOpenChange={setPreviewOpen} />
     </header>
+    </div>
   );
 }

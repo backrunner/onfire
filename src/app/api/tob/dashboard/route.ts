@@ -17,11 +17,12 @@ export const GET = withAuth({ permission: "ticket.read" }, async (_req: NextRequ
       pending: sql<number>`COUNT(CASE WHEN ${tickets.status} IN ('new', 'processing') THEN 1 END)`,
       escalated: sql<number>`COUNT(CASE WHEN ${tickets.status} = 'escalated' THEN 1 END)`,
       overdue: sql<number>`COUNT(CASE WHEN ${activeSlaOverdueCondition(now)} THEN 1 END)`,
+      handled: sql<number>`COUNT(CASE WHEN ${tickets.status} IN ('replied', 'closed') THEN 1 END)`,
     })
     .from(tickets)
     .where(scope);
 
-  const stats = statsRow || { pending: 0, escalated: 0, overdue: 0 };
+  const stats = statsRow || { pending: 0, escalated: 0, overdue: 0, handled: 0 };
 
   const [productCountRow] = await ctx.db
     .select({ count: count() })
@@ -40,6 +41,7 @@ export const GET = withAuth({ permission: "ticket.read" }, async (_req: NextRequ
       pending: Number(stats.pending),
       escalated: Number(stats.escalated),
       overdue: Number(stats.overdue),
+      handled: Number(stats.handled),
       products: Number(productCountRow?.count || 0),
     },
     recentTickets,

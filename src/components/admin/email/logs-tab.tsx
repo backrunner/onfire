@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 import { api, swrFetcher, qs } from "@/lib/api/client";
 import type { Paginated } from "@/lib/api/types";
-import { cn } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -108,8 +108,8 @@ function LogsShell({
 }) {
   const { t } = useI18n();
   return (
-    <Card>
-      <CardContent className="pt-6">
+    <Card className="py-0">
+      <CardContent className="py-4">
         {error ? (
           <div className="flex flex-col items-center gap-3 py-10 text-center">
             <AlertTriangle className="size-8 text-red-600 dark:text-red-400" />
@@ -264,7 +264,7 @@ function InboundLogsTable({ productId }: { productId: string }) {
                   <LogStatusBadge status={log.processingStatus} />
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
-                  {new Date(log.createdAt).toLocaleString()}
+                  {formatDateTime(log.createdAt)}
                 </TableCell>
                 <ErrorToggleCell
                   hasError={Boolean(log.errorMessage || log.filterReason)}
@@ -363,7 +363,7 @@ function OutboundLogsTable({ productId }: { productId: string }) {
                   <LogStatusBadge status={log.status} />
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
-                  {new Date(log.createdAt).toLocaleString()}
+                  {formatDateTime(log.createdAt)}
                 </TableCell>
                 <ErrorToggleCell
                   hasError={Boolean(log.errorMessage)}

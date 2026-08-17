@@ -129,7 +129,7 @@ export function CredentialError({
                   {t.toc.errors.technicalDetails}
                 </AccordionTrigger>
                 <AccordionContent className="space-y-2 pb-0 text-xs">
-                  <p className="font-medium">Missing:</p>
+                  <p className="font-medium">{t.toc.errors.missing}</p>
                   <div className="font-mono">
                     <ul className="list-inside list-disc">
                       {missingFields.map((field) => (

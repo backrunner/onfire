@@ -1,11 +1,29 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useI18n } from "@/lib/i18n";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CredentialsTab } from "./credentials-tab";
-import { RoutingTab } from "./routing-tab";
-import { UsageTab } from "./usage-tab";
-import { KnowledgeTab } from "./knowledge-tab";
+
+// Inner tabs load lazily so opening the AI panel only compiles and renders the
+// active sub-tab.
+const tabFallback = () => <Skeleton className="h-64 w-full" />;
+const CredentialsTab = dynamic(
+  () => import("./credentials-tab").then((m) => m.CredentialsTab),
+  { loading: tabFallback }
+);
+const RoutingTab = dynamic(
+  () => import("./routing-tab").then((m) => m.RoutingTab),
+  { loading: tabFallback }
+);
+const UsageTab = dynamic(
+  () => import("./usage-tab").then((m) => m.UsageTab),
+  { loading: tabFallback }
+);
+const KnowledgeTab = dynamic(
+  () => import("./knowledge-tab").then((m) => m.KnowledgeTab),
+  { loading: tabFallback }
+);
 
 export function AiScopePanel({
   scope,

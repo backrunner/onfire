@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
 import { useMe } from "@/lib/hooks/use-me";
@@ -9,16 +10,56 @@ import type { Permission } from "@/lib/types";
 import { Role } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TenantManagement } from "./_components/tenant-management";
-import { ProductManagement } from "./_components/product-management";
-import { TeamManagement } from "./_components/team-management";
-import { UserManagement } from "./_components/user-management";
-import { AgentManagement } from "./_components/agent-management";
-import { TicketTypePresetManagement } from "./_components/ticket-type-preset-management";
-import { SpamFilterManagement } from "./_components/spam-filter-management";
-import { CredentialsTab } from "@/components/admin/ai/credentials-tab";
-import { RoutingTab } from "@/components/admin/ai/routing-tab";
-import { UsageTab } from "@/components/admin/ai/usage-tab";
+
+// Tab panels load lazily so dev compilation and initial render only cover the
+// active tab instead of the whole management module graph.
+const tabFallback = () => <Skeleton className="h-64 w-full" />;
+const TenantManagement = dynamic(
+  () => import("./_components/tenant-management").then((m) => m.TenantManagement),
+  { loading: tabFallback }
+);
+const ProductManagement = dynamic(
+  () => import("./_components/product-management").then((m) => m.ProductManagement),
+  { loading: tabFallback }
+);
+const TeamManagement = dynamic(
+  () => import("./_components/team-management").then((m) => m.TeamManagement),
+  { loading: tabFallback }
+);
+const UserManagement = dynamic(
+  () => import("./_components/user-management").then((m) => m.UserManagement),
+  { loading: tabFallback }
+);
+const AgentManagement = dynamic(
+  () => import("./_components/agent-management").then((m) => m.AgentManagement),
+  { loading: tabFallback }
+);
+const TicketTypePresetManagement = dynamic(
+  () =>
+    import("./_components/ticket-type-preset-management").then(
+      (m) => m.TicketTypePresetManagement
+    ),
+  { loading: tabFallback }
+);
+const SpamFilterManagement = dynamic(
+  () =>
+    import("./_components/spam-filter-management").then(
+      (m) => m.SpamFilterManagement
+    ),
+  { loading: tabFallback }
+);
+const CredentialsTab = dynamic(
+  () => import("@/components/admin/ai/credentials-tab").then((m) => m.CredentialsTab),
+  { loading: tabFallback }
+);
+const RoutingTab = dynamic(
+  () => import("@/components/admin/ai/routing-tab").then((m) => m.RoutingTab),
+  { loading: tabFallback }
+);
+const UsageTab = dynamic(
+  () => import("@/components/admin/ai/usage-tab").then((m) => m.UsageTab),
+  { loading: tabFallback }
+);
 
 type TabKey =
   | "tenants"

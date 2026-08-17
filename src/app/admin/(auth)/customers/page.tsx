@@ -6,6 +6,7 @@ import useSWR from "swr";
 import { AlertTriangle, ExternalLink, Search, Users } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { swrFetcher, qs } from "@/lib/api/client";
+import { formatDateTime } from "@/lib/utils";
 import type { CustomerView, Paginated } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -110,8 +111,8 @@ export default function AdminCustomersPage() {
         )}
       </div>
 
-      <Card>
-        <CardContent className="pt-6">
+      <Card className="py-0">
+        <CardContent className="py-4">
           {error ? (
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <AlertTriangle className="size-8 text-red-600 dark:text-red-400" />
@@ -177,7 +178,7 @@ export default function AdminCustomersPage() {
                           customer.productId}
                       </TableCell>
                       <TableCell className="text-right text-xs text-muted-foreground">
-                        {new Date(customer.createdAt).toLocaleDateString()}
+                        {formatDateTime(customer.createdAt)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -229,11 +230,11 @@ export default function AdminCustomersPage() {
                 <dt className="text-muted-foreground">
                   {t.customersPage.detail.createdAt}
                 </dt>
-                <dd>{new Date(selected.createdAt).toLocaleString()}</dd>
+                <dd>{formatDateTime(selected.createdAt)}</dd>
                 <dt className="text-muted-foreground">
                   {t.customersPage.detail.updatedAt}
                 </dt>
-                <dd>{new Date(selected.updatedAt).toLocaleString()}</dd>
+                <dd>{formatDateTime(selected.updatedAt)}</dd>
               </dl>
               <Button asChild size="sm" className="w-full">
                 <Link

@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { Archive, ArchiveRestore, Pencil, Plus } from "lucide-react";
+import { Archive, ArchiveRestore, FileText, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { api, swrFetcher } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
@@ -81,6 +82,7 @@ export function ticketTypePathLabel(type: TicketTypeAdminView, byId: Map<string,
 export function TicketTypeManagement({ productId }: { productId?: string }) {
   const { t } = useI18n();
   const m = t.management.ticketTypes;
+  const router = useRouter();
   const { data, error, isLoading, mutate } = useSWR<TicketTypeAdminView[]>(
     "/api/tob/admin/ticket-types",
     swrFetcher
@@ -230,6 +232,7 @@ export function TicketTypeManagement({ productId }: { productId?: string }) {
                   </TableCell>
                   <TableCell className="text-right">
                     <RowActions actions={[
+                      { label: m.manageTemplate, icon: FileText, onSelect: () => router.push(`/admin/management/products/${item.productId}/types/${item.id}`) },
                       { label: t.common.edit, icon: Pencil, onSelect: () => openEdit(item) },
                       item.archivedAt
                         ? { label: m.restore, icon: ArchiveRestore, onSelect: () => void setArchived(item, true) }

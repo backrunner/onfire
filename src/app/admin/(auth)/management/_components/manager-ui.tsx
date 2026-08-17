@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Inbox, MoreHorizontal, RefreshCw, Search } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { cn, formatDateTime as formatDateTimeBase } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -204,16 +204,10 @@ export function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error && err.message ? err.message : fallback;
 }
 
-/** Locale-agnostic compact date-time, "-" for missing values. */
+/** Locale-agnostic `YYYY-MM-DD HH:mm:ss`, "-" for missing values. */
 export function formatDateTime(value?: string | null): string {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDateTimeBase(date);
 }

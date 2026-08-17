@@ -5,14 +5,14 @@ import { Languages } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function LanguageToggle() {
-  const { language, setLanguage } = useI18n();
+  const { t, language, setLanguage } = useI18n();
   return (
     <Button
       variant="ghost"
       size="sm"
       className="h-8 gap-1.5 px-2 text-xs font-medium"
       onClick={() => setLanguage(language === "zh" ? "en" : "zh")}
-      aria-label="Switch language"
+      aria-label={t.common.switchLanguage}
     >
       <Languages className="size-4" />
       {language === "zh" ? "EN" : "中"}
