@@ -13,6 +13,7 @@ import {
 } from "@/drizzle/schema";
 import { TicketStatus, TicketPriority } from "@/lib/types";
 import { ok, err, badRequest, conflict } from "@/lib/api/response";
+import { localizedErr } from "@/lib/api/error-messages";
 import { withCustomerAuth, parseBody, parseQuery } from "@/lib/api/handler";
 import { computeInitialSlaDeadlines } from "@/lib/tickets/sla";
 import { serializeTicketForCustomer } from "@/lib/tickets/serialize";
@@ -114,13 +115,13 @@ export const POST = withCustomerAuth(async (req: NextRequest, { db, customer }) 
     req.headers.get("cf-connecting-ip")
   );
   if (!captcha.success) {
-    return err("CAPTCHA verification failed", 400, captcha.errorCodes);
+    return localizedErr(req, "CAPTCHA verification failed", 400, captcha.errorCodes);
   }
 
   const product = await db.query.products.findFirst({
     where: eq(products.id, customer.productId),
   });
-  if (!product) return err("Product not found", 404);
+  if (!product) return localizedErr(req, "Product not found", 404);
 
   const ticketType = await db.query.ticketTypes.findFirst({
     where: and(
@@ -157,7 +158,7 @@ export const POST = withCustomerAuth(async (req: NextRequest, { db, customer }) 
   const tenant = await db.query.tenants.findFirst({
     where: eq(tenants.id, product.tenantId),
   });
-  if (!tenant) return err("Tenant not found", 404);
+  if (!tenant) return localizedErr(req, "Tenant not found", 404);
 
   const teamId = await resolveTicketTypeTeam(db, typePath, tenant.defaultTeamId);
   if (!teamId) {

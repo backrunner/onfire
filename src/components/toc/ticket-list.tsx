@@ -5,7 +5,7 @@ import { ChevronRight, Inbox, Loader2, RefreshCw } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { tocApi, ApiClientError } from "@/lib/api/toc-client";
 import { qs } from "@/lib/api/client";
-import { formatRelativeTime, type TocTicket, type TocTicketPage } from "@/lib/toc/portal";
+import { formatDateTime, type TocTicket, type TocTicketPage } from "@/lib/toc/portal";
 import { TicketStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,7 @@ const initialState: ListState = {
 };
 
 export function TicketList({ onSelect }: TicketListProps) {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const [statusFilter, setStatusFilter] = useState<TicketStatus | "all">("all");
   const [state, setState] = useState<ListState>(initialState);
 
@@ -207,7 +207,7 @@ export function TicketList({ onSelect }: TicketListProps) {
                         <span className="font-mono">#{ticket.id.slice(-8)}</span>
                         <span className="mx-1.5">·</span>
                         {t.toc.list.updated}{" "}
-                        {formatRelativeTime(ticket.updatedAt, language)}
+                        {formatDateTime(ticket.updatedAt)}
                       </p>
                     </div>
                     <ChevronRight className="size-4 shrink-0 text-muted-foreground" />

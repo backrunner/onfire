@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tocPath } from "@/lib/toc-path";
+import { rewriteTocAttachmentUrls, tocPath } from "@/lib/toc-path";
 
 describe("ToC browser paths", () => {
   it("prefixes routes only when mounted below /support", () => {
@@ -11,5 +11,14 @@ describe("ToC browser paths", () => {
     );
     expect(tocPath("/", "/support")).toBe("/support");
     expect(tocPath("/api/toc/whoami", "/")).toBe("/api/toc/whoami");
+  });
+
+  it("rewrites attachment URLs in reply HTML only behind /support", () => {
+    const html =
+      '<p>hi</p><img src="/api/attachments/abc123" alt=""><img src="https://cdn.example.com/x.png">';
+    expect(rewriteTocAttachmentUrls(html, "/support/tickets/1")).toBe(
+      '<p>hi</p><img src="/support/api/attachments/abc123" alt=""><img src="https://cdn.example.com/x.png">'
+    );
+    expect(rewriteTocAttachmentUrls(html, "/tickets/1")).toBe(html);
   });
 });

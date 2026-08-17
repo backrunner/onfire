@@ -16,3 +16,20 @@ export function tocPath(path: string, pathname?: string): string {
   }
   return path === "/" ? TOC_PROXY_PREFIX : `${TOC_PROXY_PREFIX}${path}`;
 }
+
+/**
+ * Rewrite root-relative attachment URLs inside sanitized reply HTML so inline
+ * images resolve through the proxy prefix when the portal runs at /support.
+ * Sanitizer output always emits `src="/api/attachments/<id>"` (lowercase,
+ * double-quoted), so a plain replacement is safe.
+ */
+export function rewriteTocAttachmentUrls(
+  html: string,
+  pathname?: string
+): string {
+  if (!isTocProxyLocation(pathname)) return html;
+  return html.replaceAll(
+    'src="/api/attachments/',
+    `src="${TOC_PROXY_PREFIX}/api/attachments/`
+  );
+}

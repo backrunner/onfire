@@ -1,7 +1,7 @@
 import { TOC_PROXY_PREFIX } from "@/lib/toc-path";
 import type { Surface } from "@/lib/surface-routing";
 
-const ALLOWED_TOC_PREFIXES = ["/_next/", "/api/toc/", "/tickets/"];
+const ALLOWED_TOC_PREFIXES = ["/_next/", "/api/toc/", "/api/attachments/", "/tickets/"];
 const ALLOWED_TOC_PATHS = ["/", "/_next", "/api/toc", "/tickets", "/icon.svg", "/sw.js"];
 
 export function isTocProxyStaticAsset(pathname: string): boolean {

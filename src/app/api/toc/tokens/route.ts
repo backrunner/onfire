@@ -3,6 +3,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { productKeys, products } from "@/drizzle/schema";
 import { ok, err } from "@/lib/api/response";
+import { localizedErr } from "@/lib/api/error-messages";
 import { withPublic, parseBody } from "@/lib/api/handler";
 import { verifyProductApiKey } from "@/lib/auth/api-key";
 import { signCustomerToken } from "@/lib/auth/customer";
@@ -36,14 +37,14 @@ export const POST = withPublic(async (req: NextRequest, { db }) => {
 
   const key = await verifyProductApiKey(db, body.apiKey);
   if (!key) {
-    return err("Invalid or revoked API key", 401);
+    return localizedErr(req, "Invalid or revoked API key", 401);
   }
 
   const product = await db.query.products.findFirst({
     where: eq(products.id, key.productId),
   });
   if (!product) {
-    return err("Product not found", 404);
+    return localizedErr(req, "Product not found", 404);
   }
 
   await db

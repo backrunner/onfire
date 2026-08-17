@@ -57,6 +57,8 @@ export interface TocReply {
   id: string;
   ticketId: string;
   content: string;
+  /** Sanitized rich-text rendering, when the reply carries formatting. */
+  contentHtml?: string | null;
   fromAgent: boolean;
   createdAt: string;
 }
@@ -72,35 +74,10 @@ export interface TocCreateTicketResult {
   assigned: boolean;
 }
 
-/** Format an ISO timestamp as a localized relative time ("5 minutes ago"). */
-export function formatRelativeTime(iso: string, locale: string): string {
+/** Format an ISO timestamp as local `YYYY-MM-DD HH:mm:ss`. */
+export function formatDateTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-
-  const diffMs = date.getTime() - Date.now();
-  const abs = Math.abs(diffMs);
-  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
-
-  const MINUTE = 60_000;
-  const HOUR = 3_600_000;
-  const DAY = 86_400_000;
-
-  if (abs < MINUTE) return rtf.format(Math.round(diffMs / 1000), "second");
-  if (abs < HOUR) return rtf.format(Math.round(diffMs / MINUTE), "minute");
-  if (abs < DAY) return rtf.format(Math.round(diffMs / HOUR), "hour");
-  if (abs < 30 * DAY) return rtf.format(Math.round(diffMs / DAY), "day");
-  return date.toLocaleDateString(locale);
-}
-
-/** Format an ISO timestamp as a localized absolute date-time. */
-export function formatDateTime(iso: string, locale: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleString(locale, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }

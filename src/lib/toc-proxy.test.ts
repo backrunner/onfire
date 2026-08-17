@@ -21,6 +21,9 @@ describe("ToC /support proxy contract", () => {
     expect(stripTocProxyPrefix("/support/api/toc/whoami")).toBe(
       "/api/toc/whoami"
     );
+    expect(stripTocProxyPrefix("/support/api/attachments/abc123")).toBe(
+      "/api/attachments/abc123"
+    );
     expect(stripTocProxyPrefix("/support/_next/static/chunk.js")).toBe(
       "/_next/static/chunk.js"
     );

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { productIdentityConfigs, products } from "@/drizzle/schema";
 import { withPublic, parseBody } from "@/lib/api/handler";
 import { err, notFound, ok } from "@/lib/api/response";
+import { localizedErr } from "@/lib/api/error-messages";
 import { signCustomerToken } from "@/lib/auth/customer";
 import { upsertCustomerIdentity } from "@/lib/auth/customer-record";
 import {
@@ -79,7 +80,7 @@ export const POST = withPublic(async (req: NextRequest, { db }) => {
     return response;
   } catch (error) {
     if (error instanceof RemoteIdentityRejectedError) {
-      return err("Identity credential is invalid or expired", 401);
+      return localizedErr(req, "Identity credential is invalid or expired", 401);
     }
     console.error(
       JSON.stringify({
@@ -88,6 +89,6 @@ export const POST = withPublic(async (req: NextRequest, { db }) => {
         error: error instanceof Error ? error.message : "Unknown error",
       })
     );
-    return err("Identity provider is temporarily unavailable", 502);
+    return localizedErr(req, "Identity provider is temporarily unavailable", 502);
   }
 });

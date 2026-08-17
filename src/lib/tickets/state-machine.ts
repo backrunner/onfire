@@ -9,7 +9,8 @@ import { badRequest } from "@/lib/api/response";
  *                        └──── customer reply ────────┘
  *
  *   any open status ── escalate ──▶ escalated (then handled like processing)
- *   any open status ── close ──▶ closed (terminal)
+ *   any open status ── close ──▶ closed
+ *   closed ── reopen ──▶ processing (reply SLA restarts when assigned)
  */
 const TRANSITIONS: Record<TicketStatus, readonly TicketStatus[]> = {
   [TicketStatus.New]: [
@@ -32,7 +33,7 @@ const TRANSITIONS: Record<TicketStatus, readonly TicketStatus[]> = {
     TicketStatus.Replied,
     TicketStatus.Closed,
   ],
-  [TicketStatus.Closed]: [],
+  [TicketStatus.Closed]: [TicketStatus.Processing],
 };
 
 export const OPEN_STATUSES = [

@@ -19,9 +19,12 @@ import { isOpen } from "@/lib/tickets/state-machine";
 import { emitTicketEvent } from "@/services/ticket-events";
 import { parseFormSchema } from "@/lib/form-schema";
 import { serializeState } from "@/services/ticket-internal-states";
+import { sanitizeRichHtml, richHtmlToText, richTextIsEmpty } from "@/lib/rich-text";
 
 const replySchema = z.object({
-  content: z.string().min(1).max(20_000),
+  content: z.string().max(20_000).default(""),
+  /** Optional sanitized rich-text rendering of the reply. */
+  contentHtml: z.string().max(100_000).optional(),
   internal: z.boolean().default(false),
 });
 
@@ -148,6 +151,16 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
     throw badRequest("Cannot reply to a closed ticket");
   }
 
+  // Rich text is re-sanitized server-side; a payload that sanitizes to
+  // nothing is stored as plain text only.
+  const contentHtml = body.contentHtml
+    ? sanitizeRichHtml(body.contentHtml) || null
+    : null;
+  const content = body.content.trim() || (contentHtml ? richHtmlToText(contentHtml) : "");
+  if (!content && !(contentHtml && !richTextIsEmpty(contentHtml))) {
+    throw badRequest("Reply content is required");
+  }
+
   const now = new Date().toISOString();
   const replyId = crypto.randomUUID();
 
@@ -156,7 +169,8 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
       id: replyId,
       ticketId: ticket.id,
       senderId: ctx.user.id,
-      content: body.content,
+      content,
+      contentHtml,
       internal: body.internal,
       createdAt: now,
     }),
@@ -199,6 +213,6 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
 
   return ok({
     ticket: updated ? serializeTicket(updated) : null,
-    reply: { id: replyId, content: body.content, internal: body.internal, createdAt: now },
+    reply: { id: replyId, content, internal: body.internal, createdAt: now },
   });
 });

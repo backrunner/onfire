@@ -2,6 +2,7 @@
 
 import { MessageSquare } from "lucide-react";
 import { cn, formatDateTime } from "@/lib/utils";
+import { RichTextView } from "@/components/rich-text-view";
 import { useI18n } from "@/lib/i18n";
 import { TicketStatus, TicketPriority } from "@/lib/types";
 import type { TimelineEntry, ReplyView, HistoryView } from "@/lib/api/types";
@@ -80,14 +81,18 @@ function ReplyBubble({ reply }: { reply: ReplyView }) {
           )}
           <span>{formatDateTime(reply.createdAt)}</span>
         </div>
-        <p
-          className={cn(
-            "whitespace-pre-wrap break-words",
-            internal && "text-foreground"
-          )}
-        >
-          {reply.content}
-        </p>
+        {reply.contentHtml ? (
+          <RichTextView html={reply.contentHtml} />
+        ) : (
+          <p
+            className={cn(
+              "whitespace-pre-wrap break-words",
+              internal && "text-foreground"
+            )}
+          >
+            {reply.content}
+          </p>
+        )}
       </div>
     </div>
   );

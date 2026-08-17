@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Send, Sparkles, X } from "lucide-react";
 import { api, ApiClientError } from "@/lib/api/client";
@@ -9,7 +9,11 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+import {
+  RichTextEditor,
+  type RichTextEditorHandle,
+  type RichTextValue,
+} from "@/components/rich-text-editor";
 
 interface ReplyComposerProps {
   ticketId: string;
@@ -20,7 +24,7 @@ interface ReplyComposerProps {
   onSent: () => void;
 }
 
-/** Bottom composer: reply or internal note, submits on Cmd/Ctrl+Enter. */
+/** Bottom composer: rich-text reply or internal note, submits on Cmd/Ctrl+Enter. */
 export function ReplyComposer({
   ticketId,
   closed,
@@ -28,7 +32,12 @@ export function ReplyComposer({
   onSent,
 }: ReplyComposerProps) {
   const { t, language } = useI18n();
-  const [content, setContent] = useState("");
+  const editorRef = useRef<RichTextEditorHandle>(null);
+  const [draft, setDraft] = useState<RichTextValue>({
+    html: "",
+    text: "",
+    empty: true,
+  });
   const [internal, setInternal] = useState(false);
   const [sending, setSending] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(
@@ -39,14 +48,39 @@ export function ReplyComposer({
 
   // Closed tickets only accept internal notes (backend rule).
   const effectiveInternal = closed ? true : internal;
-  const canSend = content.trim().length > 0 && !sending;
+  const canSend = !draft.empty && !sending;
   const showSuggestion = Boolean(aiSuggestion) && !aiDismissed && !closed;
+
+  const uploadImage = async (file: File): Promise<string> => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`/api/tob/tickets/${ticketId}/attachments`, {
+      method: "POST",
+      body: form,
+      credentials: "include",
+    });
+    const json = (await res.json().catch(() => null)) as {
+      ok?: boolean;
+      data?: { url?: string };
+      error?: string;
+    } | null;
+    if (!res.ok || !json?.ok || !json.data?.url) {
+      throw new Error(
+        typeof json?.error === "string" ? json.error : t.tickets.editor.imageFailed
+      );
+    }
+    return json.data.url;
+  };
 
   const send = async () => {
     if (!canSend) return;
-    const body = { content: content.trim(), internal: effectiveInternal };
+    const body = {
+      content: draft.text.trim(),
+      contentHtml: draft.html,
+      internal: effectiveInternal,
+    };
     setSending(true);
-    setContent(""); // optimistic clear
+    editorRef.current?.clear(); // optimistic clear
     try {
       await api.post(`/api/tob/tickets/${ticketId}`, body);
       toast.success(
@@ -54,7 +88,7 @@ export function ReplyComposer({
       );
       onSent();
     } catch (err) {
-      setContent(body.content); // restore on failure
+      editorRef.current?.setContent(body.contentHtml); // restore on failure
       toast.error(err instanceof Error ? err.message : String(err));
     } finally {
       setSending(false);
@@ -105,7 +139,7 @@ export function ReplyComposer({
                 size="sm"
                 className="h-6 px-2 text-xs"
                 onClick={() => {
-                  setContent(aiSuggestion ?? "");
+                  editorRef.current?.setContent(aiSuggestion ?? "");
                   setAiDismissed(true);
                 }}
               >
@@ -128,39 +162,42 @@ export function ReplyComposer({
         </div>
       )}
 
-      <Textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        onKeyDown={(e) => {
-          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-            e.preventDefault();
-            void send();
-          }
-        }}
+      <RichTextEditor
+        ref={editorRef}
+        onChange={setDraft}
+        onSubmit={() => void send()}
+        onUploadImage={uploadImage}
         placeholder={
           effectiveInternal
             ? t.tickets.detail.internalNote
             : t.tickets.actions.replyPlaceholder
         }
-        rows={3}
         disabled={sending}
-        className="resize-none border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
       />
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Switch
-            id={`internal-${ticketId}`}
-            checked={effectiveInternal}
-            onCheckedChange={setInternal}
-            disabled={closed || sending}
-            className="scale-90"
-          />
-          <Label
-            htmlFor={`internal-${ticketId}`}
-            className="text-xs text-muted-foreground"
-          >
-            {t.tickets.detail.internalNote}
-          </Label>
+          {!closed && (
+            <>
+              <Switch
+                id={`internal-${ticketId}`}
+                checked={effectiveInternal}
+                onCheckedChange={setInternal}
+                disabled={sending}
+                className="scale-90"
+              />
+              <Label
+                htmlFor={`internal-${ticketId}`}
+                className="text-xs text-muted-foreground"
+              >
+                {t.tickets.detail.internalNote}
+              </Label>
+            </>
+          )}
+          {closed && (
+            <span className="text-xs text-muted-foreground">
+              {t.tickets.detail.internalNote}
+            </span>
+          )}
           {!closed && (
             <Button
               variant="ghost"
@@ -184,7 +221,7 @@ export function ReplyComposer({
           </span>
           <Button size="sm" className="h-8" onClick={send} disabled={!canSend}>
             <Send />
-            {t.tickets.actions.sendReply}
+            {effectiveInternal ? t.tickets.actions.sendNote : t.tickets.actions.sendReply}
           </Button>
         </div>
       </div>

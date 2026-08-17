@@ -3,7 +3,7 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
-import { UserPlus, ArrowUpRight, XCircle } from "lucide-react";
+import { UserPlus, ArrowUpRight, XCircle, RotateCcw } from "lucide-react";
 import { api, swrFetcher } from "@/lib/api/client";
 import type { TicketView, TeamView } from "@/lib/api/types";
 import { TicketStatus, TicketPriority } from "@/lib/types";
@@ -32,6 +32,8 @@ import { ALL_STATUSES, VALID_TRANSITIONS } from "./utils";
 
 interface TicketActionsProps {
   ticket: TicketView;
+  /** Whether the ticket has a public agent reply (required before "replied"). */
+  hasAgentReply?: boolean;
   /** Revalidate detail + list after a successful mutation. */
   onMutated: () => void;
 }
@@ -43,7 +45,7 @@ const PRIORITIES = [
 ] as const;
 
 /** Action toolbar for a single ticket, gated by the current user's permissions. */
-export function TicketActions({ ticket, onMutated }: TicketActionsProps) {
+export function TicketActions({ ticket, hasAgentReply = true, onMutated }: TicketActionsProps) {
   const { t } = useI18n();
   const { me, can } = useMe();
   const [assignOpen, setAssignOpen] = useState(false);
@@ -131,6 +133,24 @@ export function TicketActions({ ticket, onMutated }: TicketActionsProps) {
         </Button>
       )}
 
+      {can("ticket.close") && isClosed && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8"
+          disabled={busy}
+          onClick={() =>
+            void run(
+              () => api.post(`/api/tob/tickets/${ticket.id}/reopen`, {}),
+              t.tickets.actions.reopenSuccess
+            )
+          }
+        >
+          <RotateCcw />
+          {t.tickets.actions.reopen}
+        </Button>
+      )}
+
       {can("ticket.write") && (
         <>
           <Select
@@ -157,8 +177,11 @@ export function TicketActions({ ticket, onMutated }: TicketActionsProps) {
                   key={status}
                   value={status}
                   disabled={
-                    status !== ticket.status &&
-                    !VALID_TRANSITIONS[ticket.status].includes(status)
+                    (status !== ticket.status &&
+                      !VALID_TRANSITIONS[ticket.status].includes(status)) ||
+                    (status === TicketStatus.Replied &&
+                      ticket.status !== TicketStatus.Replied &&
+                      !hasAgentReply)
                   }
                 >
                   {t.tickets.status[status]}

@@ -135,7 +135,11 @@ describe("MCP ticket writes", () => {
     } as TicketRow);
     const context = {
       db: {
-        query: { tickets: { findFirst: findTicket } },
+        query: {
+          tickets: { findFirst: findTicket },
+          // The replied-transition guard looks up a public agent reply.
+          replies: { findFirst: vi.fn().mockResolvedValue({ id: "reply-1" }) },
+        },
         update: vi.fn(() => ({
           set: vi.fn(() => ({ where: vi.fn(() => ({})) })),
         })),

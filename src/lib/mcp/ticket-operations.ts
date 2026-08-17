@@ -41,6 +41,7 @@ import {
   assertTransition,
   isOpen,
 } from "@/lib/tickets/state-machine";
+import { assertPublicAgentReply } from "@/lib/tickets/agent-reply";
 import { Role, TicketPriority, TicketStatus } from "@/lib/types";
 import { chooseEscalationAssignee } from "@/services/allocation";
 import { emitTicketEvent } from "@/services/ticket-events";
@@ -354,6 +355,9 @@ export async function updateMcpTicketStatus(
   const ticket = await loadVisibleTicket(ctx, input.ticketId);
   assertManualStatusTarget(input.status);
   assertTransition(ticket.status, input.status);
+  if (input.status === TicketStatus.Replied) {
+    await assertPublicAgentReply(ctx.db, ticket.id);
+  }
 
   const now = new Date().toISOString();
   let product: typeof products.$inferSelect | undefined;

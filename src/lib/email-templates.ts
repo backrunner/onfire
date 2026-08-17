@@ -112,9 +112,18 @@ function escapeHtml(value: string): string {
 export function renderEmailTemplate(
   template: string,
   variables: EmailTemplateVariables,
-  options: { html: boolean }
+  options: {
+    html: boolean;
+    /**
+     * Pre-sanitized rich HTML values (see sanitizeRichHtml) injected verbatim
+     * for these keys in HTML mode instead of the escaped plain value.
+     */
+    trustedHtml?: Partial<Record<keyof EmailTemplateVariables, string>>;
+  }
 ): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => {
+    const trusted = options.trustedHtml?.[key as keyof EmailTemplateVariables];
+    if (options.html && trusted !== undefined) return trusted;
     const value = variables[key as keyof EmailTemplateVariables] ?? "";
     return options.html
       ? escapeHtml(value).replace(/\n/g, "<br>")

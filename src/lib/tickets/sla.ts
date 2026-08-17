@@ -92,10 +92,15 @@ export function statusTransitionSlaUpdate(
   if (
     product &&
     ticket.assigneeId &&
-    ticket.status === TicketStatus.New &&
+    (ticket.status === TicketStatus.New || ticket.status === TicketStatus.Closed) &&
     nextStatus === TicketStatus.Processing
   ) {
+    // Accept (new) and reopen (closed) both restart the reply SLA.
     return restartReplySla(product, ticket.priority, from);
+  }
+  // Reopening without an assignee must not resurrect a stale reply deadline.
+  if (ticket.status === TicketStatus.Closed && nextStatus === TicketStatus.Processing) {
+    return { slaReplyDeadline: null };
   }
   return {};
 }

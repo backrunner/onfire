@@ -63,6 +63,7 @@ export function serializeReplyForCustomer(row: ReplyRow) {
     id: row.id,
     ticketId: row.ticketId,
     content: row.content,
+    contentHtml: row.contentHtml,
     fromAgent: Boolean(row.senderId),
     createdAt: row.createdAt,
   };

@@ -10,6 +10,7 @@ import {
   assertManualStatusTarget,
   canTransition,
 } from "@/lib/tickets/state-machine";
+import { ticketIdsWithAgentReply } from "@/lib/tickets/agent-reply";
 import { statusTransitionSlaUpdate } from "@/lib/tickets/sla";
 
 const bulkStatusSchema = z.object({
@@ -48,6 +49,11 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
     }
   }
 
+  const agentReplyTicketIds =
+    body.status === TicketStatus.Replied
+      ? await ticketIdsWithAgentReply(ctx.db, rows.map((ticket) => ticket.id))
+      : null;
+
   for (const ticket of rows) {
     if (ticket.status === body.status) {
       results.push({ id: ticket.id, success: false, error: "Status unchanged" });
@@ -58,6 +64,14 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
         id: ticket.id,
         success: false,
         error: `Invalid transition: ${ticket.status} → ${body.status}`,
+      });
+      continue;
+    }
+    if (agentReplyTicketIds && !agentReplyTicketIds.has(ticket.id)) {
+      results.push({
+        id: ticket.id,
+        success: false,
+        error: "Cannot mark as replied before a public agent reply exists",
       });
       continue;
     }

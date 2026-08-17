@@ -196,7 +196,14 @@ export function TicketDetail({
           onMutated={refresh}
         />
 
-        <TicketActions ticket={ticket} onMutated={refresh} />
+        <TicketActions
+          ticket={ticket}
+          hasAgentReply={timeline.some(
+            (entry) =>
+              entry.type === "reply" && Boolean(entry.senderId) && !entry.internal
+          )}
+          onMutated={refresh}
+        />
       </div>
 
       {/* Scrollable conversation */}

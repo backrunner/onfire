@@ -63,6 +63,8 @@ export interface ReplyView {
   /** Resolved display name for agent replies. */
   senderName?: string | null;
   content: string;
+  /** Sanitized rich-text rendering, when the reply carries formatting. */
+  contentHtml?: string | null;
   internal: boolean | null;
   source: "web" | "email" | null;
   createdAt: string;
@@ -186,6 +188,8 @@ export interface DashboardResponse {
     pending: number;
     escalated: number;
     overdue: number;
+    /** Scoped tickets in replied/closed status (shown to team-scoped roles). */
+    handled: number;
     products: number;
   };
   recentTickets: Array<{

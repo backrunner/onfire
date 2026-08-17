@@ -30,9 +30,9 @@ describe("ticket state machine", () => {
     expect(canTransition(TicketStatus.Escalated, TicketStatus.Escalated)).toBe(false);
   });
 
-  it("closed is terminal", () => {
+  it("closed reopens only to processing", () => {
+    expect(canTransition(TicketStatus.Closed, TicketStatus.Processing)).toBe(true);
     expect(canTransition(TicketStatus.Closed, TicketStatus.New)).toBe(false);
-    expect(canTransition(TicketStatus.Closed, TicketStatus.Processing)).toBe(false);
     expect(canTransition(TicketStatus.Closed, TicketStatus.Replied)).toBe(false);
     expect(canTransition(TicketStatus.Closed, TicketStatus.Escalated)).toBe(false);
     expect(isOpen(TicketStatus.Closed)).toBe(false);
@@ -44,7 +44,7 @@ describe("ticket state machine", () => {
 
   it("assertTransition throws ApiError(400) on invalid transitions", () => {
     expect(() =>
-      assertTransition(TicketStatus.Closed, TicketStatus.Processing)
+      assertTransition(TicketStatus.Closed, TicketStatus.Replied)
     ).toThrowError(ApiError);
     expect(() =>
       assertTransition(TicketStatus.New, TicketStatus.New)

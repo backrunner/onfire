@@ -115,6 +115,34 @@ describe("computeSlaDeadlines", () => {
       ),
     ).toEqual({ slaReplyDeadline: null });
   });
+
+  it("restarts the reply SLA on reopen for assigned tickets, clears it otherwise", () => {
+    const closed = {
+      status: TicketStatus.Closed,
+      priority: TicketPriority.High,
+    };
+    expect(
+      statusTransitionSlaUpdate(
+        { ...closed, assigneeId: "agent-1" },
+        TicketStatus.Processing,
+        product(),
+        from,
+      ),
+    ).toEqual({
+      slaReplyDeadline: "2026-01-01T01:00:00.000Z",
+      slaReplyBreached: false,
+      slaReplyWarned: false,
+    });
+    // Unassigned reopen clears a stale deadline instead of resurrecting it.
+    expect(
+      statusTransitionSlaUpdate(
+        { ...closed, assigneeId: null },
+        TicketStatus.Processing,
+        product(),
+        from,
+      ),
+    ).toEqual({ slaReplyDeadline: null });
+  });
 });
 
 describe("slaViewOf", () => {

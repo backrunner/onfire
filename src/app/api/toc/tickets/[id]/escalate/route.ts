@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { tickets, history, products } from "@/drizzle/schema";
 import { TicketStatus } from "@/lib/types";
 import { ok, err, badRequest } from "@/lib/api/response";
+import { localizedErr } from "@/lib/api/error-messages";
 import { withCustomerAuth, parseBody } from "@/lib/api/handler";
 import { loadCustomerTicket } from "@/lib/tickets/customer-access";
 import { chooseEscalationAssignee } from "@/services/allocation";
@@ -46,7 +47,7 @@ export const POST = withCustomerAuth(async (req: NextRequest, ctx) => {
     req.headers.get("cf-connecting-ip")
   );
   if (!captcha.success) {
-    return err("CAPTCHA verification failed", 400, captcha.errorCodes);
+    return localizedErr(req, "CAPTCHA verification failed", 400, captcha.errorCodes);
   }
 
   const newAssignee = await chooseEscalationAssignee(

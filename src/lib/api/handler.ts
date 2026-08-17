@@ -23,6 +23,11 @@ import {
   verifyPreviewCookie,
 } from "@/lib/preview-identity";
 import { ApiError, err } from "./response";
+import {
+  localizeApiErrorMessage,
+  localizedErr,
+  requestLanguage,
+} from "./error-messages";
 import { readBodyBytes } from "@/lib/request-body";
 import {
   authenticateCustomer,
@@ -158,12 +163,21 @@ function attachClearedPreviewCookie(response: NextResponse, req: NextRequest) {
   );
 }
 
-function toResponse(error: unknown, route: string): NextResponse {
+function toResponse(
+  error: unknown,
+  route: string,
+  req?: NextRequest
+): NextResponse {
+  const lang = req ? requestLanguage(req) : "en";
   if (error instanceof ApiError) {
-    return err(error.message, error.status, error.details);
+    return err(
+      localizeApiErrorMessage(error.message, lang),
+      error.status,
+      error.details
+    );
   }
   console.error(`API error in ${route}:`, error);
-  return err("Internal server error", 500);
+  return err(localizeApiErrorMessage("Internal server error", lang), 500);
 }
 
 /**
@@ -184,17 +198,17 @@ export function withAuth(
     try {
       const auth = getAuth();
       const session = await auth.api.getSession({ headers: req.headers });
-      if (!session?.user) return err("Unauthorized", 401);
+      if (!session?.user) return localizedErr(req, "Unauthorized", 401);
 
       const db = getDb();
       const params = route?.params ? await route.params : {};
       const actor = await resolveAuthedContext(db, session.user.id, params);
-      if (!actor) return err("User profile not found", 404);
+      if (!actor) return localizedErr(req, "User profile not found", 404);
 
       const pathname = new URL(req.url).pathname;
       if (isPreviewControlPath(pathname)) {
         if (options.permission && !hasPermission(actor.role, options.permission)) {
-          return err("Forbidden", 403);
+          return localizedErr(req, "Forbidden", 403);
         }
         return await handler(req, actor);
       }
@@ -206,20 +220,18 @@ export function withAuth(
         isWriteMethod(req.method) &&
         !isPreviewControlPath(pathname)
       ) {
-        return err(PREVIEW_READONLY_MESSAGE, 403, {
-          code: PREVIEW_READONLY_CODE,
-        });
+        return localizedErr(req, PREVIEW_READONLY_MESSAGE, 403, { code: PREVIEW_READONLY_CODE });
       }
 
       if (options.permission && !hasPermission(ctx.role, options.permission)) {
-        return err("Forbidden", 403);
+        return localizedErr(req, "Forbidden", 403);
       }
 
       const response = await handler(req, ctx);
       if (previewed.clearCookie) attachClearedPreviewCookie(response, req);
       return response;
     } catch (error) {
-      return toResponse(error, new URL(req.url).pathname);
+      return toResponse(error, new URL(req.url).pathname, req);
     }
   };
 }
@@ -236,7 +248,7 @@ export function withCustomerAuth(
   ): Promise<NextResponse> => {
     try {
       const token = await authenticateCustomer(req);
-      if (!token) return err("Unauthorized", 401);
+      if (!token) return localizedErr(req, "Unauthorized", 401);
       const db = getDb();
       const [record, product] = await Promise.all([
         db.query.customers.findFirst({
@@ -253,7 +265,7 @@ export function withCustomerAuth(
         record.tenantId !== token.tenantId ||
         product.tenantId !== token.tenantId
       ) {
-        return err("Unauthorized", 401);
+        return localizedErr(req, "Unauthorized", 401);
       }
       const customer = {
         ...token,
@@ -264,7 +276,7 @@ export function withCustomerAuth(
       const params = route?.params ? await route.params : {};
       return await handler(req, { db, customer, params });
     } catch (error) {
-      return toResponse(error, new URL(req.url).pathname);
+      return toResponse(error, new URL(req.url).pathname, req);
     }
   };
 }
@@ -286,7 +298,7 @@ export function withPublic(
       const params = route?.params ? await route.params : {};
       return await handler(req, { db: getDb(), params });
     } catch (error) {
-      return toResponse(error, new URL(req.url).pathname);
+      return toResponse(error, new URL(req.url).pathname, req);
     }
   };
 }

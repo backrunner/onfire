@@ -41,6 +41,29 @@ interface OutboundLinks {
   replyId?: string;
 }
 
+/**
+ * Email clients load images without credentials, so relative attachment URLs
+ * in rich reply HTML are absolutized against the public ToC origin.
+ */
+function publicTocOrigin(): string {
+  const raw = (getEnv().TOC_DOMAINS as string | undefined) ?? "";
+  const first = raw
+    .split(",")
+    .map((domain) => domain.trim())
+    .filter(Boolean)[0];
+  if (!first || first === "localhost" || first.startsWith("127.")) {
+    return "http://localhost:3000";
+  }
+  return `https://${first}`;
+}
+
+function absolutizeAttachmentUrls(html: string): string {
+  return html.replaceAll(
+    'src="/api/attachments/',
+    `src="${publicTocOrigin()}/api/attachments/`
+  );
+}
+
 export type SendEmailResult = {
   success: boolean;
   messageId?: string;
@@ -190,6 +213,7 @@ export async function sendTicketNotification(
 
   // Get reply content if applicable
   let replyContent = "";
+  let replyContentHtml = "";
   let agentName = "";
   if (replyId) {
     const reply = await db.query.replies.findFirst({
@@ -197,6 +221,7 @@ export async function sendTicketNotification(
     });
     if (reply) {
       replyContent = reply.content;
+      replyContentHtml = reply.contentHtml ?? "";
       if (reply.senderId) {
         const profile = await db.query.agentProfiles.findFirst({
           where: eq(agentProfiles.userId, reply.senderId),
@@ -233,7 +258,14 @@ export async function sendTicketNotification(
   const bodyHtml = renderEmailTemplate(
     sanitizeEmailTemplateHtml(bodyTemplate),
     variables,
-    { html: true }
+    {
+      html: true,
+      // Stored reply HTML is already sanitized (sanitizeRichHtml); inject it
+      // verbatim so rich agent replies keep their formatting in emails.
+      trustedHtml: replyContentHtml
+        ? { reply_content: absolutizeAttachmentUrls(replyContentHtml) }
+        : undefined,
+    }
   );
   const previousMessages = await db
     .select({ providerMessageId: outboundEmails.providerMessageId })

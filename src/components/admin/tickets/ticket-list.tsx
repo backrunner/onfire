@@ -3,7 +3,7 @@
 import { ChevronLeft, ChevronRight, Inbox } from "lucide-react";
 import type { Paginated, TicketView } from "@/lib/api/types";
 import { useI18n } from "@/lib/i18n";
-import { cn, formatRelativeTime } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -133,7 +133,7 @@ export function TicketList({
                       )}
                     />
                     <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
-                      {formatRelativeTime(ticket.updatedAt)}
+                      {formatDateTime(ticket.updatedAt)}
                     </span>
                   </div>
                   <p className="mt-1 truncate text-sm font-medium">

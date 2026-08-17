@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { Database } from "@/lib/db";
+import { sanitizeRichHtml } from "@/lib/rich-text";
 import {
   emailConfigs,
   history,
@@ -77,6 +78,8 @@ export interface ProcessResult {
 interface StoredEmailContext {
   row: InboundEmailRow;
   content: string;
+  /** Sanitized rich-text rendering of the HTML part, when present. */
+  contentHtml: string | null;
   product: typeof products.$inferSelect;
   tenant: typeof tenants.$inferSelect;
 }
@@ -221,6 +224,7 @@ async function addEmailReply(
       ticketId: ticket.id,
       senderEmail: context.row.fromEmail,
       content: context.content,
+      contentHtml: context.contentHtml,
       source: "email",
       sourceEmailId: context.row.id,
       createdAt: now,
@@ -394,7 +398,10 @@ async function loadStoredContext(db: Database, row: InboundEmailRow): Promise<St
   const tenant = await db.query.tenants.findFirst({ where: eq(tenants.id, product.tenantId) });
   if (!tenant) throw new Error("Tenant not found");
   const content = row.bodyPlain?.trim() || stripHtml(row.bodyHtml || "");
-  return { row, content, product, tenant };
+  // Sanitized HTML preserves customer formatting and hosted inline images;
+  // cid: attachment images are filtered out by the sanitizer.
+  const contentHtml = row.bodyHtml ? sanitizeRichHtml(row.bodyHtml) || null : null;
+  return { row, content, contentHtml, product, tenant };
 }
 
 export async function processInboundEmail(

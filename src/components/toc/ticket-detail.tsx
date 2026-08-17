@@ -12,12 +12,19 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { tocApi, ApiClientError } from "@/lib/api/toc-client";
+import { notifyTocSessionExpired, readTocCredentials } from "@/lib/toc-session";
+import { rewriteTocAttachmentUrls, tocPath } from "@/lib/toc-path";
 import {
   formatDateTime,
-  formatRelativeTime,
   type TocReply,
   type TocTicket,
 } from "@/lib/toc/portal";
+import { RichTextView } from "@/components/rich-text-view";
+import {
+  RichTextEditor,
+  type RichTextEditorHandle,
+  type RichTextValue,
+} from "@/components/rich-text-editor";
 import { TicketStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -52,13 +59,13 @@ interface TicketDetailProps {
 interface Message {
   id: string;
   content: string;
+  contentHtml?: string | null;
   fromAgent: boolean;
   createdAt: string;
 }
 
-function MessageBubble({ message, language, agentLabel, youLabel }: {
+function MessageBubble({ message, agentLabel, youLabel }: {
   message: Message;
-  language: string;
   agentLabel: string;
   youLabel: string;
 }) {
@@ -80,19 +87,24 @@ function MessageBubble({ message, language, agentLabel, youLabel }: {
           )}
         >
           <span className="font-medium">{fromAgent ? agentLabel : youLabel}</span>
-          <time dateTime={message.createdAt} title={formatDateTime(message.createdAt, language)}>
-            {formatRelativeTime(message.createdAt, language)}
+          <time dateTime={message.createdAt}>
+            {formatDateTime(message.createdAt)}
           </time>
         </div>
         <div
           className={cn(
-            "rounded-2xl px-3.5 py-2.5 text-sm whitespace-pre-wrap break-words transition-colors",
+            "rounded-2xl px-3.5 py-2.5 text-sm break-words transition-colors",
             fromAgent
               ? "rounded-tl-sm bg-muted text-foreground"
-              : "rounded-tr-sm bg-primary text-primary-foreground"
+              : "rounded-tr-sm bg-primary text-primary-foreground",
+            !message.contentHtml && "whitespace-pre-wrap"
           )}
         >
-          {message.content}
+          {message.contentHtml ? (
+            <RichTextView html={rewriteTocAttachmentUrls(message.contentHtml)} />
+          ) : (
+            message.content
+          )}
         </div>
       </div>
     </div>
@@ -100,10 +112,15 @@ function MessageBubble({ message, language, agentLabel, youLabel }: {
 }
 
 export function TicketDetail({ ticket, replies, onBack, onRefresh }: TicketDetailProps) {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
 
   // Reply composer
-  const [replyContent, setReplyContent] = useState("");
+  const editorRef = useRef<RichTextEditorHandle>(null);
+  const [draft, setDraft] = useState<RichTextValue>({
+    html: "",
+    text: "",
+    empty: true,
+  });
   const [sending, setSending] = useState(false);
   const [replyError, setReplyError] = useState("");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -132,13 +149,43 @@ export function TicketDetail({ ticket, replies, onBack, onRefresh }: TicketDetai
     ...replies.map((reply) => ({
       id: reply.id,
       content: reply.content,
+      contentHtml: reply.contentHtml,
       fromAgent: reply.fromAgent,
       createdAt: reply.createdAt,
     })),
   ];
 
+  const uploadImage = async (file: File): Promise<string> => {
+    const form = new FormData();
+    form.append("file", file);
+    const token = readTocCredentials()?.token;
+    const res = await fetch(
+      tocPath(`/api/toc/tickets/${ticket.id}/attachments`),
+      {
+        method: "POST",
+        body: form,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }
+    );
+    if (res.status === 401) {
+      notifyTocSessionExpired();
+      throw new ApiClientError("Session expired", 401);
+    }
+    const json = (await res.json().catch(() => null)) as {
+      ok?: boolean;
+      data?: { url?: string };
+      error?: string;
+    } | null;
+    if (!res.ok || !json?.ok || !json.data?.url) {
+      throw new Error(
+        typeof json?.error === "string" ? json.error : t.tickets.editor.imageFailed
+      );
+    }
+    return json.data.url;
+  };
+
   const sendDisabled =
-    sending || !replyContent.trim() || (turnstileEnabled && !turnstileToken);
+    sending || draft.empty || (turnstileEnabled && !turnstileToken);
 
   const handleReply = async () => {
     if (sendDisabled) return;
@@ -148,11 +195,12 @@ export function TicketDetail({ ticket, replies, onBack, onRefresh }: TicketDetai
       const result = await tocApi.post<{ status: TicketStatus }>(
         `/api/toc/tickets/${ticket.id}/reply`,
         {
-          content: replyContent.trim(),
+          content: draft.text.trim(),
+          contentHtml: draft.html,
           turnstileToken: turnstileToken ?? undefined,
         }
       );
-      setReplyContent("");
+      editorRef.current?.clear();
       if (
         ticket.status === TicketStatus.Replied &&
         result.status === TicketStatus.Processing
@@ -239,11 +287,8 @@ export function TicketDetail({ ticket, replies, onBack, onRefresh }: TicketDetai
             <span className="font-mono">#{ticket.id.slice(-8)}</span>
             <span className="mx-1.5">·</span>
             {t.toc.detail.created}{" "}
-            <time
-              dateTime={ticket.createdAt}
-              title={formatDateTime(ticket.createdAt, language)}
-            >
-              {formatRelativeTime(ticket.createdAt, language)}
+            <time dateTime={ticket.createdAt}>
+              {formatDateTime(ticket.createdAt)}
             </time>
           </p>
         </CardContent>
@@ -260,7 +305,6 @@ export function TicketDetail({ ticket, replies, onBack, onRefresh }: TicketDetai
               <MessageBubble
                 key={message.id}
                 message={message}
-                language={language}
                 agentLabel={t.toc.detail.support}
                 youLabel={t.toc.detail.you}
               />
@@ -277,19 +321,16 @@ export function TicketDetail({ ticket, replies, onBack, onRefresh }: TicketDetai
             </div>
           ) : (
             <div className="space-y-3">
-              <Textarea
-                value={replyContent}
-                onChange={(e) => setReplyContent(e.target.value)}
-                onKeyDown={(e) => {
-                  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                    e.preventDefault();
-                    void handleReply();
-                  }
-                }}
-                placeholder={t.toc.detail.replyPlaceholder}
-                className="min-h-24"
-                disabled={sending}
-              />
+              <div className="rounded-md border border-border px-1 py-1">
+                <RichTextEditor
+                  ref={editorRef}
+                  onChange={setDraft}
+                  onSubmit={() => void handleReply()}
+                  onUploadImage={uploadImage}
+                  placeholder={t.toc.detail.replyPlaceholder}
+                  disabled={sending}
+                />
+              </div>
               <TurnstileWidget widgetRef={turnstileRef} onToken={setTurnstileToken} />
               {replyError && (
                 <p className="text-sm text-destructive">{replyError}</p>

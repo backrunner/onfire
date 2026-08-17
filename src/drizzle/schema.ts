@@ -799,6 +799,8 @@ export const replies = sqliteTable(
     senderId: text("sender_id"),
     senderEmail: text("sender_email"),
     content: text("content").notNull(),
+    // Sanitized rich-text rendering of the reply, when available.
+    contentHtml: text("content_html"),
     internal: integer("internal", { mode: "boolean" }).default(false),
     // Email-related fields
     source: text("source").$type<"web" | "email">().default("web"),
@@ -807,6 +809,22 @@ export const replies = sqliteTable(
     createdAt: text("created_at").notNull(),
   },
   (t) => [index("replies_ticket_idx").on(t.ticketId)],
+);
+
+// Inline reply images. The id doubles as the unguessable public key used by
+// the /api/attachments/[id] serving route; blobs live in R2 under the same id.
+export const attachments = sqliteTable(
+  "attachments",
+  {
+    id: text("id").primaryKey(),
+    ticketId: text("ticket_id").notNull(),
+    replyId: text("reply_id"),
+    fileName: text("file_name").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [index("attachments_ticket_idx").on(t.ticketId)],
 );
 
 export const history = sqliteTable(
