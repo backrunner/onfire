@@ -11,6 +11,7 @@ import { swrFetcher } from "@/lib/api/client";
 import { useMe } from "@/lib/hooks/use-me";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ManagementPanelSkeleton } from "@/components/admin/loading-skeletons";
 import {
   ticketTypePathLabel,
   type TicketTypeAdminView,
@@ -23,8 +24,23 @@ const TicketTemplateVersionManagement = dynamic(
     import("../../../../_components/ticket-template-version-management").then(
       (m) => m.TicketTemplateVersionManagement
     ),
-  { loading: () => <Skeleton className="h-64 w-full" /> }
+  { loading: () => <ManagementPanelSkeleton columns={5} /> }
 );
+
+function TicketTypePageSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3">
+        <Skeleton className="size-9 shrink-0" />
+        <div className="space-y-2">
+          <Skeleton className="h-6 w-52" />
+          <Skeleton className="h-4 w-40" />
+        </div>
+      </div>
+      <ManagementPanelSkeleton columns={5} />
+    </div>
+  );
+}
 
 export default function TicketTypeTemplatePage() {
   const { t } = useI18n();
@@ -40,7 +56,7 @@ export default function TicketTypeTemplatePage() {
   );
   const type = types?.find((item) => item.id === typeId);
 
-  if (isLoading || meLoading) return <Skeleton className="h-80 w-full" />;
+  if (isLoading || meLoading) return <TicketTypePageSkeleton />;
   if (!type || type.productId !== productId || !can("ticket_template.read")) {
     return (
       <p className="py-12 text-center text-sm text-muted-foreground">

@@ -41,7 +41,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
+import { EmailSettingsSkeleton } from "./email-loading-skeletons";
 import { Switch } from "@/components/ui/switch";
 import type {
   AiFilterStrictness,
@@ -279,13 +279,7 @@ export function EmailSettingsTab({
   }
 
   if (isLoading) {
-    return (
-      <div className="space-y-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-48 w-full rounded-xl" />
-        ))}
-      </div>
-    );
+    return <EmailSettingsSkeleton />;
   }
 
   return (

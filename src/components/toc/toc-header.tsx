@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useTheme } from "@/components/ui/theme-provider";
 import { Flame, Languages, Moon, Sun, UserRound } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -86,12 +87,23 @@ export function TocHeader({ productName, customerEmail, loading }: TocHeaderProp
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          {customerEmail && (
-            <span className="mr-1 hidden max-w-48 items-center gap-1.5 truncate rounded-full border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground sm:inline-flex">
-              <UserRound className="size-3 shrink-0" />
-              <span className="truncate">{customerEmail}</span>
-            </span>
-          )}
+          <div
+            className={cn(
+              "mr-1 hidden w-40 items-center gap-1.5 truncate rounded-full border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground sm:inline-flex",
+              !loading && !customerEmail && "invisible",
+            )}
+          >
+            {loading ? (
+              <Skeleton className="h-3 w-28" />
+            ) : customerEmail ? (
+              <>
+                <UserRound className="size-3 shrink-0" />
+                <span className="truncate">{customerEmail}</span>
+              </>
+            ) : (
+              <span className="h-3 w-28" aria-hidden="true" />
+            )}
+          </div>
           <LanguageToggle label={t.toc.header.switchLanguage} />
           <ThemeToggle label={t.toc.header.toggleTheme} />
         </div>

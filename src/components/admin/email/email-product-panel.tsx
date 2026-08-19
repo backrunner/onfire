@@ -3,24 +3,27 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { useI18n } from "@/lib/i18n";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  EmailLogsSkeleton,
+  EmailSettingsSkeleton,
+  EmailTemplatesSkeleton,
+} from "./email-loading-skeletons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmDiscardDialog } from "@/components/admin/confirm-discard-dialog";
 
 // Inner tabs load lazily so opening the email panel only compiles and renders
 // the active sub-tab (templates pulls in the Monaco chain).
-const tabFallback = () => <Skeleton className="h-64 w-full" />;
 const EmailSettingsTab = dynamic(
   () => import("./settings-tab").then((m) => m.EmailSettingsTab),
-  { loading: tabFallback }
+  { loading: () => <EmailSettingsSkeleton /> }
 );
 const EmailTemplatesTab = dynamic(
   () => import("./templates-tab").then((m) => m.EmailTemplatesTab),
-  { loading: tabFallback }
+  { loading: () => <EmailTemplatesSkeleton /> }
 );
 const EmailLogsTab = dynamic(
   () => import("./logs-tab").then((m) => m.EmailLogsTab),
-  { loading: tabFallback }
+  { loading: () => <EmailLogsSkeleton /> }
 );
 
 export function EmailProductPanel({

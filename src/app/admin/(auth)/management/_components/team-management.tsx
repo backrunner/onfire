@@ -203,7 +203,7 @@ export function TeamManagement({
         }
       >
         {isLoading ? (
-          <TableSkeleton />
+          <TableSkeleton columns={canSeeMembers ? 4 : 3} />
         ) : error ? (
           <ErrorState onRetry={() => void mutate()} />
         ) : !teams || teams.length === 0 ? (

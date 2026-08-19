@@ -147,15 +147,7 @@ export default function AdminLoginPage() {
   if (checkingInstall) {
     return (
       <AuthShell>
-        <Card className="w-full max-w-sm border-border/60 shadow-sm">
-          <CardContent className="space-y-4 p-6">
-            <Skeleton className="mx-auto h-10 w-10 rounded-lg" />
-            <Skeleton className="mx-auto h-5 w-40" />
-            <Skeleton className="h-9 w-full" />
-            <Skeleton className="h-9 w-full" />
-            <Skeleton className="h-9 w-full" />
-          </CardContent>
-        </Card>
+        <AuthLoadingSkeleton />
       </AuthShell>
     );
   }
@@ -312,6 +304,39 @@ export default function AdminLoginPage() {
         </p>
       </div>
     </AuthShell>
+  );
+}
+
+function AuthLoadingSkeleton() {
+  return (
+    <div className="w-full max-w-sm space-y-6" aria-hidden="true">
+      <div className="flex flex-col items-center gap-2 text-center">
+        <Skeleton className="size-11 rounded-xl" />
+        <div className="space-y-2">
+          <Skeleton className="mx-auto h-5 w-40" />
+          <Skeleton className="mx-auto h-4 w-56 max-w-full" />
+        </div>
+      </div>
+      <Card className="border-border/60 shadow-sm">
+        <CardContent className="space-y-4 p-6">
+          <Skeleton className="h-9 w-full" />
+          <div className="space-y-4">
+            {Array.from({ length: 2 }).map((_, index) => (
+              <div key={index} className="space-y-1.5">
+                <div className="flex h-5 items-center">
+                  <Skeleton
+                    className={index === 0 ? "h-3.5 w-12" : "h-3.5 w-16"}
+                  />
+                </div>
+                <Skeleton className="h-9 w-full" />
+              </div>
+            ))}
+            <Skeleton className="h-9 w-full" />
+          </div>
+        </CardContent>
+      </Card>
+      <Skeleton className="mx-auto h-3 w-48" />
+    </div>
   );
 }
 

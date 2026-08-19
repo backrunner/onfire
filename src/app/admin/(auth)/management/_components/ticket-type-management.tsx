@@ -199,7 +199,7 @@ export function TicketTypeManagement({ productId }: { productId?: string }) {
           </Button>
         }
       >
-        {isLoading ? <TableSkeleton /> : error ? (
+        {isLoading ? <TableSkeleton columns={productId ? 4 : 5} /> : error ? (
           <ErrorState onRetry={() => void mutate()} />
         ) : visible.length === 0 ? (
           <EmptyState message={m.empty} />

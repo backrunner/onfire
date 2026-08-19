@@ -150,7 +150,10 @@ export default function AdminAccountPage() {
               <>
                 <Skeleton className="size-12 rounded-full" />
                 <div className="space-y-1.5">
-                  <Skeleton className="h-4 w-32" />
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
                   <Skeleton className="h-3 w-44" />
                 </div>
               </>
@@ -224,9 +227,19 @@ export default function AdminAccountPage() {
           </CardHeader>
           <CardContent className="px-4 pb-4">
             {endpointsLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-14 w-full" />
-                <Skeleton className="h-14 w-full" />
+              <div className="divide-y rounded-md border">
+                {Array.from({ length: 2 }).map((_, index) => (
+                  <div key={index} className="flex items-center gap-3 px-3 py-2.5">
+                    <Skeleton className="size-8 shrink-0 rounded-md" />
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <Skeleton className="h-4 w-32 max-w-[70%]" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                    <Skeleton className="size-8 shrink-0 rounded-md" />
+                    <Skeleton className="size-8 shrink-0 rounded-md" />
+                    <Skeleton className="size-8 shrink-0 rounded-md" />
+                  </div>
+                ))}
               </div>
             ) : endpointsError && !endpoints ? (
               <div className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-md border border-dashed px-4 text-center">

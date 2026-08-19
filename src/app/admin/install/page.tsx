@@ -95,15 +95,7 @@ export default function AdminInstallPage() {
   if (loading) {
     return (
       <AuthShell>
-        <Card className="w-full max-w-lg border-border/60 shadow-sm">
-          <CardContent className="space-y-4 p-6">
-            <Skeleton className="mx-auto h-10 w-10 rounded-lg" />
-            <Skeleton className="mx-auto h-5 w-48" />
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-9 w-full" />
-            ))}
-          </CardContent>
-        </Card>
+        <InstallLoadingSkeleton />
       </AuthShell>
     );
   }
@@ -241,6 +233,80 @@ export default function AdminInstallPage() {
         </Card>
       </div>
     </AuthShell>
+  );
+}
+
+function InstallLoadingSkeleton() {
+  return (
+    <div className="w-full max-w-lg space-y-6 py-8" aria-hidden="true">
+      <div className="flex flex-col items-center gap-2 text-center">
+        <Skeleton className="size-11 rounded-xl" />
+        <Skeleton className="h-5 w-48" />
+        <Skeleton className="h-4 w-64 max-w-full" />
+      </div>
+      <Card className="border-border/60 shadow-sm">
+        <CardContent className="p-6">
+          <div className="space-y-6">
+            <section className="space-y-4">
+              <SkeletonLine className="w-32" />
+              <InstallFieldSkeleton labelWidth="w-20" />
+              <InstallFieldSkeleton labelWidth="w-24" hint />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <InstallFieldSkeleton labelWidth="w-16" />
+                <InstallFieldSkeleton labelWidth="w-24" />
+              </div>
+              <div className="grid gap-1 rounded-md border border-border/60 bg-muted/30 p-3 sm:grid-cols-2">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div key={index} className="flex h-4 items-center gap-2">
+                    <Skeleton className="size-3.5 shrink-0 rounded-full" />
+                    <Skeleton
+                      className={index === 4 ? "h-3 w-24" : "h-3 w-28"}
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <div className="h-px bg-border" />
+
+            <section className="space-y-4">
+              <SkeletonLine className="w-24" />
+              <InstallFieldSkeleton labelWidth="w-20" hint />
+            </section>
+
+            <Skeleton className="h-9 w-full" />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function InstallFieldSkeleton({
+  labelWidth,
+  hint = false,
+}: {
+  labelWidth: string;
+  hint?: boolean;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <SkeletonLine className={labelWidth} />
+      <Skeleton className="h-9 w-full" />
+      {hint && (
+        <div className="flex h-4 items-center">
+          <Skeleton className="h-3 w-40 max-w-full" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SkeletonLine({ className }: { className: string }) {
+  return (
+    <div className="flex h-5 items-center">
+      <Skeleton className={`h-3.5 ${className}`} />
+    </div>
   );
 }
 

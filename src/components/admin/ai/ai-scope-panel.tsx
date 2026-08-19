@@ -2,27 +2,35 @@
 
 import dynamic from "next/dynamic";
 import { useI18n } from "@/lib/i18n";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AiCredentialsSkeleton,
+  AiKnowledgeSkeleton,
+  AiRoutingSkeleton,
+  AiUsageSkeleton,
+} from "./ai-loading-skeletons";
 
 // Inner tabs load lazily so opening the AI panel only compiles and renders the
 // active sub-tab.
-const tabFallback = () => <Skeleton className="h-64 w-full" />;
 const CredentialsTab = dynamic(
   () => import("./credentials-tab").then((m) => m.CredentialsTab),
-  { loading: tabFallback }
+  { loading: () => <AiCredentialsSkeleton /> }
 );
 const RoutingTab = dynamic(
   () => import("./routing-tab").then((m) => m.RoutingTab),
-  { loading: tabFallback }
+  { loading: () => <AiRoutingSkeleton /> }
 );
-const UsageTab = dynamic(
+const SystemUsageTab = dynamic(
   () => import("./usage-tab").then((m) => m.UsageTab),
-  { loading: tabFallback }
+  { loading: () => <AiUsageSkeleton scope="system" /> }
+);
+const ScopedUsageTab = dynamic(
+  () => import("./usage-tab").then((m) => m.UsageTab),
+  { loading: () => <AiUsageSkeleton scope="tenant" /> }
 );
 const KnowledgeTab = dynamic(
   () => import("./knowledge-tab").then((m) => m.KnowledgeTab),
-  { loading: tabFallback }
+  { loading: () => <AiKnowledgeSkeleton /> }
 );
 
 export function AiScopePanel({
@@ -37,6 +45,7 @@ export function AiScopePanel({
   includeKnowledge?: boolean;
 }) {
   const { t } = useI18n();
+  const UsageTab = scope === "system" ? SystemUsageTab : ScopedUsageTab;
   return (
     <Tabs defaultValue="credentials">
       <TabsList>

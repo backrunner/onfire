@@ -295,7 +295,7 @@ export function TicketDetail({ ticket, replies, onBack, onRefresh }: TicketDetai
       </Card>
 
       {/* Conversation */}
-      <Card className="py-4">
+      <Card className="min-h-[32rem] py-4">
         <CardContent className="space-y-4 px-4">
           <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
             {t.toc.detail.conversation}

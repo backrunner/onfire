@@ -124,11 +124,28 @@ export default function AdminCustomersPage() {
               </Button>
             </div>
           ) : isLoading && !data ? (
-            <div className="space-y-2">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <Skeleton key={i} className="h-9 w-full" />
-              ))}
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead><Skeleton className="h-3 w-28" /></TableHead>
+                  <TableHead><Skeleton className="h-3 w-24" /></TableHead>
+                  <TableHead className="w-20"><Skeleton className="h-3 w-12" /></TableHead>
+                  <TableHead><Skeleton className="h-3 w-20" /></TableHead>
+                  <TableHead className="w-36 text-right"><Skeleton className="ml-auto h-3 w-24" /></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-40 max-w-full" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-28 max-w-full" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-8" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-24 max-w-full" /></TableCell>
+                    <TableCell><Skeleton className="ml-auto h-3 w-28 max-w-full" /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           ) : !data || data.items.length === 0 ? (
             <div className="flex flex-col items-center gap-1.5 py-12 text-center">
               <Users className="size-8 text-muted-foreground/40" />

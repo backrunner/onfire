@@ -159,7 +159,7 @@ export function TenantManagement() {
         }
       >
         {isLoading ? (
-          <TableSkeleton />
+          <TableSkeleton columns={3} />
         ) : error ? (
           <ErrorState onRetry={() => void mutate()} />
         ) : !tenants || tenants.length === 0 ? (

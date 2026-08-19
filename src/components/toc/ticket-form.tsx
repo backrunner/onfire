@@ -88,6 +88,21 @@ function expandableTypeIds(nodes: TocTicketTypeNode[]): Set<string> {
   return ids;
 }
 
+function FormFieldsSkeleton() {
+  return (
+    <div aria-hidden="true" className="space-y-5">
+      <div className="space-y-2">
+        <Skeleton className="h-3.5 w-28" />
+        <Skeleton className="h-9 w-full" />
+      </div>
+      <div className="space-y-2">
+        <Skeleton className="h-3.5 w-36" />
+        <Skeleton className="h-20 w-full" />
+      </div>
+    </div>
+  );
+}
+
 function TicketTypeTree({
   nodes,
   selectedId,
@@ -217,13 +232,20 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
     setTypesError(false);
     try {
       const data = await tocApi.get<TocTicketTypeNode[]>("/api/toc/ticket-types");
-      setTicketTypes(data);
-      setExpandedTypeIds(expandableTypeIds(data));
       const selectable = flattenSelectableTypes(data);
       if (selectable.length === 1) {
         setSelectedTypeId(selectable[0].id);
-        await loadTypeForm(selectable[0].id);
+        try {
+          await loadTypeForm(selectable[0].id);
+        } catch (error) {
+          setTicketTypes(data);
+          setExpandedTypeIds(expandableTypeIds(data));
+          setFormError(error instanceof Error ? error.message : t.toc.errors.loadFailed);
+          return;
+        }
       }
+      setTicketTypes(data);
+      setExpandedTypeIds(expandableTypeIds(data));
     } catch (error) {
       if (error instanceof ApiClientError && error.status === 401) return;
       setTypesError(true);
@@ -431,18 +453,35 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
 
   if (ticketTypes === null) {
     return (
-      <Card>
+      <Card aria-hidden="true">
         <CardHeader>
-          <Skeleton className="h-5 w-36" />
-          <Skeleton className="h-4 w-64" />
+          <Skeleton className="h-4 w-36" />
+          <Skeleton className="h-10 w-64 sm:h-5" />
         </CardHeader>
         <CardContent className="space-y-5">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="space-y-2">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-9 w-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-3.5 w-24" />
+            <div className="space-y-1 rounded-md border p-1">
+              <div className="flex h-9 items-center gap-2 px-2">
+                <Skeleton className="size-4 shrink-0" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
             </div>
-          ))}
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-3.5 w-20" />
+            <Skeleton className="h-9 w-full" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-3.5 w-24" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-3.5 w-16" />
+            <Skeleton className="h-9 w-full" />
+          </div>
+          <FormFieldsSkeleton />
+          {turnstileEnabled && <Skeleton className="h-[65px] w-full" />}
           <Skeleton className="h-9 w-full" />
         </CardContent>
       </Card>
@@ -481,8 +520,6 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
             <p className="text-sm text-muted-foreground">{t.toc.submit.noTicketTypes}</p>
           )}
         </div>
-
-        {formLoading && <Skeleton className="h-20 w-full" />}
 
         <div className="space-y-2">
           <Label>
@@ -529,15 +566,18 @@ export function TicketForm({ onSuccess }: TicketFormProps) {
           </Select>
         </div>
 
-        {visibleFields.map((field) => (
-          <DynamicFormField
-            key={field.id ?? field.key}
-            field={field}
-            value={customFields[field.key] ?? ""}
-            onChange={(value) => setFieldValue(field.key, value)}
-            error={fieldErrors[field.key]}
-          />
-        ))}
+        {formLoading && <FormFieldsSkeleton />}
+
+        {!formLoading &&
+          visibleFields.map((field) => (
+            <DynamicFormField
+              key={field.id ?? field.key}
+              field={field}
+              value={customFields[field.key] ?? ""}
+              onChange={(value) => setFieldValue(field.key, value)}
+              error={fieldErrors[field.key]}
+            />
+          ))}
 
         <TurnstileWidget widgetRef={turnstileRef} onToken={setTurnstileToken} />
 

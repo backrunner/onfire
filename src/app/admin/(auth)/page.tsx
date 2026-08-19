@@ -19,6 +19,7 @@ import { cn, formatDateTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TableSkeleton } from "@/components/admin/loading-skeletons";
 import {
   Table,
   TableBody,
@@ -125,29 +126,49 @@ export default function AdminDashboardPage() {
     <div className="space-y-6">
       <PageHeading t={t} />
 
-      {/* SLA alert banner */}
-      {!isLoading && (stats?.overdue ?? 0) > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
-          <AlertTriangle className="size-4 shrink-0 text-red-600 dark:text-red-400" />
-          <p className="flex-1 text-sm text-red-700 dark:text-red-400">
-            {t.dashboard.slaAlert.replace(
-              "{{count}}",
-              String(stats?.overdue ?? 0)
-            )}
-          </p>
-          <Button asChild size="sm" variant="outline" className="h-8">
-            <Link href="/admin/tickets?overdue=true">
-              {t.dashboard.slaAlertCta}
-            </Link>
-          </Button>
-        </div>
-      )}
+      {/* Keep this slot stable because the overdue count arrives client-side. */}
+      <div className="min-h-[66px] sm:min-h-[58px]">
+        {isLoading ? (
+          <div
+            className="flex min-h-[66px] flex-wrap items-center gap-3 rounded-lg border px-4 py-3 sm:min-h-[58px]"
+            aria-hidden="true"
+          >
+            <Skeleton className="size-4 shrink-0 rounded-full" />
+            <Skeleton className="h-4 min-w-40 flex-1" />
+            <Skeleton className="h-8 w-28" />
+          </div>
+        ) : (stats?.overdue ?? 0) > 0 ? (
+          <div className="flex min-h-[66px] flex-wrap items-center gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 sm:min-h-[58px]">
+            <AlertTriangle className="size-4 shrink-0 text-red-600 dark:text-red-400" />
+            <p className="flex-1 text-sm text-red-700 dark:text-red-400">
+              {t.dashboard.slaAlert.replace(
+                "{{count}}",
+                String(stats?.overdue ?? 0)
+              )}
+            </p>
+            <Button asChild size="sm" variant="outline" className="h-8">
+              <Link href="/admin/tickets?overdue=true">
+                {t.dashboard.slaAlertCta}
+              </Link>
+            </Button>
+          </div>
+        ) : null}
+      </div>
 
       {/* Stat cards */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {isLoading
           ? Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-28 w-full rounded-xl" />
+              <Card key={i} aria-hidden="true">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="size-8 rounded-md" />
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Skeleton className="h-8 w-12" />
+                  <Skeleton className="h-3 w-28 max-w-full" />
+                </CardContent>
+              </Card>
             ))
           : statCards.map((stat) => (
               <Link key={stat.key} href={stat.href} className="group">
@@ -190,11 +211,12 @@ export default function AdminDashboardPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-9 w-full" />
-              ))}
-            </div>
+            <TableSkeleton
+              rows={5}
+              columns={4}
+              rowClassName="h-10"
+              columnWidths={["", "w-28", "w-24", "w-28"]}
+            />
           ) : !data || data.recentTickets.length === 0 ? (
             <div className="flex flex-col items-center gap-1.5 py-10 text-center">
               <TicketIcon className="size-8 text-muted-foreground/40" />

@@ -13,45 +13,57 @@ import type { Permission } from "@/lib/types";
 import { useMe } from "@/lib/hooks/use-me";
 import { canViewTenantConfiguration } from "@/lib/staff-access";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ConfigurationPageSkeleton,
+  ManagementFormSkeleton,
+  ManagementPanelSkeleton,
+  TabsPanelSkeleton,
+} from "@/components/admin/loading-skeletons";
+import { AiScopePanelSkeleton } from "@/components/admin/ai/ai-loading-skeletons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Tab panels load lazily so dev compilation and initial render only cover the
 // active tab instead of the whole tenant configuration module graph.
-const tabFallback = () => <Skeleton className="h-64 w-full" />;
 const TicketTypePresetManagement = dynamic(
   () =>
     import("../../_components/ticket-type-preset-management").then(
       (m) => m.TicketTypePresetManagement
     ),
-  { loading: tabFallback }
+  {
+    loading: () => (
+      <ManagementPanelSkeleton
+        columns={3}
+        columnWidths={["", "hidden sm:table-cell", "w-12"]}
+      />
+    ),
+  }
 );
 const SpamFilterManagement = dynamic(
   () =>
     import("../../_components/spam-filter-management").then(
       (m) => m.SpamFilterManagement
     ),
-  { loading: tabFallback }
+  { loading: () => <ManagementFormSkeleton fields={4} /> }
 );
 const ProductManagement = dynamic(
   () => import("../../_components/product-management").then((m) => m.ProductManagement),
-  { loading: tabFallback }
+  { loading: () => <ManagementPanelSkeleton columns={4} /> }
 );
 const UserManagement = dynamic(
   () => import("../../_components/user-management").then((m) => m.UserManagement),
-  { loading: tabFallback }
+  { loading: () => <ManagementPanelSkeleton columns={6} /> }
 );
 const TeamManagement = dynamic(
   () => import("../../_components/team-management").then((m) => m.TeamManagement),
-  { loading: tabFallback }
+  { loading: () => <ManagementPanelSkeleton columns={4} /> }
 );
 const AgentManagement = dynamic(
   () => import("../../_components/agent-management").then((m) => m.AgentManagement),
-  { loading: tabFallback }
+  { loading: () => <ManagementPanelSkeleton columns={5} /> }
 );
 const AiScopePanel = dynamic(
   () => import("@/components/admin/ai/ai-scope-panel").then((m) => m.AiScopePanel),
-  { loading: tabFallback }
+  { loading: () => <AiScopePanelSkeleton /> }
 );
 
 interface Tenant {
@@ -168,7 +180,7 @@ export default function TenantConfigurationPage() {
   const tenant = tenants?.find((item) => item.id === id);
   const allowed = me ? canViewTenantConfiguration(me, id) : false;
 
-  if (isLoading || meLoading) return <Skeleton className="h-80 w-full" />;
+  if (isLoading || meLoading) return <ConfigurationPageSkeleton tabs={7} />;
   if (!tenant || !allowed) {
     return (
       <p className="py-12 text-center text-sm text-muted-foreground">
@@ -196,7 +208,7 @@ export default function TenantConfigurationPage() {
           </p>
         </div>
       </div>
-      <Suspense fallback={<Skeleton className="h-80 w-full" />}>
+      <Suspense fallback={<TabsPanelSkeleton tabs={7} />}>
         <TenantConfigurationTabs tenantId={id} />
       </Suspense>
     </div>

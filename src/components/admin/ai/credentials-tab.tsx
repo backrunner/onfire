@@ -35,7 +35,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Skeleton } from "@/components/ui/skeleton";
+import { AiCredentialsSkeleton } from "./ai-loading-skeletons";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -226,12 +226,7 @@ export function CredentialsTab({
   };
 
   if (isLoading) {
-    return (
-      <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <Skeleton className="h-[520px] rounded-lg" />
-        <Skeleton className="h-[520px] rounded-lg" />
-      </div>
-    );
+    return <AiCredentialsSkeleton />;
   }
 
   if (error) {

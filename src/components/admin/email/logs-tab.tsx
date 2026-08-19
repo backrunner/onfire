@@ -10,7 +10,7 @@ import type { Paginated } from "@/lib/api/types";
 import { cn, formatDateTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { TableSkeleton } from "@/components/admin/loading-skeletons";
 import {
   Table,
   TableBody,
@@ -97,12 +97,14 @@ function LogsShell({
   error,
   isLoading,
   isEmpty,
+  columns,
   onRetry,
   children,
 }: {
   error: unknown;
   isLoading: boolean;
   isEmpty: boolean;
+  columns: number;
   onRetry: () => void;
   children: React.ReactNode;
 }) {
@@ -121,11 +123,7 @@ function LogsShell({
             </Button>
           </div>
         ) : isLoading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-9 w-full" />
-            ))}
-          </div>
+          <TableSkeleton rows={6} columns={columns} rowClassName="h-10" />
         ) : isEmpty ? (
           <div className="flex flex-col items-center gap-1.5 py-10 text-center">
             <Inbox className="size-8 text-muted-foreground/40" />
@@ -238,6 +236,7 @@ function InboundLogsTable({ productId }: { productId: string }) {
       error={error}
       isLoading={isLoading && !data}
       isEmpty={!data || data.items.length === 0}
+      columns={5}
       onRetry={() => mutate()}
     >
       <Table>
@@ -331,6 +330,7 @@ function OutboundLogsTable({ productId }: { productId: string }) {
       error={error}
       isLoading={isLoading && !data}
       isEmpty={!data || data.items.length === 0}
+      columns={6}
       onRetry={() => mutate()}
     >
       <Table>

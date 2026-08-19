@@ -160,7 +160,16 @@ export function TicketTypePresetManagement({ tenantId }: { tenantId?: string }) 
           {canWrite && <Button size="sm" className="h-8" onClick={openCreate}><Plus className="mr-1.5 size-3.5" />{m.create}</Button>}
         </>
       }>
-        {isLoading ? <TableSkeleton /> : error ? <ErrorState onRetry={() => void mutate()} /> : visible.length === 0 ? <EmptyState message={m.empty} /> : (
+        {isLoading ? <TableSkeleton
+          columns={canManageTenants && !tenantId ? (canWrite ? 4 : 3) : canWrite ? 3 : 2}
+          columnWidths={canManageTenants && !tenantId
+            ? canWrite
+              ? ["", "hidden md:table-cell", "hidden sm:table-cell", "w-12"]
+              : ["", "hidden md:table-cell", "hidden sm:table-cell"]
+            : canWrite
+              ? ["", "hidden sm:table-cell", "w-12"]
+              : ["", "hidden sm:table-cell"]}
+        /> : error ? <ErrorState onRetry={() => void mutate()} /> : visible.length === 0 ? <EmptyState message={m.empty} /> : (
           <Table>
             <TableHeader><TableRow><TableHead>{m.path}</TableHead>{canManageTenants && !tenantId && <TableHead className="hidden md:table-cell">{m.tenant}</TableHead>}<TableHead className="hidden sm:table-cell">{m.status}</TableHead>{canWrite && <TableHead className="w-12" />}</TableRow></TableHeader>
             <TableBody>{visible.map(({ item, path }) => (

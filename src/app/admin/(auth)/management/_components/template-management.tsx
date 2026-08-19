@@ -218,7 +218,7 @@ export function TemplateManagement() {
         }
       >
         {isLoading ? (
-          <TableSkeleton />
+          <TableSkeleton columns={5} />
         ) : error ? (
           <ErrorState onRetry={() => void mutate()} />
         ) : filtered.length === 0 ? (

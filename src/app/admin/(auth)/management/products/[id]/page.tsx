@@ -12,67 +12,81 @@ import type { ProductView } from "@/lib/api/types";
 import { useMe } from "@/lib/hooks/use-me";
 import type { Permission } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ConfigurationPageSkeleton,
+  ManagementPanelSkeleton,
+  TabsPanelSkeleton,
+} from "@/components/admin/loading-skeletons";
+import { AiScopePanelSkeleton } from "@/components/admin/ai/ai-loading-skeletons";
+import { EmailProductPanelSkeleton } from "@/components/admin/email/email-loading-skeletons";
+import { NotificationProductPanelSkeleton } from "@/components/admin/notifications/notification-loading-skeletons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmDiscardDialog } from "@/components/admin/confirm-discard-dialog";
 
 // Tab panels load lazily so dev compilation and initial render only cover the
 // active tab instead of the whole product configuration module graph (which
 // includes the email, notification, and AI chains).
-const tabFallback = () => <Skeleton className="h-64 w-full" />;
 const AiScopePanel = dynamic(
   () => import("@/components/admin/ai/ai-scope-panel").then((m) => m.AiScopePanel),
-  { loading: tabFallback }
+  { loading: () => <AiScopePanelSkeleton includeKnowledge /> }
 );
 const EmailProductPanel = dynamic(
   () =>
     import("@/components/admin/email/email-product-panel").then(
       (m) => m.EmailProductPanel
     ),
-  { loading: tabFallback }
+  { loading: () => <EmailProductPanelSkeleton /> }
 );
 const NotificationProductPanel = dynamic(
   () =>
     import("@/components/admin/notifications/notification-product-panel").then(
       (m) => m.NotificationProductPanel
     ),
-  { loading: tabFallback }
+  { loading: () => <NotificationProductPanelSkeleton /> }
 );
 const TicketTypeManagement = dynamic(
   () =>
     import("../../_components/ticket-type-management").then(
       (m) => m.TicketTypeManagement
     ),
-  { loading: tabFallback }
+  { loading: () => <ManagementPanelSkeleton columns={4} /> }
 );
 const TicketTypeRouteManagement = dynamic(
   () =>
     import("../../_components/ticket-type-route-management").then(
       (m) => m.TicketTypeRouteManagement
     ),
-  { loading: tabFallback }
+  { loading: () => <ManagementPanelSkeleton columns={4} /> }
 );
 const TicketInternalStateManagement = dynamic(
   () =>
     import("../../_components/ticket-internal-state-management").then(
       (m) => m.TicketInternalStateManagement
     ),
-  { loading: tabFallback }
+  {
+    loading: () => (
+      <ManagementPanelSkeleton
+        columns={5}
+        controls={1}
+        columnWidths={["", "", "hidden md:table-cell", "hidden md:table-cell", "w-12"]}
+      />
+    ),
+  }
 );
 const ProductKeyManagement = dynamic(
   () =>
     import("../../_components/product-key-management").then(
       (m) => m.ProductKeyManagement
     ),
-  { loading: tabFallback }
+  { loading: () => <ManagementPanelSkeleton columns={5} /> }
 );
 const TeamManagement = dynamic(
   () => import("../../_components/team-management").then((m) => m.TeamManagement),
-  { loading: tabFallback }
+  { loading: () => <ManagementPanelSkeleton columns={4} /> }
 );
 const AgentManagement = dynamic(
   () => import("../../_components/agent-management").then((m) => m.AgentManagement),
-  { loading: tabFallback }
+  { loading: () => <ManagementPanelSkeleton columns={5} /> }
 );
 
 type ProductTab =
@@ -215,7 +229,7 @@ export default function ProductConfigurationPage() {
   );
   const product = products?.find((item) => item.id === id);
 
-  if (isLoading || meLoading) return <Skeleton className="h-80 w-full" />;
+  if (isLoading || meLoading) return <ConfigurationPageSkeleton tabs={9} />;
   if (!product) {
     return (
       <p className="py-12 text-center text-sm text-muted-foreground">
@@ -248,7 +262,7 @@ export default function ProductConfigurationPage() {
           <p className="text-sm text-muted-foreground">{t.management.productConfiguration}</p>
         </div>
       </div>
-      <Suspense fallback={<Skeleton className="h-80 w-full" />}>
+      <Suspense fallback={<TabsPanelSkeleton tabs={9} />}>
         <ProductConfigurationTabs productId={id} tenantId={product.tenantId} />
       </Suspense>
     </div>

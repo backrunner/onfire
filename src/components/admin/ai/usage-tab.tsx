@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { aiScopeQuery } from "./scope";
+import { AiUsageSkeleton } from "./ai-loading-skeletons";
 
 interface DailyRow {
   day: string;
@@ -106,6 +107,10 @@ export function UsageTab({
     }
   };
 
+  if (isLoading || settings.isLoading) {
+    return <AiUsageSkeleton scope={scope} />;
+  }
+
   return (
     <div className="space-y-4">
       <Card className="gap-0 py-0">
@@ -157,9 +162,7 @@ export function UsageTab({
           </CardDescription>
         </CardHeader>
         <CardContent className="px-5 pb-4">
-          {isLoading ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">{t.common.loading}</p>
-          ) : error ? (
+          {error ? (
             <p className="py-8 text-center text-sm text-muted-foreground">{u.loadFailed}</p>
           ) : (
             <>

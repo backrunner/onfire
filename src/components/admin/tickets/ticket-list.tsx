@@ -44,10 +44,36 @@ export function TicketList({
 
   if (isLoading && !data) {
     return (
-      <div className="space-y-2 p-3">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <Skeleton key={i} className="h-16 w-full" />
-        ))}
+      <div className="flex h-full min-h-0 flex-col" aria-hidden="true">
+        <div className="flex h-[29px] shrink-0 items-center gap-2 border-b border-border px-3">
+          <Skeleton className="size-4 shrink-0" />
+          <Skeleton className="h-3 w-16" />
+        </div>
+        <div className="min-h-0 flex-1 overflow-hidden px-3">
+          <div className="divide-y divide-border">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex min-h-[81px] items-start gap-2 px-0.5 py-2">
+                <Skeleton className="mt-0.5 size-4 shrink-0" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <Skeleton className="h-5 w-16" />
+                    <Skeleton className="h-5 w-14" />
+                    <Skeleton className="ml-auto h-3 w-16" />
+                  </div>
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="flex h-10 shrink-0 items-center justify-between border-t border-border px-3">
+          <Skeleton className="h-3 w-16" />
+          <div className="flex gap-1">
+            <Skeleton className="size-7" />
+            <Skeleton className="size-7" />
+          </div>
+        </div>
       </div>
     );
   }

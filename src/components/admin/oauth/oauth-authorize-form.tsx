@@ -526,18 +526,93 @@ function ConsentPanel({
 
 function AuthorizationSkeleton() {
   return (
-    <Card className="w-full max-w-2xl gap-0 overflow-hidden py-0">
-      <CardContent className="space-y-6 px-5 py-6 sm:px-7">
-        <div className="flex gap-4">
+    <Card
+      className="w-full max-w-2xl gap-0 overflow-hidden py-0 shadow-sm"
+      aria-hidden="true"
+    >
+      <CardHeader className="px-5 py-6 sm:px-7">
+        <div className="flex items-start gap-4">
           <Skeleton className="size-11 shrink-0 rounded-lg" />
-          <div className="flex-1 space-y-2">
+          <div className="min-w-0 flex-1 space-y-2">
             <Skeleton className="h-5 w-2/3" />
             <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-3 w-1/2" />
+            <div className="mt-3 space-y-2 rounded-md border bg-muted/40 px-3 py-2">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-3 w-40 max-w-full" />
+            </div>
           </div>
         </div>
-        <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-32 w-full" />
+      </CardHeader>
+
+      <Separator />
+
+      <CardContent className="space-y-6 px-5 py-6 sm:px-7">
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-52 max-w-full" />
+            </div>
+            <Skeleton className="h-8 w-44" />
+          </div>
+
+          <div className="divide-y rounded-md border">
+            {[8, 2].map((count, group) => (
+              <div key={count} className="px-3 py-3">
+                <div className="mb-2 flex items-center gap-2">
+                  <Skeleton className="size-4" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+                <div className="grid gap-1 sm:grid-cols-2">
+                  {Array.from({ length: count }).map((_, index) => (
+                    <div
+                      key={`${group}-${index}`}
+                      className="flex min-h-14 items-start gap-3 px-2 py-2"
+                    >
+                      <Skeleton className="mt-0.5 size-4 shrink-0" />
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-3 w-full" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <Separator />
+
+        <section className="space-y-4">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-3 w-56 max-w-full" />
+          </div>
+          <div className="space-y-2">
+            {[0, 1].map((index) => (
+              <div
+                key={index}
+                className="flex min-h-[70px] items-start gap-3 rounded-md border px-3 py-3"
+              >
+                <Skeleton className="mt-0.5 size-4 shrink-0 rounded-full" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-36" />
+                  <Skeleton className="h-3 w-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       </CardContent>
+
+      <Separator />
+
+      <div className="flex flex-col-reverse gap-2 px-5 py-4 sm:flex-row sm:justify-end sm:px-7">
+        <Skeleton className="h-9 w-full sm:w-20" />
+        <Skeleton className="h-9 w-full sm:w-24" />
+      </div>
     </Card>
   );
 }

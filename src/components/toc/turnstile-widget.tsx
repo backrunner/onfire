@@ -29,19 +29,21 @@ export function TurnstileWidget({ onToken, widgetRef }: TurnstileWidgetProps) {
   if (!TURNSTILE_SITE_KEY) return null;
 
   return (
-    <Turnstile
-      ref={(instance) => {
-        if (widgetRef) widgetRef.current = instance ?? undefined;
-      }}
-      siteKey={TURNSTILE_SITE_KEY}
-      onSuccess={onToken}
-      onExpire={() => onToken(null)}
-      onError={() => onToken(null)}
-      options={{
-        theme: resolvedTheme === "dark" ? "dark" : "light",
-        size: "flexible",
-      }}
-    />
+    <div className="min-h-[65px]">
+      <Turnstile
+        ref={(instance) => {
+          if (widgetRef) widgetRef.current = instance ?? undefined;
+        }}
+        siteKey={TURNSTILE_SITE_KEY}
+        onSuccess={onToken}
+        onExpire={() => onToken(null)}
+        onError={() => onToken(null)}
+        options={{
+          theme: resolvedTheme === "dark" ? "dark" : "light",
+          size: "flexible",
+        }}
+      />
+    </div>
   );
 }
 

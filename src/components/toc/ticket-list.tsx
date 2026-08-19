@@ -135,13 +135,16 @@ export function TicketList({ onSelect }: TicketListProps) {
       {state.loading ? (
         <div className="space-y-3">
           {[0, 1, 2].map((i) => (
-            <Card key={i}>
-              <CardContent className="space-y-2.5 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <Skeleton className="h-5 w-2/3" />
-                  <Skeleton className="h-5 w-16 rounded-full" />
+            <Card key={i} className="py-0" aria-hidden="true">
+              <CardContent className="flex items-center gap-3 p-4">
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-5 min-w-0 flex-1" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
+                  <Skeleton className="h-4 w-48 max-w-full" />
                 </div>
-                <Skeleton className="h-4 w-1/3" />
+                <Skeleton className="size-4 shrink-0" />
               </CardContent>
             </Card>
           ))}

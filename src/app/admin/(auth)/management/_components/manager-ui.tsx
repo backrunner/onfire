@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
+import { TableSkeleton as SharedTableSkeleton } from "@/components/admin/loading-skeletons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -83,13 +83,21 @@ export function ManagerPanel({
   );
 }
 
-export function TableSkeleton({ rows = 5 }: { rows?: number }) {
+export function TableSkeleton({
+  rows = 5,
+  columns = 5,
+  columnWidths,
+}: {
+  rows?: number;
+  columns?: number;
+  columnWidths?: string[];
+}) {
   return (
-    <div className="space-y-2">
-      {Array.from({ length: rows }).map((_, i) => (
-        <Skeleton key={i} className="h-9 w-full" />
-      ))}
-    </div>
+    <SharedTableSkeleton
+      rows={rows}
+      columns={columns}
+      columnWidths={columnWidths}
+    />
   );
 }
 

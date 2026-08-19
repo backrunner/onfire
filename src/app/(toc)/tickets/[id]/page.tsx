@@ -16,22 +16,38 @@ import { tocPath } from "@/lib/toc-path";
 
 function DetailSkeleton() {
   return (
-    <div className="space-y-4">
-      <Skeleton className="h-8 w-40" />
+    <div className="space-y-4" aria-hidden="true">
+      <div className="flex h-8 items-center justify-between gap-2">
+        <Skeleton className="h-8 w-28" />
+        <Skeleton className="h-8 w-24" />
+      </div>
       <Card className="py-4">
-        <CardContent className="space-y-2.5 px-4">
-          <div className="flex items-center justify-between gap-3">
+        <CardContent className="space-y-2 px-4">
+          <div className="flex min-h-10 items-start justify-between gap-3">
             <Skeleton className="h-5 w-2/3" />
             <Skeleton className="h-5 w-20 rounded-full" />
           </div>
           <Skeleton className="h-4 w-44" />
         </CardContent>
       </Card>
-      <Card className="py-4">
+      <Card className="min-h-[32rem] py-4">
         <CardContent className="space-y-4 px-4">
-          <Skeleton className="ml-auto h-16 w-3/4 rounded-2xl" />
-          <Skeleton className="h-16 w-3/4 rounded-2xl" />
-          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-4 w-28" />
+          <div className="space-y-1">
+            <Skeleton className="ml-auto h-3 w-32" />
+            <Skeleton className="ml-auto h-16 w-3/4 rounded-2xl" />
+          </div>
+          <div className="h-px bg-border" />
+          <div className="space-y-3">
+            <div className="rounded-md border p-1">
+              <Skeleton className="h-8 w-full rounded-sm" />
+              <Skeleton className="mt-1 h-28 w-full rounded-sm" />
+            </div>
+            <div className="flex h-8 items-center justify-between">
+              <Skeleton className="hidden h-3 w-40 sm:block" />
+              <Skeleton className="ml-auto h-8 w-24" />
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

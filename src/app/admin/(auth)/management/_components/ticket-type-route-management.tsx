@@ -107,7 +107,7 @@ export function TicketTypeRouteManagement({ productId }: { productId?: string })
   return (
     <>
       <ManagerPanel title={m.title} description={m.description}>
-        {isLoading ? <TableSkeleton /> : error ? <ErrorState onRetry={() => void mutate()} /> : rows.length === 0 ? (
+        {isLoading ? <TableSkeleton columns={4} /> : error ? <ErrorState onRetry={() => void mutate()} /> : rows.length === 0 ? (
           <EmptyState message={m.empty} />
         ) : (
           <Table>

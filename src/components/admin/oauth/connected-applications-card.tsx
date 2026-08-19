@@ -103,9 +103,27 @@ export function ConnectedApplicationsCard() {
         </CardHeader>
         <CardContent className="px-4 pb-4">
           {isLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
+            <div className="divide-y rounded-md border">
+              {Array.from({ length: 2 }).map((_, index) => (
+                <div key={index} className="flex items-start gap-3 px-3 py-3">
+                  <Skeleton className="size-9 shrink-0 rounded-md" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Skeleton className="h-4 w-36 max-w-[70%]" />
+                    <Skeleton className="h-3 w-64 max-w-full" />
+                    <div className="flex flex-wrap gap-1.5">
+                      <Skeleton className="h-5 w-32 rounded-full" />
+                      <Skeleton className="h-5 w-20 rounded-full" />
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                      <Skeleton className="h-3 w-20" />
+                      <Skeleton className="h-3 w-24" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
+                    <Skeleton className="h-3 w-32" />
+                  </div>
+                  <Skeleton className="size-8 shrink-0 rounded-md" />
+                </div>
+              ))}
             </div>
           ) : error && !data ? (
             <div className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-md border border-dashed px-4 text-center">

@@ -187,7 +187,7 @@ export function TicketTemplateVersionManagement({ ticketTypeId }: { ticketTypeId
           </>
         )}
       >
-        {error ? <ErrorState onRetry={() => void mutate()} /> : isLoading ? <TableSkeleton /> : !detail || detail.versions.length === 0 ? (
+        {error ? <ErrorState onRetry={() => void mutate()} /> : isLoading ? <TableSkeleton columns={5} /> : !detail || detail.versions.length === 0 ? (
           <EmptyState message={m.noVersions} />
         ) : (
           <Table>

@@ -53,7 +53,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  KnowledgeCardSkeleton,
+  KnowledgeRowsSkeleton,
+} from "./ai-loading-skeletons";
 
 const KNOWLEDGE_TYPES = [
   "description",
@@ -264,8 +267,8 @@ export function KnowledgeTab({ productId: fixedProductId }: { productId?: string
 
       {!productId ? (
         <div className="space-y-4">
-          <Skeleton className="h-48 w-full rounded-xl" />
-          <Skeleton className="h-48 w-full rounded-xl" />
+          <KnowledgeCardSkeleton rows={3} />
+          <KnowledgeCardSkeleton rows={2} documents />
         </div>
       ) : (
         <>
@@ -285,11 +288,7 @@ export function KnowledgeTab({ productId: fixedProductId }: { productId?: string
             </CardHeader>
             <CardContent>
               {entriesLoading ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full" />
-                  ))}
-                </div>
+                <KnowledgeRowsSkeleton rows={3} />
               ) : entriesError ? (
                 <LoadError message={k.loadFailed} retryLabel={k.retry} onRetry={() => void mutateEntries()} />
               ) : (entries?.length ?? 0) === 0 ? (
@@ -385,11 +384,7 @@ export function KnowledgeTab({ productId: fixedProductId }: { productId?: string
             </CardHeader>
             <CardContent>
               {documentsLoading ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 2 }).map((_, i) => (
-                    <Skeleton key={i} className="h-10 w-full" />
-                  ))}
-                </div>
+                <KnowledgeRowsSkeleton rows={2} documents />
               ) : documentsError ? (
                 <LoadError message={k.loadFailed} retryLabel={k.retry} onRetry={() => void mutateDocuments()} />
               ) : (documents?.length ?? 0) === 0 ? (

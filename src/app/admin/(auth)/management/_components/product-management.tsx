@@ -273,7 +273,7 @@ export function ProductManagement({ tenantId }: { tenantId?: string } = {}) {
         ) : null}
       >
         {isLoading ? (
-          <TableSkeleton />
+          <TableSkeleton columns={showTenantColumn ? 5 : 4} />
         ) : error ? (
           <ErrorState onRetry={() => void mutate()} />
         ) : filtered.length === 0 ? (

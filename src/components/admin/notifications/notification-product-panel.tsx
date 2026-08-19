@@ -26,11 +26,14 @@ import {
 } from "@/components/admin/notifications/channel-meta";
 import { RuleDialog } from "@/components/admin/notifications/rule-dialog";
 import { RequirementDialog } from "@/components/admin/notifications/requirement-dialog";
+import {
+  NotificationComplianceSkeleton,
+  NotificationPolicySkeleton,
+} from "./notification-loading-skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -232,6 +235,7 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
               loading={rulesState.isLoading}
               error={rulesState.error}
               onRetry={() => void rulesState.mutate()}
+              skeleton="policy"
             >
               {(rulesState.data?.length ?? 0) === 0 ? (
                 <EmptyState
@@ -283,6 +287,7 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
               loading={requirementsState.isLoading}
               error={requirementsState.error}
               onRetry={() => void requirementsState.mutate()}
+              skeleton="policy"
             >
               {(requirementsState.data?.length ?? 0) === 0 ? (
                 <EmptyState
@@ -340,6 +345,7 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
               loading={complianceState.isLoading}
               error={complianceState.error}
               onRetry={() => void complianceState.mutate()}
+              skeleton="compliance"
             >
               {(complianceState.data?.requirements.length ?? 0) === 0 ? (
                 <EmptyState
@@ -715,21 +721,22 @@ function StateBoundary({
   loading,
   error,
   onRetry,
+  skeleton,
   children,
 }: {
   ready: boolean;
   loading: boolean;
   error: unknown;
   onRetry: () => void;
+  skeleton: "policy" | "compliance";
   children: React.ReactNode;
 }) {
   const { t } = useI18n();
   if (!ready || loading) {
-    return (
-      <div className="space-y-2">
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-20 w-full" />
-      </div>
+    return skeleton === "compliance" ? (
+      <NotificationComplianceSkeleton />
+    ) : (
+      <NotificationPolicySkeleton />
     );
   }
   if (error) {

@@ -479,27 +479,48 @@ function SlaCountdown({
 
 function DetailSkeleton() {
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col" aria-hidden="true">
       <div className="space-y-3 border-b border-border p-4">
-        <Skeleton className="h-5 w-3/4" />
+        <div className="flex items-start gap-2">
+          <Skeleton className="size-8 shrink-0" />
+          <Skeleton className="h-5 min-w-0 flex-1" />
+          <Skeleton className="size-8 shrink-0" />
+          <Skeleton className="size-8 shrink-0" />
+        </div>
         <div className="flex gap-1.5">
           <Skeleton className="h-5 w-14" />
           <Skeleton className="h-5 w-12" />
+          <Skeleton className="h-5 w-14" />
         </div>
-        <div className="grid grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-8 w-full" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="space-y-1.5">
+              <Skeleton className="h-2.5 w-14" />
+              <Skeleton className="h-3 w-20 max-w-full" />
+            </div>
           ))}
         </div>
-        <Skeleton className="h-8 w-2/3" />
+        <Skeleton className="h-8 w-full" />
+        <div className="flex flex-wrap gap-2">
+          <Skeleton className="h-8 w-24" />
+          <Skeleton className="h-8 w-28" />
+          <Skeleton className="h-8 w-24" />
+        </div>
       </div>
       <div className="flex-1 space-y-3 p-4">
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="ml-auto h-12 w-2/3" />
-        <Skeleton className="h-12 w-2/3" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-16 w-2/3" />
+        <Skeleton className="ml-auto h-16 w-2/3" />
+        <Skeleton className="h-12 w-1/2" />
       </div>
       <div className="border-t border-border p-3">
-        <Skeleton className="h-24 w-full" />
+        <div className="space-y-2 rounded-lg border p-3">
+          <Skeleton className="h-24 w-full" />
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-8 w-24" />
+          </div>
+        </div>
       </div>
     </div>
   );

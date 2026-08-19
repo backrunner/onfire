@@ -270,7 +270,7 @@ export function ProductKeyManagement({ productId }: { productId?: string }) {
         }
       >
         {isLoading ? (
-          <TableSkeleton />
+          <TableSkeleton columns={productId ? 5 : 6} />
         ) : error ? (
           <ErrorState onRetry={() => void mutate()} />
         ) : !keys || keys.length === 0 ? (

@@ -216,7 +216,7 @@ export function CategoryRouteManagement() {
           {m.categoryRoutes.hint}
         </p>
         {isLoading ? (
-          <TableSkeleton />
+          <TableSkeleton columns={5} />
         ) : error ? (
           <ErrorState onRetry={() => void mutate()} />
         ) : !routes || routes.length === 0 ? (

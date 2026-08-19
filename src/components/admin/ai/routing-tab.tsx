@@ -31,9 +31,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { aiScopeQuery } from "./scope";
+import { AiRoutingSkeleton } from "./ai-loading-skeletons";
 
 interface TaskAssignmentView {
   id: string;
@@ -87,13 +87,7 @@ export function RoutingTab({
   );
 
   if (routing.isLoading || credentials.isLoading) {
-    return (
-      <div className="grid gap-4 lg:grid-cols-2">
-        {AI_TASK_TYPES.map((taskType) => (
-          <Skeleton key={taskType} className="h-[360px] rounded-lg" />
-        ))}
-      </div>
-    );
+    return <AiRoutingSkeleton />;
   }
 
   if (routing.error || credentials.error) {

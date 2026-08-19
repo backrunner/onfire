@@ -348,7 +348,23 @@ function SearchContent() {
       ) : isLoading && !data ? (
         <div className="space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-[72px] w-full rounded-lg" />
+            <div
+              key={i}
+              className="space-y-1.5 rounded-lg border border-border bg-card px-4 py-3"
+            >
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-5 w-16 rounded-full" />
+                <Skeleton className="h-5 w-14 rounded-full" />
+                <Skeleton className="h-5 w-12 rounded-full" />
+                <Skeleton className="ml-auto h-3 w-24" />
+              </div>
+              <Skeleton className="h-4 w-3/4" />
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-3 w-32 max-w-[45%]" />
+                <Skeleton className="h-3 w-24 max-w-[30%]" />
+                <Skeleton className="h-3 w-20 max-w-[25%]" />
+              </div>
+            </div>
           ))}
         </div>
       ) : error ? (
@@ -465,12 +481,19 @@ function EmptyHint({
 function SearchSkeleton() {
   return (
     <div className="mx-auto max-w-4xl space-y-4">
-      <Skeleton className="h-7 w-44" />
+      <div className="space-y-1.5">
+        <Skeleton className="h-7 w-44" />
+        <Skeleton className="h-4 w-72 max-w-full" />
+      </div>
       <Skeleton className="h-10 w-full" />
-      <div className="flex gap-2">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-8 w-32" />
-        ))}
+      <div className="flex flex-wrap items-center gap-2">
+        <Skeleton className="h-8 w-[140px]" />
+        <Skeleton className="h-8 w-[140px]" />
+        <Skeleton className="h-8 w-[160px]" />
+        <Skeleton className="h-8 w-[140px]" />
+        <Skeleton className="h-3 w-2" />
+        <Skeleton className="h-8 w-[140px]" />
+        <Skeleton className="h-8 w-32" />
       </div>
     </div>
   );

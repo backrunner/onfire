@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
+import { EmailTemplatesSkeleton } from "./email-loading-skeletons";
 import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
@@ -243,13 +243,7 @@ export function EmailTemplatesTab({ productId }: { productId: string }) {
   }
 
   if (isLoading) {
-    return (
-      <div className="space-y-2">
-        {EMAIL_TEMPLATE_TYPES.map((type) => (
-          <Skeleton key={type} className="h-14 w-full rounded-lg" />
-        ))}
-      </div>
-    );
+    return <EmailTemplatesSkeleton />;
   }
 
   return (

@@ -195,22 +195,65 @@ function TicketsWorkspace() {
 
 function WorkspaceSkeleton() {
   return (
-    <div className="flex h-[calc(100vh-var(--admin-chrome-h,3.5rem)-2rem)] flex-col gap-3 lg:h-[calc(100vh-var(--admin-chrome-h,3.5rem)-3rem)]">
-      <div className="flex gap-2">
-        <Skeleton className="h-8 flex-1" />
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="hidden h-8 w-28 sm:block" />
-        ))}
+    <div
+      className="flex h-[calc(100vh-var(--admin-chrome-h,3.5rem)-2rem)] flex-col gap-3 lg:h-[calc(100vh-var(--admin-chrome-h,3.5rem)-3rem)]"
+      aria-hidden="true"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <Skeleton className="h-8 min-w-[180px] flex-1" />
+        <Skeleton className="h-8 w-[120px]" />
+        <Skeleton className="h-8 w-[120px]" />
+        <Skeleton className="h-8 w-[140px]" />
+        <Skeleton className="h-8 w-[140px]" />
+        <Skeleton className="h-8 w-28" />
       </div>
       <div className="flex min-h-0 flex-1 overflow-hidden rounded-lg border border-border">
-        <div className="w-full space-y-2 p-3 lg:w-[400px] lg:border-r lg:border-border">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full" />
-          ))}
+        <div className="flex w-full min-w-0 flex-col lg:w-[400px] lg:shrink-0 lg:border-r lg:border-border">
+          <div className="flex h-[29px] shrink-0 items-center gap-2 border-b border-border px-3">
+            <Skeleton className="size-4 shrink-0" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+          <div className="min-h-0 flex-1 overflow-hidden px-3">
+            <div className="divide-y divide-border">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="flex min-h-[81px] items-start gap-2 px-0.5 py-2">
+                  <Skeleton className="mt-0.5 size-4 shrink-0" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <Skeleton className="h-5 w-16" />
+                      <Skeleton className="h-5 w-14" />
+                      <Skeleton className="ml-auto h-3 w-16" />
+                    </div>
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="flex h-10 shrink-0 items-center justify-between border-t border-border px-3">
+            <Skeleton className="h-3 w-16" />
+            <div className="flex gap-1">
+              <Skeleton className="size-7" />
+              <Skeleton className="size-7" />
+            </div>
+          </div>
         </div>
         <div className="hidden flex-1 p-4 lg:block">
-          <Skeleton className="h-5 w-2/3" />
-          <Skeleton className="mt-4 h-32 w-full" />
+          <div className="space-y-3 border-b pb-4">
+            <Skeleton className="h-5 w-2/3" />
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="space-y-1.5">
+                  <Skeleton className="h-2.5 w-14" />
+                  <Skeleton className="h-3 w-20 max-w-full" />
+                </div>
+              ))}
+            </div>
+            <Skeleton className="h-8 w-full" />
+          </div>
+          <Skeleton className="mt-4 h-40 w-full" />
+          <Skeleton className="mt-4 h-28 w-full" />
         </div>
       </div>
     </div>

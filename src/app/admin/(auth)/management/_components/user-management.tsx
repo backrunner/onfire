@@ -275,7 +275,7 @@ export function UserManagement({ tenantId }: { tenantId?: string } = {}) {
         }
       >
         {isLoading ? (
-          <TableSkeleton />
+          <TableSkeleton columns={showTenantColumn ? 7 : 6} />
         ) : error ? (
           <ErrorState onRetry={() => void mutate()} />
         ) : filtered.length === 0 ? (

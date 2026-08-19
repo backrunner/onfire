@@ -8,57 +8,72 @@ import { useMe } from "@/lib/hooks/use-me";
 import { managementEntryHref } from "@/lib/staff-access";
 import type { Permission } from "@/lib/types";
 import { Role } from "@/lib/types";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ManagementFormSkeleton,
+  ManagementPanelSkeleton,
+  TabsPanelSkeleton,
+} from "@/components/admin/loading-skeletons";
+import {
+  AiCredentialsSkeleton,
+  AiRoutingSkeleton,
+  AiUsageSkeleton,
+} from "@/components/admin/ai/ai-loading-skeletons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Tab panels load lazily so dev compilation and initial render only cover the
 // active tab instead of the whole management module graph.
-const tabFallback = () => <Skeleton className="h-64 w-full" />;
 const TenantManagement = dynamic(
   () => import("./_components/tenant-management").then((m) => m.TenantManagement),
-  { loading: tabFallback }
+  { loading: () => <ManagementPanelSkeleton columns={3} /> }
 );
 const ProductManagement = dynamic(
   () => import("./_components/product-management").then((m) => m.ProductManagement),
-  { loading: tabFallback }
+  { loading: () => <ManagementPanelSkeleton columns={5} /> }
 );
 const TeamManagement = dynamic(
   () => import("./_components/team-management").then((m) => m.TeamManagement),
-  { loading: tabFallback }
+  { loading: () => <ManagementPanelSkeleton columns={4} /> }
 );
 const UserManagement = dynamic(
   () => import("./_components/user-management").then((m) => m.UserManagement),
-  { loading: tabFallback }
+  { loading: () => <ManagementPanelSkeleton columns={7} /> }
 );
 const AgentManagement = dynamic(
   () => import("./_components/agent-management").then((m) => m.AgentManagement),
-  { loading: tabFallback }
+  { loading: () => <ManagementPanelSkeleton columns={5} /> }
 );
 const TicketTypePresetManagement = dynamic(
   () =>
     import("./_components/ticket-type-preset-management").then(
       (m) => m.TicketTypePresetManagement
     ),
-  { loading: tabFallback }
+  {
+    loading: () => (
+      <ManagementPanelSkeleton
+        columns={4}
+        columnWidths={["", "hidden md:table-cell", "hidden sm:table-cell", "w-12"]}
+      />
+    ),
+  }
 );
 const SpamFilterManagement = dynamic(
   () =>
     import("./_components/spam-filter-management").then(
       (m) => m.SpamFilterManagement
     ),
-  { loading: tabFallback }
+  { loading: () => <ManagementFormSkeleton fields={5} /> }
 );
 const CredentialsTab = dynamic(
   () => import("@/components/admin/ai/credentials-tab").then((m) => m.CredentialsTab),
-  { loading: tabFallback }
+  { loading: () => <AiCredentialsSkeleton /> }
 );
 const RoutingTab = dynamic(
   () => import("@/components/admin/ai/routing-tab").then((m) => m.RoutingTab),
-  { loading: tabFallback }
+  { loading: () => <AiRoutingSkeleton /> }
 );
 const UsageTab = dynamic(
   () => import("@/components/admin/ai/usage-tab").then((m) => m.UsageTab),
-  { loading: tabFallback }
+  { loading: () => <AiUsageSkeleton scope="system" /> }
 );
 
 type TabKey =
@@ -101,12 +116,7 @@ const TABS: TabDef[] = [
 ];
 
 function ManagementPageSkeleton() {
-  return (
-    <div className="space-y-4">
-      <Skeleton className="h-9 w-full max-w-2xl" />
-      <Skeleton className="h-64 w-full" />
-    </div>
-  );
+  return <TabsPanelSkeleton tabs={10} />;
 }
 
 function ManagementTabs() {
