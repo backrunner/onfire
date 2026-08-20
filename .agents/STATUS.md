@@ -1,6 +1,6 @@
 # OnFire Project Status
 
-Updated: 2026-08-16
+Updated: 2026-08-20
 
 ## Current State
 
@@ -98,7 +98,7 @@ Updated: 2026-08-16
 - Worker edge routing now rejects `/api/tob/*` on ToC/unknown hosts and `/api/toc/*` on ToB hosts; domain-level Zero Trust policies can therefore be applied without leaving the opposite API surface public.
 - Current deployment target is one OpenNext Worker attached to `onfire.alkinum.com` (ToB) and `support.alkinum.io` (ToC) as Custom Domains. Two physically independent Workers are intentionally not enabled yet; they require separate Wrangler environments/build entries and single-owner coordination for cron/email.
 - The fallback `workers.dev` hostname is disabled in production; traffic enters through the two configured Custom Domains only.
-- Worker version `98a32e09-169a-4102-9c91-09d88258b6e3` is deployed at 100% traffic with both Custom Domains, the `*/5 * * * *` SLA cron, and all configured D1/R2/Vectorize/Email/service bindings. Deployment reported 35 ms startup time. The public ToC health endpoint returns 200, the ToC-to-ToB cross-surface probe returns 404, unauthenticated ticket-type requests return JSON 401, and Cloudflare Access intercepts unauthenticated ToB probes with its expected 302 login redirect.
+- Worker version `86cc37db-8d45-4661-beb9-9f0cfcb38c66` is deployed at 100% traffic with both Custom Domains, the `*/5 * * * *` SLA cron, and all configured D1/R2/Vectorize/Email/service bindings. Deployment reported 30 ms startup time. The public ToC health endpoint returns 200, the ToC-to-ToB cross-surface probe returns 404, unauthenticated ticket-type requests return JSON 401, and Cloudflare Access intercepts unauthenticated ToB probes with its expected 302 login redirect.
 - Production `AUTH_SECRET` and `TURNSTILE_SECRET` are set as Worker secrets. The application database is initialized and contains its SuperAdmin account.
 - RBAC combines role permissions with tenant, product, and team scope. ProductAdmin scope comes from `user_products`; support-agent membership remains separate.
 - Product lifecycle and product settings are separate permissions. ProductAdmin can update scoped SLA, auto-close, and team associations without creating or deleting products.
@@ -149,13 +149,15 @@ Updated: 2026-08-16
 - `0022_talented_virginia_dare.sql`: sanitized `replies.content_html` for rich
   text and the `attachments` table for inline reply images stored in R2.
 
-A fresh local D1 applied all 19 migrations from `0000` through `0018`, with no
+A fresh local D1 applied all 23 migrations from `0000` through `0022`, with no
 foreign-key violations, and confirmed the Better Auth 1.7 OAuth/resource
-tables, `account.issuer`, MCP grant version, and authorization binding table.
+tables, `account.issuer`, MCP grant version, authorization binding table,
+scoped AI usage tables, product/team scope columns, and rich-text attachment
+tables.
 A separate non-empty legacy fixture also verifies unique migrated type keys,
 invalid legacy metadata tolerance, pinned version backfill, and historical path
-snapshots. Production D1 remains at migrations `0000` through `0016`; `0017`
-through `0020` have not been applied remotely.
+snapshots. Production D1 has migrations `0000` through `0022` applied, and
+Wrangler reports no pending migration.
 
 ## Verification
 
@@ -169,15 +171,15 @@ through `0020` have not been applied remotely.
   checks, live reassignment membership, signed-consent structure, strict bearer
   scopes, canonical discovery, encoded-path isolation, MCP Origin checks,
   sensitive response no-store policy, and JSON media type.
-- Full `pnpm test`: passing, 68 files and 447 tests.
+- Full `pnpm test`: passing, 73 files and 493 tests.
 - `pnpm build:worker`: passing with OpenNext Cloudflare 1.20.2, Next 16.2.12, Wrangler 4.120.1, and Wrangler-generated workerd runtime types.
 - `pnpm cf-typegen --check`: passing with generated `CloudflareEnv`; `wrangler.types.env` keeps secret typing deterministic without storing values.
 - `pnpm exec drizzle-kit check`: passing.
 - `pnpm install --frozen-lockfile`: passing on the tracked pnpm lockfile.
 - `pnpm audit --prod`: no known vulnerabilities after scoped esbuild/PostCSS/Sharp overrides in `pnpm-workspace.yaml`.
 - `wrangler deploy --dry-run`: passing with all D1, R2, Vectorize, Email, service, and asset bindings detected.
-- `wrangler check startup`: passing; final local profile window was 299.9 ms
-  with 28.6 ms active CPU time and no sampled garbage collection (the generated
+- `wrangler check startup`: passing; active CPU was approximately 32.7 ms with
+  no sampled garbage collection (the generated
   profile was removed after inspection).
 - Real local OAuth/MCP smoke: DCR associated the public client with the exact
   `/mcp` resource; PKCE S256 authorization delegated only `tickets:read` to the
@@ -200,25 +202,29 @@ through `0020` have not been applied remotely.
   history, form editor, type routing, spam settings, notification policy and
   compliance flows, personal endpoint rows, and endpoint testing. No horizontal
   overflow or interactive-element overlap was detected in the new MCP views.
+- Skeleton-to-content visual checks: passed at 1440x900 and 390x844 in light
+  and dark modes with delayed ToC type/form requests; measured CLS was `0` and
+  no horizontal overflow was detected.
 - Local Wrangler reverse-proxy smoke: `/support` HTML and prefixed CSS/JS load successfully; ToB paths below `/support` return 404; cross-origin preflight receives no CORS allow headers; the portal has no browser console errors.
 
 ## Deployment Prerequisites
 
 - Target Cloudflare account is `Alkinum` (`b6754402d59fc29ee8b62119014fec89`). On 2026-07-13, the APAC `onfire-d1` D1 database (`3f3294ab-8c05-4935-93c0-677ee18641dd`), APAC Standard `onfire-storage` R2 bucket, and 1024-dimension cosine `onfire-knowledge` Vectorize index were created.
-- `wrangler.jsonc` contains the production D1 ID. Migrations `0000` through `0016` are applied remotely, Wrangler reports no pending migration, the Passkey/TOTP and default-email endpoint tables are queryable, and `PRAGMA foreign_key_check` returns no violations.
+- `wrangler.jsonc` contains the production D1 ID. Migrations `0000` through `0022` are applied remotely, Wrangler reports no pending migration, the OAuth, scoped AI usage, team scope, rich-text, and attachment tables are queryable, and the migration run completed without errors.
 - `wrangler deploy --dry-run` resolves all DB, R2, Vectorize, Email, service, and asset bindings against the production configuration.
 - Vectorize has no local simulator. Use a selected Cloudflare account and temporary remote binding only when remote development is intended; do not commit an account ID.
 - Enable Cloudflare Email Sending for the sender domain and route inbound email to the Worker. The current Wrangler OAuth token includes `email_sending:write` and `email_routing:write`.
 - Configure `AUTH_SECRET`. Configure `TURNSTILE_SECRET` and `NEXT_PUBLIC_TURNSTILE_SITE_KEY` together; if either is intentionally disabled, leave both unset. Never commit `.dev.vars`.
 - Run `pnpm cf-typegen` after any Wrangler binding or variable change and keep the generated `worker-configuration.d.ts` plus `wrangler.types.env` in the checkout.
 - `onfire.alkinum.com` and `support.alkinum.io` are attached to the same Worker, the Worker surface guard is verified, and Cloudflare Access is enforced on the ToB hostname.
-- Before enabling MCP in production, add narrow Cloudflare Access path
+- Before enabling MCP for standard clients, add narrow Cloudflare Access path
   exceptions for `/.well-known/oauth-*`, `/api/tob/auth/oauth2/register`,
   `/api/tob/auth/oauth2/token`, `/api/tob/auth/oauth2/revoke`, and `/mcp`.
-  Keep consent, account management, and the rest of ToB behind Access. Then
-  apply migrations `0017` and `0018` in order and deploy the matching Worker
-  bundle; none of those actions has been performed by this implementation
-  task. Existing OAuth connections must authorize again after `0018`.
+  Keep consent, account management, and the rest of ToB behind Access. The
+  current production probe confirms these machine paths still receive Access
+  `302` responses until those exceptions are configured. Migrations `0017`
+  through `0022` and the matching Worker bundle are deployed; existing OAuth
+  connections must authorize again after `0018`.
 
 ## Known Follow-up
 
