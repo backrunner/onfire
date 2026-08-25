@@ -374,6 +374,10 @@ export const products = sqliteTable("products", {
   slaLowReply: integer("sla_low_reply"),
   // Auto-close settings: minutes of customer inactivity before auto-closing
   autoCloseMinutes: integer("auto_close_minutes"),
+  // Language settings: BCP-47 default language and optional JSON array of
+  // supported languages (includes the default; null = single-language product).
+  defaultLanguage: text("default_language").notNull().default("en"),
+  supportedLanguages: text("supported_languages"),
 });
 
 /**
@@ -571,6 +575,10 @@ export const ticketTypes = sqliteTable(
     level: integer("level").notNull(),
     name: text("name").notNull(),
     description: text("description"),
+    // Per-language translations as JSON Record<lang,string>; base columns
+    // hold the product default language and are the fallback.
+    nameI18n: text("name_i18n"),
+    descriptionI18n: text("description_i18n"),
     sortOrder: integer("sort_order").notNull().default(0),
     systemKey: text("system_key").$type<TicketTypeSystemKey>(),
     archivedAt: text("archived_at"),
@@ -596,6 +604,10 @@ export const ticketTypePresets = sqliteTable(
     level: integer("level").notNull(),
     name: text("name").notNull(),
     description: text("description"),
+    // Per-language translations as JSON Record<lang,string>; base columns
+    // hold the default language and are the fallback.
+    nameI18n: text("name_i18n"),
+    descriptionI18n: text("description_i18n"),
     sortOrder: integer("sort_order").notNull().default(0),
     archivedAt: text("archived_at"),
     archivedBy: text("archived_by"),
@@ -722,6 +734,10 @@ export const tickets = sqliteTable(
     priority: text("priority").$type<TicketPriority>().notNull(),
     subject: text("subject").notNull(),
     content: text("content").notNull(),
+    // Original customer text remains authoritative; these JSON maps cache
+    // validated translations keyed by BCP-47 language code.
+    subjectTranslations: text("subject_translations"),
+    contentTranslations: text("content_translations"),
     /** Canonical owner link (customers.id); email is display/mail-channel only. */
     customerId: text("customer_id"),
     customerEmail: text("customer_email"),
@@ -732,6 +748,8 @@ export const tickets = sqliteTable(
     /** Legacy template identifier retained for pre-migration history. */
     templateId: text("template_id"),
     metadata: text("metadata"),
+    // Detected customer language (BCP-47); drives outbound reply translation.
+    customerLanguage: text("customer_language"),
     slaAcceptDeadline: text("sla_accept_deadline"),
     slaReplyDeadline: text("sla_reply_deadline"),
     slaAcceptBreached: integer("sla_accept_breached", {
@@ -801,6 +819,10 @@ export const replies = sqliteTable(
     content: text("content").notNull(),
     // Sanitized rich-text rendering of the reply, when available.
     contentHtml: text("content_html"),
+    // Detected source language (BCP-47) and cached translations as JSON
+    // Record<lang, { content, contentHtml }>.
+    detectedLanguage: text("detected_language"),
+    translations: text("translations"),
     internal: integer("internal", { mode: "boolean" }).default(false),
     // Email-related fields
     source: text("source").$type<"web" | "email">().default("web"),
@@ -842,7 +864,12 @@ export const history = sqliteTable(
 
 // ==================== AI Feature Tables ====================
 
-export type AITaskType = "agent" | "prescreening" | "prereply" | "embedding";
+export type AITaskType =
+  | "agent"
+  | "prescreening"
+  | "prereply"
+  | "translation"
+  | "embedding";
 export type AIProvider =
   | "openai"
   | "anthropic"

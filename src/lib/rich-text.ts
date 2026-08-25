@@ -51,7 +51,7 @@ export function decodeEntities(value: string): string {
   });
 }
 
-function escapeText(value: string): string {
+export function escapeRichText(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -59,7 +59,7 @@ function escapeText(value: string): string {
 }
 
 function escapeAttr(value: string): string {
-  return escapeText(value).replace(/"/g, "&quot;");
+  return escapeRichText(value).replace(/"/g, "&quot;");
 }
 
 /**
@@ -137,7 +137,7 @@ export function sanitizeRichHtml(html: string): string {
   let match: RegExpExecArray | null;
   while ((match = TOKEN_RE.exec(html)) !== null) {
     if (match[5] !== undefined) {
-      if (dropDepth === 0) out += escapeText(match[5]);
+      if (dropDepth === 0) out += escapeRichText(match[5]);
       continue;
     }
     if (match[2] === undefined) continue; // comment, doctype, or malformed

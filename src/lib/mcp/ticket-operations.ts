@@ -46,6 +46,8 @@ import { Role, TicketPriority, TicketStatus } from "@/lib/types";
 import { chooseEscalationAssignee } from "@/services/allocation";
 import { emitTicketEvent } from "@/services/ticket-events";
 import { serializeState } from "@/services/ticket-internal-states";
+import { prepareReplyTranslation } from "@/services/ticket-translation";
+import { translationSearchCondition } from "@/lib/tickets/search";
 
 export interface McpTicketListInput {
   productId?: string;
@@ -91,6 +93,7 @@ export async function listMcpTickets(
     conditions.push(
       or(
         sql`instr(lower(${tickets.subject}), lower(${input.query})) > 0`,
+        translationSearchCondition(tickets.subjectTranslations, input.query),
         sql`instr(lower(${tickets.customerEmail}), lower(${input.query})) > 0`,
         sql`instr(lower(${tickets.id}), lower(${input.query})) > 0`,
         exists(
@@ -293,6 +296,21 @@ export async function replyToMcpTicket(
     throw badRequest("Cannot reply to a closed ticket");
   }
 
+  let detectedLanguage = ticket.customerLanguage ?? "unknown";
+  let translations: string | null = null;
+  if (!input.internal) {
+    const product = await ctx.db.query.products.findFirst({
+      where: eq(products.id, ticket.productId),
+    });
+    if (!product) throw notFound("Product not found");
+    const prepared = await prepareReplyTranslation(ctx.db, product, {
+      content: input.content,
+      targetLanguage: ticket.customerLanguage ?? product.defaultLanguage,
+    });
+    detectedLanguage = prepared.detectedLanguage;
+    translations = prepared.translations;
+  }
+
   const now = new Date().toISOString();
   const replyId = crypto.randomUUID();
   const statements = [
@@ -301,6 +319,8 @@ export async function replyToMcpTicket(
       ticketId: ticket.id,
       senderId: ctx.user.id,
       content: input.content,
+      detectedLanguage,
+      translations,
       internal: input.internal,
       createdAt: now,
     }),

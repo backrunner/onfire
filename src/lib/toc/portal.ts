@@ -14,6 +14,10 @@ export interface TocWhoAmI {
   level: number | null;
   /** email → externalId fallback for the header identity chip. */
   displayName: string | null;
+  /** Product content default language. */
+  defaultLanguage: string;
+  /** Enabled content languages; empty means a single-language product. */
+  supportedLanguages: string[];
 }
 
 export interface TocTicketTypeNode {

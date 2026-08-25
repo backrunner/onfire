@@ -35,11 +35,17 @@ export interface TicketView {
   priority: TicketPriority;
   subject: string;
   content: string;
+  /** Original customer text when the agent projection uses a translation. */
+  originalSubject?: string;
+  originalContent?: string;
+  subjectTranslations?: Record<string, string>;
+  contentTranslations?: Record<string, string>;
   customerId?: string | null;
   customerEmail: string | null;
   /** Display identity: email, else the product's external id, else a label. */
   customerLabel?: string | null;
   customerLevel: number | null;
+  customerLanguage?: string | null;
   ticketTypeId: string;
   templateVersionId: string | null;
   ticketTypePath: TicketTypePathItem[];
@@ -65,6 +71,14 @@ export interface ReplyView {
   content: string;
   /** Sanitized rich-text rendering, when the reply carries formatting. */
   contentHtml?: string | null;
+  originalContent?: string;
+  originalContentHtml?: string | null;
+  detectedLanguage?: string | null;
+  translatedLanguage?: string;
+  translations?: Record<
+    string,
+    { content: string; contentHtml?: string | null }
+  >;
   internal: boolean | null;
   source: "web" | "email" | null;
   createdAt: string;
@@ -161,6 +175,11 @@ export interface ProductView {
   slaLowAccept: number | null;
   slaLowReply: number | null;
   autoCloseMinutes: number | null;
+  defaultLanguage: string;
+  /** True once the product has its first non-system ticket type. */
+  defaultLanguageLocked: boolean;
+  /** JSON array of enabled content languages, null = single-language. */
+  supportedLanguages: string | null;
 }
 
 export interface AgentView {

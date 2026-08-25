@@ -112,7 +112,7 @@ function MessageBubble({ message, agentLabel, youLabel }: {
 }
 
 export function TicketDetail({ ticket, replies, onBack, onRefresh }: TicketDetailProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
 
   // Reply composer
   const editorRef = useRef<RichTextEditorHandle>(null);
@@ -193,7 +193,7 @@ export function TicketDetail({ ticket, replies, onBack, onRefresh }: TicketDetai
     setReplyError("");
     try {
       const result = await tocApi.post<{ status: TicketStatus }>(
-        `/api/toc/tickets/${ticket.id}/reply`,
+        `/api/toc/tickets/${ticket.id}/reply?lang=${encodeURIComponent(language)}`,
         {
           content: draft.text.trim(),
           contentHtml: draft.html,

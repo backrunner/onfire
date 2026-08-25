@@ -28,6 +28,8 @@ export interface ProductFormValues {
   slaLowAccept: string;
   slaLowReply: string;
   autoCloseMinutes: string;
+  defaultLanguage: string;
+  supportedLanguages: string[];
 }
 
 interface ProductValidationMessages {
@@ -36,6 +38,7 @@ interface ProductValidationMessages {
   identityUrlInvalid: string;
   identitySecretRequired: string;
   invalidNumber: string;
+  defaultLanguageNotSupported: string;
 }
 
 interface ValidateProductFormOptions {
@@ -94,11 +97,18 @@ export function validateProductForm(
     else if (parsed !== undefined) parsedMinutes[field] = parsed;
   }
 
+  const supportedLanguages = [...new Set(form.supportedLanguages)];
+  if (!supportedLanguages.includes(form.defaultLanguage)) {
+    errors.supportedLanguages = messages.defaultLanguageNotSupported;
+  }
+
   if (Object.keys(errors).length > 0) return { errors, payload: null };
 
   const payload: Record<string, unknown> = {
     name,
     identityEnabled: form.identityEnabled,
+    defaultLanguage: form.defaultLanguage,
+    supportedLanguages,
   };
   if (options.includeTenant && form.tenantId) payload.tenantId = form.tenantId;
   if (options.editing) {

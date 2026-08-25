@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import {
   products,
   ticketTemplates,
@@ -9,17 +9,27 @@ import {
   ticketTypes,
 } from "@/drizzle/schema";
 import { parseBody, withAuth } from "@/lib/api/handler";
-import { ok } from "@/lib/api/response";
+import { badRequest, ok } from "@/lib/api/response";
 import { assertProductAccess, productScopeCondition } from "@/lib/api/scope";
 import { ensureUnclassifiedType } from "@/services/ticket-types";
 import { hasPermission, Role } from "@/lib/types";
+import {
+  parseSupportedLanguages,
+  unsupportedI18nKeys,
+} from "@/lib/product-language";
+import { nullableI18nField } from "@/lib/i18n-schema";
 import { assertUniqueSiblingName, resolveParentLevel } from "./shared";
+
+const nameI18nField = nullableI18nField(200);
+const descriptionI18nField = nullableI18nField(2000);
 
 const createSchema = z.object({
   productId: z.string().min(1),
   parentId: z.string().nullable().optional(),
   name: z.string().trim().min(1).max(200),
   description: z.string().trim().max(2000).nullable().optional(),
+  nameI18n: nameI18nField,
+  descriptionI18n: descriptionI18nField,
   sortOrder: z.number().int().min(-100000).max(100000).default(0),
 });
 
@@ -83,6 +93,18 @@ export const GET = withAuth({ permission: "ticket_type.read" }, async (_req, ctx
 export const POST = withAuth({ permission: "ticket_type.write" }, async (req: NextRequest, ctx) => {
   const body = await parseBody(req, createSchema);
   await assertProductAccess(ctx, body.productId);
+  if (body.nameI18n || body.descriptionI18n) {
+    const product = await ctx.db.query.products.findFirst({
+      where: eq(products.id, body.productId),
+    });
+    const unsupported = unsupportedI18nKeys(
+      [body.nameI18n, body.descriptionI18n],
+      parseSupportedLanguages(product?.supportedLanguages)
+    );
+    if (unsupported.length > 0) {
+      throw badRequest("Translations contain unsupported languages", unsupported);
+    }
+  }
   const parentId = body.parentId ?? null;
   const level = await resolveParentLevel(ctx, body.productId, parentId);
   await assertUniqueSiblingName(ctx, {
@@ -99,6 +121,8 @@ export const POST = withAuth({ permission: "ticket_type.write" }, async (req: Ne
     level,
     name: body.name,
     description: body.description?.trim() || null,
+    nameI18n: body.nameI18n ? JSON.stringify(body.nameI18n) : null,
+    descriptionI18n: body.descriptionI18n ? JSON.stringify(body.descriptionI18n) : null,
     sortOrder: body.sortOrder,
     createdAt: now,
     updatedAt: now,

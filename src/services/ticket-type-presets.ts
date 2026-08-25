@@ -1,7 +1,8 @@
 import { and, asc, eq, isNull, inArray, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { Database } from "@/lib/db";
-import { ticketTypePresets, ticketTypes, type TicketTypePresetRow } from "@/drizzle/schema";
+import { products, ticketTypePresets, ticketTypes, type TicketTypePresetRow } from "@/drizzle/schema";
+import { parseI18nRecord, parseSupportedLanguages } from "@/lib/product-language";
 
 export const MAX_TICKET_TYPE_PRESET_DEPTH = 3;
 
@@ -17,6 +18,54 @@ export class TicketTypePresetConflictError extends Error {
     super(message);
     this.name = "TicketTypePresetConflictError";
   }
+}
+
+/**
+ * Preset base columns are English. Rebase them into a product's default
+ * language while retaining the other enabled languages as i18n companions.
+ */
+export function projectPresetTextForProduct(
+  base: string,
+  raw: string | null,
+  defaultLanguage: string,
+  languages: string[]
+): { base: string; i18n: string | null };
+export function projectPresetTextForProduct(
+  base: null,
+  raw: string | null,
+  defaultLanguage: string,
+  languages: string[]
+): { base: null; i18n: null };
+export function projectPresetTextForProduct(
+  base: string | null,
+  raw: string | null,
+  defaultLanguage: string,
+  languages: string[]
+): { base: string | null; i18n: string | null };
+export function projectPresetTextForProduct(
+  base: string | null,
+  raw: string | null,
+  defaultLanguage: string,
+  languages: string[]
+) {
+  if (base === null) return { base: null, i18n: null };
+  const all: Record<string, string> = {
+    en: base,
+    ...(parseI18nRecord(raw) ?? {}),
+  };
+  const projectedBase = all[defaultLanguage] ?? base;
+  const translations = Object.fromEntries(
+    languages
+      .filter((language) => language !== defaultLanguage)
+      .map((language) => [language, all[language]])
+      .filter((entry): entry is [string, string] => Boolean(entry[1]))
+  );
+  return {
+    base: projectedBase,
+    i18n: Object.keys(translations).length > 0
+      ? JSON.stringify(translations)
+      : null,
+  };
 }
 
 export async function loadPreset(db: Database, id: string): Promise<TicketTypePresetRow | null> {
@@ -122,6 +171,10 @@ export async function copyPresetToProduct(
 ) {
   const preset = await loadPreset(db, presetId);
   if (!preset || preset.archivedAt) throw new TicketTypePresetValidationError("Preset not found or archived");
+  const product = await db.query.products.findFirst({
+    where: eq(products.id, productId),
+  });
+  if (!product) throw new TicketTypePresetValidationError("Product not found");
   await loadPresetPath(db, preset);
   const productParent = targetParentId
     ? await db.query.ticketTypes.findFirst({ where: eq(ticketTypes.id, targetParentId) })
@@ -155,18 +208,34 @@ export async function copyPresetToProduct(
   const now = new Date().toISOString();
   const created: typeof ticketTypes.$inferSelect[] = [];
   const statements: BatchItem<"sqlite">[] = [];
+  const supported = parseSupportedLanguages(product.supportedLanguages);
+  const languages = supported.length > 0 ? supported : [product.defaultLanguage];
   for (const row of selected) {
     const parentId = row.parentId && idMap.get(row.parentId) ? idMap.get(row.parentId)! : targetParentId;
     const level = targetRootLevel + (row.level - roots[0].level);
     const id = crypto.randomUUID();
+    const name = projectPresetTextForProduct(
+      row.name,
+      row.nameI18n,
+      product.defaultLanguage,
+      languages
+    );
+    const description = projectPresetTextForProduct(
+      row.description,
+      row.descriptionI18n,
+      product.defaultLanguage,
+      languages
+    );
     idMap.set(row.id, id);
     const value = {
       id,
       productId,
       parentId,
       level,
-      name: row.name,
-      description: row.description,
+      name: name.base,
+      description: description.base,
+      nameI18n: name.i18n,
+      descriptionI18n: description.i18n,
       sortOrder: row.sortOrder,
       systemKey: null,
       archivedAt: null,

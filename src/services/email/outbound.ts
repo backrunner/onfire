@@ -21,6 +21,7 @@ import {
   type EmailTemplateType,
   type EmailTemplateVariables,
 } from "@/lib/email-templates";
+import { translatedReply, translatedTicketText } from "@/lib/tickets/translation";
 
 export interface SendEmailOptions {
   ticketId: string;
@@ -220,8 +221,12 @@ export async function sendTicketNotification(
       where: eq(replies.id, replyId),
     });
     if (reply) {
-      replyContent = reply.content;
-      replyContentHtml = reply.contentHtml ?? "";
+      const projected = translatedReply(
+        reply,
+        ticket.customerLanguage ?? product?.defaultLanguage ?? "en"
+      );
+      replyContent = projected.content;
+      replyContentHtml = projected.contentHtml ?? "";
       if (reply.senderId) {
         const profile = await db.query.agentProfiles.findFirst({
           where: eq(agentProfiles.userId, reply.senderId),
@@ -241,7 +246,11 @@ export async function sendTicketNotification(
   // Build email content
   const variables: EmailTemplateVariables = {
     ticket_id: ticket.id,
-    subject: ticket.subject,
+    subject: translatedTicketText(
+      ticket,
+      ticket.customerLanguage ?? product?.defaultLanguage ?? "en",
+      "subject"
+    ),
     customer_name: customerEmail.split("@")[0],
     customer_email: customerEmail,
     agent_name: agentName,

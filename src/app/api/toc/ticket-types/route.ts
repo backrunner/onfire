@@ -1,13 +1,18 @@
 import { NextRequest } from "next/server";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import {
+  products,
   ticketTemplates,
   ticketTemplateVersions,
   ticketTypes,
-  type TicketTypeRow,
 } from "@/drizzle/schema";
 import { withCustomerAuth } from "@/lib/api/handler";
 import { ok } from "@/lib/api/response";
+import {
+  parseI18nRecord,
+  requestedTocLanguage,
+  resolveProductLanguage,
+} from "@/lib/product-language";
 
 interface TicketTypeNode {
   id: string;
@@ -20,19 +25,31 @@ interface TicketTypeNode {
   children: TicketTypeNode[];
 }
 
-export const GET = withCustomerAuth(async (_req: NextRequest, { db, customer }) => {
-  const types = await db
-    .select()
-    .from(ticketTypes)
-    .where(
-      and(
-        eq(ticketTypes.productId, customer.productId),
-        isNull(ticketTypes.archivedAt),
-        isNull(ticketTypes.systemKey)
+export const GET = withCustomerAuth(async (req: NextRequest, { db, customer }) => {
+  const [product, types] = await Promise.all([
+    db.query.products.findFirst({
+      where: eq(products.id, customer.productId),
+    }),
+    db
+      .select()
+      .from(ticketTypes)
+      .where(
+        and(
+          eq(ticketTypes.productId, customer.productId),
+          isNull(ticketTypes.archivedAt),
+          isNull(ticketTypes.systemKey)
+        )
       )
-    )
-    .orderBy(asc(ticketTypes.level), asc(ticketTypes.sortOrder), asc(ticketTypes.name));
+      .orderBy(asc(ticketTypes.level), asc(ticketTypes.sortOrder), asc(ticketTypes.name)),
+  ]);
   if (types.length === 0) return ok([]);
+  // Language priority: ?lang= query → onfire-lang cookie → Accept-Language
+  // intersected with the product languages → product default.
+  const lang = resolveProductLanguage(
+    product ?? { defaultLanguage: "en", supportedLanguages: null },
+    requestedTocLanguage(req),
+    req.headers.get("accept-language")
+  );
 
   const templates = await db
     .select()
@@ -69,11 +86,16 @@ export const GET = withCustomerAuth(async (_req: NextRequest, { db, customer }) 
 
   const byId = new Map<string, TicketTypeNode>();
   for (const type of types) {
+    // Project the i18n companions into the resolved language; the base
+    // columns (product default language) are the fallback and the raw i18n
+    // fields are not exposed to the customer.
+    const nameI18n = parseI18nRecord(type.nameI18n);
+    const descriptionI18n = parseI18nRecord(type.descriptionI18n);
     byId.set(type.id, {
       id: type.id,
       parentId: type.parentId,
-      name: type.name,
-      description: type.description,
+      name: nameI18n?.[lang] ?? type.name,
+      description: descriptionI18n?.[lang] ?? type.description,
       level: type.level,
       sortOrder: type.sortOrder,
       selectable: selectable.has(type.id),

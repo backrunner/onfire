@@ -46,6 +46,12 @@ export const zh = {
     agent: '客服'
   },
 
+  // Content language display names (endonyms, keyed by language code)
+  languages: {
+    en: 'English',
+    zh: '中文'
+  },
+
   preview: {
     start: '体验身份',
     startThis: '体验此身份',
@@ -508,6 +514,11 @@ export const zh = {
     },
     selectPlaceholder: '请选择…',
     emptyPreview: '添加字段后可查看预览',
+    language: '语言',
+    defaultTag: '默认',
+    translationModeHint: '翻译模式：仅可编辑文本翻译，结构、选项值与校验规则请在默认语言下修改',
+    description: '字段描述',
+    patternMessage: '格式错误提示',
     errors: {
       missingId: '字段 {{field}} 缺少 ID',
       duplicateId: '字段 {{field}} 的 ID 重复',
@@ -634,6 +645,8 @@ export const zh = {
       prescreeningHint: '自动审查新工单内容',
       prereply: '预回复生成',
       prereplyHint: '为客服生成建议回复',
+      translation: '翻译',
+      translationHint: '翻译工单内容与工单类型文本',
       embedding: '向量嵌入',
       embeddingHint: '知识库向量化检索'
     },
@@ -799,6 +812,9 @@ export const zh = {
       selectTicketHint: '从左侧列表选择工单查看详情',
       agentReply: '客服',
       customerReply: '客户',
+      original: '原文',
+      showOriginal: '查看原文',
+      customerTranslation: '客户所见译文',
       internalStates: '内部状态',
       internalStateArchived: '已归档 · 保留历史值',
       internalStateUnset: '未设置',
@@ -1211,7 +1227,22 @@ export const zh = {
       autoClose: '自动关闭（分钟）',
       autoCloseHint: '客户在指定分钟内未回复时自动关闭已回复的工单，留空禁用',
       slaNone: '未配置 SLA',
-      autoCloseOff: '关闭'
+      autoCloseOff: '关闭',
+      languages: '内容语言',
+      defaultLanguage: '默认语言',
+      defaultLanguageLocked: '创建首个工单类型后，默认语言不可更改',
+      supportedLanguages: '支持语言',
+      languagesHint: '工单类型与表单内容以默认语言撰写；启用多语言前需配置翻译 AI 路由',
+      defaultLanguageNotSupported: '支持语言必须包含默认语言'
+    },
+
+    translation: {
+      translate: 'AI 翻译',
+      translateAll: 'AI 翻译全部文本',
+      translating: '翻译中…',
+      applied: '已填充译文草稿，可逐项修订',
+      notConfigured: '未配置 AI 翻译任务，请先在 AI 配置中启用',
+      failed: '翻译失败，请稍后重试'
     },
 
     teams: {
@@ -1735,8 +1766,6 @@ export const zh = {
       selectCategory: '选择分类',
       ticketType: '工单类型',
       selectTicketType: '选择工单类型',
-      expandTicketType: '展开工单类型',
-      collapseTicketType: '收起工单类型',
       noTicketTypes: '当前暂无可提交的工单类型',
       subject: '主题',
       subjectPlaceholder: '简要描述您的问题',
@@ -1822,6 +1851,7 @@ export const zh = {
         agent: 'AI 助手',
         prescreening: '工单预审',
         prereply: '预回复生成',
+        translation: '翻译',
         embedding: '向量嵌入'
       },
       providers: {

@@ -1,14 +1,16 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { ticketTemplates } from "@/drizzle/schema";
+import { products, ticketTemplates } from "@/drizzle/schema";
 import { parseBody, withAuth } from "@/lib/api/handler";
 import { badRequest, conflict, ok } from "@/lib/api/response";
 import {
   parseFormSchema,
   parseFormSchemaValue,
   validateFormSchema,
+  validateFormSchemaLanguages,
 } from "@/lib/form-schema";
+import { parseSupportedLanguages } from "@/lib/product-language";
 import { loadAccessibleTicketType } from "@/app/api/tob/admin/ticket-types/shared";
 import { createTemplateVersion, listTemplateVersions } from "@/services/ticket-templates";
 
@@ -38,6 +40,16 @@ export const POST = withAuth({ permission: "ticket_template.write" }, async (req
   const formSchema = parseFormSchemaValue(body.formSchema);
   const errors = formSchema ? validateFormSchema(formSchema) : [];
   if (!formSchema || errors.length > 0) throw badRequest("Invalid form schema", errors);
+  const product = await ctx.db.query.products.findFirst({
+    where: eq(products.id, type.productId),
+  });
+  const unsupportedLangs = validateFormSchemaLanguages(
+    formSchema,
+    parseSupportedLanguages(product?.supportedLanguages)
+  );
+  if (unsupportedLangs.length > 0) {
+    throw badRequest("Form schema contains unsupported languages", unsupportedLangs);
+  }
   try {
     return ok(
       await createTemplateVersion(ctx.db, {

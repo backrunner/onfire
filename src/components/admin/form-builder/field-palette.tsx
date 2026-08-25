@@ -17,6 +17,8 @@ import {
 
 interface FieldPaletteProps {
   onAddField: (type: FormFieldType) => void;
+  /** Translation mode disables structural changes such as adding fields. */
+  disabled?: boolean;
 }
 
 const FIELD_ICONS: Array<{ type: FormFieldType; icon: LucideIcon }> = [
@@ -30,7 +32,7 @@ const FIELD_ICONS: Array<{ type: FormFieldType; icon: LucideIcon }> = [
   { type: "date", icon: Calendar },
 ];
 
-export function FieldPalette({ onAddField }: FieldPaletteProps) {
+export function FieldPalette({ onAddField, disabled }: FieldPaletteProps) {
   const { t } = useI18n();
   const types = t.formBuilder.types;
 
@@ -46,6 +48,7 @@ export function FieldPalette({ onAddField }: FieldPaletteProps) {
             variant="ghost"
             className="h-auto w-full justify-start px-2 py-2 md:px-3"
             onClick={() => onAddField(type)}
+            disabled={disabled}
           >
             <div className="flex min-w-0 items-center gap-2 md:gap-3">
               <div className="shrink-0 rounded bg-muted p-1.5">

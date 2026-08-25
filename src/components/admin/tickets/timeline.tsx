@@ -46,6 +46,22 @@ function ReplyBubble({ reply }: { reply: ReplyView }) {
   const { t } = useI18n();
   const fromAgent = Boolean(reply.senderId);
   const internal = Boolean(reply.internal);
+  const customerTranslation = fromAgent
+    ? Object.entries(reply.translations ?? {})[0]
+    : undefined;
+  const alternate = reply.originalContent
+    ? {
+        label: t.tickets.detail.showOriginal,
+        content: reply.originalContent,
+        contentHtml: reply.originalContentHtml,
+      }
+    : customerTranslation
+      ? {
+          label: `${t.tickets.detail.customerTranslation} · ${customerTranslation[0]}`,
+          content: customerTranslation[1].content,
+          contentHtml: customerTranslation[1].contentHtml,
+        }
+      : null;
 
   return (
     <div className={cn("flex", fromAgent ? "justify-end" : "justify-start")}>
@@ -92,6 +108,29 @@ function ReplyBubble({ reply }: { reply: ReplyView }) {
           >
             {reply.content}
           </p>
+        )}
+        {alternate && alternate.content !== reply.content && (
+          <details
+            className={cn(
+              "mt-2 border-t pt-2 text-xs",
+              fromAgent && !internal
+                ? "border-primary-foreground/20"
+                : "border-border/70"
+            )}
+          >
+            <summary className="cursor-pointer opacity-75">
+              {alternate.label}
+            </summary>
+            <div className="mt-2 opacity-90">
+              {alternate.contentHtml ? (
+                <RichTextView html={alternate.contentHtml} />
+              ) : (
+                <p className="whitespace-pre-wrap break-words">
+                  {alternate.content}
+                </p>
+              )}
+            </div>
+          </details>
         )}
       </div>
     </div>

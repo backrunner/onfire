@@ -40,6 +40,11 @@ import {
   resolveSpamFilterConfig,
   runExternalSpamFilter,
 } from "./spam-filter";
+import {
+  effectiveProductLanguages,
+  prepareReplyTranslation,
+  prepareTicketTranslation,
+} from "@/services/ticket-translation";
 
 export interface InboundEmailPayload {
   provider?: InboundEmailProvider;
@@ -218,6 +223,16 @@ async function addEmailReply(
   }
   const now = new Date().toISOString();
   const replyId = crypto.randomUUID();
+  const translation = await prepareReplyTranslation(db, context.product, {
+    content: context.content,
+    contentHtml: context.contentHtml,
+    targetLanguage: context.product.defaultLanguage,
+  });
+  const detectedCustomerLanguage = effectiveProductLanguages(context.product).includes(
+    translation.detectedLanguage
+  )
+    ? translation.detectedLanguage
+    : context.product.defaultLanguage;
   const statements: [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]] = [
     db.insert(replies).values({
       id: replyId,
@@ -225,6 +240,8 @@ async function addEmailReply(
       senderEmail: context.row.fromEmail,
       content: context.content,
       contentHtml: context.contentHtml,
+      detectedLanguage: translation.detectedLanguage,
+      translations: translation.translations,
       source: "email",
       sourceEmailId: context.row.id,
       createdAt: now,
@@ -256,7 +273,21 @@ async function addEmailReply(
     statements.push(
       db
         .update(tickets)
-        .set({ status: TicketStatus.Processing, slaReplyDeadline: null, updatedAt: now })
+        .set({
+          status: TicketStatus.Processing,
+          slaReplyDeadline: null,
+          ...(!ticket.customerLanguage && {
+            customerLanguage: detectedCustomerLanguage,
+          }),
+          updatedAt: now,
+        })
+        .where(eq(tickets.id, ticket.id))
+    );
+  } else if (!ticket.customerLanguage) {
+    statements.push(
+      db
+        .update(tickets)
+        .set({ customerLanguage: detectedCustomerLanguage, updatedAt: now })
         .where(eq(tickets.id, ticket.id))
     );
   }
@@ -328,6 +359,10 @@ async function createEmailTicket(
     new Date(now)
   );
   const analysisJson = analysis ? JSON.stringify(analysis) : null;
+  const translated = await prepareTicketTranslation(db, context.product, {
+    subject: context.row.subject || "No Subject",
+    content: context.content,
+  });
   await db.batch([
     db.insert(tickets).values({
       id: ticketId,
@@ -339,12 +374,15 @@ async function createEmailTicket(
       priority,
       subject: context.row.subject || "No Subject",
       content: context.content,
+      subjectTranslations: translated.subjectTranslations,
+      contentTranslations: translated.contentTranslations,
       customerId: customer.id,
       customerEmail: context.row.fromEmail,
       customerLevel: customer.level ?? null,
       ticketTypeId: type.id,
       templateVersionId,
       ticketTypePath: JSON.stringify(ticketTypePathSnapshot(path)),
+      customerLanguage: translated.customerLanguage,
       source: "email",
       sourceEmailId: context.row.id,
       ...(analysis && {

@@ -55,7 +55,7 @@ function DetailSkeleton() {
 }
 
 function TicketDetailBody({ ticketId }: { ticketId: string }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const router = useRouter();
   const { isValid } = useTocCredentials();
 
@@ -71,7 +71,7 @@ function TicketDetailBody({ ticketId }: { ticketId: string }) {
       }
       try {
         const data = await tocApi.get<TocTicketDetail>(
-          `/api/toc/tickets/${ticketId}`
+          `/api/toc/tickets/${ticketId}?lang=${encodeURIComponent(language)}`
         );
         setDetail(data);
         setError(null);
@@ -88,7 +88,7 @@ function TicketDetailBody({ ticketId }: { ticketId: string }) {
         if (!silent) setLoading(false);
       }
     },
-    [ticketId]
+    [language, ticketId]
   );
 
   useEffect(() => {

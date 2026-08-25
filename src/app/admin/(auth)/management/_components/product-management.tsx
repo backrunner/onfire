@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
 import { Pencil, Plus, Settings, Trash2 } from "lucide-react";
@@ -9,6 +9,10 @@ import { useI18n } from "@/lib/i18n";
 import { api, swrFetcher } from "@/lib/api/client";
 import { useMe } from "@/lib/hooks/use-me";
 import type { ProductView } from "@/lib/api/types";
+import {
+  parseSupportedLanguages,
+  PRODUCT_LANGUAGES,
+} from "@/lib/product-language";
 import {
   type ProductFormValues,
   type ProductSlaField,
@@ -81,6 +85,8 @@ const emptyForm = (): ProductFormValues => ({
   slaLowAccept: "",
   slaLowReply: "",
   autoCloseMinutes: "",
+  defaultLanguage: "en",
+  supportedLanguages: ["en"],
 });
 
 export function ProductManagement({ tenantId }: { tenantId?: string } = {}) {
@@ -118,6 +124,19 @@ export function ProductManagement({ tenantId }: { tenantId?: string } = {}) {
     [tenants]
   );
 
+  useEffect(() => {
+    if (
+      !dialogOpen ||
+      editing ||
+      !showTenantColumn ||
+      form.tenantId ||
+      !tenants?.[0]
+    ) {
+      return;
+    }
+    setForm((current) => ({ ...current, tenantId: tenants[0].id }));
+  }, [dialogOpen, editing, form.tenantId, showTenantColumn, tenants]);
+
   const filtered = useMemo(() => {
     const list = (products ?? []).filter(
       (product) => !tenantId || product.tenantId === tenantId
@@ -128,13 +147,17 @@ export function ProductManagement({ tenantId }: { tenantId?: string } = {}) {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ ...emptyForm(), tenantId: tenantId ?? "" });
+    setForm({
+      ...emptyForm(),
+      tenantId: tenantId ?? tenants?.[0]?.id ?? "",
+    });
     setFormErrors({});
     setDialogOpen(true);
   };
 
   const openEdit = (product: ProductView) => {
     setEditing(product);
+    const supported = parseSupportedLanguages(product.supportedLanguages);
     setForm({
       name: product.name,
       tenantId: product.tenantId,
@@ -151,6 +174,9 @@ export function ProductManagement({ tenantId }: { tenantId?: string } = {}) {
       slaLowAccept: product.slaLowAccept?.toString() ?? "",
       slaLowReply: product.slaLowReply?.toString() ?? "",
       autoCloseMinutes: product.autoCloseMinutes?.toString() ?? "",
+      defaultLanguage: product.defaultLanguage,
+      supportedLanguages:
+        supported.length > 0 ? supported : [product.defaultLanguage],
     });
     setFormErrors({});
     setDialogOpen(true);
@@ -166,6 +192,7 @@ export function ProductManagement({ tenantId }: { tenantId?: string } = {}) {
         identityUrlInvalid: m.products.identityUrlInvalid,
         identitySecretRequired: m.products.identitySecretRequired,
         invalidNumber: m.invalidNumber,
+        defaultLanguageNotSupported: m.products.defaultLanguageNotSupported,
       },
     });
     setFormErrors(errors);
@@ -410,9 +437,11 @@ export function ProductManagement({ tenantId }: { tenantId?: string } = {}) {
                     <SelectValue placeholder={m.products.selectTenant} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={DEFAULT_TENANT}>
-                      {m.products.defaultTenant}
-                    </SelectItem>
+                    {(tenants?.length ?? 0) === 0 && (
+                      <SelectItem value={DEFAULT_TENANT}>
+                        {m.products.defaultTenant}
+                      </SelectItem>
+                    )}
                     {(tenants ?? []).map((tenant) => (
                       <SelectItem key={tenant.id} value={tenant.id}>
                         {tenant.name}
@@ -532,6 +561,85 @@ export function ProductManagement({ tenantId }: { tenantId?: string } = {}) {
                   disabled={!form.identityEnabled}
                 />
               </FormField>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <Label className="text-sm">{m.products.languages}</Label>
+              <p className="text-xs text-muted-foreground">
+                {m.products.languagesHint}
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <FormField
+                  label={m.products.defaultLanguage}
+                  htmlFor="product-default-language"
+                >
+                  <Select
+                    value={form.defaultLanguage}
+                    disabled={editing?.defaultLanguageLocked ?? false}
+                    onValueChange={(value) =>
+                      setForm((f) => ({
+                        ...f,
+                        defaultLanguage: value,
+                        supportedLanguages: f.supportedLanguages.includes(value)
+                          ? f.supportedLanguages
+                          : [...f.supportedLanguages, value],
+                      }))
+                    }
+                  >
+                    <SelectTrigger id="product-default-language" className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRODUCT_LANGUAGES.map((lang) => (
+                        <SelectItem key={lang} value={lang}>
+                          {t.languages[lang]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {editing?.defaultLanguageLocked && (
+                    <p className="text-xs text-muted-foreground">
+                      {m.products.defaultLanguageLocked}
+                    </p>
+                  )}
+                </FormField>
+                <FormField
+                  label={m.products.supportedLanguages}
+                  error={formErrors.supportedLanguages}
+                >
+                  <div className="flex h-8 items-center gap-4">
+                    {PRODUCT_LANGUAGES.map((lang) => {
+                      const isDefault = form.defaultLanguage === lang;
+                      const checked =
+                        isDefault || form.supportedLanguages.includes(lang);
+                      return (
+                        <label
+                          key={lang}
+                          className="flex items-center gap-1.5 text-sm"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            disabled={isDefault}
+                            onCheckedChange={(value) =>
+                              setForm((f) => ({
+                                ...f,
+                                supportedLanguages: value
+                                  ? [...f.supportedLanguages, lang]
+                                  : f.supportedLanguages.filter(
+                                      (item) => item !== lang
+                                    ),
+                              }))
+                            }
+                          />
+                          {t.languages[lang]}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </FormField>
+              </div>
             </div>
 
             <Separator />

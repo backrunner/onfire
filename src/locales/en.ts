@@ -48,6 +48,12 @@ export const en: Translations = {
     agent: 'Agent'
   },
 
+  // Content language display names (endonyms, keyed by language code)
+  languages: {
+    en: 'English',
+    zh: '中文'
+  },
+
   preview: {
     start: 'Preview identity',
     startThis: 'Preview this identity',
@@ -510,6 +516,11 @@ export const en: Translations = {
     },
     selectPlaceholder: 'Select…',
     emptyPreview: 'Add fields to see the preview',
+    language: 'Language',
+    defaultTag: 'Default',
+    translationModeHint: 'Translation mode: only text translations are editable here; structure, option values, and validation rules change in the default language',
+    description: 'Description',
+    patternMessage: 'Format error message',
     errors: {
       missingId: 'Field {{field}} is missing an ID',
       duplicateId: 'Field {{field}} has a duplicate ID',
@@ -636,6 +647,8 @@ export const en: Translations = {
       prescreeningHint: 'Automatically screen new ticket content',
       prereply: 'Pre-reply Generation',
       prereplyHint: 'Generate suggested replies for agents',
+      translation: 'Translation',
+      translationHint: 'Translate ticket content and ticket type text',
       embedding: 'Vector Embedding',
       embeddingHint: 'Knowledge base vector retrieval'
     },
@@ -801,6 +814,9 @@ export const en: Translations = {
       selectTicketHint: 'Choose a ticket from the list to view details',
       agentReply: 'Agent',
       customerReply: 'Customer',
+      original: 'Original',
+      showOriginal: 'Show original',
+      customerTranslation: 'Customer translation',
       internalStates: 'Internal States',
       internalStateArchived: 'Archived · historical value',
       internalStateUnset: 'Not set',
@@ -1213,7 +1229,22 @@ export const en: Translations = {
       autoClose: 'Auto-close (minutes)',
       autoCloseHint: 'Close replied tickets after this many minutes of customer inactivity. Empty disables auto-close.',
       slaNone: 'No SLA',
-      autoCloseOff: 'Off'
+      autoCloseOff: 'Off',
+      languages: 'Content Languages',
+      defaultLanguage: 'Default language',
+      defaultLanguageLocked: 'The default language is fixed after the first ticket type is created',
+      supportedLanguages: 'Supported languages',
+      languagesHint: 'Ticket types and form content are authored in the default language; multiple languages require an enabled Translation AI route',
+      defaultLanguageNotSupported: 'Supported languages must include the default language'
+    },
+
+    translation: {
+      translate: 'AI Translate',
+      translateAll: 'AI-translate all text',
+      translating: 'Translating…',
+      applied: 'Translation drafts filled in; review each item',
+      notConfigured: 'AI translation is not configured; enable it in AI settings first',
+      failed: 'Translation failed, please try again later'
     },
 
     teams: {
@@ -1737,8 +1768,6 @@ export const en: Translations = {
       selectCategory: 'Select a category',
       ticketType: 'Ticket Type',
       selectTicketType: 'Select a ticket type',
-      expandTicketType: 'Expand ticket type',
-      collapseTicketType: 'Collapse ticket type',
       noTicketTypes: 'No ticket type is currently available',
       subject: 'Subject',
       subjectPlaceholder: 'Brief description of your issue',
@@ -1824,6 +1853,7 @@ export const en: Translations = {
         agent: 'AI Assistant',
         prescreening: 'Ticket Prescreening',
         prereply: 'Pre-reply Generation',
+        translation: 'Translation',
         embedding: 'Vector Embedding'
       },
       providers: {

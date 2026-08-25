@@ -80,7 +80,7 @@ export default function TicketTypeTemplatePage() {
           </p>
         </div>
       </div>
-      <TicketTemplateVersionManagement ticketTypeId={typeId} />
+      <TicketTemplateVersionManagement ticketTypeId={typeId} productId={productId} />
     </div>
   );
 }

@@ -25,6 +25,8 @@ const product = (overrides: Partial<ProductRow> = {}): ProductRow => ({
   slaLowAccept: null,
   slaLowReply: null,
   autoCloseMinutes: null,
+  defaultLanguage: "en",
+  supportedLanguages: null,
   ...overrides,
 });
 

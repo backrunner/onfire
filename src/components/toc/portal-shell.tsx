@@ -71,6 +71,13 @@ export function TocPortalShell({ children }: { children: ReactNode }) {
         productName={whoami?.productName}
         customerEmail={whoami?.displayName ?? whoami?.email}
         loading={whoamiLoading && !whoami}
+        languages={
+          whoami
+            ? whoami.supportedLanguages.length > 0
+              ? whoami.supportedLanguages
+              : [whoami.defaultLanguage]
+            : undefined
+        }
       />
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-6">
         {children}

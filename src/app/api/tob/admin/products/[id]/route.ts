@@ -28,6 +28,7 @@ import {
 import { badRequest, conflict, ok, notFound, forbidden } from "@/lib/api/response";
 import { withAuth, parseBody, type AuthedContext } from "@/lib/api/handler";
 import { assertProductAccess, assertTeamAccess } from "@/lib/api/scope";
+import { parseSupportedLanguages } from "@/lib/product-language";
 import {
   REMOTE_IDENTITY_SECRET_PURPOSE,
   safeIdentityEndpoint,
@@ -35,6 +36,7 @@ import {
 import { getEnv } from "@/lib/db";
 import { sealSecret } from "@/lib/secret-storage";
 import { safeHttpUrl } from "@/lib/external-url";
+import { hasConfiguredAITask } from "@/services/ai/config";
 
 const slaMinutes = z.number().int().positive().nullable().optional();
 const optionalHttpUrl = z
@@ -66,6 +68,8 @@ const updateProductSchema = z.object({
   slaLowAccept: slaMinutes,
   slaLowReply: slaMinutes,
   autoCloseMinutes: z.number().int().positive().nullable().optional(),
+  defaultLanguage: z.enum(["en", "zh"]).optional(),
+  supportedLanguages: z.array(z.enum(["en", "zh"])).min(1).max(2).optional(),
   teamIds: z.array(z.string()).optional(),
 });
 
@@ -76,16 +80,30 @@ async function loadAccessibleProduct(ctx: AuthedContext, id: string) {
   return product;
 }
 
+async function isDefaultLanguageLocked(ctx: AuthedContext, productId: string) {
+  const authoredType = await ctx.db.query.ticketTypes.findFirst({
+    where: and(
+      eq(ticketTypes.productId, productId),
+      isNull(ticketTypes.systemKey)
+    ),
+    columns: { id: true },
+  });
+  return Boolean(authoredType);
+}
+
 export const GET = withAuth({ permission: "product.settings" }, async (_req: NextRequest, ctx) => {
   const product = await loadAccessibleProduct(ctx, ctx.params.id);
 
-  const teamRows = await ctx.db
-    .select({ teamId: productTeams.teamId })
-    .from(productTeams)
-    .where(eq(productTeams.productId, product.id));
-  const identity = await ctx.db.query.productIdentityConfigs.findFirst({
-    where: eq(productIdentityConfigs.productId, product.id),
-  });
+  const [teamRows, identity, defaultLanguageLocked] = await Promise.all([
+    ctx.db
+      .select({ teamId: productTeams.teamId })
+      .from(productTeams)
+      .where(eq(productTeams.productId, product.id)),
+    ctx.db.query.productIdentityConfigs.findFirst({
+      where: eq(productIdentityConfigs.productId, product.id),
+    }),
+    isDefaultLanguageLocked(ctx, product.id),
+  ]);
 
   return ok({
     ...product,
@@ -93,15 +111,47 @@ export const GET = withAuth({ permission: "product.settings" }, async (_req: Nex
     identityEnabled: identity?.enabled ?? false,
     identityEndpointUrl: identity?.endpointUrl ?? null,
     identitySecretConfigured: Boolean(identity?.authSecret),
+    defaultLanguageLocked,
   });
 });
 
 export const PATCH = withAuth({ permission: "product.settings" }, async (req: NextRequest, ctx) => {
   const product = await loadAccessibleProduct(ctx, ctx.params.id);
   const body = await parseBody(req, updateProductSchema);
+  const defaultLanguageLocked = await isDefaultLanguageLocked(ctx, product.id);
   const teamIds = body.teamIds
     ? [...new Set(body.teamIds)]
     : undefined;
+  const defaultLanguage = body.defaultLanguage ?? product.defaultLanguage;
+  const supportedLanguages = body.supportedLanguages
+    ? [...new Set(body.supportedLanguages)]
+    : undefined;
+  const effectiveSupported =
+    supportedLanguages ?? parseSupportedLanguages(product.supportedLanguages);
+  if (
+    effectiveSupported.length > 0 &&
+    !effectiveSupported.includes(defaultLanguage)
+  ) {
+    throw badRequest("Supported languages must include the default language");
+  }
+  if (body.defaultLanguage && body.defaultLanguage !== product.defaultLanguage) {
+    if (defaultLanguageLocked) {
+      throw conflict(
+        "Default language cannot be changed after ticket types have been created"
+      );
+    }
+  }
+  if (
+    effectiveSupported.length > 1 &&
+    !(await hasConfiguredAITask(ctx.db, "translation", {
+      tenantId: product.tenantId,
+      productId: product.id,
+    }))
+  ) {
+    throw badRequest(
+      "Translation AI must be configured before enabling multiple languages"
+    );
+  }
   const existingIdentity =
     await ctx.db.query.productIdentityConfigs.findFirst({
       where: eq(productIdentityConfigs.productId, product.id),
@@ -168,6 +218,10 @@ export const PATCH = withAuth({ permission: "product.settings" }, async (req: Ne
     ...(body.slaLowAccept !== undefined && { slaLowAccept: body.slaLowAccept }),
     ...(body.slaLowReply !== undefined && { slaLowReply: body.slaLowReply }),
     ...(body.autoCloseMinutes !== undefined && { autoCloseMinutes: body.autoCloseMinutes }),
+    ...(body.defaultLanguage !== undefined && { defaultLanguage: body.defaultLanguage }),
+    ...(supportedLanguages !== undefined && {
+      supportedLanguages: JSON.stringify(supportedLanguages),
+    }),
   };
 
   const statements: BatchItem<"sqlite">[] = [];
@@ -242,6 +296,7 @@ export const PATCH = withAuth({ permission: "product.settings" }, async (req: Ne
     identityEnabled: updatedIdentity?.enabled ?? false,
     identityEndpointUrl: updatedIdentity?.endpointUrl ?? null,
     identitySecretConfigured: Boolean(updatedIdentity?.authSecret),
+    defaultLanguageLocked,
   });
 });
 

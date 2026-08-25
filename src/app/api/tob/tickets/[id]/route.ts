@@ -5,21 +5,27 @@ import {
   tickets,
   replies,
   history,
+  products,
   ticketTemplateVersions,
   ticketTypeInternalStates,
   ticketInternalStateValues,
 } from "@/drizzle/schema";
 import { TicketStatus } from "@/lib/types";
-import { ok, notFound, badRequest } from "@/lib/api/response";
+import { ok, notFound, badRequest, ApiError } from "@/lib/api/response";
 import { withAuth, parseBody } from "@/lib/api/handler";
 import { assertTicketVisible } from "@/lib/api/scope";
-import { serializeTicket, serializeHistory } from "@/lib/tickets/serialize";
+import {
+  serializeTicket,
+  serializeHistory,
+  serializeReplyForAgent,
+} from "@/lib/tickets/serialize";
 import { resolveUserNames, resolveCustomerExternalIds } from "@/lib/tickets/names";
 import { isOpen } from "@/lib/tickets/state-machine";
 import { emitTicketEvent } from "@/services/ticket-events";
 import { parseFormSchema } from "@/lib/form-schema";
 import { serializeState } from "@/services/ticket-internal-states";
 import { sanitizeRichHtml, richHtmlToText, richTextIsEmpty } from "@/lib/rich-text";
+import { prepareReplyTranslation } from "@/services/ticket-translation";
 
 const replySchema = z.object({
   content: z.string().max(20_000).default(""),
@@ -35,7 +41,7 @@ export const GET = withAuth({ permission: "ticket.read" }, async (_req: NextRequ
   if (!ticket) throw notFound("Ticket not found");
   assertTicketVisible(ctx, ticket);
 
-  const [replyRows, historyRows, templateVersion, internalStateRows, internalStateValues] = await Promise.all([
+  const [replyRows, historyRows, templateVersion, internalStateRows, internalStateValues, product] = await Promise.all([
     ctx.db
       .select()
       .from(replies)
@@ -60,6 +66,7 @@ export const GET = withAuth({ permission: "ticket.read" }, async (_req: NextRequ
       .select()
       .from(ticketInternalStateValues)
       .where(eq(ticketInternalStateValues.ticketId, ticket.id)),
+    ctx.db.query.products.findFirst({ where: eq(products.id, ticket.productId) }),
   ]);
 
   const valuesByState = new Map(internalStateValues.map((row) => [row.stateId, row]));
@@ -96,8 +103,9 @@ export const GET = withAuth({ permission: "ticket.read" }, async (_req: NextRequ
     ticket.customerEmail ??
     (ticket.customerId ? (customerRefs[ticket.customerId] ?? null) : null);
 
+  const agentLanguage = product?.defaultLanguage ?? "en";
   const namedReplies = replyRows.map((r) => ({
-    ...r,
+    ...serializeReplyForAgent(r, agentLanguage),
     senderName: r.senderId ? (actors[r.senderId] ?? null) : null,
   }));
   const namedHistory = serializedHistory.map((h) => ({
@@ -112,7 +120,7 @@ export const GET = withAuth({ permission: "ticket.read" }, async (_req: NextRequ
 
   return ok({
     ticket: {
-      ...serializeTicket(ticket),
+      ...serializeTicket(ticket, agentLanguage),
       assigneeName: ticket.assigneeId
         ? (actors[ticket.assigneeId] ?? null)
         : null,
@@ -161,6 +169,27 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
     throw badRequest("Reply content is required");
   }
 
+  let translation: Awaited<ReturnType<typeof prepareReplyTranslation>> = {
+    detectedLanguage: productLanguageFallback(ticket.customerLanguage),
+    translations: null,
+  };
+  if (!body.internal) {
+    const product = await ctx.db.query.products.findFirst({
+      where: eq(products.id, ticket.productId),
+    });
+    if (!product) throw notFound("Product not found");
+    try {
+      translation = await prepareReplyTranslation(ctx.db, product, {
+        content,
+        contentHtml,
+        targetLanguage: ticket.customerLanguage ?? product.defaultLanguage,
+      });
+    } catch (error) {
+      console.error("Agent reply translation failed:", error);
+      throw new ApiError(503, "Reply translation is temporarily unavailable");
+    }
+  }
+
   const now = new Date().toISOString();
   const replyId = crypto.randomUUID();
 
@@ -171,6 +200,8 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
       senderId: ctx.user.id,
       content,
       contentHtml,
+      detectedLanguage: translation.detectedLanguage,
+      translations: translation.translations,
       internal: body.internal,
       createdAt: now,
     }),
@@ -216,3 +247,7 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
     reply: { id: replyId, content, internal: body.internal, createdAt: now },
   });
 });
+
+function productLanguageFallback(language: string | null): string {
+  return language || "unknown";
+}

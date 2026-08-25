@@ -5,6 +5,7 @@ import { customers, tickets } from "@/drizzle/schema";
 import { ok } from "@/lib/api/response";
 import { withAuth, parseQuery } from "@/lib/api/handler";
 import { ticketScopeCondition } from "@/lib/api/scope";
+import { translationSearchCondition } from "@/lib/tickets/search";
 
 const suggestQuerySchema = z.object({
   q: z.string().trim().min(1).max(100),
@@ -37,6 +38,7 @@ export const GET = withAuth(
           scope,
           or(
             sql`instr(lower(${tickets.subject}), lower(${q})) > 0`,
+            translationSearchCondition(tickets.subjectTranslations, q),
             sql`instr(lower(${tickets.customerEmail}), lower(${q})) > 0`,
             sql`instr(lower(${tickets.id}), lower(${q})) > 0`,
             sql`instr(lower(${customers.externalId}), lower(${q})) > 0`

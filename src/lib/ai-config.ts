@@ -4,6 +4,7 @@ export const AI_TASK_TYPES = [
   "agent",
   "prescreening",
   "prereply",
+  "translation",
   "embedding",
 ] as const;
 

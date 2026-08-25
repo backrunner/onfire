@@ -126,6 +126,46 @@
 - Internal operational states belong to one exact product ticket type and support boolean or finite-select controls. They are visible only in ToB, never in ToC form selection or submission metadata.
 - Internal-state definitions archive instead of deleting. Existing ticket values remain readable after archive, archived definitions cannot be changed on tickets, and every value mutation writes an `internal_state_changed` history record.
 
+## Product Languages And Translation
+
+- A product has one default authored-content language and a supported language
+  set that must include it. English and Chinese are currently supported. A
+  multi-language product cannot be enabled unless the effective `translation`
+  AI task has an enabled credential route.
+- Treat product default language as immutable after the first non-system ticket
+  type is authored. Base type/form fields are written in that language;
+  `*I18n` companions hold translated display strings. Never translate field
+  keys, option values, conditions, or customer metadata values.
+- Tenant ticket-type presets use English base text plus language companions.
+  Copying a preset into a product rebases base and companion fields to the
+  destination product's default/supported languages without retaining a live
+  preset relationship.
+- ToC language resolution is explicit `?lang=` then `onfire-lang` cookie, then
+  supported `Accept-Language`, then product default. The portal switcher offers
+  only the product's supported languages and is absent for a single-language
+  product. Type trees and immutable forms are projected on every language
+  change while preserving the selected type and compatible draft values.
+- Preserve authorial ticket/reply text in base columns and cache translations
+  separately. Translate a valid Web/email ticket only after spam, support,
+  identity, form, type, routing, and other business validation succeeds, but
+  before any ticket insert. A required translation failure returns/retries as a
+  temporary failure and must not create a partially translated ticket.
+- Split oversized ticket and reply text at stable text boundaries before model
+  calls, detect the source language once, and reuse it for later chunks. For
+  oversized rich text, translate text nodes in bounded batches and reconstruct
+  them around the sanitized local tags so links and images are not model-owned.
+  Every chunk must succeed before a ticket or reply is inserted; usage is
+  recorded per underlying model call.
+- Public customer, inbound-email, ToB agent, and MCP replies complete their
+  required translation before insertion. Internal notes skip translation.
+  Rich reply translation must be sanitized before storage. Outbound customer
+  email reuses the stored customer-language projection.
+- Customer-facing ticket and reply APIs return exactly one resolved projection.
+  They must never expose translation dictionaries, language-detection data,
+  alternate originals, internal notes, or AI-only fields. ToB may show the
+  product-default translation with an explicit original disclosure and may
+  disclose an agent reply's customer-facing translation for review.
+
 ## ToB Interaction
 
 - Top search is a ticket suggestion combobox. Suggestion click opens the ticket; Enter opens `/admin/search?q=...`.

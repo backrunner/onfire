@@ -47,7 +47,7 @@ const initialState: ListState = {
 };
 
 export function TicketList({ onSelect }: TicketListProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [statusFilter, setStatusFilter] = useState<TicketStatus | "all">("all");
   const [state, setState] = useState<ListState>(initialState);
 
@@ -66,6 +66,7 @@ export function TicketList({ onSelect }: TicketListProps) {
             status: status === "all" ? undefined : status,
             page,
             pageSize: PAGE_SIZE,
+            lang: language,
           })}`
         );
         setState((prev) => ({
@@ -86,7 +87,7 @@ export function TicketList({ onSelect }: TicketListProps) {
         }));
       }
     },
-    []
+    [language]
   );
 
   useEffect(() => {

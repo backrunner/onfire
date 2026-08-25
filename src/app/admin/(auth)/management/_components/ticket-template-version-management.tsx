@@ -6,6 +6,7 @@ import { Archive, ArchiveRestore, Copy, FilePlus2, Pencil, ShieldX } from "lucid
 import { toast } from "sonner";
 import { api, swrFetcher } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
+import { parseSupportedLanguages } from "@/lib/product-language";
 import {
   createEmptyFormSchema,
   type FormSchema,
@@ -70,13 +71,24 @@ interface TemplateDetail {
   versions: VersionView[];
 }
 
-export function TicketTemplateVersionManagement({ ticketTypeId }: { ticketTypeId: string }) {
+interface ProductLanguageInfo {
+  defaultLanguage: string;
+  supportedLanguages: string | null;
+}
+
+export function TicketTemplateVersionManagement({ ticketTypeId, productId }: { ticketTypeId: string; productId: string }) {
   const { t } = useI18n();
   const m = t.management.ticketTemplates;
   const { data: detail, error, isLoading, mutate } = useSWR<TemplateDetail | null>(
     `/api/tob/admin/ticket-types/${ticketTypeId}/template`,
     swrFetcher
   );
+  // Product language context drives the form-builder's translation mode.
+  const { data: product } = useSWR<ProductLanguageInfo>(
+    `/api/tob/admin/products/${productId}`,
+    swrFetcher
+  );
+  const supportedLanguages = parseSupportedLanguages(product?.supportedLanguages);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorBaseId, setEditorBaseId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -173,13 +185,13 @@ export function TicketTemplateVersionManagement({ ticketTypeId }: { ticketTypeId
       <ManagerPanel
         title={m.title}
         description={m.description}
-        actions={detail && (
+        actions={detail !== undefined && (
           <>
-            {archived ? (
+            {detail && (archived ? (
               <Button variant="outline" size="sm" className="h-8" onClick={() => void setArchived(true)}><ArchiveRestore className="mr-1.5 size-3.5" />{m.restoreTemplate}</Button>
             ) : (
               <Button variant="outline" size="sm" className="h-8" onClick={() => setArchiveOpen(true)}><Archive className="mr-1.5 size-3.5" />{m.archiveTemplate}</Button>
-            )}
+            ))}
             <Button size="sm" className="h-8" onClick={() => openEditor(current)} disabled={archived}>
               {current ? <Pencil className="mr-1.5 size-3.5" /> : <FilePlus2 className="mr-1.5 size-3.5" />}
               {current ? m.newVersion : m.createTemplate}
@@ -223,6 +235,9 @@ export function TicketTemplateVersionManagement({ ticketTypeId }: { ticketTypeId
               key={`${ticketTypeId}:${editorBase?.id ?? current?.id ?? "new"}`}
               initialSchema={editorBase?.formSchema ?? current?.formSchema ?? createEmptyFormSchema()}
               onSave={(schema) => setSaveDraft(schema)}
+              productId={productId}
+              defaultLanguage={product?.defaultLanguage}
+              supportedLanguages={supportedLanguages.length > 0 ? supportedLanguages : undefined}
             />
           </div>
         </DialogContent>

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { and, desc, eq, exists, or, sql, count } from "drizzle-orm";
-import { customers, tickets } from "@/drizzle/schema";
+import { and, desc, eq, exists, inArray, or, sql, count } from "drizzle-orm";
+import { customers, products, tickets } from "@/drizzle/schema";
 import { TicketStatus, TicketPriority } from "@/lib/types";
 import { ok } from "@/lib/api/response";
 import { withAuth, parseQuery } from "@/lib/api/handler";
@@ -9,6 +9,7 @@ import { ticketScopeCondition } from "@/lib/api/scope";
 import { serializeTicket } from "@/lib/tickets/serialize";
 import { resolveUserNames, resolveCustomerExternalIds } from "@/lib/tickets/names";
 import { activeSlaOverdueCondition } from "@/lib/tickets/sla";
+import { translationSearchCondition } from "@/lib/tickets/search";
 
 const listQuerySchema = z.object({
   productId: z.string().optional(),
@@ -47,6 +48,7 @@ export const GET = withAuth({ permission: "ticket.read" }, async (req: NextReque
     conditions.push(
       or(
         sql`instr(lower(${tickets.subject}), lower(${query.q})) > 0`,
+        translationSearchCondition(tickets.subjectTranslations, query.q),
         sql`instr(lower(${tickets.customerEmail}), lower(${query.q})) > 0`,
         sql`instr(lower(${tickets.id}), lower(${query.q})) > 0`,
         exists(
@@ -79,7 +81,7 @@ export const GET = withAuth({ permission: "ticket.read" }, async (req: NextReque
     .limit(query.pageSize)
     .offset((query.page - 1) * query.pageSize);
 
-  const [names, customerRefs] = await Promise.all([
+  const [names, customerRefs, productRows] = await Promise.all([
     resolveUserNames(
       ctx.db,
       rows.map((row) => row.assigneeId)
@@ -88,11 +90,20 @@ export const GET = withAuth({ permission: "ticket.read" }, async (req: NextReque
       ctx.db,
       rows.filter((row) => !row.customerEmail).map((row) => row.customerId)
     ),
+    rows.length > 0
+      ? ctx.db
+          .select({ id: products.id, defaultLanguage: products.defaultLanguage })
+          .from(products)
+          .where(inArray(products.id, [...new Set(rows.map((row) => row.productId))]))
+      : [],
   ]);
+  const productLanguages = new Map(
+    productRows.map((product) => [product.id, product.defaultLanguage])
+  );
 
   return ok({
     items: rows.map((row) => ({
-      ...serializeTicket(row),
+      ...serializeTicket(row, productLanguages.get(row.productId)),
       assigneeName: row.assigneeId ? (names[row.assigneeId] ?? null) : null,
       customerLabel:
         row.customerEmail ??

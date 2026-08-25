@@ -4,6 +4,7 @@
  * Defines the structure for dynamic form fields used in ticket templates.
  */
 import { z } from "zod";
+import { i18nRecordSchema } from "@/lib/i18n-schema";
 
 // ============================================
 // Field Types
@@ -32,6 +33,8 @@ export interface FormFieldValidation {
   pattern?: string;
   /** Pattern error message */
   patternMessage?: string;
+  /** Per-language pattern error messages (missing keys fall back to patternMessage) */
+  patternMessageI18n?: Record<string, string>;
   /** Minimum value for number fields */
   min?: number;
   /** Maximum value for number fields */
@@ -62,6 +65,8 @@ export interface FormFieldOption {
   label: string;
   /** Stored value */
   value: string;
+  /** Per-language option labels (value is never translated) */
+  labelI18n?: Record<string, string>;
 }
 
 // ============================================
@@ -86,20 +91,28 @@ export interface FormFieldConfig {
 export interface FormFieldSchema {
   /** Unique identifier for the field */
   id: string;
-  /** Field key used in form data */
+  /** Field key used in form data (never translated) */
   key: string;
   /** Display label */
   label: string;
+  /** Per-language labels (missing keys fall back to label) */
+  labelI18n?: Record<string, string>;
   /** Field type */
   type: FormFieldType;
   /** Field description/help text */
   description?: string;
+  /** Per-language descriptions */
+  descriptionI18n?: Record<string, string>;
   /** Whether the field is required */
   required?: boolean;
   /** Placeholder text */
   placeholder?: string;
+  /** Per-language placeholders */
+  placeholderI18n?: Record<string, string>;
   /** Help text shown below the field */
   helpText?: string;
+  /** Per-language help texts */
+  helpTextI18n?: Record<string, string>;
   /** Validation rules */
   validation?: FormFieldValidation;
   /** Conditional display rules */
@@ -119,8 +132,12 @@ export interface FormFieldSchema {
 export interface FormSection {
   /** Section title (optional) */
   title?: string;
+  /** Per-language section titles */
+  titleI18n?: Record<string, string>;
   /** Description for the section */
   description?: string;
+  /** Per-language section descriptions */
+  descriptionI18n?: Record<string, string>;
   /** Field IDs in this section */
   fields: string[];
 }
@@ -156,21 +173,32 @@ const fieldTypeSchema = z.enum([
   "date",
 ]);
 
+/** Shape-only check for per-language companions; language keys are validated
+ * against the product's supported languages at the service layer. */
+const i18nShortMapSchema = i18nRecordSchema(200);
+const i18nMediumMapSchema = i18nRecordSchema(500);
+const i18nLongMapSchema = i18nRecordSchema(1000);
+
 const formFieldSchema = z.object({
   id: z.string().trim().min(1).max(128),
   key: z.string().trim().min(1).max(100),
   label: z.string().trim().min(1).max(200),
+  labelI18n: i18nShortMapSchema.optional(),
   type: fieldTypeSchema,
   description: z.string().max(1_000).optional(),
+  descriptionI18n: i18nLongMapSchema.optional(),
   required: z.boolean().optional(),
   placeholder: z.string().max(500).optional(),
+  placeholderI18n: i18nMediumMapSchema.optional(),
   helpText: z.string().max(1_000).optional(),
+  helpTextI18n: i18nLongMapSchema.optional(),
   validation: z
     .object({
       minLength: z.number().int().min(0).max(10_000).optional(),
       maxLength: z.number().int().min(1).max(10_000).optional(),
       pattern: z.string().max(256).optional(),
       patternMessage: z.string().max(500).optional(),
+      patternMessageI18n: i18nMediumMapSchema.optional(),
       min: z.number().finite().optional(),
       max: z.number().finite().optional(),
     })
@@ -193,6 +221,7 @@ const formFieldSchema = z.object({
       z.object({
         label: z.string().trim().min(1).max(200),
         value: z.string().trim().min(1).max(200),
+        labelI18n: i18nShortMapSchema.optional(),
       })
     )
     .max(100)
@@ -225,7 +254,9 @@ const storedFormSchema = z.object({
         .array(
           z.object({
             title: z.string().max(200).optional(),
+            titleI18n: i18nShortMapSchema.optional(),
             description: z.string().max(1_000).optional(),
+            descriptionI18n: i18nLongMapSchema.optional(),
             fields: z.array(z.string().max(128)).max(50),
           })
         )
@@ -247,6 +278,97 @@ export function parseFormSchemaValue(value: unknown): FormSchema | null {
   }
   const parsed = storedFormSchema.safeParse(value);
   return parsed.success ? (parsed.data as FormSchema) : null;
+}
+
+/**
+ * Project a stored schema into a single language: every `*I18n` companion
+ * overrides its base field when it has an entry for `lang`, otherwise the
+ * base field (product default language) is kept. The i18n companions are
+ * stripped so the projected schema is clean for customer-facing delivery.
+ */
+export function localizeFormSchema(schema: FormSchema, lang: string): FormSchema {
+  const fields = schema.fields.map((field) => {
+    const localized: FormFieldSchema = {
+      ...field,
+      label: field.labelI18n?.[lang] ?? field.label,
+      description: field.descriptionI18n?.[lang] ?? field.description,
+      placeholder: field.placeholderI18n?.[lang] ?? field.placeholder,
+      helpText: field.helpTextI18n?.[lang] ?? field.helpText,
+    };
+    delete localized.labelI18n;
+    delete localized.descriptionI18n;
+    delete localized.placeholderI18n;
+    delete localized.helpTextI18n;
+    if (field.validation) {
+      const validation: FormFieldValidation = {
+        ...field.validation,
+        patternMessage:
+          field.validation.patternMessageI18n?.[lang] ??
+          field.validation.patternMessage,
+      };
+      delete validation.patternMessageI18n;
+      localized.validation = validation;
+    }
+    if (field.options) {
+      localized.options = field.options.map((option) => {
+        const localizedOption: FormFieldOption = {
+          ...option,
+          label: option.labelI18n?.[lang] ?? option.label,
+        };
+        delete localizedOption.labelI18n;
+        return localizedOption;
+      });
+    }
+    return localized;
+  });
+  const layout = schema.layout
+    ? {
+        ...schema.layout,
+        sections: schema.layout.sections?.map((section) => {
+          const localizedSection: FormSection = {
+            ...section,
+            title: section.titleI18n?.[lang] ?? section.title,
+            description: section.descriptionI18n?.[lang] ?? section.description,
+          };
+          delete localizedSection.titleI18n;
+          delete localizedSection.descriptionI18n;
+          return localizedSection;
+        }),
+      }
+    : undefined;
+  return { ...schema, fields, layout };
+}
+
+/**
+ * Collect the language keys used by i18n companion fields that are not in
+ * `supportedLanguages`. An empty result means the schema is valid; an empty
+ * supported set forbids all i18n keys.
+ */
+export function validateFormSchemaLanguages(
+  schema: FormSchema,
+  supportedLanguages: string[]
+): string[] {
+  const supported = new Set(supportedLanguages);
+  const unsupported = new Set<string>();
+  const collect = (map: Record<string, string> | undefined) => {
+    if (!map) return;
+    for (const lang of Object.keys(map)) {
+      if (!supported.has(lang)) unsupported.add(lang);
+    }
+  };
+  for (const field of schema.fields) {
+    collect(field.labelI18n);
+    collect(field.descriptionI18n);
+    collect(field.placeholderI18n);
+    collect(field.helpTextI18n);
+    collect(field.validation?.patternMessageI18n);
+    for (const option of field.options ?? []) collect(option.labelI18n);
+  }
+  for (const section of schema.layout?.sections ?? []) {
+    collect(section.titleI18n);
+    collect(section.descriptionI18n);
+  }
+  return [...unsupported].sort();
 }
 
 export interface SubmissionError {

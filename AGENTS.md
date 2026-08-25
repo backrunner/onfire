@@ -295,6 +295,31 @@ agent reply; otherwise the transition is rejected.
 - `{{reply_content}}` injects the sanitized reply HTML verbatim in outbound
   HTML mail (plain text part uses `content`).
 
+### Product Languages And Translation
+
+- Products have one immutable authored-content default language and may enable
+  English and Chinese portal languages. Enabling more than one language
+  requires an effective Translation AI credential route. Once authored ticket
+  types exist, the default language cannot change.
+- Ticket type and immutable form-version base text uses the product default
+  language. `*I18n` companions contain only display text; field keys, option
+  values, conditions, and submitted metadata remain language-neutral. Tenant
+  presets use English base text and are rebased when copied into a product.
+- ToC resolves product content language from explicit `?lang=`, then the
+  language cookie, supported `Accept-Language`, and finally product default.
+  The language switcher shows only product-supported choices and is hidden for
+  single-language products.
+- Ticket and reply base columns preserve the author's original text.
+  Translation JSON is cached separately. Valid Web/email tickets translate
+  after filtering and form/routing validation but before insertion. Public
+  Web, email, ToB, and MCP replies likewise complete required translation
+  before insertion; internal notes never invoke translation.
+- Customer ticket APIs project exactly one resolved language and never expose
+  translation maps, detected-language metadata, alternate originals, internal
+  notes, or AI fields. ToB keeps the original available for audit and shows the
+  customer-facing reply translation as a disclosure. Outbound email reuses the
+  stored customer-language projection instead of translating again.
+
 ### Status Descriptions
 
 | Status | Description |
@@ -551,7 +576,7 @@ Custom product templates use the same escaped variable renderer for preview and 
 
 ## AI System
 
-- Language tasks (`agent`, `prescreening`, `prereply`) support OpenAI, Anthropic, Google, xAI, and DeepSeek.
+- Language tasks (`agent`, `prescreening`, `prereply`, `translation`) support OpenAI, Anthropic, Google, xAI, and DeepSeek.
 - OpenAI explicitly selects `responses` or `chat`; new configurations default to Responses API.
 - Embedding is separate and supports OpenAI, Qwen/DashScope, Jina AI, Cohere, and Google.
 - Provider credentials are stored once in an encrypted credential pool and can be reused by multiple AI tasks.
@@ -652,6 +677,9 @@ GET                   /admin/email-logs/outbound - Outbound email logs
 GET/PATCH             /admin/spam-filter - Global or tenant external spam service
 POST                  /admin/email-config/:productId/test - Test outbound config
 POST                  /admin/email-config/:productId/webhook-secret - Generate webhook secret
+
+# Translation Drafts (Admin)
+POST /admin/ai/translate-content - Batch product-scoped type/form text translation
 
 # Personal Notification Endpoints
 GET/POST              /notification-endpoints           - Current user's receiving methods
@@ -824,8 +852,8 @@ const portalUrl =
 | templates | Read-only legacy ticket templates |
 | product_keys | API keys |
 | product_identity_configs | Encrypted per-product remote identity resolver configuration |
-| tickets | Tickets |
-| replies | Ticket replies (plain `content` + sanitized `contentHtml`) |
+| tickets | Tickets (authorial subject/content plus cached language projections) |
+| replies | Ticket replies (authorial plain/rich content plus cached language projections) |
 | attachments | Inline reply images (unguessable public id, blob in R2) |
 | history | Operation history |
 | customers | Customer information |

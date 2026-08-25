@@ -13,6 +13,8 @@ interface TocHeaderProps {
   customerEmail?: string | null;
   /** Show skeleton placeholders while whoami is loading. */
   loading?: boolean;
+  /** Product-enabled content languages. A single language hides the switch. */
+  languages?: string[];
 }
 
 function ThemeToggle({ label }: { label: string }) {
@@ -42,27 +44,39 @@ function ThemeToggle({ label }: { label: string }) {
   );
 }
 
-function LanguageToggle({ label }: { label: string }) {
+function LanguageToggle({ label, languages }: { label: string; languages: string[] }) {
   const { language, setLanguage } = useI18n();
+  const supported = languages.filter(
+    (item): item is "en" | "zh" => item === "en" || item === "zh"
+  );
+
+  useEffect(() => {
+    if (supported.length > 0 && !supported.includes(language)) {
+      setLanguage(supported[0]);
+    }
+  }, [language, setLanguage, supported.join(",")]);
+
+  if (supported.length < 2) return null;
+  const next = supported.find((item) => item !== language) ?? supported[0];
 
   return (
     <Button
       variant="ghost"
       size="sm"
       className="h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-      onClick={() => setLanguage(language === "zh" ? "en" : "zh")}
+      onClick={() => setLanguage(next)}
       aria-label={label}
       title={label}
     >
       <Languages className="size-4" />
       <span className="text-xs font-medium">
-        {language === "zh" ? "EN" : "中文"}
+        {next === "zh" ? "中文" : "EN"}
       </span>
     </Button>
   );
 }
 
-export function TocHeader({ productName, customerEmail, loading }: TocHeaderProps) {
+export function TocHeader({ productName, customerEmail, loading, languages }: TocHeaderProps) {
   const { t } = useI18n();
 
   return (
@@ -104,7 +118,9 @@ export function TocHeader({ productName, customerEmail, loading }: TocHeaderProp
               <span className="h-3 w-28" aria-hidden="true" />
             )}
           </div>
-          <LanguageToggle label={t.toc.header.switchLanguage} />
+          {languages && (
+            <LanguageToggle label={t.toc.header.switchLanguage} languages={languages} />
+          )}
           <ThemeToggle label={t.toc.header.toggleTheme} />
         </div>
       </div>

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { api, swrFetcher, ApiClientError } from "@/lib/api/client";
 import type { TicketDetailResponse } from "@/lib/api/types";
 import { TicketStatus } from "@/lib/types";
+import { localizeFormSchema, type FormSchema } from "@/lib/form-schema";
 import { useI18n } from "@/lib/i18n";
 import { cn, formatDateTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -108,6 +109,11 @@ export function TicketDetail({
             <h2 className="truncate text-base font-semibold leading-tight">
               {ticket.subject}
             </h2>
+            {ticket.originalSubject && ticket.originalSubject !== ticket.subject && (
+              <p className="mt-0.5 truncate text-xs text-muted-foreground" title={ticket.originalSubject}>
+                {t.tickets.detail.original}: {ticket.originalSubject}
+              </p>
+            )}
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               <StatusBadge status={ticket.status} />
               <PriorityBadge priority={ticket.priority} />
@@ -215,6 +221,16 @@ export function TicketDetail({
           <p className="whitespace-pre-wrap break-words text-sm">
             {ticket.content}
           </p>
+          {ticket.originalContent && ticket.originalContent !== ticket.content && (
+            <details className="mt-2 border-t border-border/70 pt-2 text-xs">
+              <summary className="cursor-pointer text-muted-foreground">
+                {t.tickets.detail.showOriginal}
+              </summary>
+              <p className="mt-2 whitespace-pre-wrap break-words text-foreground/80">
+                {ticket.originalContent}
+              </p>
+            </details>
+          )}
         </div>
         <HistoricalFields
           metadata={ticket.metadata}
@@ -324,15 +340,18 @@ function HistoricalFields({
   version,
 }: {
   metadata: unknown;
-  schema?: { fields?: Array<{ key: string; label: string }> };
+  schema?: FormSchema | null;
   version?: number;
 }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   if (!metadata || typeof metadata !== "object" || !Array.isArray(schema?.fields)) {
     return null;
   }
+  // Labels are projected into the agent's UI language; missing translations
+  // fall back to the product default-language text stored on the base fields.
+  const localized = localizeFormSchema(schema, language);
   const values = metadata as Record<string, unknown>;
-  const fields = schema.fields.filter((field) => values[field.key] !== undefined);
+  const fields = localized.fields.filter((field) => values[field.key] !== undefined);
   if (fields.length === 0) return null;
   const display = (value: unknown) => {
     if (Array.isArray(value)) return value.join(", ");

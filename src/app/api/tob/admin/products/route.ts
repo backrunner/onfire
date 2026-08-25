@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { productIdentityConfigs, products, tenants, ticketTypes } from "@/drizzle/schema";
 import { ok, badRequest, notFound } from "@/lib/api/response";
@@ -13,6 +13,7 @@ import {
 import { getEnv } from "@/lib/db";
 import { sealSecret } from "@/lib/secret-storage";
 import { safeHttpUrl } from "@/lib/external-url";
+import { hasConfiguredAITask } from "@/services/ai/config";
 
 const slaMinutes = z.number().int().positive().optional();
 const optionalHttpUrl = z
@@ -45,6 +46,8 @@ const createProductSchema = z.object({
   slaLowAccept: slaMinutes,
   slaLowReply: slaMinutes,
   autoCloseMinutes: z.number().int().positive().nullable().optional(),
+  defaultLanguage: z.enum(["en", "zh"]).optional(),
+  supportedLanguages: z.array(z.enum(["en", "zh"])).min(1).max(2).optional(),
 });
 
 export const GET = withAuth({ permission: "product.settings" }, async (_req: NextRequest, ctx) => {
@@ -53,17 +56,27 @@ export const GET = withAuth({ permission: "product.settings" }, async (_req: Nex
     .from(products)
     .where(productScopeCondition(ctx));
   if (productList.length === 0) return ok([]);
-  const identityRows = await ctx.db
-    .select()
-    .from(productIdentityConfigs)
-    .where(
-      inArray(
-        productIdentityConfigs.productId,
-        productList.map((product) => product.id)
-      )
-    );
+  const productIds = productList.map((product) => product.id);
+  const [identityRows, authoredTypes] = await Promise.all([
+    ctx.db
+      .select()
+      .from(productIdentityConfigs)
+      .where(inArray(productIdentityConfigs.productId, productIds)),
+    ctx.db
+      .select({ productId: ticketTypes.productId })
+      .from(ticketTypes)
+      .where(
+        and(
+          inArray(ticketTypes.productId, productIds),
+          isNull(ticketTypes.systemKey)
+        )
+      ),
+  ]);
   const identityByProduct = new Map(
     identityRows.map((config) => [config.productId, config])
+  );
+  const productsWithAuthoredTypes = new Set(
+    authoredTypes.map((type) => type.productId)
   );
   return ok(
     productList.map((product) => {
@@ -73,6 +86,7 @@ export const GET = withAuth({ permission: "product.settings" }, async (_req: Nex
         identityEnabled: identity?.enabled ?? false,
         identityEndpointUrl: identity?.endpointUrl ?? null,
         identitySecretConfigured: Boolean(identity?.authSecret),
+        defaultLanguageLocked: productsWithAuthoredTypes.has(product.id),
       };
     })
   );
@@ -90,6 +104,23 @@ export const POST = withAuth({ permission: "product.manage" }, async (req: NextR
     where: eq(tenants.id, tenantId),
   });
   if (!tenant) throw notFound("Tenant not found");
+
+  const defaultLanguage = body.defaultLanguage ?? "en";
+  const supportedLanguages = body.supportedLanguages
+    ? [...new Set(body.supportedLanguages)]
+    : undefined;
+  if (supportedLanguages && !supportedLanguages.includes(defaultLanguage)) {
+    throw badRequest("Supported languages must include the default language");
+  }
+  if (
+    supportedLanguages &&
+    supportedLanguages.length > 1 &&
+    !(await hasConfiguredAITask(ctx.db, "translation", { tenantId: tenant.id }))
+  ) {
+    throw badRequest(
+      "Translation AI must be configured before enabling multiple languages"
+    );
+  }
 
   const id = crypto.randomUUID();
   if (
@@ -119,6 +150,8 @@ export const POST = withAuth({ permission: "product.manage" }, async (req: NextR
     slaLowAccept: body.slaLowAccept,
     slaLowReply: body.slaLowReply,
     autoCloseMinutes: body.autoCloseMinutes,
+    defaultLanguage,
+    supportedLanguages: supportedLanguages ? JSON.stringify(supportedLanguages) : null,
   });
 
   const statements: [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]] = [
@@ -163,6 +196,7 @@ export const POST = withAuth({ permission: "product.manage" }, async (req: NextR
       identityEnabled: body.identityEnabled ?? false,
       identityEndpointUrl: body.identityEndpointUrl ?? null,
       identitySecretConfigured: Boolean(body.identityAuthSecret),
+      defaultLanguageLocked: false,
     },
     201
   );

@@ -4,6 +4,8 @@ import { z } from "zod";
 import { ticketTypePresets } from "@/drizzle/schema";
 import { parseBody, withAuth } from "@/lib/api/handler";
 import { badRequest, conflict, ok } from "@/lib/api/response";
+import { PRODUCT_LANGUAGES, unsupportedI18nKeys } from "@/lib/product-language";
+import { nullableI18nField } from "@/lib/i18n-schema";
 import {
   assertPresetNameAvailable,
   movePreset,
@@ -12,16 +14,28 @@ import {
 } from "@/services/ticket-type-presets";
 import { loadAccessiblePreset } from "../shared";
 
+const nameI18nField = nullableI18nField(200);
+const descriptionI18nField = nullableI18nField(2000);
 const updateSchema = z.object({
   parentId: z.string().min(1).nullable().optional(),
   name: z.string().trim().min(1).max(200).optional(),
   description: z.string().trim().max(2000).nullable().optional(),
+  nameI18n: nameI18nField,
+  descriptionI18n: descriptionI18nField,
   sortOrder: z.number().int().min(-100000).max(100000).optional(),
 });
 
 export const PATCH = withAuth({ permission: "ticket_type.preset.write" }, async (req: NextRequest, ctx) => {
   const preset = await loadAccessiblePreset(ctx, ctx.params.id);
   const body = await parseBody(req, updateSchema);
+  // Presets belong to a tenant, not a product, so any UI language is allowed.
+  const unsupportedLangs = unsupportedI18nKeys(
+    [body.nameI18n, body.descriptionI18n],
+    [...PRODUCT_LANGUAGES]
+  );
+  if (unsupportedLangs.length > 0) {
+    throw badRequest("Translations contain unsupported languages", unsupportedLangs);
+  }
   const parentId = body.parentId === undefined ? preset.parentId : body.parentId;
   const name = body.name ?? preset.name;
   try {
@@ -36,6 +50,8 @@ export const PATCH = withAuth({ permission: "ticket_type.preset.write" }, async 
   await ctx.db.update(ticketTypePresets).set({
     ...(body.name !== undefined && { name: body.name }),
     ...(body.description !== undefined && { description: body.description?.trim() || null }),
+    ...(body.nameI18n !== undefined && { nameI18n: body.nameI18n ? JSON.stringify(body.nameI18n) : null }),
+    ...(body.descriptionI18n !== undefined && { descriptionI18n: body.descriptionI18n ? JSON.stringify(body.descriptionI18n) : null }),
     ...(body.sortOrder !== undefined && { sortOrder: body.sortOrder }),
     updatedAt: now,
   }).where(eq(ticketTypePresets.id, preset.id));

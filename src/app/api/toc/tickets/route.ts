@@ -12,8 +12,8 @@ import {
   ticketTemplateVersions,
 } from "@/drizzle/schema";
 import { TicketStatus, TicketPriority } from "@/lib/types";
-import { ok, err, badRequest, conflict } from "@/lib/api/response";
-import { localizedErr } from "@/lib/api/error-messages";
+import { ok, badRequest, conflict, ApiError } from "@/lib/api/response";
+import { localizedErr, localizeApiErrorMessage, requestLanguage } from "@/lib/api/error-messages";
 import { withCustomerAuth, parseBody, parseQuery } from "@/lib/api/handler";
 import { computeInitialSlaDeadlines } from "@/lib/tickets/sla";
 import { serializeTicketForCustomer } from "@/lib/tickets/serialize";
@@ -30,6 +30,11 @@ import {
   parseFormSchema,
   validateFormSubmission,
 } from "@/lib/form-schema";
+import {
+  requestedTocLanguage,
+  resolveProductLanguage,
+} from "@/lib/product-language";
+import { prepareTicketTranslation } from "@/services/ticket-translation";
 
 const listQuerySchema = z.object({
   status: z.enum(TicketStatus).optional(),
@@ -59,6 +64,14 @@ const createTicketSchema = z.object({
  */
 export const GET = withCustomerAuth(async (req: NextRequest, { db, customer }) => {
   const query = parseQuery(req, listQuerySchema);
+  const product = await db.query.products.findFirst({
+    where: eq(products.id, customer.productId),
+  });
+  const language = resolveProductLanguage(
+    product ?? { defaultLanguage: "en", supportedLanguages: null },
+    requestedTocLanguage(req),
+    req.headers.get("accept-language")
+  );
 
   // Ownership: canonical customerId link, with an email fallback for
   // tickets created before the link existed (or via inbound email).
@@ -87,7 +100,7 @@ export const GET = withCustomerAuth(async (req: NextRequest, { db, customer }) =
     .offset((query.page - 1) * query.pageSize);
 
   return ok({
-    items: rows.map(serializeTicketForCustomer),
+    items: rows.map((row) => serializeTicketForCustomer(row, language)),
     total,
     page: query.page,
     pageSize: query.pageSize,
@@ -148,7 +161,16 @@ export const POST = withCustomerAuth(async (req: NextRequest, { db, customer }) 
   if (!formSchema) throw badRequest("Template form configuration is invalid");
   const submissionErrors = validateFormSubmission(formSchema, body.metadata ?? {});
   if (submissionErrors.length > 0) {
-    throw badRequest("Template fields are invalid", submissionErrors);
+    // The submission validator emits English source messages; translate the
+    // per-field messages so the customer sees them in their language.
+    const lang = requestLanguage(req);
+    throw badRequest(
+      "Template fields are invalid",
+      submissionErrors.map((error) => ({
+        ...error,
+        message: localizeApiErrorMessage(error.message, lang),
+      }))
+    );
   }
   const typePath = await loadTicketTypePath(db, ticketType);
   if (typePath.some((item) => item.archivedAt)) {
@@ -175,6 +197,22 @@ export const POST = withCustomerAuth(async (req: NextRequest, { db, customer }) 
     Boolean(assignee),
     new Date(now)
   );
+  const customerLanguage = resolveProductLanguage(
+    product,
+    requestedTocLanguage(req),
+    req.headers.get("accept-language")
+  );
+  let preparedTranslation;
+  try {
+    preparedTranslation = await prepareTicketTranslation(db, product, {
+      subject: body.subject,
+      content: body.content,
+      sourceLanguage: customerLanguage,
+    });
+  } catch (error) {
+    console.error("Ticket intake translation failed:", error);
+    throw new ApiError(503, "Ticket translation is temporarily unavailable");
+  }
 
   await db.batch([
     db.insert(tickets).values({
@@ -187,6 +225,8 @@ export const POST = withCustomerAuth(async (req: NextRequest, { db, customer }) 
       priority,
       subject: body.subject,
       content: body.content,
+      subjectTranslations: preparedTranslation.subjectTranslations,
+      contentTranslations: preparedTranslation.contentTranslations,
       customerId: customer.sub,
       customerEmail: customer.email ?? null,
       customerLevel: customer.level ?? null,
@@ -195,6 +235,7 @@ export const POST = withCustomerAuth(async (req: NextRequest, { db, customer }) 
       ticketTypePath: JSON.stringify(ticketTypePathSnapshot(typePath)),
       templateId: null,
       metadata: body.metadata ? JSON.stringify(body.metadata) : null,
+      customerLanguage: preparedTranslation.customerLanguage,
       ...sla,
       source: "api",
       createdAt: now,

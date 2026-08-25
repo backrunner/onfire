@@ -12,6 +12,8 @@ interface CanvasProps {
   onSelectField: (id: string | null) => void;
   onReorderFields: (fields: FormFieldSchema[]) => void;
   onDeleteField: (id: string) => void;
+  /** Translation mode: selection stays enabled, reorder/delete are hidden. */
+  readOnly?: boolean;
 }
 
 export function Canvas({
@@ -20,6 +22,7 @@ export function Canvas({
   onSelectField,
   onReorderFields,
   onDeleteField,
+  readOnly,
 }: CanvasProps) {
   const { t } = useI18n();
   const fb = t.formBuilder;
@@ -55,9 +58,11 @@ export function Canvas({
           )}
           onClick={() => onSelectField(field.id)}
         >
-          <div className="cursor-grab text-muted-foreground">
-            <GripVertical className="size-4" />
-          </div>
+          {!readOnly && (
+            <div className="cursor-grab text-muted-foreground">
+              <GripVertical className="size-4" />
+            </div>
+          )}
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
@@ -75,7 +80,8 @@ export function Canvas({
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
+          {!readOnly && (
+            <div className="flex items-center gap-1">
             {index > 0 && (
               <Button
                 variant="ghost"
@@ -116,7 +122,8 @@ export function Canvas({
             >
               <Trash2 className="size-4" />
             </Button>
-          </div>
+            </div>
+          )}
         </div>
       ))}
     </div>

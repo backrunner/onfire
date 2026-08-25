@@ -7,6 +7,7 @@ import { ok } from "@/lib/api/response";
 import { withAuth, parseQuery } from "@/lib/api/handler";
 import { ticketScopeCondition } from "@/lib/api/scope";
 import { activeSlaOverdueCondition, isTicketSlaOverdue } from "@/lib/tickets/sla";
+import { translationSearchCondition } from "@/lib/tickets/search";
 
 const searchQuerySchema = z.object({
   q: z.string().trim().min(1).max(200).optional(),
@@ -37,6 +38,7 @@ export const GET = withAuth({ permission: "ticket.read" }, async (req: NextReque
     conditions.push(
       or(
         sql`instr(lower(${tickets.subject}), lower(${query.q})) > 0`,
+        translationSearchCondition(tickets.subjectTranslations, query.q),
         sql`instr(lower(${tickets.content}), lower(${query.q})) > 0`,
         sql`instr(lower(${tickets.customerEmail}), lower(${query.q})) > 0`,
         sql`instr(lower(${tickets.id}), lower(${query.q})) > 0`,

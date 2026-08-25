@@ -10,6 +10,7 @@ const messages = {
   identityUrlInvalid: "identity-url",
   identitySecretRequired: "secret",
   invalidNumber: "number",
+  defaultLanguageNotSupported: "lang",
 };
 
 const validForm = (): ProductFormValues => ({
@@ -28,6 +29,8 @@ const validForm = (): ProductFormValues => ({
   slaLowAccept: "",
   slaLowReply: "",
   autoCloseMinutes: "",
+  defaultLanguage: "en",
+  supportedLanguages: ["en"],
 });
 
 describe("validateProductForm", () => {
@@ -39,7 +42,12 @@ describe("validateProductForm", () => {
     });
 
     expect(result.errors).toEqual({});
-    expect(result.payload).toEqual({ name: "Product", identityEnabled: false });
+    expect(result.payload).toEqual({
+      name: "Product",
+      identityEnabled: false,
+      defaultLanguage: "en",
+      supportedLanguages: ["en"],
+    });
   });
 
   it("normalizes every persisted product form field", () => {
@@ -92,5 +100,32 @@ describe("validateProductForm", () => {
       slaLowReply: "number",
       autoCloseMinutes: "number",
     });
+  });
+
+  it("requires the supported set to contain the product default language", () => {
+    const form = validForm();
+    form.supportedLanguages = ["zh"];
+
+    const result = validateProductForm(form, {
+      editing: false,
+      includeTenant: false,
+      messages,
+    });
+
+    expect(result.payload).toBeNull();
+    expect(result.errors.supportedLanguages).toBe("lang");
+  });
+
+  it("deduplicates supported languages in the submitted payload", () => {
+    const form = validForm();
+    form.supportedLanguages = ["en", "zh", "zh"];
+
+    const result = validateProductForm(form, {
+      editing: false,
+      includeTenant: false,
+      messages,
+    });
+
+    expect(result.payload?.supportedLanguages).toEqual(["en", "zh"]);
   });
 });

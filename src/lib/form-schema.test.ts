@@ -3,7 +3,9 @@ import {
   createEmptyFormSchema,
   isEmptyFieldValue,
   isFieldVisible,
+  localizeFormSchema,
   parseFormSchemaValue,
+  validateFormSchemaLanguages,
   validateFormSubmission,
   validateFormSchema,
   type FormFieldSchema,
@@ -173,6 +175,24 @@ describe("stored form submissions", () => {
     expect(parseFormSchemaValue({ version: "1.0", fields: "bad" })).toBeNull();
   });
 
+  it("rejects translated form text beyond each base field limit", () => {
+    const tooLongLabel = {
+      ...schema,
+      fields: [field({ labelI18n: { zh: "x".repeat(201) } })],
+    };
+    const tooLongPlaceholder = {
+      ...schema,
+      fields: [field({ placeholderI18n: { zh: "x".repeat(501) } })],
+    };
+    const tooLongHelp = {
+      ...schema,
+      fields: [field({ helpTextI18n: { zh: "x".repeat(1001) } })],
+    };
+    expect(parseFormSchemaValue(tooLongLabel)).toBeNull();
+    expect(parseFormSchemaValue(tooLongPlaceholder)).toBeNull();
+    expect(parseFormSchemaValue(tooLongHelp)).toBeNull();
+  });
+
   it("enforces required, type, range, and option constraints server-side", () => {
     expect(
       validateFormSubmission(schema, {
@@ -189,5 +209,121 @@ describe("stored form submissions", () => {
     expect(errors.map((error) => error.field)).toEqual(
       expect.arrayContaining(["email", "plan", "seats"])
     );
+  });
+});
+
+describe("localizeFormSchema", () => {
+  const schema: FormSchema = {
+    version: "1.0",
+    fields: [
+      field({
+        id: "a",
+        key: "ka",
+        label: "Name",
+        labelI18n: { zh: "姓名" },
+        placeholder: "Your name",
+        placeholderI18n: { zh: "您的姓名" },
+        description: "Shown under the label",
+        descriptionI18n: { fr: "fr only" },
+        helpText: "We never share it",
+        validation: {
+          pattern: "^\\w+$",
+          patternMessage: "Letters only",
+          patternMessageI18n: { zh: "仅限字母" },
+        },
+      }),
+      field({
+        id: "b",
+        key: "kb",
+        type: "select",
+        options: [
+          { label: "Free", value: "free", labelI18n: { zh: "免费" } },
+          { label: "Pro", value: "pro" },
+        ],
+      }),
+    ],
+    layout: {
+      columns: 1,
+      sections: [
+        {
+          title: "Basics",
+          titleI18n: { zh: "基本信息" },
+          description: "Start here",
+          fields: ["a", "b"],
+        },
+      ],
+    },
+  };
+
+  it("overrides base text when the language has a translation", () => {
+    const localized = localizeFormSchema(schema, "zh");
+    expect(localized.fields[0].label).toBe("姓名");
+    expect(localized.fields[0].placeholder).toBe("您的姓名");
+    expect(localized.fields[0].validation?.patternMessage).toBe("仅限字母");
+    expect(localized.fields[1].options?.[0].label).toBe("免费");
+    expect(localized.layout?.sections?.[0].title).toBe("基本信息");
+  });
+
+  it("falls back to the base field when the language key is missing", () => {
+    const localized = localizeFormSchema(schema, "zh");
+    expect(localized.fields[0].description).toBe("Shown under the label");
+    expect(localized.fields[0].helpText).toBe("We never share it");
+    expect(localized.fields[1].options?.[1].label).toBe("Pro");
+    expect(localized.layout?.sections?.[0].description).toBe("Start here");
+  });
+
+  it("strips i18n companions and never translates keys or option values", () => {
+    const localized = localizeFormSchema(schema, "zh");
+    expect(JSON.stringify(localized)).not.toContain("I18n");
+    expect(localized.fields[0].key).toBe("ka");
+    expect(localized.fields[1].options?.[0].value).toBe("free");
+  });
+
+  it("does not mutate the source schema", () => {
+    localizeFormSchema(schema, "zh");
+    expect(schema.fields[0].label).toBe("Name");
+    expect(schema.fields[0].labelI18n).toEqual({ zh: "姓名" });
+    expect(schema.layout?.sections?.[0].titleI18n).toEqual({ zh: "基本信息" });
+  });
+
+  it("round-trips through the stored zod schema with i18n companions", () => {
+    expect(parseFormSchemaValue(schema)).toEqual(schema);
+  });
+});
+
+describe("validateFormSchemaLanguages", () => {
+  it("accepts i18n keys inside the supported set", () => {
+    const schema: FormSchema = {
+      ...createEmptyFormSchema(),
+      fields: [field({ labelI18n: { zh: "姓名", en: "Name" } })],
+    };
+    expect(validateFormSchemaLanguages(schema, ["en", "zh"])).toEqual([]);
+  });
+
+  it("collects unsupported keys across fields, options, validation and sections", () => {
+    const schema: FormSchema = {
+      version: "1.0",
+      fields: [
+        field({
+          placeholderI18n: { fr: "x" },
+          validation: { patternMessageI18n: { de: "x" } },
+          options: [{ label: "A", value: "a", labelI18n: { fr: "x" } }],
+        }),
+      ],
+      layout: { sections: [{ titleI18n: { ja: "x" }, fields: ["f1"] }] },
+    };
+    expect(validateFormSchemaLanguages(schema, ["en", "zh"])).toEqual([
+      "de",
+      "fr",
+      "ja",
+    ]);
+  });
+
+  it("forbids all i18n keys when the product has no supported set", () => {
+    const schema: FormSchema = {
+      ...createEmptyFormSchema(),
+      fields: [field({ helpTextI18n: { zh: "x" } })],
+    };
+    expect(validateFormSchemaLanguages(schema, [])).toEqual(["zh"]);
   });
 });

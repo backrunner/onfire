@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { tickets, replies, history } from "@/drizzle/schema";
+import { products, tickets, replies, history } from "@/drizzle/schema";
 import { TicketStatus } from "@/lib/types";
-import { ok, err, badRequest } from "@/lib/api/response";
+import { ok, badRequest, notFound, ApiError } from "@/lib/api/response";
 import { localizedErr } from "@/lib/api/error-messages";
 import { withCustomerAuth, parseBody } from "@/lib/api/handler";
 import { loadCustomerTicket } from "@/lib/tickets/customer-access";
@@ -11,6 +11,8 @@ import { verifyTurnstileToken } from "@/lib/turnstile";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { sanitizeRichHtml, richHtmlToText, richTextIsEmpty } from "@/lib/rich-text";
 import { emitTicketEvent } from "@/services/ticket-events";
+import { resolveProductLanguage, requestedTocLanguage } from "@/lib/product-language";
+import { prepareReplyTranslation } from "@/services/ticket-translation";
 
 const replySchema = z.object({
   content: z.string().max(50_000).default(""),
@@ -61,6 +63,28 @@ export const POST = withCustomerAuth(async (req: NextRequest, ctx) => {
     throw badRequest("Reply content is required");
   }
 
+  const product = await ctx.db.query.products.findFirst({
+    where: eq(products.id, ticket.productId),
+  });
+  if (!product) throw notFound("Product not found");
+  const sourceLanguage = resolveProductLanguage(
+    product,
+    requestedTocLanguage(req),
+    req.headers.get("accept-language")
+  );
+  let translation: Awaited<ReturnType<typeof prepareReplyTranslation>>;
+  try {
+    translation = await prepareReplyTranslation(ctx.db, product, {
+      content,
+      contentHtml,
+      sourceLanguage,
+      targetLanguage: product.defaultLanguage,
+    });
+  } catch (error) {
+    console.error("Customer reply translation failed:", error);
+    throw new ApiError(503, "Reply translation is temporarily unavailable");
+  }
+
   await ctx.db.batch([
     ctx.db.insert(replies).values({
       id: replyId,
@@ -68,6 +92,8 @@ export const POST = withCustomerAuth(async (req: NextRequest, ctx) => {
       senderEmail: ctx.customer.email,
       content,
       contentHtml,
+      detectedLanguage: translation.detectedLanguage,
+      translations: translation.translations,
       source: "web",
       createdAt: now,
     }),
@@ -81,6 +107,7 @@ export const POST = withCustomerAuth(async (req: NextRequest, ctx) => {
     ctx.db
       .update(tickets)
       .set({
+        ...(!ticket.customerLanguage && { customerLanguage: sourceLanguage }),
         ...(reopen
           ? {
               status: TicketStatus.Processing,

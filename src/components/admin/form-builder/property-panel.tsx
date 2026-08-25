@@ -37,6 +37,152 @@ interface PropertyPanelProps {
   allFields: FormFieldSchema[];
   onChange: (field: FormFieldSchema) => void;
   onDelete: () => void;
+  /** When set, the panel edits only the translatable text companions for this
+   * language; structural properties stay in the default language. */
+  translationLang?: string | null;
+}
+
+/** Translation-only panel: text companions of the selected field. */
+function TranslationPanel({
+  field,
+  lang,
+  onChange,
+}: {
+  field: FormFieldSchema;
+  lang: string;
+  onChange: (field: FormFieldSchema) => void;
+}) {
+  const { t } = useI18n();
+  const fb = t.formBuilder;
+  const hasOptions = ["select", "radio", "checkbox"].includes(field.type);
+
+  const readI18n = (map: Record<string, string> | undefined) => map?.[lang] ?? "";
+  const writeI18n = (
+    key: "labelI18n" | "placeholderI18n" | "helpTextI18n" | "descriptionI18n",
+    value: string
+  ) => {
+    const map = { ...(field[key] ?? {}) };
+    if (value.trim()) map[lang] = value;
+    else delete map[lang];
+    onChange({ ...field, [key]: Object.keys(map).length > 0 ? map : undefined });
+  };
+  const writeOptionLabel = (index: number, value: string) => {
+    const options = [...(field.options ?? [])];
+    const option = options[index];
+    const map = { ...(option.labelI18n ?? {}) };
+    if (value.trim()) map[lang] = value;
+    else delete map[lang];
+    options[index] = {
+      ...option,
+      labelI18n: Object.keys(map).length > 0 ? map : undefined,
+    };
+    onChange({ ...field, options });
+  };
+  const writePatternMessage = (value: string) => {
+    const map = { ...(field.validation?.patternMessageI18n ?? {}) };
+    if (value.trim()) map[lang] = value;
+    else delete map[lang];
+    onChange({
+      ...field,
+      validation: {
+        ...field.validation,
+        patternMessageI18n: Object.keys(map).length > 0 ? map : undefined,
+      },
+    });
+  };
+
+  return (
+    <div className="space-y-4 p-4">
+      <h3 className="text-sm font-medium">
+        {fb.fieldProperties} · {t.languages[lang as keyof typeof t.languages] ?? lang}
+      </h3>
+      <Separator />
+
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="i18n-label">{fb.label}</Label>
+          <Input
+            id="i18n-label"
+            className="h-8"
+            value={readI18n(field.labelI18n)}
+            placeholder={field.label}
+            onChange={(e) => writeI18n("labelI18n", e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="i18n-placeholder">{fb.placeholder}</Label>
+          <Input
+            id="i18n-placeholder"
+            className="h-8"
+            value={readI18n(field.placeholderI18n)}
+            placeholder={field.placeholder || undefined}
+            onChange={(e) => writeI18n("placeholderI18n", e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="i18n-helpText">{fb.helpText}</Label>
+          <Textarea
+            id="i18n-helpText"
+            value={readI18n(field.helpTextI18n)}
+            placeholder={field.helpText || undefined}
+            onChange={(e) => writeI18n("helpTextI18n", e.target.value)}
+            rows={2}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="i18n-description">{fb.description}</Label>
+          <Textarea
+            id="i18n-description"
+            value={readI18n(field.descriptionI18n)}
+            placeholder={field.description || undefined}
+            onChange={(e) => writeI18n("descriptionI18n", e.target.value)}
+            rows={2}
+          />
+        </div>
+
+        {field.validation?.pattern && (
+          <div className="space-y-1.5">
+            <Label htmlFor="i18n-patternMessage">{fb.patternMessage}</Label>
+            <Input
+              id="i18n-patternMessage"
+              className="h-8"
+              value={readI18n(field.validation.patternMessageI18n)}
+              placeholder={field.validation.patternMessage || undefined}
+              onChange={(e) => writePatternMessage(e.target.value)}
+            />
+          </div>
+        )}
+      </div>
+
+      {hasOptions && (
+        <>
+          <Separator />
+          <div className="space-y-3">
+            <Label>{fb.options}</Label>
+            <div className="space-y-2">
+              {(field.options || []).map((option, index) => (
+                <div key={index} className="space-y-1">
+                  <p className="truncate text-xs text-muted-foreground">
+                    {option.label}
+                    <span className="ml-1 text-muted-foreground/60">({option.value})</span>
+                  </p>
+                  <Input
+                    className="h-8"
+                    value={readI18n(option.labelI18n)}
+                    placeholder={option.label}
+                    onChange={(e) => writeOptionLabel(index, e.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export function PropertyPanel({
@@ -44,6 +190,7 @@ export function PropertyPanel({
   allFields,
   onChange,
   onDelete,
+  translationLang,
 }: PropertyPanelProps) {
   const { t } = useI18n();
   const fb = t.formBuilder;
@@ -54,6 +201,10 @@ export function PropertyPanel({
         {fb.selectFieldHint}
       </div>
     );
+  }
+
+  if (translationLang) {
+    return <TranslationPanel field={field} lang={translationLang} onChange={onChange} />;
   }
 
   const updateField = (updates: Partial<FormFieldSchema>) => {
