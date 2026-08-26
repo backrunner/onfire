@@ -25,6 +25,10 @@ export class GoogleProvider implements AIProvider {
     this.baseUrl = config.baseUrl || "https://generativelanguage.googleapis.com/v1beta";
   }
 
+  private modelId(): string {
+    return this.config.model.replace(/^models\//, "");
+  }
+
   async complete(options: AICompletionOptions): Promise<AICompletionResult> {
     const systemInstruction = options.messages.find((m) => m.role === "system");
     const contents = options.messages
@@ -35,7 +39,7 @@ export class GoogleProvider implements AIProvider {
       }));
 
     const response = await fetchWithTimeout(
-      `${this.baseUrl}/models/${this.config.model}:generateContent?key=${this.config.apiKey}`,
+      `${this.baseUrl}/models/${this.modelId()}:generateContent?key=${this.config.apiKey}`,
       {
         method: "POST",
         headers: {
@@ -96,7 +100,7 @@ export class GoogleProvider implements AIProvider {
     options?: AIEmbeddingOptions
   ): Promise<AIEmbeddingResult> {
     const response = await fetchWithTimeout(
-      `${this.baseUrl}/models/${this.config.model}:embedContent?key=${this.config.apiKey}`,
+      `${this.baseUrl}/models/${this.modelId()}:embedContent?key=${this.config.apiKey}`,
       {
         method: "POST",
         headers: {

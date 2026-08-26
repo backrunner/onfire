@@ -18,12 +18,19 @@ import {
   type AICompletionResult,
   type AIEmbeddingOptions,
   type AIEmbeddingResult,
+  type AIRerankOptions,
+  type AIRerankResult,
   type AIProvider,
   type ProviderConfig,
 } from "./providers";
 import { openStoredSecret } from "@/lib/secret-storage";
 import { getEnv } from "@/lib/db";
-import { safeAIBaseUrl } from "@/lib/ai-config";
+import {
+  classifyAIModel,
+  modelKindForTask,
+  safeAIBaseUrl,
+  type AIModelKind,
+} from "@/lib/ai-config";
 import {
   type AIRuntimeContext,
   resolveAiScopeChain,
@@ -42,6 +49,8 @@ export interface RoutedCredential {
   secretPurpose: string;
   baseUrl: string | null;
   model: string;
+  modelKind: AIModelKind;
+  modelDimensions: number | null;
   priority: number;
   cooldownSeconds: number;
 }
@@ -91,6 +100,9 @@ export async function hasConfiguredAITask(
       taskEnabled: aiConfigs.enabled,
       routeEnabled: aiTaskCredentials.enabled,
       credentialEnabled: aiCredentials.enabled,
+      model: aiTaskCredentials.model,
+      modelKind: aiTaskCredentials.modelKind,
+      modelDimensions: aiTaskCredentials.modelDimensions,
     })
     .from(aiTaskCredentials)
     .innerJoin(
@@ -111,9 +123,14 @@ export async function hasConfiguredAITask(
       )
     );
 
-  return rows.some(
-    (row) => row.taskEnabled && row.routeEnabled && row.credentialEnabled
-  );
+  return rows.some((row) => {
+    const kind = row.modelKind ?? classifyAIModel(row.model);
+    return row.taskEnabled &&
+      row.routeEnabled &&
+      row.credentialEnabled &&
+      kind === modelKindForTask(taskType) &&
+      (kind !== "embedding" || row.modelDimensions === 1024);
+  });
 }
 
 async function listAvailableCredentials(
@@ -138,6 +155,8 @@ async function listAvailableCredentials(
       blockedUntil: aiCredentials.blockedUntil,
       cooldownSeconds: aiCredentials.cooldownSeconds,
       model: aiTaskCredentials.model,
+      modelKind: aiTaskCredentials.modelKind,
+      modelDimensions: aiTaskCredentials.modelDimensions,
       priority: aiTaskCredentials.priority,
     })
     .from(aiTaskCredentials)
@@ -169,18 +188,26 @@ async function listAvailableCredentials(
         row.credentialEnabled &&
         (!row.blockedUntil || Date.parse(row.blockedUntil) <= now)
     )
-    .map((row) => ({
-      id: row.credentialId,
-      name: row.credentialName,
-      provider: row.provider,
-      apiMode: row.apiMode,
-      encryptedApiKey: row.encryptedApiKey,
-      secretPurpose: row.secretPurpose,
-      baseUrl: row.baseUrl,
-      model: row.model,
-      priority: row.priority,
-      cooldownSeconds: row.cooldownSeconds,
-    }));
+    .map((row) => {
+      const modelKind = row.modelKind ?? classifyAIModel(row.model);
+      if (modelKind !== modelKindForTask(taskType)) return null;
+      if (modelKind === "embedding" && row.modelDimensions !== 1024) return null;
+      return {
+        id: row.credentialId,
+        name: row.credentialName,
+        provider: row.provider,
+        apiMode: row.apiMode,
+        encryptedApiKey: row.encryptedApiKey,
+        secretPurpose: row.secretPurpose,
+        baseUrl: row.baseUrl,
+        model: row.model,
+        modelKind,
+        modelDimensions: row.modelDimensions,
+        priority: row.priority,
+        cooldownSeconds: row.cooldownSeconds,
+      };
+    })
+    .filter((row): row is RoutedCredential => row !== null);
 }
 
 async function buildProvider(candidate: RoutedCredential): Promise<AIProvider> {
@@ -330,6 +357,13 @@ class FailoverAIProvider implements AIProvider {
     options?: AIEmbeddingOptions
   ): Promise<AIEmbeddingResult> {
     return this.execute((provider) => provider.embed(text, options));
+  }
+
+  rerank(options: AIRerankOptions): Promise<AIRerankResult> {
+    return this.execute((provider) => {
+      if (!provider.rerank) throw new Error(`${provider.name} does not support reranking`);
+      return provider.rerank(options);
+    });
   }
 
   private execute<T>(operation: (provider: AIProvider) => Promise<T>): Promise<T> {

@@ -309,6 +309,7 @@ export function CredentialsTab({
                       setForm({
                         ...form,
                         provider: value as AIProviderValue,
+                        apiMode: value === "openrouter" ? "chat" : form.apiMode,
                         baseUrl: "",
                       })
                     }
@@ -335,7 +336,7 @@ export function CredentialsTab({
                     onChange={(event) => setForm({ ...form, cooldownSeconds: event.target.value })}
                   />
                 </div>
-                {form.provider === "openai" && (
+                {(form.provider === "openai" || form.provider === "openrouter") && (
                   <div className="space-y-1.5 sm:col-span-2">
                     <Label className="text-xs">{t.aiConfig.apiMode}</Label>
                     <Select
@@ -346,7 +347,7 @@ export function CredentialsTab({
                     >
                       <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="responses">{t.aiConfig.apiModes.responses}</SelectItem>
+                        <SelectItem value="responses" disabled={form.provider === "openrouter"}>{t.aiConfig.apiModes.responses}</SelectItem>
                         <SelectItem value="chat">{t.aiConfig.apiModes.chat}</SelectItem>
                       </SelectContent>
                     </Select>

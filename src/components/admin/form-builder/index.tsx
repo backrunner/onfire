@@ -18,6 +18,7 @@ import { FieldPalette } from "./field-palette";
 import { Canvas } from "./canvas";
 import { PropertyPanel } from "./property-panel";
 import { Preview } from "./preview";
+import { FormBuilderAssistant } from "./assistant-panel";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -37,6 +38,7 @@ interface FormBuilderProps {
    * builder gains a language switch: the default language edits structure,
    * other languages edit only the translatable text companions. */
   productId?: string;
+  enableAssistant?: boolean;
   defaultLanguage?: string;
   supportedLanguages?: string[];
 }
@@ -133,6 +135,7 @@ export function FormBuilder({
   initialSchema,
   onSave,
   productId,
+  enableAssistant = false,
   defaultLanguage,
   supportedLanguages,
 }: FormBuilderProps) {
@@ -234,6 +237,12 @@ export function FormBuilder({
         f.id === updatedField.id ? updatedField : f
       ),
     }));
+  }, []);
+
+  const handleApplyAssistantSchema = useCallback((nextSchema: FormSchema) => {
+    setSchema(nextSchema);
+    setSelectedFieldId(null);
+    setValidationErrors([]);
   }, []);
 
   const handleDeleteField = useCallback((id: string) => {
@@ -444,6 +453,15 @@ export function FormBuilder({
             translationLang={translationLang}
           />
         </div>
+
+        {enableAssistant && productId && defaultLanguage && (
+          <FormBuilderAssistant
+            productId={productId}
+            defaultLanguage={defaultLanguage}
+            schema={schema}
+            onApply={handleApplyAssistantSchema}
+          />
+        )}
       </div>
     </div>
   );

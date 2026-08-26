@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { isSafeAIBaseUrl, safeAIBaseUrl } from "@/lib/ai-config";
+import {
+  isSafeAIBaseUrl,
+  safeAIBaseUrl,
+} from "@/lib/ai-config";
 
 describe("AI base URL validation", () => {
   it("normalizes public HTTPS gateway paths", () => {

@@ -202,14 +202,15 @@
 
 ## AI
 
-- Language providers: OpenAI, Anthropic, Google, xAI, DeepSeek.
+- Language providers: OpenAI, OpenRouter, Anthropic, Google, xAI, DeepSeek.
 - OpenAI persists `responses` or `chat`; default to Responses, retain Chat for compatible gateways.
-- Embedding providers: OpenAI, Qwen/DashScope, Jina AI, Cohere, Google.
+- Embedding providers: OpenAI, OpenRouter, Qwen/DashScope, Jina AI, Cohere, Google.
+- Rerank providers: Cohere and Jina AI. Every route must use a model matching its text, embedding, or rerank capability; provider-specific catalogs are fetched and exact model capabilities are verified by the server before assignment.
 - Store provider credentials independently from task routing so one encrypted credential can be reused by multiple AI functions.
 - Each AI task owns an ordered credential route with a model per route entry. Runtime calls skip disabled or cooling-down credentials and try the next configured entry after a provider failure.
 - When a failed credential has another available route entry, place it in a configurable cooldown. Do not cooldown the final credential, and never repeat a successful provider call because health bookkeeping failed.
-- All embedding adapters output exactly 1024 dimensions and distinguish document/query input where supported.
-- Store and query vectors in product namespaces, with a scoped D1 fallback.
+- Only catalog-confirmed embedding models capable of the fixed 1024-dimension contract may be assigned. All embedding adapters request and validate exactly 1024 dimensions and distinguish document/query input where supported.
+- Store and query vectors in product namespaces, with a scoped D1 fallback. Knowledge retrieval reranks a bounded candidate set when a rerank route exists and preserves vector/D1 order when reranking is unavailable or fails.
 - Every language provider treats a successful HTTP response with an empty completion as a protocol error; do not store or display an empty model answer as success.
 - A feature that depends on an AI task cannot be enabled until that task has at least one enabled credential route. Email AI filtering requires configured prescreening credentials; knowledge mutations require configured embedding credentials. Enabling an AI task itself requires at least one assigned credential.
 - AI credentials and task routes exist at system, tenant, and product scope. Tenant and product routes default to the parent scope and can independently override it, including selecting parent-scope credentials. Runtime resolution walks product → tenant → system.

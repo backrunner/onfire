@@ -16,6 +16,8 @@ import { useI18n } from "@/lib/i18n";
 import { api, ApiClientError, swrFetcher } from "@/lib/api/client";
 import {
   AI_TASK_TYPES,
+  modelKindForTask,
+  type AIModelKind,
   type AIProviderValue,
   type AITaskTypeValue,
 } from "@/lib/ai-config";
@@ -46,6 +48,8 @@ interface TaskAssignmentView {
   provider: AIProviderValue;
   credentialEnabled: boolean;
   blockedUntil: string | null;
+  modelKind: AIModelKind | null;
+  modelDimensions: number | null;
 }
 
 interface TaskRoutingView {
@@ -64,6 +68,8 @@ interface AssignmentDraft {
   credentialId: string;
   model: string;
   enabled: boolean;
+  modelKind?: AIModelKind;
+  modelDimensions?: number;
 }
 
 export function RoutingTab({
@@ -152,6 +158,11 @@ function TaskRoutingCard({
   const [inherit, setInherit] = useState(scope !== "system");
   const [assignments, setAssignments] = useState<AssignmentDraft[]>([]);
   const [pending, setPending] = useState(false);
+  const [catalogs, setCatalogs] = useState<Record<
+    string,
+    Array<{ id: string; kind: AIModelKind; dimensions?: number }>
+  >>({});
+  const [loadingCatalog, setLoadingCatalog] = useState<string | null>(null);
 
   const compatibleCredentials = useMemo(
     () =>
@@ -170,6 +181,8 @@ function TaskRoutingCard({
         credentialId: assignment.credentialId,
         model: assignment.model,
         enabled: assignment.enabled,
+        modelKind: assignment.modelKind ?? undefined,
+        modelDimensions: assignment.modelDimensions ?? undefined,
       })) ?? []
     );
   }, [config]);
@@ -190,6 +203,8 @@ function TaskRoutingCard({
         credentialId: credential.id,
         model: defaultModelForTask(credential.provider, taskType),
         enabled: true,
+        modelKind: modelKindForTask(taskType),
+        modelDimensions: taskType === "embedding" ? 1024 : undefined,
       },
     ]);
   };
@@ -228,6 +243,8 @@ function TaskRoutingCard({
           credentialId: assignment.credentialId,
           model: assignment.model,
           enabled: assignment.enabled,
+          modelKind: assignment.modelKind ?? undefined,
+          modelDimensions: assignment.modelDimensions ?? undefined,
         }))
       );
     }
@@ -255,6 +272,8 @@ function TaskRoutingCard({
           : assignments.map((assignment) => ({
               credentialId: assignment.credentialId,
               model: assignment.model.trim(),
+              ...(assignment.modelKind ? { modelKind: assignment.modelKind } : {}),
+              ...(assignment.modelDimensions ? { modelDimensions: assignment.modelDimensions } : {}),
               enabled: assignment.enabled,
             })),
       });
@@ -264,6 +283,24 @@ function TaskRoutingCard({
       toast.error(error instanceof ApiClientError ? error.message : r.saveFailed);
     } finally {
       setPending(false);
+    }
+  };
+
+  const loadCatalog = async (credentialId: string) => {
+    setLoadingCatalog(credentialId);
+    try {
+      const scopeQuery = aiScopeQuery({ scope, tenantId, productId })
+        .replace("?", "&");
+      const result = await api.get<{
+        models: Array<{ id: string; kind: AIModelKind; dimensions?: number }>;
+      }>(
+        `/api/tob/admin/ai/models?credentialId=${encodeURIComponent(credentialId)}${scopeQuery}`,
+      );
+      setCatalogs((current) => ({ ...current, [credentialId]: result.models }));
+    } catch (error) {
+      toast.error(error instanceof ApiClientError ? error.message : r.loadModelsFailed);
+    } finally {
+      setLoadingCatalog(null);
     }
   };
 
@@ -358,6 +395,15 @@ function TaskRoutingCard({
               const models = credential
                 ? modelsForTask(credential.provider, taskType)
                 : [];
+              const fetchedModels = catalogs[assignment.credentialId];
+              const availableModels = fetchedModels
+                ? fetchedModels
+                    .filter((model) =>
+                      model.kind === modelKindForTask(taskType) &&
+                      (model.kind !== "embedding" || model.dimensions === 1024)
+                    )
+                    .map((model) => model.id)
+                : models;
               const usedByOthers = new Set(
                 assignments
                   .filter((_, itemIndex) => itemIndex !== index)
@@ -420,6 +466,8 @@ function TaskRoutingCard({
                             model: nextCredential
                               ? defaultModelForTask(nextCredential.provider, taskType)
                               : "",
+                            modelKind: nextCredential ? modelKindForTask(taskType) : undefined,
+                            modelDimensions: taskType === "embedding" ? 1024 : undefined,
                           });
                         }}
                       >
@@ -458,14 +506,36 @@ function TaskRoutingCard({
                         id={`model-${taskType}-${assignment.id}`}
                         className="h-8 w-full"
                         value={assignment.model}
-                        onChange={(event) =>
-                          updateAssignment(index, { model: event.target.value })
-                        }
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          const catalogModel = (catalogs[assignment.credentialId] ?? [])
+                            .find((item) => item.id === value);
+                          updateAssignment(index, {
+                            model: value,
+                            modelKind: catalogModel?.kind,
+                            modelDimensions: catalogModel?.dimensions,
+                          });
+                        }}
                         list={`models-${taskType}-${assignment.id}`}
                       />
                       <datalist id={`models-${taskType}-${assignment.id}`}>
-                        {models.map((model) => <option key={model} value={model} />)}
+                        {availableModels
+                          .filter((model, index, all) => all.indexOf(model) === index)
+                          .map((model) => <option key={model} value={model} />)}
                       </datalist>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-0 text-[11px]"
+                        onClick={() => void loadCatalog(assignment.credentialId)}
+                        disabled={loadingCatalog === assignment.credentialId}
+                      >
+                        {loadingCatalog === assignment.credentialId && (
+                          <Loader2 className="size-3 animate-spin" />
+                        )}
+                        {t.aiConfig.routing.loadModels}
+                      </Button>
                     </div>
                   </div>
                 </div>

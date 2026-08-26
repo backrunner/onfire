@@ -31,6 +31,8 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@assistant-ui/react": "^0.15.16",
+    "@assistant-ui/react-markdown": "^0.14.12",
     "@better-auth/oauth-provider": "1.7.0-rc.5",
     "@better-auth/passkey": "1.7.0-rc.5",
     "@marsidev/react-turnstile": "^1.5.4",

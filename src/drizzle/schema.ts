@@ -869,9 +869,11 @@ export type AITaskType =
   | "prescreening"
   | "prereply"
   | "translation"
-  | "embedding";
+  | "embedding"
+  | "rerank";
 export type AIProvider =
   | "openai"
+  | "openrouter"
   | "anthropic"
   | "google"
   | "xai"
@@ -939,6 +941,8 @@ export const aiTaskCredentials = sqliteTable(
     taskType: text("task_type").$type<AITaskType>().notNull(),
     credentialId: text("credential_id").notNull(),
     model: text("model").notNull(),
+    modelKind: text("model_kind").$type<"text" | "embedding" | "rerank">(),
+    modelDimensions: integer("model_dimensions"),
     priority: integer("priority").notNull().default(0),
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
     createdAt: text("created_at").notNull(),

@@ -236,6 +236,7 @@ export function TicketTemplateVersionManagement({ ticketTypeId, productId }: { t
               initialSchema={editorBase?.formSchema ?? current?.formSchema ?? createEmptyFormSchema()}
               onSave={(schema) => setSaveDraft(schema)}
               productId={productId}
+              enableAssistant
               defaultLanguage={product?.defaultLanguage}
               supportedLanguages={supportedLanguages.length > 0 ? supportedLanguages : undefined}
             />

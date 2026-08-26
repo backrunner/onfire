@@ -32,6 +32,17 @@ export interface AIEmbeddingResult {
   };
 }
 
+export interface AIRerankResult {
+  results: Array<{ index: number; relevanceScore: number; document?: string }>;
+  usage?: { totalTokens: number };
+}
+
+export interface AIRerankOptions {
+  query: string;
+  documents: string[];
+  topN?: number;
+}
+
 export interface AIEmbeddingOptions {
   inputType?: "document" | "query";
 }
@@ -40,6 +51,7 @@ export interface AIProvider {
   name: string;
   complete(options: AICompletionOptions): Promise<AICompletionResult>;
   embed(text: string, options?: AIEmbeddingOptions): Promise<AIEmbeddingResult>;
+  rerank?(options: AIRerankOptions): Promise<AIRerankResult>;
 }
 
 export interface ProviderConfig {
@@ -66,6 +78,10 @@ export async function createProvider(config: ProviderConfig): Promise<AIProvider
     case "openai": {
       const { OpenAIProvider } = await import("./openai");
       return new OpenAIProvider(config);
+    }
+    case "openrouter": {
+      const { OpenRouterProvider } = await import("./openrouter");
+      return new OpenRouterProvider(config);
     }
     case "anthropic": {
       const { AnthropicProvider } = await import("./anthropic");

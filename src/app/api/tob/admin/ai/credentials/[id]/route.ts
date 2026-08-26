@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import { aiCredentials, aiTaskCredentials } from "@/drizzle/schema";
 import { withAuth, parseBody, type AuthedContext } from "@/lib/api/handler";
 import { badRequest, notFound, ok } from "@/lib/api/response";
@@ -8,12 +9,18 @@ import {
   ALL_AI_PROVIDERS,
   OPENAI_API_MODES,
   isProviderAllowedForTask,
+  modelKindForTask,
   safeAIBaseUrl,
 } from "@/lib/ai-config";
 import { getEnv } from "@/lib/db";
-import { sealSecret } from "@/lib/secret-storage";
+import { openStoredSecret, sealSecret } from "@/lib/secret-storage";
 import { AI_CREDENTIAL_SECRET_PURPOSE } from "@/services/ai/config";
 import { assertCanManageAiScope } from "@/lib/ai-scope";
+import {
+  findCompatibleModel,
+  listProviderModels,
+  normalizeProviderModelId,
+} from "@/services/ai/model-catalog";
 
 const baseUrlSchema = z.preprocess(
   (value) => (typeof value === "string" && value.trim() === "" ? null : value),
@@ -61,11 +68,24 @@ export const PATCH = withAuth(
     const body = await parseBody(req, updateCredentialSchema);
     const nextProvider = body.provider ?? existing.provider;
 
-    if (body.provider && body.provider !== existing.provider) {
-      const routes = await ctx.db
-        .select({ taskType: aiTaskCredentials.taskType })
-        .from(aiTaskCredentials)
-        .where(eq(aiTaskCredentials.credentialId, existing.id));
+    const routes = await ctx.db
+      .select({
+        id: aiTaskCredentials.id,
+        taskType: aiTaskCredentials.taskType,
+        model: aiTaskCredentials.model,
+      })
+      .from(aiTaskCredentials)
+      .where(eq(aiTaskCredentials.credentialId, existing.id));
+    const modelChanges = body.provider !== undefined ||
+      body.apiKey !== undefined ||
+      body.baseUrl !== undefined;
+    const verifiedRoutes: Array<{
+      id: string;
+      model: string;
+      kind: "text" | "embedding" | "rerank";
+      dimensions?: number;
+    }> = [];
+    if (modelChanges && routes.length > 0) {
       if (
         routes.some(
           (route) => !isProviderAllowedForTask(route.taskType, nextProvider)
@@ -75,6 +95,40 @@ export const PATCH = withAuth(
           "Remove incompatible task routes before changing this provider"
         );
       }
+      const nextApiKey = body.apiKey ?? await openStoredSecret(
+        existing.apiKey,
+        getEnv().AUTH_SECRET,
+        existing.secretPurpose,
+      );
+      let models;
+      try {
+        models = await listProviderModels(
+          nextProvider,
+          nextApiKey,
+          body.baseUrl === undefined ? existing.baseUrl : body.baseUrl,
+        );
+      } catch (error) {
+        throw badRequest(error instanceof Error ? error.message : "Unable to verify provider models");
+      }
+      for (const route of routes) {
+        const model = normalizeProviderModelId(nextProvider, route.model);
+        const match = findCompatibleModel(
+          models,
+          model,
+          modelKindForTask(route.taskType),
+        );
+        if (!match) {
+          throw badRequest(
+            "Remove or update incompatible task routes before changing this credential",
+          );
+        }
+        verifiedRoutes.push({
+          id: route.id,
+          model,
+          kind: match.kind,
+          dimensions: match.dimensions,
+        });
+      }
     }
 
     const now = new Date().toISOString();
@@ -83,7 +137,11 @@ export const PATCH = withAuth(
     };
     if (body.name !== undefined) updates.name = body.name;
     if (body.provider !== undefined) updates.provider = body.provider;
-    if (body.apiMode !== undefined) updates.apiMode = body.apiMode;
+    if (body.apiMode !== undefined || body.provider !== undefined) {
+      updates.apiMode = nextProvider === "openrouter"
+        ? "chat"
+        : body.apiMode ?? existing.apiMode;
+    }
     if (body.baseUrl !== undefined) updates.baseUrl = body.baseUrl;
     if (body.enabled !== undefined) updates.enabled = body.enabled;
     if (body.cooldownSeconds !== undefined) {
@@ -105,10 +163,18 @@ export const PATCH = withAuth(
       updates.lastFailureMessage = null;
     }
 
-    await ctx.db
-      .update(aiCredentials)
-      .set(updates)
-      .where(eq(aiCredentials.id, existing.id));
+    const statements: BatchItem<"sqlite">[] = [
+      ctx.db.update(aiCredentials).set(updates).where(eq(aiCredentials.id, existing.id)),
+      ...verifiedRoutes.map((route) =>
+        ctx.db.update(aiTaskCredentials).set({
+          model: route.model,
+          modelKind: route.kind,
+          modelDimensions: route.dimensions ?? null,
+          updatedAt: now,
+        }).where(eq(aiTaskCredentials.id, route.id)),
+      ),
+    ];
+    await ctx.db.batch(statements as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
 
     return ok({ updated: true });
   }

@@ -521,6 +521,18 @@ export const en: Translations = {
     translationModeHint: 'Translation mode: only text translations are editable here; structure, option values, and validation rules change in the default language',
     description: 'Description',
     patternMessage: 'Format error message',
+    assistant: {
+      title: 'AI Form Agent',
+      hint: 'Describe the form you need',
+      empty: 'Ask the agent to create or revise a form draft. The result will stay here until you apply it.',
+      placeholder: 'e.g. Create a bug report form with steps, environment, and priority…',
+      generating: 'Generating form draft…',
+      apply: 'Apply draft',
+      applied: 'Draft applied',
+      stop: 'Stop generating',
+      notConfigured: 'The product AI agent is not configured',
+      failed: 'Form generation failed. Please try again.'
+    },
     errors: {
       missingId: 'Field {{field}} is missing an ID',
       duplicateId: 'Field {{field}} has a duplicate ID',
@@ -637,6 +649,8 @@ export const en: Translations = {
       moveDown: 'Move credential down',
       coolingDown: 'Currently cooling down',
       credentialDisabled: 'Credential is disabled',
+      loadModels: 'Load models',
+      loadModelsFailed: 'Failed to load provider models',
       saved: 'Function routing saved',
       saveFailed: 'Failed to save function routing'
     },
@@ -650,7 +664,9 @@ export const en: Translations = {
       translation: 'Translation',
       translationHint: 'Translate ticket content and ticket type text',
       embedding: 'Vector Embedding',
-      embeddingHint: 'Knowledge base vector retrieval'
+      embeddingHint: 'Knowledge base vector retrieval',
+      rerank: 'Document Reranking',
+      rerankHint: 'Reorder retrieved knowledge by relevance'
     },
     scopes: {
       system: 'System',
@@ -678,6 +694,7 @@ export const en: Translations = {
     },
     providers: {
       openai: 'OpenAI',
+      openrouter: 'OpenRouter',
       anthropic: 'Anthropic',
       google: 'Google AI',
       xai: 'xAI (Grok)',

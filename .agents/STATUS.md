@@ -1,6 +1,6 @@
 # OnFire Project Status
 
-Updated: 2026-08-25
+Updated: 2026-08-26
 
 ## Current State
 
@@ -111,7 +111,8 @@ Updated: 2026-08-25
 - Product creation can explicitly use the creator's default tenant without selecting a tenant. The product form validates and normalizes every persisted field again at save time, including return URLs, remote identity settings, SLA values, and auto-close values.
 - Tenant/product/team writes reject cross-tenant associations, including SuperAdmin requests, and dependency-protected deletes return HTTP 409.
 - Global search provides scoped ticket suggestions. Clicking opens the ticket; Enter opens the full search page.
-- OpenAI language tasks select Responses API or Chat Completions. Embeddings are independent and support OpenAI, Qwen, Jina, Cohere, and Google.
+- AI routes persist server-verified text, embedding, and rerank capabilities plus embedding dimensions. Provider-specific catalogs use OpenRouter's separate text/embedding endpoints, Anthropic headers/cursor pagination, Google key pagination and normalized IDs, and exact model matching; the API rejects unlisted, wrong-capability, and non-1024 embedding assignments.
+- OpenRouter is supported for language and embedding routes through its OpenAI-compatible API. Cohere and Jina rerank bounded knowledge candidates; missing or failed reranking preserves Vectorize/D1 order, and Cohere search units are not misreported as tokens.
 - AI provider credentials are managed in a reusable credential pool. Each AI function has an ordered credential/model route; provider failures automatically fall through to the next available credential and temporarily cool down failed credentials when a fallback exists.
 - Embeddings use a fixed 1024-dimension contract and product-scoped Cloudflare Vectorize namespaces. Knowledge mutations synchronize vectors and AI workflows use semantic retrieval with a D1 fallback.
 - ToB management lists use compact equal-height panels, stable empty states, explicit empty product selectors, and edit flows for all mutable entities, including API key names.
@@ -159,16 +160,18 @@ Updated: 2026-08-25
   cached rich-text translations.
 - `0024_acoustic_mother_askani.sql`: cached ticket subject and content
   translation maps while preserving authorial base text.
+- `0025_unknown_toxin.sql`: verified model capability and embedding-dimension
+  metadata on AI task routes, with legacy Google and Jina model ID normalization.
 
-A fresh local D1 applied all 25 migrations from `0000` through `0024`, with no
+A fresh local D1 applied all 26 migrations from `0000` through `0025`, with no
 foreign-key violations, and confirmed the Better Auth 1.7 OAuth/resource
 tables, `account.issuer`, MCP grant version, authorization binding table,
 scoped AI usage tables, product/team scope columns, and rich-text attachment
-tables, plus the product/ticket/reply translation columns.
+tables, product/ticket/reply translation columns, and AI route capability metadata.
 A separate non-empty legacy fixture also verifies unique migrated type keys,
 invalid legacy metadata tolerance, pinned version backfill, and historical path
 snapshots. Production D1 has migrations `0000` through `0022` applied;
-`0023` and `0024` remain pending operator application with the matching Worker.
+`0023` through `0025` remain pending operator application with the matching Worker.
 
 ## Verification
 
@@ -182,14 +185,14 @@ snapshots. Production D1 has migrations `0000` through `0022` applied;
   checks, live reassignment membership, signed-consent structure, strict bearer
   scopes, canonical discovery, encoded-path isolation, MCP Origin checks,
   sensitive response no-store policy, and JSON media type.
-- Full `pnpm test`: passing, 78 files and 532 tests.
+- Full `pnpm test`: passing, 83 files and 557 tests.
 - `pnpm build:worker`: passing with OpenNext Cloudflare 1.20.2, Next 16.2.12, Wrangler 4.120.1, and Wrangler-generated workerd runtime types.
 - `pnpm cf-typegen --check`: passing with generated `CloudflareEnv`; `wrangler.types.env` keeps secret typing deterministic without storing values.
 - `pnpm exec drizzle-kit check`: passing.
 - `pnpm install --frozen-lockfile`: passing on the tracked pnpm lockfile.
 - `pnpm audit --prod`: no known vulnerabilities after scoped esbuild/PostCSS/Sharp overrides in `pnpm-workspace.yaml`.
 - `wrangler deploy --dry-run`: passing with all D1, R2, Vectorize, Email, service, and asset bindings detected.
-- `wrangler check startup`: passing; active CPU was approximately 23.8 ms with
+- `wrangler check startup`: passing; active CPU was approximately 16.6 ms with
   no sampled garbage collection (the generated
   profile was removed after inspection).
 - Real local OAuth/MCP smoke: DCR associated the public client with the exact

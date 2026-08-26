@@ -57,8 +57,8 @@ async function request<T>(
 
 export const api = {
   get: <T>(url: string) => request<T>(url),
-  post: <T>(url: string, json?: unknown) =>
-    request<T>(url, { method: "POST", json }),
+  post: <T>(url: string, json?: unknown, options?: RequestInit) =>
+    request<T>(url, { ...options, method: "POST", json }),
   /** Multipart upload — the browser sets the Content-Type boundary. */
   postForm: <T>(url: string, form: FormData) =>
     request<T>(url, { method: "POST", body: form }),

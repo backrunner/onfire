@@ -5,6 +5,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { EMBEDDING_DIMENSIONS } from "@/lib/ai-config";
 import { getAIProvider } from "./config";
 import type { AIRuntimeContext } from "@/lib/ai-scope";
+import { applyRerankOrder, rerank } from "./rerank";
 
 export async function generateEmbedding(
   db: Database,
@@ -168,12 +169,14 @@ export async function findRelevantKnowledge(
   query: string,
   limit = 5
 ): Promise<Array<typeof productKnowledge.$inferSelect>> {
+  const resultLimit = Math.min(Math.max(Math.trunc(limit), 1), 20);
+  const candidateLimit = Math.min(resultLimit * 4, 20);
   let matches: Array<{ id: string; score: number; type: string }> = [];
   try {
     matches = await searchSimilar(db, query, {
       productId,
       type: "knowledge",
-      limit,
+      limit: candidateLimit,
     });
   } catch (error) {
     console.error("Vector knowledge search failed:", error);
@@ -193,14 +196,40 @@ export async function findRelevantKnowledge(
     const ranked = matches
       .map((match) => byId.get(match.id))
       .filter((row): row is typeof productKnowledge.$inferSelect => Boolean(row));
-    if (ranked.length > 0) return ranked;
+    if (ranked.length > 0) {
+      return rerankKnowledgeRows(db, productId, query, ranked, resultLimit);
+    }
   }
 
-  return db
+  const fallback = await db
     .select()
     .from(productKnowledge)
     .where(eq(productKnowledge.productId, productId))
-    .limit(limit);
+    .limit(candidateLimit);
+  return rerankKnowledgeRows(db, productId, query, fallback, resultLimit);
+}
+
+async function rerankKnowledgeRows(
+  db: Database,
+  productId: string,
+  query: string,
+  rows: Array<typeof productKnowledge.$inferSelect>,
+  limit: number,
+): Promise<Array<typeof productKnowledge.$inferSelect>> {
+  if (rows.length <= 1) return rows.slice(0, limit);
+  try {
+    const result = await rerank(
+      db,
+      query,
+      rows.map((row) => `${row.title}\n\n${row.content}`.slice(0, 8_000)),
+      limit,
+      { productId },
+    );
+    return applyRerankOrder(rows, result, limit);
+  } catch (error) {
+    console.error("Knowledge reranking failed:", error);
+    return rows.slice(0, limit);
+  }
 }
 
 export async function batchEmbedKnowledge(

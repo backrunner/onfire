@@ -137,7 +137,7 @@ export const POST = withAuth({}, async (req: NextRequest, ctx) => {
       id,
       name: body.name,
       provider: body.provider,
-      apiMode: body.apiMode,
+      apiMode: body.provider === "openrouter" ? "chat" : body.apiMode,
       apiKey,
       secretPurpose: purpose,
       baseUrl: body.baseUrl ?? null,

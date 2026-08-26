@@ -18,4 +18,5 @@ export {
 } from "./translation";
 export { chatWithAgent, getChatHistory, clearChatSession, type AgentChatOptions, type AgentChatResult } from "./agent";
 export { generateEmbedding, embedKnowledge, embedTicket, searchSimilar, batchEmbedKnowledge } from "./embedding";
+export { rerank } from "./rerank";
 export { createProvider, type AIProvider, type AIMessage, type ProviderConfig } from "./providers";

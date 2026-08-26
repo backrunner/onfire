@@ -15,6 +15,8 @@ function candidate(id: string, cooldownSeconds = 60): RoutedCredential {
     secretPurpose: `ai-credential:${id}`,
     baseUrl: null,
     model: "gpt-5.4-mini",
+    modelKind: "text",
+    modelDimensions: null,
     priority: 0,
     cooldownSeconds,
   };

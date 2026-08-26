@@ -8,6 +8,7 @@ import { GoogleProvider } from "./google";
 import { AnthropicProvider } from "./anthropic";
 import { DeepSeekProvider } from "./deepseek";
 import { XAIProvider } from "./xai";
+import { OpenRouterProvider } from "./openrouter";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -18,6 +19,20 @@ function mockJson(body: unknown) {
 }
 
 describe("AI provider protocols", () => {
+  it("uses OpenRouter's OpenAI-compatible chat endpoint", async () => {
+    const fetchMock = mockJson({ choices: [{ message: { content: "ok" } }] });
+    const provider = new OpenRouterProvider({
+      provider: "openrouter",
+      model: "openai/gpt-4o-mini",
+      apiKey: "test",
+      apiMode: "chat",
+    });
+    await expect(provider.complete({ messages: [{ role: "user", content: "hello" }] }))
+      .resolves.toMatchObject({ content: "ok" });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "https://openrouter.ai/api/v1/chat/completions"
+    );
+  });
   it("uses the OpenAI Responses API when configured", async () => {
     const fetchMock = mockJson({
       output: [{ type: "message", content: [{ type: "output_text", text: "ok" }] }],
@@ -196,5 +211,47 @@ describe("AI provider protocols", () => {
       taskType: "RETRIEVAL_QUERY",
       outputDimensionality: EMBEDDING_DIMENSIONS,
     });
+  });
+
+  it("accepts legacy Google model ids without duplicating the models path", async () => {
+    const fetchMock = mockJson({ embedding: { values: [0.1] } });
+    const provider = new GoogleProvider({
+      provider: "google",
+      model: "models/gemini-embedding-2",
+      apiKey: "test",
+    });
+    await provider.embed("hello");
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:embedContent?key=test",
+    );
+  });
+
+  it.each([
+    {
+      provider: new JinaEmbeddingProvider({
+        provider: "jina",
+        model: "jina-reranker-v3",
+        apiKey: "test",
+      }),
+      endpoint: "https://api.jina.ai/v1/rerank",
+    },
+    {
+      provider: new CohereEmbeddingProvider({
+        provider: "cohere",
+        model: "rerank-v3.5",
+        apiKey: "test",
+      }),
+      endpoint: "https://api.cohere.com/v2/rerank",
+    },
+  ])("uses the provider rerank endpoint", async ({ provider, endpoint }) => {
+    const fetchMock = mockJson({
+      results: [{ index: 1, relevance_score: 0.9, document: { text: "second" } }],
+      meta: { billed_units: { search_units: 1 } },
+    });
+    await expect(provider.rerank?.({ query: "q", documents: ["first", "second"], topN: 1 }))
+      .resolves.toMatchObject({ results: [{ index: 1, relevanceScore: 0.9 }] });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(endpoint);
+    const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(request).toMatchObject({ top_n: 1, return_documents: true });
   });
 });

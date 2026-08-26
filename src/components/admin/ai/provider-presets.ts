@@ -1,6 +1,7 @@
 import {
   EMBEDDING_AI_PROVIDERS,
   LANGUAGE_AI_PROVIDERS,
+  RERANK_AI_PROVIDERS,
   type AIProviderValue,
   type AITaskTypeValue,
 } from "@/lib/ai-config";
@@ -9,6 +10,7 @@ interface ProviderPreset {
   baseUrl: string;
   languageModels?: string[];
   embeddingModels?: string[];
+  rerankModels?: string[];
 }
 
 export const PROVIDER_PRESETS: Record<AIProviderValue, ProviderPreset> = {
@@ -16,6 +18,11 @@ export const PROVIDER_PRESETS: Record<AIProviderValue, ProviderPreset> = {
     baseUrl: "https://api.openai.com/v1",
     languageModels: ["gpt-5.4-mini", "gpt-4.1-mini"],
     embeddingModels: ["text-embedding-3-small", "text-embedding-3-large"],
+  },
+  openrouter: {
+    baseUrl: "https://openrouter.ai/api/v1",
+    languageModels: ["openai/gpt-4o-mini", "anthropic/claude-3.5-haiku"],
+    embeddingModels: ["openai/text-embedding-3-small"],
   },
   anthropic: {
     baseUrl: "https://api.anthropic.com/v1",
@@ -41,14 +48,17 @@ export const PROVIDER_PRESETS: Record<AIProviderValue, ProviderPreset> = {
   jina: {
     baseUrl: "https://api.jina.ai/v1",
     embeddingModels: [
-      "jina-embeddings-v5",
+      "jina-embeddings-v5-text-small",
+      "jina-embeddings-v5-omni-small",
       "jina-embeddings-v4",
       "jina-embeddings-v3",
     ],
+    rerankModels: ["jina-reranker-v3.5", "jina-reranker-v3", "jina-reranker-v2-base-multilingual"],
   },
   cohere: {
     baseUrl: "https://api.cohere.com/v2",
     embeddingModels: ["embed-v4.0", "embed-multilingual-v3.0"],
+    rerankModels: ["rerank-v4.0-pro", "rerank-v3.5"],
   },
 };
 
@@ -56,9 +66,10 @@ export function providerSupportsTask(
   provider: AIProviderValue,
   taskType: AITaskTypeValue
 ): boolean {
-  const providers =
-    taskType === "embedding"
-      ? EMBEDDING_AI_PROVIDERS
+  const providers = taskType === "embedding"
+    ? EMBEDDING_AI_PROVIDERS
+    : taskType === "rerank"
+      ? RERANK_AI_PROVIDERS
       : LANGUAGE_AI_PROVIDERS;
   return providers.some((value) => value === provider);
 }
@@ -68,9 +79,9 @@ export function modelsForTask(
   taskType: AITaskTypeValue
 ): string[] {
   const preset = PROVIDER_PRESETS[provider];
-  return taskType === "embedding"
-    ? preset.embeddingModels ?? []
-    : preset.languageModels ?? [];
+  if (taskType === "embedding") return preset.embeddingModels ?? [];
+  if (taskType === "rerank") return preset.rerankModels ?? [];
+  return preset.languageModels ?? [];
 }
 
 export function defaultModelForTask(

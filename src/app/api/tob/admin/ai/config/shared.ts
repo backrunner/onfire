@@ -12,7 +12,16 @@ import { badRequest } from "@/lib/api/response";
 import {
   AI_TASK_TYPES,
   isProviderAllowedForTask,
+  modelKindForTask,
 } from "@/lib/ai-config";
+import { getEnv } from "@/lib/db";
+import { openStoredSecret } from "@/lib/secret-storage";
+import {
+  findCompatibleModel,
+  listProviderModels,
+  normalizeProviderModelId,
+  type AIModelDescriptor,
+} from "@/services/ai/model-catalog";
 import {
   type AIScope,
   type AIScopeRef,
@@ -25,6 +34,8 @@ import {
 const assignmentSchema = z.object({
   credentialId: z.string().min(1),
   model: z.string().trim().min(1).max(200),
+  modelKind: z.enum(["text", "embedding", "rerank"]).optional(),
+  modelDimensions: z.number().int().positive().max(16_384).optional(),
   enabled: z.boolean().optional(),
 });
 
@@ -52,6 +63,8 @@ const assignmentSelect = {
   taskType: aiTaskCredentials.taskType,
   credentialId: aiTaskCredentials.credentialId,
   model: aiTaskCredentials.model,
+  modelKind: aiTaskCredentials.modelKind,
+  modelDimensions: aiTaskCredentials.modelDimensions,
   priority: aiTaskCredentials.priority,
   enabled: aiTaskCredentials.enabled,
   credentialName: aiCredentials.name,
@@ -161,6 +174,9 @@ async function assertAssignableCredentials(
       scope: aiCredentials.scope,
       tenantId: aiCredentials.tenantId,
       productId: aiCredentials.productId,
+      apiKey: aiCredentials.apiKey,
+      secretPurpose: aiCredentials.secretPurpose,
+      baseUrl: aiCredentials.baseUrl,
     })
     .from(aiCredentials)
     .where(inArray(aiCredentials.id, credentialIds));
@@ -182,6 +198,36 @@ async function assertAssignableCredentials(
     if (!allowed) {
       throw badRequest("Credential is outside the inheritable scope");
     }
+  }
+  const catalogs = new Map<string, AIModelDescriptor[]>();
+  for (const assignment of assignments) {
+    const credential = credentials.find((item) => item.id === assignment.credentialId);
+    if (!credential) throw badRequest("AI credential does not exist");
+    let catalog = catalogs.get(credential.id);
+    if (!catalog) {
+      try {
+        const apiKey = await openStoredSecret(
+          credential.apiKey,
+          getEnv().AUTH_SECRET,
+          credential.secretPurpose,
+        );
+        catalog = await listProviderModels(credential.provider, apiKey, credential.baseUrl);
+      } catch (error) {
+        throw badRequest(
+          error instanceof Error ? error.message : "Unable to verify the provider model",
+        );
+      }
+      catalogs.set(credential.id, catalog);
+    }
+    assignment.model = normalizeProviderModelId(credential.provider, assignment.model);
+    const match = findCompatibleModel(
+      catalog,
+      assignment.model,
+      modelKindForTask(taskType),
+    );
+    if (!match) throw badRequest(`Model is not compatible with the ${taskType} task`);
+    assignment.modelKind = match.kind;
+    assignment.modelDimensions = match.dimensions;
   }
 }
 
@@ -243,6 +289,8 @@ export async function saveTaskRouting(
         taskType,
         credentialId: assignment.credentialId,
         model: assignment.model,
+        modelKind: assignment.modelKind ?? null,
+        modelDimensions: assignment.modelDimensions ?? null,
         priority,
         enabled: assignment.enabled ?? true,
         createdAt: now,

@@ -519,6 +519,18 @@ export const zh = {
     translationModeHint: '翻译模式：仅可编辑文本翻译，结构、选项值与校验规则请在默认语言下修改',
     description: '字段描述',
     patternMessage: '格式错误提示',
+    assistant: {
+      title: 'AI 表单助手',
+      hint: '描述你需要的表单',
+      empty: '告诉助手创建或修改什么表单。生成结果会先停留在这里，确认后才应用。',
+      placeholder: '例如：创建一个包含复现步骤、运行环境和优先级的故障表单…',
+      generating: '正在生成表单草稿…',
+      apply: '应用草稿',
+      applied: '已应用草稿',
+      stop: '停止生成',
+      notConfigured: '产品尚未配置 AI Agent',
+      failed: '表单生成失败，请稍后重试。'
+    },
     errors: {
       missingId: '字段 {{field}} 缺少 ID',
       duplicateId: '字段 {{field}} 的 ID 重复',
@@ -635,6 +647,8 @@ export const zh = {
       moveDown: '下移凭据',
       coolingDown: '当前处于冷却期',
       credentialDisabled: '该凭据已停用',
+      loadModels: '拉取模型列表',
+      loadModelsFailed: '供应商模型列表拉取失败',
       saved: '功能路由已保存',
       saveFailed: '功能路由保存失败'
     },
@@ -648,7 +662,9 @@ export const zh = {
       translation: '翻译',
       translationHint: '翻译工单内容与工单类型文本',
       embedding: '向量嵌入',
-      embeddingHint: '知识库向量化检索'
+      embeddingHint: '知识库向量化检索',
+      rerank: '文档重排序',
+      rerankHint: '按相关性重新排列检索结果'
     },
     scopes: {
       system: '系统',
@@ -676,6 +692,7 @@ export const zh = {
     },
     providers: {
       openai: 'OpenAI',
+      openrouter: 'OpenRouter',
       anthropic: 'Anthropic',
       google: 'Google AI',
       xai: 'xAI (Grok)',
