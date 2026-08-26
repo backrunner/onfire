@@ -27,6 +27,7 @@ import { openStoredSecret } from "@/lib/secret-storage";
 import { getEnv } from "@/lib/db";
 import {
   classifyAIModel,
+  isProviderAllowedForTask,
   modelKindForTask,
   safeAIBaseUrl,
   type AIModelKind,
@@ -100,6 +101,7 @@ export async function hasConfiguredAITask(
       taskEnabled: aiConfigs.enabled,
       routeEnabled: aiTaskCredentials.enabled,
       credentialEnabled: aiCredentials.enabled,
+      provider: aiCredentials.provider,
       model: aiTaskCredentials.model,
       modelKind: aiTaskCredentials.modelKind,
       modelDimensions: aiTaskCredentials.modelDimensions,
@@ -128,6 +130,7 @@ export async function hasConfiguredAITask(
     return row.taskEnabled &&
       row.routeEnabled &&
       row.credentialEnabled &&
+      isProviderAllowedForTask(taskType, row.provider) &&
       kind === modelKindForTask(taskType) &&
       (kind !== "embedding" || row.modelDimensions === 1024);
   });
@@ -186,6 +189,7 @@ async function listAvailableCredentials(
         row.taskEnabled &&
         row.routeEnabled &&
         row.credentialEnabled &&
+        isProviderAllowedForTask(taskType, row.provider) &&
         (!row.blockedUntil || Date.parse(row.blockedUntil) <= now)
     )
     .map((row) => {

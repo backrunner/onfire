@@ -185,16 +185,16 @@ snapshots. Production D1 has migrations `0000` through `0022` applied;
   checks, live reassignment membership, signed-consent structure, strict bearer
   scopes, canonical discovery, encoded-path isolation, MCP Origin checks,
   sensitive response no-store policy, and JSON media type.
-- Full `pnpm test`: passing, 83 files and 557 tests.
+- Full `pnpm test`: passing, 83 files and 559 tests.
 - `pnpm build:worker`: passing with OpenNext Cloudflare 1.20.2, Next 16.2.12, Wrangler 4.120.1, and Wrangler-generated workerd runtime types.
 - `pnpm cf-typegen --check`: passing with generated `CloudflareEnv`; `wrangler.types.env` keeps secret typing deterministic without storing values.
 - `pnpm exec drizzle-kit check`: passing.
 - `pnpm install --frozen-lockfile`: passing on the tracked pnpm lockfile.
 - `pnpm audit --prod`: no known vulnerabilities after scoped esbuild/PostCSS/Sharp overrides in `pnpm-workspace.yaml`.
 - `wrangler deploy --dry-run`: passing with all D1, R2, Vectorize, Email, service, and asset bindings detected.
-- `wrangler check startup`: passing; active CPU was approximately 16.6 ms with
-  no sampled garbage collection (the generated
-  profile was removed after inspection).
+- `wrangler check startup`: passing; active CPU was approximately 21.4 ms with
+  1.3 ms sampled garbage collection (the generated profile was removed after
+  inspection).
 - Real local OAuth/MCP smoke: DCR associated the public client with the exact
   `/mcp` resource; PKCE S256 authorization delegated only `tickets:read` to the
   selected Iconwiz product; code exchange returned opaque bearer/rotating

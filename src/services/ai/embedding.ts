@@ -169,7 +169,8 @@ export async function findRelevantKnowledge(
   query: string,
   limit = 5
 ): Promise<Array<typeof productKnowledge.$inferSelect>> {
-  const resultLimit = Math.min(Math.max(Math.trunc(limit), 1), 20);
+  const normalizedLimit = Number.isFinite(limit) ? Math.trunc(limit) : 5;
+  const resultLimit = Math.min(Math.max(normalizedLimit, 1), 20);
   const candidateLimit = Math.min(resultLimit * 4, 20);
   let matches: Array<{ id: string; score: number; type: string }> = [];
   try {

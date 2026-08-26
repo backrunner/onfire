@@ -101,6 +101,22 @@ describe("AI model catalog", () => {
     expect(findCompatibleModel(models, "fixed-embed", "embedding")).toBeNull();
   });
 
+  it("rejects an unsafe configured base URL instead of falling back to the provider", async () => {
+    await expect(listProviderModels("openai", "secret", "http://localhost/v1"))
+      .rejects.toThrow(/unsafe|invalid/i);
+  });
+
+  it("does not assume every unknown Google embedding is 1024-dimensional", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(json({
+      models: [{
+        name: "models/embedding-future",
+        supportedGenerationMethods: ["embedContent"],
+      }],
+    }));
+    const models = await listProviderModels("google", "secret");
+    expect(findCompatibleModel(models, "embedding-future", "embedding")).toBeNull();
+  });
+
   it("does not make static suggestions assignable when a live catalog omits them", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(json({ data: [{ id: "listed-chat" }] }));
     const models = await listProviderModels("openai", "secret");

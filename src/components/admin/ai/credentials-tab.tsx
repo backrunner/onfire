@@ -129,7 +129,7 @@ export function CredentialsTab({
       setForm({
         name: selected.name,
         provider: selected.provider,
-        apiMode: selected.apiMode,
+        apiMode: selected.provider === "openrouter" ? "chat" : selected.apiMode,
         apiKey: "",
         baseUrl: selected.baseUrl ?? "",
         enabled: selected.enabled,
@@ -302,7 +302,7 @@ export function CredentialsTab({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">{t.aiConfig.provider}</Label>
+                  <Label htmlFor="credential-provider" className="text-xs">{t.aiConfig.provider}</Label>
                   <Select
                     value={form.provider}
                     onValueChange={(value) =>
@@ -314,7 +314,7 @@ export function CredentialsTab({
                       })
                     }
                   >
-                    <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                    <SelectTrigger id="credential-provider" className="h-8"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {ALL_AI_PROVIDERS.map((provider) => (
                         <SelectItem key={provider} value={provider}>
@@ -338,14 +338,14 @@ export function CredentialsTab({
                 </div>
                 {(form.provider === "openai" || form.provider === "openrouter") && (
                   <div className="space-y-1.5 sm:col-span-2">
-                    <Label className="text-xs">{t.aiConfig.apiMode}</Label>
+                    <Label htmlFor="credential-api-mode" className="text-xs">{t.aiConfig.apiMode}</Label>
                     <Select
                       value={form.apiMode}
                       onValueChange={(value) =>
                         setForm({ ...form, apiMode: value as OpenAIApiModeValue })
                       }
                     >
-                      <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                      <SelectTrigger id="credential-api-mode" className="h-8"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="responses" disabled={form.provider === "openrouter"}>{t.aiConfig.apiModes.responses}</SelectItem>
                         <SelectItem value="chat">{t.aiConfig.apiModes.chat}</SelectItem>

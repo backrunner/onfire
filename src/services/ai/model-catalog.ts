@@ -104,7 +104,11 @@ function supportsOnFireDimensions(
   if (dimensions.length > 0) return false;
   return (
     (provider === "openai" || provider === "openrouter") && /text-embedding-3-(?:small|large)$/i.test(id)
-  ) || provider === "google" || provider === "qwen";
+  ) || (
+    provider === "google" && /^gemini-embedding-(?:001|2)$/i.test(id)
+  ) || (
+    provider === "qwen" && /^text-embedding-v[34]$/i.test(id)
+  );
 }
 
 function normalizeModels(
@@ -232,7 +236,10 @@ export async function listProviderModels(
   if (!configuredBaseUrl && STATIC_ONLY_PROVIDERS.has(provider)) {
     return STATIC_MODELS[provider] ?? [];
   }
-  const baseUrl = safeAIBaseUrl(configuredBaseUrl) ?? DEFAULT_BASE_URLS[provider];
+  const baseUrl = configuredBaseUrl === undefined || configuredBaseUrl === null || configuredBaseUrl.trim() === ""
+    ? DEFAULT_BASE_URLS[provider]
+    : safeAIBaseUrl(configuredBaseUrl);
+  if (!baseUrl) throw new Error("AI base URL is unsafe or invalid");
   const models = provider === "anthropic"
     ? await listAnthropicModels(baseUrl, apiKey)
     : provider === "google"
