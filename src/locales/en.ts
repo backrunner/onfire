@@ -208,7 +208,16 @@ export const en: Translations = {
       secretDialogWarning: 'This secret is shown only once. Copy and store it securely now. The old secret has been invalidated.',
       copySecret: 'Copy Secret',
       copied: 'Copied to clipboard',
-      regenerateFailed: 'Failed to generate secret'
+      regenerateFailed: 'Failed to generate secret',
+      mailerooHint: 'Maileroo Inbound Routing posts to the webhook URL on your ToC domain. Authentication uses Maileroo\'s one-shot validation callback, so no webhook secret is required.',
+      webhookUrl: 'Webhook URL',
+      copyUrl: 'Copy URL',
+      resendHint: 'Paste the webhook signing secret and API key from your Resend dashboard. Received email content is fetched from the Resend API.',
+      resendSecret: 'Webhook Signing Secret',
+      resendSecretPlaceholder: 'whsec_…',
+      resendApiKey: 'Resend API Key',
+      resendApiKeyPlaceholder: 're_…',
+      credentialConfigured: 'Configured — leave blank to keep'
     },
     outbound: {
       title: 'Outbound Email',

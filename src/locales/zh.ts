@@ -206,7 +206,16 @@ export const zh = {
       secretDialogWarning: '此密钥仅显示一次，请立即复制并妥善保存。旧密钥已失效。',
       copySecret: '复制密钥',
       copied: '已复制到剪贴板',
-      regenerateFailed: '密钥生成失败'
+      regenerateFailed: '密钥生成失败',
+      mailerooHint: 'Maileroo Inbound Routing 会将邮件推送到 ToC 域名下的 Webhook 地址。认证使用 Maileroo 的一次性验证回调，无需配置 Webhook 密钥。',
+      webhookUrl: 'Webhook 地址',
+      copyUrl: '复制地址',
+      resendHint: '粘贴 Resend 控制台中的 Webhook 签名密钥和 API Key。收到的邮件内容会通过 Resend API 拉取。',
+      resendSecret: 'Webhook 签名密钥',
+      resendSecretPlaceholder: 'whsec_…',
+      resendApiKey: 'Resend API Key',
+      resendApiKeyPlaceholder: 're_…',
+      credentialConfigured: '已配置 — 留空则保持不变'
     },
     outbound: {
       title: '发送邮件',

@@ -571,6 +571,21 @@ sender identity, and forwards normalized content through the same inbound
 pipeline as webhooks. Cloudflare-routed inbound mail does not use a webhook
 secret.
 
+### Provider Inbound Webhooks
+
+Maileroo Inbound Routing posts the full parsed message (recipients, headers,
+stripped/plain bodies) to `/api/toc/webhooks/maileroo`. Maileroo cannot send
+custom headers, so authenticity is established by calling the one-shot
+`validation_url` in the payload; only `https://inbound-api.maileroo.net` URLs
+are accepted and a `{success: true}` response is required.
+
+Resend's `email.received` webhook at `/api/toc/webhooks/resend` carries
+metadata only and is verified with the product's Svix signing secret
+(`whsec_…`, stored as `inboundWebhookSecret`). The body is then pulled from
+`GET https://api.resend.com/emails/receiving/{email_id}` using the product's
+Resend API key (`inboundApiKey`, sealed). Non-`email.received` events are
+acknowledged with 200 and ignored.
+
 A blank plain-text MIME alternative falls back to usable HTML-derived text; it never overwrites valid content with an empty body.
 
 Custom product templates use the same escaped variable renderer for preview and delivery. Template authoring uses a locally bundled Monaco HTML editor that lazy-loads when a template opens, formats HTML by default, provides format/minify actions and shortcuts, and supports cursor-aware quick-variable insertion with highlighted `{{variable}}` tokens. Email settings discard restores the persisted product snapshot when the settings tab is revisited, and secret drafts clear after a successful save. Preview runs in a sandboxed iframe with scripts and external requests disabled. User-correctable validation and HTTP 4xx feedback use warning toasts; authorization, network, and server failures use error toasts.
@@ -733,7 +748,8 @@ POST   /tickets/:id/escalate  - Escalate ticket
 POST /tasks/sla-scan      - SLA breach scan + auto-close (cron-invoked; Bearer AUTH_SECRET)
 
 # Webhooks
-POST /webhooks/maileroo   - Maileroo inbound email webhook
+POST /webhooks/maileroo   - Maileroo inbound email webhook (validation_url callback auth)
+POST /webhooks/resend     - Resend inbound email webhook (Svix signature auth)
 POST /webhooks/inbound    - Generic inbound email webhook (requires auth)
 ```
 

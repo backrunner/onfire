@@ -9,19 +9,48 @@ export async function hmacSha256Hex(
   message: string | Uint8Array<ArrayBuffer>,
   secret: string
 ): Promise<string> {
+  const signature = await hmacSha256(message, encoder.encode(secret));
+  return bufferToHex(signature);
+}
+
+/** HMAC-SHA256 with raw key bytes, base64-encoded (Svix-style signatures). */
+export async function hmacSha256Base64(
+  message: string | Uint8Array<ArrayBuffer>,
+  keyBytes: Uint8Array<ArrayBuffer>
+): Promise<string> {
+  const signature = await hmacSha256(message, keyBytes);
+  let binary = "";
+  for (const byte of new Uint8Array(signature)) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
+
+export function base64ToBytes(value: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(value);
+  const bytes = new Uint8Array(new ArrayBuffer(binary.length));
+  for (let index = 0; index < binary.length; index++) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+async function hmacSha256(
+  message: string | Uint8Array<ArrayBuffer>,
+  keyBytes: Uint8Array<ArrayBuffer>
+): Promise<ArrayBuffer> {
   const key = await crypto.subtle.importKey(
     "raw",
-    encoder.encode(secret),
+    keyBytes,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"]
   );
-  const signature = await crypto.subtle.sign(
+  return crypto.subtle.sign(
     "HMAC",
     key,
     typeof message === "string" ? encoder.encode(message) : message
   );
-  return bufferToHex(signature);
 }
 
 /** Hash both inputs to a fixed length before comparing to avoid length leaks. */

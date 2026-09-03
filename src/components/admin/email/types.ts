@@ -4,6 +4,7 @@ export type InboundProvider =
   | "maileroo"
   | "sendgrid"
   | "mailgun"
+  | "resend"
   | "cloudflare"
   | "generic";
 export type OutboundProvider =
@@ -43,6 +44,7 @@ export interface EmailConfigView {
   inboundProvider: InboundProvider | null;
   inboundAddress: string | null;
   hasWebhookSecret: boolean;
+  hasInboundApiKey: boolean;
   outboundEnabled: boolean | null;
   outboundProvider: OutboundProvider | null;
   hasOutboundApiKey: boolean;

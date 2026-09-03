@@ -3,6 +3,7 @@ import { openStoredSecret, sealSecret } from "@/lib/secret-storage";
 
 export const EMAIL_SECRET_FIELDS = [
   "inboundWebhookSecret",
+  "inboundApiKey",
   "outboundApiKey",
   "outboundSmtpPass",
 ] as const;

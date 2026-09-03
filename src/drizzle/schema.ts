@@ -1092,6 +1092,7 @@ export type InboundEmailProvider =
   | "maileroo"
   | "sendgrid"
   | "mailgun"
+  | "resend"
   | "cloudflare"
   | "generic";
 export type EmailTemplateType =
@@ -1153,6 +1154,7 @@ export const emailConfigs = sqliteTable(
     inboundProvider: text("inbound_provider").$type<InboundEmailProvider>(),
     inboundAddress: text("inbound_address"),
     inboundWebhookSecret: text("inbound_webhook_secret"),
+    inboundApiKey: text("inbound_api_key"),
     // Outbound settings
     outboundEnabled: integer("outbound_enabled", { mode: "boolean" }).default(
       false,

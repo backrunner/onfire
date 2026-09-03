@@ -98,6 +98,7 @@ Updated: 2026-09-04
 - Notification administration now has explicit metadata and endpoint load failures, fixed-action dialogs with inline validation and discard confirmation, compact policy summaries, and searchable/batched compliance details.
 - Recipient resolution supports current assignee, ticket team, all product agents, specific teams, and specific agents. Overlapping policies deduplicate endpoints, while missing selected methods create failed delivery logs.
 - Cloudflare Email Routing inbound mail is parsed once, normalized, authenticated through the internal task endpoint, deduplicated, threaded, filtered, and persisted.
+- Inbound mail arrives through four paths: the authenticated generic webhook, Cloudflare Email Routing, Maileroo (authenticated by its one-shot `validation_url` callback pinned to `inbound-api.maileroo.net`), and Resend (Svix-signed `email.received` metadata plus body fetch from the receiving API with the product's sealed `inboundApiKey`).
 - Outbound email supports Resend, SendGrid, Mailgun, Maileroo, SMTP, and the Cloudflare `SEND_EMAIL` binding with shared logs, text fallbacks, and thread headers.
 - Email settings discard restores the persisted product snapshot, including after leaving and re-entering the settings tab; secret drafts clear after a successful save.
 - Each product can override four system email templates with custom HTML in a locally bundled Monaco editor. The editor lazy-loads when opened, formats HTML by default, provides format/minify actions and shortcuts, supports cursor-aware quick variables and placeholder highlighting, and has a sandboxed live desktop/mobile preview.
@@ -166,6 +167,8 @@ Updated: 2026-09-04
   translation maps while preserving authorial base text.
 - `0025_unknown_toxin.sql`: verified model capability and embedding-dimension
   metadata on AI task routes, with legacy Google and Jina model ID normalization.
+- `0026_organic_starbolt.sql`: sealed per-product `email_configs.inbound_api_key`
+  for the Resend inbound receiving API.
 
 A fresh local D1 applied all 26 migrations from `0000` through `0025`, with no
 foreign-key violations, and confirmed the Better Auth 1.7 OAuth/resource

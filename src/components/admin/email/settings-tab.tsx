@@ -54,6 +54,7 @@ import { showEmailMutationFailure } from "./toast";
 const INBOUND_PROVIDERS: InboundProvider[] = [
   "cloudflare",
   "maileroo",
+  "resend",
   "generic",
 ];
 const OUTBOUND_PROVIDERS: OutboundProvider[] = [
@@ -88,6 +89,8 @@ interface FormState {
   inboundEnabled: boolean;
   inboundProvider: InboundProvider;
   inboundAddress: string;
+  inboundWebhookSecret: string;
+  inboundApiKey: string;
   outboundEnabled: boolean;
   outboundProvider: OutboundProvider;
   outboundApiKey: string;
@@ -107,6 +110,8 @@ function toFormState(config: EmailConfigView | null): FormState {
     inboundEnabled: config?.inboundEnabled ?? false,
     inboundProvider: config?.inboundProvider ?? "generic",
     inboundAddress: config?.inboundAddress ?? "",
+    inboundWebhookSecret: "",
+    inboundApiKey: "",
     outboundEnabled: config?.outboundEnabled ?? false,
     outboundProvider: isOutboundProvider(config?.outboundProvider)
       ? config.outboundProvider
@@ -200,6 +205,12 @@ export function EmailSettingsTab({
         aiFilterStrictness: form.aiFilterStrictness,
       };
       // Secrets are only written when explicitly provided.
+      if (form.inboundWebhookSecret.trim()) {
+        payload.inboundWebhookSecret = form.inboundWebhookSecret.trim();
+      }
+      if (form.inboundApiKey.trim()) {
+        payload.inboundApiKey = form.inboundApiKey.trim();
+      }
       if (form.outboundApiKey.trim()) {
         payload.outboundApiKey = form.outboundApiKey.trim();
       }
@@ -210,6 +221,8 @@ export function EmailSettingsTab({
       toast.success(tc.saved);
       setForm((current) => ({
         ...current,
+        inboundWebhookSecret: "",
+        inboundApiKey: "",
         outboundApiKey: "",
         outboundSmtpPass: "",
       }));
@@ -261,6 +274,11 @@ export function EmailSettingsTab({
   const copySecret = async () => {
     if (!newSecret) return;
     await navigator.clipboard.writeText(newSecret);
+    toast.success(tc.inbound.copied);
+  };
+
+  const copyWebhookUrl = async () => {
+    await navigator.clipboard.writeText("/api/toc/webhooks/maileroo");
     toast.success(tc.inbound.copied);
   };
 
@@ -355,12 +373,87 @@ export function EmailSettingsTab({
             </div>
           </div>
 
-          {form.inboundProvider === "cloudflare" ? (
+          {form.inboundProvider === "cloudflare" && (
             <div className="flex gap-3 rounded-lg border border-sky-500/20 bg-sky-500/[0.06] px-3 py-2.5 text-sky-800 dark:text-sky-300">
               <ShieldCheck className="mt-0.5 size-4 shrink-0" />
               <p className="text-xs leading-5">{tc.inbound.cloudflareHint}</p>
             </div>
-          ) : (
+          )}
+
+          {form.inboundProvider === "maileroo" && (
+            <>
+              <div className="flex gap-3 rounded-lg border border-sky-500/20 bg-sky-500/[0.06] px-3 py-2.5 text-sky-800 dark:text-sky-300">
+                <ShieldCheck className="mt-0.5 size-4 shrink-0" />
+                <p className="text-xs leading-5">{tc.inbound.mailerooHint}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <KeyRound className="size-4 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">{tc.inbound.webhookUrl}</p>
+                  <code className="block break-all font-mono text-xs text-muted-foreground">
+                    /api/toc/webhooks/maileroo
+                  </code>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  onClick={copyWebhookUrl}
+                >
+                  <Copy className="mr-1.5 size-3.5" />
+                  {tc.inbound.copyUrl}
+                </Button>
+              </div>
+            </>
+          )}
+
+          {form.inboundProvider === "resend" && (
+            <>
+              <Separator />
+              <p className="text-xs text-muted-foreground">
+                {tc.inbound.resendHint}
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">{tc.inbound.resendSecret}</Label>
+                  <Input
+                    type="password"
+                    autoComplete="off"
+                    value={form.inboundWebhookSecret}
+                    onChange={(e) =>
+                      set("inboundWebhookSecret", e.target.value)
+                    }
+                    placeholder={
+                      config?.hasWebhookSecret
+                        ? tc.inbound.credentialConfigured
+                        : tc.inbound.resendSecretPlaceholder
+                    }
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">{tc.inbound.resendApiKey}</Label>
+                  <Input
+                    type="password"
+                    autoComplete="off"
+                    value={form.inboundApiKey}
+                    onChange={(e) => set("inboundApiKey", e.target.value)}
+                    placeholder={
+                      config?.hasInboundApiKey
+                        ? tc.inbound.credentialConfigured
+                        : tc.inbound.resendApiKeyPlaceholder
+                    }
+                    className="h-8 text-sm"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {(form.inboundProvider === "generic" ||
+            form.inboundProvider === "sendgrid" ||
+            form.inboundProvider === "mailgun") && (
             <>
               <Separator />
               <div className="flex flex-wrap items-center gap-3">

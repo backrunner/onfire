@@ -1,0 +1,1 @@
+ALTER TABLE `email_configs` ADD `inbound_api_key` text;
