@@ -1,47 +1,115 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { sql } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import { emailConfigs } from "@/drizzle/schema";
 import { ok, err } from "@/lib/api/response";
 import { withPublic } from "@/lib/api/handler";
-import { verifyWebhookAuth } from "@/lib/webhooks";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { readBodyBytes } from "@/lib/request-body";
+import { parseMailboxHeader } from "@/lib/email-address";
 import { processInboundEmail } from "@/services/email/inbound";
-import { getEnv } from "@/lib/db";
-import { openEmailSecret } from "@/services/email/config-secrets";
 
 const MAX_WEBHOOK_BODY_BYTES = 2 * 1024 * 1024;
+const VALIDATION_URL_HOST = "inbound-api.maileroo.net";
+const VALIDATION_TIMEOUT_MS = 5_000;
+
+const headerValues = z.array(z.string().max(20_000)).max(50);
 
 const mailerooPayloadSchema = z
   .object({
-    from: z.string().email().max(320),
-    from_name: z.string().max(256).optional(),
-    to: z.string().email().max(320),
-    subject: z.string().min(1).max(998),
-    text: z.string().max(500_000).optional(),
-    html: z.string().max(1_000_000).optional(),
+    _id: z.string().max(128).optional(),
     message_id: z.string().max(998).optional(),
-    in_reply_to: z.string().max(2_000).optional(),
-    references: z.string().max(20_000).optional(),
-    spam_score: z.number().optional(),
-    spf: z.string().max(32).optional(),
-    dkim: z.string().max(32).optional(),
-  })
-  .refine((p) => p.text || p.html, {
-    message: "At least one of text or html is required",
+    envelope_sender: z.string().max(320).optional(),
+    recipients: z.array(z.string().max(320)).max(100).optional(),
+    headers: z.record(z.string(), headerValues).optional(),
+    body: z.object({
+      plaintext: z.string().max(500_000).nullish(),
+      stripped_plaintext: z.string().max(500_000).nullish(),
+      html: z.string().max(1_000_000).nullish(),
+      stripped_html: z.string().max(1_000_000).nullish(),
+    }),
+    spf_result: z.string().max(32).optional(),
+    dkim_result: z.boolean().optional(),
+    is_spam: z.boolean().optional(),
+    validation_url: z.string().max(2_000).optional(),
   })
   .refine(
-    (p) => (p.text?.length ?? 0) + (p.html?.length ?? 0) <= 1_500_000,
+    (p) =>
+      p.body.stripped_plaintext?.trim() ||
+      p.body.plaintext?.trim() ||
+      p.body.stripped_html?.trim() ||
+      p.body.html?.trim(),
+    { message: "At least one plaintext or html body part is required" }
+  )
+  .refine(
+    (p) =>
+      (p.body.stripped_plaintext?.length ?? p.body.plaintext?.length ?? 0) +
+        (p.body.stripped_html?.length ?? p.body.html?.length ?? 0) <=
+      1_500_000,
     { message: "Email content exceeds the 1.5 MB limit" }
   );
 
+/** Maileroo strips quoted history; fall back to the full part when empty. */
+function pickBodyPart(
+  stripped: string | null | undefined,
+  full: string | null | undefined
+): string | undefined {
+  if (stripped?.trim()) return stripped;
+  return full ?? undefined;
+}
+
+/** Case-insensitive lookup into the Title-Case header map Maileroo sends. */
+function headerValue(
+  headers: Record<string, string[]> | undefined,
+  name: string
+): string | undefined {
+  if (!headers) return undefined;
+  const key = Object.keys(headers).find(
+    (candidate) => candidate.toLowerCase() === name
+  );
+  return key ? headers[key][0] : undefined;
+}
+
 /**
- * POST /api/toc/webhooks/maileroo — Maileroo inbound email webhook.
+ * Maileroo cannot send custom headers or shared secrets. The only forgery
+ * check is the one-shot validation URL: it must point at Maileroo's own
+ * inbound API (anything else would turn this endpoint into an SSRF relay)
+ * and it is consumed exactly once — never retried.
+ */
+async function validateMailerooCallback(rawUrl: string | undefined): Promise<boolean> {
+  if (!rawUrl) return false;
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:" || url.hostname !== VALIDATION_URL_HOST) {
+    return false;
+  }
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      signal: AbortSignal.timeout(VALIDATION_TIMEOUT_MS),
+    });
+    if (!response.ok) return false;
+    const result: unknown = await response.json();
+    return (
+      typeof result === "object" &&
+      result !== null &&
+      (result as { success?: unknown }).success === true
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * POST /api/toc/webhooks/maileroo — Maileroo Inbound Routing webhook.
  *
- * Authenticated with the same per-product webhook secret as the generic
- * endpoint (Bearer token or HMAC over the raw body). Configure the secret in
- * Maileroo's webhook settings.
+ * Authenticated exclusively through the one-shot `validation_url` callback
+ * (see validateMailerooCallback); Maileroo retries non-200 responses, so a
+ * successfully processed message always returns 200.
  */
 export const POST = withPublic(async (req: NextRequest, { db }) => {
   await enforceRateLimit(db, req, "webhook:maileroo", {
@@ -64,40 +132,63 @@ export const POST = withPublic(async (req: NextRequest, { db }) => {
   }
   const payload = parsed.data;
 
+  // The To header may carry a comma-separated mailbox list.
+  const headerTo = (headerValue(payload.headers, "to") ?? "")
+    .split(",")
+    .map((value) => parseMailboxHeader(value)?.email);
+  const candidates = [
+    ...(payload.recipients ?? []).map(
+      (value) => parseMailboxHeader(value)?.email ?? value.trim().toLowerCase()
+    ),
+    ...headerTo,
+  ].filter((value): value is string => Boolean(value));
+  const uniqueCandidates = [...new Set(candidates)];
+  if (uniqueCandidates.length === 0) {
+    return err("Unknown inbound address", 404);
+  }
   const config = await db.query.emailConfigs.findFirst({
-    where: sql`lower(${emailConfigs.inboundAddress}) = ${payload.to.toLowerCase()}`,
+    where: inArray(
+      sql`lower(${emailConfigs.inboundAddress})`,
+      uniqueCandidates
+    ),
   });
   if (!config) {
     return err("Unknown inbound address", 404);
   }
 
-  const webhookSecret = config.inboundWebhookSecret
-    ? await openEmailSecret(
-        config.productId,
-        "inboundWebhookSecret",
-        config.inboundWebhookSecret,
-        getEnv().AUTH_SECRET
-      )
-    : null;
-  const authenticated = await verifyWebhookAuth(req, rawBody, webhookSecret);
-  if (!authenticated) {
+  if (!(await validateMailerooCallback(payload.validation_url))) {
     return err("Unauthorized", 401);
   }
 
+  const headerFrom = parseMailboxHeader(headerValue(payload.headers, "from"));
+  const envelopeFrom = parseMailboxHeader(payload.envelope_sender);
+  const from = headerFrom ?? envelopeFrom;
+  if (!from) {
+    return err("Missing sender", 400);
+  }
+  const subject =
+    headerValue(payload.headers, "subject")?.trim() || "(no subject)";
+
   const result = await processInboundEmail(db, {
     provider: "maileroo",
-    fromEmail: payload.from,
-    fromName: payload.from_name,
-    toEmail: payload.to,
-    subject: payload.subject,
-    bodyPlain: payload.text,
-    bodyHtml: payload.html,
-    messageId: payload.message_id,
-    inReplyTo: payload.in_reply_to,
-    references: payload.references,
-    spfResult: payload.spf,
-    dkimResult: payload.dkim === "pass",
-    isSpam: payload.spam_score !== undefined && payload.spam_score > 5,
+    fromEmail: from.email,
+    fromName: from.name,
+    toEmail: config.inboundAddress!,
+    subject,
+    bodyPlain: pickBodyPart(
+      payload.body.stripped_plaintext,
+      payload.body.plaintext
+    ),
+    bodyHtml: pickBodyPart(payload.body.stripped_html, payload.body.html),
+    messageId:
+      payload.message_id ?? headerValue(payload.headers, "message-id"),
+    inReplyTo: headerValue(payload.headers, "in-reply-to"),
+    references: headerValue(payload.headers, "references"),
+    spfResult: payload.spf_result,
+    dkimResult: payload.dkim_result,
+    isSpam: payload.is_spam,
+    // The envelope sender is transport-verified; keep it for bounce checks.
+    returnPath: envelopeFrom?.email,
   });
 
   if (!result.success && result.action === "error") {
