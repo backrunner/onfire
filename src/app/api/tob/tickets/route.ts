@@ -49,6 +49,8 @@ export const GET = withAuth({ permission: "ticket.read" }, async (req: NextReque
       or(
         sql`instr(lower(${tickets.subject}), lower(${query.q})) > 0`,
         translationSearchCondition(tickets.subjectTranslations, query.q),
+        sql`instr(lower(${tickets.content}), lower(${query.q})) > 0`,
+        translationSearchCondition(tickets.contentTranslations, query.q),
         sql`instr(lower(${tickets.customerEmail}), lower(${query.q})) > 0`,
         sql`instr(lower(${tickets.id}), lower(${query.q})) > 0`,
         exists(

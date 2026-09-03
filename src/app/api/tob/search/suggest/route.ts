@@ -39,6 +39,8 @@ export const GET = withAuth(
           or(
             sql`instr(lower(${tickets.subject}), lower(${q})) > 0`,
             translationSearchCondition(tickets.subjectTranslations, q),
+            sql`instr(lower(${tickets.content}), lower(${q})) > 0`,
+            translationSearchCondition(tickets.contentTranslations, q),
             sql`instr(lower(${tickets.customerEmail}), lower(${q})) > 0`,
             sql`instr(lower(${tickets.id}), lower(${q})) > 0`,
             sql`instr(lower(${customers.externalId}), lower(${q})) > 0`

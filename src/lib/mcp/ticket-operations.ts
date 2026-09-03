@@ -94,6 +94,8 @@ export async function listMcpTickets(
       or(
         sql`instr(lower(${tickets.subject}), lower(${input.query})) > 0`,
         translationSearchCondition(tickets.subjectTranslations, input.query),
+        sql`instr(lower(${tickets.content}), lower(${input.query})) > 0`,
+        translationSearchCondition(tickets.contentTranslations, input.query),
         sql`instr(lower(${tickets.customerEmail}), lower(${input.query})) > 0`,
         sql`instr(lower(${tickets.id}), lower(${input.query})) > 0`,
         exists(
