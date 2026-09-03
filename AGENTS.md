@@ -1018,8 +1018,8 @@ NEXT_PUBLIC_TURNSTILE_SITE_KEY=xxx  # Pair with TURNSTILE_SECRET; leave both uns
 On 2026-07-13, the APAC `onfire-d1` D1 database, APAC Standard
 `onfire-storage` R2 bucket, and 1024-dimension cosine `onfire-knowledge`
 Vectorize index were provisioned in the Alkinum account. The D1 ID is recorded
-in `wrangler.jsonc`, and migrations through `0014_thick_edwin_jarvis.sql` have
-been applied remotely. Worker version `c3331ad6-bf56-4b68-ac8d-4b9b4b16182b`
+in `wrangler.jsonc`, and migrations through `0026_organic_starbolt.sql` have
+been applied remotely. Worker version `dea21d6f-01d4-44a2-a568-82869490533e`
 is deployed on both Custom Domains with the SLA cron and runtime secrets configured. Remaining
 external rollout steps are Cloudflare Email Sending/routing onboarding and the
 first `/admin/install` SuperAdmin setup. Cloudflare Access is enforced on ToB.
@@ -1068,7 +1068,7 @@ pnpm deploy
 
 ## Current Predeployment Verification
 
-As of 2026-09-04, generated binding checks, TypeScript, 83 test files / 583 tests, and the OpenNext Worker build pass. Worker version `c3331ad6-bf56-4b68-ac8d-4b9b4b16182b` serves 100% of traffic on both Custom Domains. The public ToC health probe returns 200 and the ToC-to-ToB surface guard returns 404. The remaining build warnings are expected: Vectorize has no local simulator, and OpenNext 1.20.1 still requires `src/middleware.ts` instead of Next 16 `proxy.ts`.
+As of 2026-09-04, generated binding checks, TypeScript, 84 test files / 596 tests, and the OpenNext Worker build pass. Worker version `dea21d6f-01d4-44a2-a568-82869490533e` serves 100% of traffic on both Custom Domains. The public ToC health probe returns 200 and the ToC-to-ToB surface guard returns 404. The remaining build warnings are expected: Vectorize has no local simulator, and OpenNext 1.20.1 still requires `src/middleware.ts` instead of Next 16 `proxy.ts`.
 
 ## Contribution Convention
 
