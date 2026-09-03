@@ -657,8 +657,9 @@ export const zh = {
       moveDown: '下移凭据',
       coolingDown: '当前处于冷却期',
       credentialDisabled: '该凭据已停用',
-      loadModels: '拉取模型列表',
+      loadModels: '刷新模型列表',
       loadModelsFailed: '供应商模型列表拉取失败',
+      customModelHint: '也可以直接输入列表外的自定义模型',
       saved: '功能路由已保存',
       saveFailed: '功能路由保存失败'
     },

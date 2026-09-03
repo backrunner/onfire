@@ -1,5 +1,5 @@
 import type { AIModelKind, AIProviderValue } from "@/lib/ai-config";
-import { classifyAIModel, safeAIBaseUrl } from "@/lib/ai-config";
+import { classifyAIModel, EMBEDDING_DIMENSIONS, safeAIBaseUrl } from "@/lib/ai-config";
 import { fetchWithTimeout } from "@/lib/fetch-timeout";
 import { readResponseJson, readResponseText } from "@/lib/response-body";
 
@@ -245,9 +245,10 @@ export async function listProviderModels(
     : provider === "google"
       ? await listGoogleModels(baseUrl, apiKey)
       : await listOpenAiCompatibleModels(provider, baseUrl, apiKey);
-  // Live catalogs are authoritative for server-side route validation. Static
-  // entries enrich matching live records for providers whose catalog omits
-  // dimension metadata, but must never make an unlisted model assignable.
+  // Live catalogs remain authoritative for capability metadata. Static entries
+  // enrich matching live records for providers whose catalog omits dimension
+  // metadata; models outside the catalog are handled by the name-based
+  // fallback in resolveAssignableModel at assignment time.
   const staticModels = STATIC_MODELS[provider] ?? [];
   return models.reduce<AIModelDescriptor[]>((result, model) => {
     const metadata = staticModels.find(
@@ -276,4 +277,33 @@ export function findCompatibleModel(
   if (!match) return null;
   if (expectedKind === "embedding" && match.dimensions !== 1024) return null;
   return match;
+}
+
+/**
+ * Resolve a route assignment to capability metadata. Compatible live-catalog
+ * matches win; a model listed in the catalog with the wrong kind or
+ * unsupported dimensions stays rejected. Models absent from the catalog
+ * (custom gateways, newly released models, or an unreachable provider) fall
+ * back to name-based classification and must still match the task kind.
+ * Custom embedding models are stored as 1024 dimensions, matching what the
+ * adapters request.
+ */
+export function resolveAssignableModel(
+  provider: AIProviderValue,
+  catalog: readonly AIModelDescriptor[],
+  modelId: string,
+  expectedKind: AIModelKind,
+): AIModelDescriptor | null {
+  const id = normalizeProviderModelId(provider, modelId.trim());
+  if (!id) return null;
+  const match = findCompatibleModel(catalog, id, expectedKind);
+  if (match) return match;
+  if (catalog.some((model) => model.id === id)) return null;
+  const kind = classifyAIModel(id);
+  if (kind !== expectedKind) return null;
+  return {
+    id,
+    kind,
+    dimensions: kind === "embedding" ? EMBEDDING_DIMENSIONS : undefined,
+  };
 }

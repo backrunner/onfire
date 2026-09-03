@@ -3,6 +3,7 @@ import {
   findCompatibleModel,
   listProviderModels,
   normalizeProviderModelId,
+  resolveAssignableModel,
 } from "./model-catalog";
 
 afterEach(() => vi.restoreAllMocks());
@@ -137,5 +138,55 @@ describe("AI model catalog", () => {
       id: "opaque-embedding",
       kind: "embedding",
     }));
+  });
+});
+
+describe("resolveAssignableModel", () => {
+  const catalog = [
+    { id: "listed-chat", kind: "text" as const },
+    { id: "listed-embed", kind: "embedding" as const, dimensions: 1024 },
+  ];
+
+  it("prefers server-verified catalog metadata", () => {
+    expect(resolveAssignableModel("openai", catalog, "listed-chat", "text"))
+      .toEqual({ id: "listed-chat", kind: "text" });
+    expect(resolveAssignableModel("openai", catalog, "listed-embed", "embedding"))
+      .toEqual({ id: "listed-embed", kind: "embedding", dimensions: 1024 });
+    expect(resolveAssignableModel("openai", catalog, "listed-chat", "embedding")).toBeNull();
+  });
+
+  it("accepts unlisted models whose names classify to the task kind", () => {
+    expect(resolveAssignableModel("openai", [], "gpt-5-custom", "text"))
+      .toEqual({ id: "gpt-5-custom", kind: "text", dimensions: undefined });
+    expect(resolveAssignableModel("openai", [], "my-embedding-model", "embedding"))
+      .toEqual({ id: "my-embedding-model", kind: "embedding", dimensions: 1024 });
+    expect(resolveAssignableModel("jina", [], "bge-reranker-v2", "rerank"))
+      .toEqual({ id: "bge-reranker-v2", kind: "rerank", dimensions: undefined });
+  });
+
+  it("rejects unlisted models whose names classify to a different kind", () => {
+    expect(resolveAssignableModel("jina", [], "jina-reranker-v9", "text")).toBeNull();
+    expect(resolveAssignableModel("openai", [], "gpt-5-custom", "rerank")).toBeNull();
+    expect(resolveAssignableModel("openai", [], "my-embedding-model", "text")).toBeNull();
+  });
+
+  it("normalizes provider prefixes and trims before classifying", () => {
+    expect(resolveAssignableModel("google", [], " models/gemini-3-custom ", "text"))
+      .toEqual({ id: "gemini-3-custom", kind: "text", dimensions: undefined });
+    expect(resolveAssignableModel("jina", [], "jina-ai/custom-embedder", "embedding"))
+      .toEqual({ id: "custom-embedder", kind: "embedding", dimensions: 1024 });
+    expect(resolveAssignableModel("openai", [], "   ", "text")).toBeNull();
+  });
+
+  it("still rejects catalog embeddings that cannot produce 1024 dimensions", () => {
+    const fixed = [{ id: "fixed-embed", kind: "embedding" as const, dimensions: 768 }];
+    expect(resolveAssignableModel("openai", fixed, "fixed-embed", "embedding")).toBeNull();
+  });
+
+  it("does not let the name fallback override a catalog-listed kind", () => {
+    const listed = [{ id: "my-embedding-model", kind: "text" as const }];
+    expect(resolveAssignableModel("openai", listed, "my-embedding-model", "embedding")).toBeNull();
+    expect(resolveAssignableModel("openai", listed, "my-embedding-model", "text"))
+      .toEqual({ id: "my-embedding-model", kind: "text" });
   });
 });

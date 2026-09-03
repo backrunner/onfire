@@ -17,9 +17,8 @@ import {
 import { getEnv } from "@/lib/db";
 import { openStoredSecret } from "@/lib/secret-storage";
 import {
-  findCompatibleModel,
   listProviderModels,
-  normalizeProviderModelId,
+  resolveAssignableModel,
   type AIModelDescriptor,
 } from "@/services/ai/model-catalog";
 import {
@@ -212,22 +211,23 @@ async function assertAssignableCredentials(
           credential.secretPurpose,
         );
         catalog = await listProviderModels(credential.provider, apiKey, credential.baseUrl);
-      } catch (error) {
-        throw badRequest(
-          error instanceof Error ? error.message : "Unable to verify the provider model",
-        );
+      } catch {
+        // An unreachable provider must not block saving: models outside the
+        // catalog fall back to name-based capability classification below.
+        catalog = [];
       }
       catalogs.set(credential.id, catalog);
     }
-    assignment.model = normalizeProviderModelId(credential.provider, assignment.model);
-    const match = findCompatibleModel(
+    const resolved = resolveAssignableModel(
+      credential.provider,
       catalog,
       assignment.model,
       modelKindForTask(taskType),
     );
-    if (!match) throw badRequest(`Model is not compatible with the ${taskType} task`);
-    assignment.modelKind = match.kind;
-    assignment.modelDimensions = match.dimensions;
+    if (!resolved) throw badRequest(`Model is not compatible with the ${taskType} task`);
+    assignment.model = resolved.id;
+    assignment.modelKind = resolved.kind;
+    assignment.modelDimensions = resolved.dimensions;
   }
 }
 

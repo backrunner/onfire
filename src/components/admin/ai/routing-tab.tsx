@@ -30,8 +30,8 @@ import {
 } from "./provider-presets";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ModelCombobox } from "./model-combobox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { aiScopeQuery } from "./scope";
@@ -502,12 +502,26 @@ function TaskRoutingCard({
                       <Label htmlFor={`model-${taskType}-${assignment.id}`} className="text-[11px]">
                         {t.aiConfig.model}
                       </Label>
-                      <Input
+                      <ModelCombobox
                         id={`model-${taskType}-${assignment.id}`}
-                        className="h-8 w-full"
                         value={assignment.model}
-                        onChange={(event) => {
-                          const value = event.target.value;
+                        options={availableModels.filter(
+                          (model, modelIndex, all) => all.indexOf(model) === modelIndex
+                        )}
+                        loading={loadingCatalog === assignment.credentialId}
+                        placeholder={t.aiConfig.modelPlaceholder}
+                        refreshLabel={t.aiConfig.routing.loadModels}
+                        customHint={t.aiConfig.routing.customModelHint}
+                        onOpen={() => {
+                          if (
+                            !catalogs[assignment.credentialId] &&
+                            loadingCatalog !== assignment.credentialId
+                          ) {
+                            void loadCatalog(assignment.credentialId);
+                          }
+                        }}
+                        onRefresh={() => void loadCatalog(assignment.credentialId)}
+                        onChange={(value) => {
                           const catalogModel = (catalogs[assignment.credentialId] ?? [])
                             .find((item) => item.id === value);
                           updateAssignment(index, {
@@ -516,26 +530,7 @@ function TaskRoutingCard({
                             modelDimensions: catalogModel?.dimensions,
                           });
                         }}
-                        list={`models-${taskType}-${assignment.id}`}
                       />
-                      <datalist id={`models-${taskType}-${assignment.id}`}>
-                        {availableModels
-                          .filter((model, index, all) => all.indexOf(model) === index)
-                          .map((model) => <option key={model} value={model} />)}
-                      </datalist>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-0 text-[11px]"
-                        onClick={() => void loadCatalog(assignment.credentialId)}
-                        disabled={loadingCatalog === assignment.credentialId}
-                      >
-                        {loadingCatalog === assignment.credentialId && (
-                          <Loader2 className="size-3 animate-spin" />
-                        )}
-                        {t.aiConfig.routing.loadModels}
-                      </Button>
                     </div>
                   </div>
                 </div>

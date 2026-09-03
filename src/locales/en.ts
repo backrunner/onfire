@@ -659,8 +659,9 @@ export const en: Translations = {
       moveDown: 'Move credential down',
       coolingDown: 'Currently cooling down',
       credentialDisabled: 'Credential is disabled',
-      loadModels: 'Load models',
+      loadModels: 'Refresh model list',
       loadModelsFailed: 'Failed to load provider models',
+      customModelHint: 'You can also type a custom model not in the list',
       saved: 'Function routing saved',
       saveFailed: 'Failed to save function routing'
     },

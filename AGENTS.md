@@ -598,7 +598,7 @@ Custom product templates use the same escaped variable renderer for preview and 
 - OpenAI explicitly selects `responses` or `chat`; new configurations default to Responses API.
 - Embedding is separate and supports OpenAI, OpenRouter, Qwen/DashScope, Jina AI, Cohere, and Google. Only catalog-confirmed models that can produce 1024 dimensions may be assigned.
 - Reranking is separate and supports Cohere and Jina AI. Knowledge retrieval reranks a bounded candidate set and preserves vector/D1 order when no rerank route is configured or reranking fails.
-- Provider-specific model catalogs are fetched with each provider's required authentication and pagination. Route saves persist server-verified text, embedding, or rerank capability metadata and reject unlisted or mismatched models.
+- Provider-specific model catalogs are fetched with each provider's required authentication and pagination. Route saves persist server-verified text, embedding, or rerank capability metadata for catalog-listed models; models outside the catalog are accepted when name-based classification matches the task capability (custom embedding models are stored as 1024 dimensions), while catalog-listed models with the wrong capability or non-1024 dimensions stay rejected.
 - Provider credentials are stored once in an encrypted credential pool and can be reused by multiple AI tasks.
 - Each task has an ordered credential route and a model per route entry. Provider failures fall through to the next available credential; failed credentials enter their configured cooldown only when another route entry is available.
 - All adapters request 1024 dimensions. Vectorize uses a 1024-dimension cosine index with product namespaces.
