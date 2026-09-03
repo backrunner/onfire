@@ -169,6 +169,8 @@ System-scope teams exist outside any tenant and are SuperAdmin-only.
 | ticket_type.route | ✓ | ✓ | ✓ | ✓ | - |
 | ticket_type.preset.read | ✓ | ✓ | ✓ | - | - |
 | ticket_type.preset.write | ✓ | ✓ | - | - | - |
+| template.read | ✓ | ✓ | ✓ | - | - |
+| template.write | ✓ | ✓ | ✓ | - | - |
 | ticket_template.read | ✓ | ✓ | ✓ | - | - |
 | ticket_template.write | ✓ | ✓ | ✓ | - | - |
 | team.manage | ✓ | ✓ | ✓ | - | - |
@@ -192,6 +194,7 @@ System-scope teams exist outside any tenant and are SuperAdmin-only.
 - **Support Agent**: The assignment target for tickets, separate from system user accounts
 - Administrators can also become support agents; the ability to reply to tickets is independent of RBAC permissions
 - `product.manage` controls product lifecycle operations such as creation and deletion. `product.settings` controls scoped product configuration such as SLA, auto-close, and team associations.
+- `template.read`/`template.write` guard email templates (legacy naming; ticket form schemas use `ticket_template.*`).
 - ProductAdmin access is limited by `user_products`; IDs submitted for tenant, product, or team associations must belong to the same tenant even for SuperAdmin requests.
 - Configuration landing is role-specific. SuperAdmin sees system administration. TenantAdmin is sent to their tenant page and never sees the global tenant list. ProductAdmin sees only assigned products and never tenant tabs. TeamAdmin and Agent have no management entry.
 - SuperAdmin and TenantAdmin can preview a strictly lower-role user in their scope. The session stays the actor; APIs overlay the target's live role and scope. Writes are blocked except starting or leaving preview. The sidebar shows a persistent preview indicator.

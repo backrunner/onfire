@@ -1,6 +1,6 @@
 import type { Database } from "@/lib/db";
 import { getEnv } from "@/lib/db";
-import { productKnowledge, tickets } from "@/drizzle/schema";
+import { productKnowledge } from "@/drizzle/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import { EMBEDDING_DIMENSIONS } from "@/lib/ai-config";
 import { getAIProvider } from "./config";
@@ -68,44 +68,6 @@ export async function embedKnowledge(
       updatedAt: new Date().toISOString(),
     })
     .where(eq(productKnowledge.id, knowledgeId));
-  return true;
-}
-
-export async function embedTicket(
-  db: Database,
-  ticketId: string
-): Promise<boolean> {
-  const ticket = await db.query.tickets.findFirst({
-    where: eq(tickets.id, ticketId),
-  });
-  if (!ticket) throw new Error(`Ticket not found: ${ticketId}`);
-
-  const embedding = await generateEmbedding(
-    db,
-    `${ticket.subject}\n\n${ticket.content}`,
-    "document",
-    { tenantId: ticket.tenantId, productId: ticket.productId }
-  );
-  if (!embedding) return false;
-
-  const vectorizeId = `ticket:${ticketId}`;
-  await getEnv().VECTORIZE.upsert([
-    {
-      id: vectorizeId,
-      values: embedding,
-      namespace: `product:${ticket.productId}`,
-      metadata: {
-        entityId: ticketId,
-        productId: ticket.productId,
-        type: "ticket",
-      },
-    },
-  ]);
-
-  await db
-    .update(tickets)
-    .set({ vectorizeId, updatedAt: new Date().toISOString() })
-    .where(eq(tickets.id, ticketId));
   return true;
 }
 
@@ -231,26 +193,4 @@ async function rerankKnowledgeRows(
     console.error("Knowledge reranking failed:", error);
     return rows.slice(0, limit);
   }
-}
-
-export async function batchEmbedKnowledge(
-  db: Database,
-  productId: string
-): Promise<{ success: number; failed: number }> {
-  const items = await db
-    .select({ id: productKnowledge.id })
-    .from(productKnowledge)
-    .where(eq(productKnowledge.productId, productId));
-
-  let success = 0;
-  let failed = 0;
-  for (const item of items) {
-    try {
-      (await embedKnowledge(db, item.id)) ? success++ : failed++;
-    } catch (error) {
-      console.error(`Failed to embed knowledge ${item.id}:`, error);
-      failed++;
-    }
-  }
-  return { success, failed };
 }

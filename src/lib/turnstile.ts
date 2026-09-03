@@ -49,7 +49,3 @@ export async function verifyTurnstileToken(
     return { success: false, errorCodes: ["verification-unavailable"] };
   }
 }
-
-export function isTurnstileEnabled(): boolean {
-  return Boolean(getEnv().TURNSTILE_SECRET);
-}

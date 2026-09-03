@@ -56,18 +56,6 @@ export interface RoutedCredential {
   cooldownSeconds: number;
 }
 
-export interface AIConfig {
-  taskType: AITaskType;
-  credentialId: string;
-  credentialName: string;
-  provider: AIProviderType;
-  model: string;
-  apiKey: string;
-  baseUrl?: string | null;
-  apiMode: OpenAIApiMode;
-  enabled: boolean;
-}
-
 function normalizedBaseUrl(value: string | null): string | null {
   if (!value) return null;
   return safeAIBaseUrl(value);
@@ -418,40 +406,6 @@ class FailoverAIProvider implements AIProvider {
   }
 }
 
-export async function getAIConfig(
-  db: Database,
-  taskType: AITaskType,
-  context: AIRuntimeContext = {}
-): Promise<AIConfig | null> {
-  const candidates = await listAvailableCredentials(db, taskType, context);
-  for (const candidate of candidates) {
-    try {
-      const apiKey = await openStoredSecret(
-        candidate.encryptedApiKey,
-        getEnv().AUTH_SECRET,
-        candidate.secretPurpose
-      );
-      return {
-        taskType,
-        credentialId: candidate.id,
-        credentialName: candidate.name,
-        provider: candidate.provider,
-        model: candidate.model,
-        apiKey,
-        baseUrl: normalizedBaseUrl(candidate.baseUrl),
-        apiMode: candidate.apiMode,
-        enabled: true,
-      };
-    } catch (error) {
-      console.error(
-        `Failed to open AI credential ${candidate.id} for ${taskType}:`,
-        error
-      );
-    }
-  }
-  return null;
-}
-
 export async function getAIProvider(
   db: Database,
   taskType: AITaskType,
@@ -461,8 +415,4 @@ export async function getAIProvider(
   return candidates.length > 0
     ? new FailoverAIProvider(db, candidates, taskType, context)
     : null;
-}
-
-export function clearConfigCache(_taskType?: AITaskType): void {
-  // Configuration and credential health are read from D1 on every request.
 }

@@ -14,9 +14,3 @@ export function formatDateTime(date: string | Date): string {
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
-
-export function generateId(prefix: string = ""): string {
-  const timestamp = Date.now().toString(36);
-  const random = crypto.randomUUID().replace(/-/g, "").substring(0, 12);
-  return prefix ? `${prefix}_${timestamp}${random}` : `${timestamp}${random}`;
-}

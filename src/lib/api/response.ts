@@ -11,8 +11,6 @@ export interface ApiErr {
   details?: unknown;
 }
 
-export type ApiResult<T> = ApiOk<T> | ApiErr;
-
 export const ok = <T>(data: T, status = 200): NextResponse =>
   NextResponse.json({ ok: true, data } satisfies ApiOk<T>, { status });
 

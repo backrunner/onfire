@@ -81,7 +81,6 @@ Tenant
 | role.manage | ✓ | ✓ | - | - | - |
 | customer.read | ✓ | ✓ | ✓ | ✓ | - |
 | customer.write | ✓ | ✓ | ✓ | - | - |
-| category.map | ✓ | ✓ | ✓ | ✓ | - |
 | agent.profile | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 ---

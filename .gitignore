@@ -22,8 +22,4 @@ output/playwright/
 yarn.lock
 package-lock.json
 .history
-workers/tob-worker/public
-workers/toc-worker/public
-wrangler.toml
-wrangler.tob.toml
-wrangler.toc.toml
+tsconfig.tsbuildinfo

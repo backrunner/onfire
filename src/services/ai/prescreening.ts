@@ -109,22 +109,3 @@ export async function prescreenTicket(
     throw error;
   }
 }
-
-export async function batchPrescreenTickets(
-  db: Database,
-  ticketIds: string[]
-): Promise<Map<string, PrescreeningResult | null>> {
-  const results = new Map<string, PrescreeningResult | null>();
-
-  for (const ticketId of ticketIds) {
-    try {
-      const result = await prescreenTicket(db, ticketId);
-      results.set(ticketId, result);
-    } catch (error) {
-      console.error(`Failed to prescreen ticket ${ticketId}:`, error);
-      results.set(ticketId, null);
-    }
-  }
-
-  return results;
-}

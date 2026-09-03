@@ -26,10 +26,6 @@ export function effectiveProductLanguages(product: ProductRow): string[] {
   return configured.length > 0 ? configured : [product.defaultLanguage];
 }
 
-export function isMultilingualProduct(product: ProductRow): boolean {
-  return effectiveProductLanguages(product).length > 1;
-}
-
 /**
  * Translate only after the caller has completed ticket validation/filtering.
  * Original customer text stays in the base columns; translations are cached

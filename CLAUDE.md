@@ -142,7 +142,6 @@ Tenant
 | role.manage | ✓ | ✓ | - | - | - |
 | customer.read | ✓ | ✓ | ✓ | ✓ | - |
 | customer.write | ✓ | ✓ | ✓ | - | - |
-| category.map | ✓ | ✓ | ✓ | ✓ | - |
 | agent.profile | ✓ | ✓ | ✓ | ✓ | ✓ |
 | email.config | ✓ | ✓ | ✓ | - | - |
 | notification.manage | ✓ | ✓ | ✓ | - | - |
@@ -438,11 +437,9 @@ GET    /search/suggest        - Search-box autocomplete (subjects, customer emai
 GET/POST/PATCH/DELETE /admin/tenants      - Tenant management
 GET/POST/PATCH/DELETE /admin/products     - Product management
 GET/POST/PATCH/DELETE /admin/teams        - Team management
-GET/POST/PATCH/DELETE /admin/templates    - Template management
 GET/PATCH             /admin/users        - User management
 GET/PATCH             /admin/agents       - Agent management
 GET                   /admin/customers    - Customer query
-GET/POST/PATCH/DELETE /admin/category-routes - Category routing
 GET/POST              /admin/product-keys     - API key management
 POST                  /admin/product-keys/:id/rotate - Rotate key
 

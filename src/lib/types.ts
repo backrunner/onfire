@@ -58,15 +58,6 @@ export interface Product {
   sla?: PriorityPolicy;
 }
 
-export interface ProductApiKey {
-  id: string;
-  productId: ProductID;
-  name?: string | null;
-  createdAt: string;
-  lastUsedAt?: string | null;
-  revoked?: boolean;
-}
-
 export interface Team {
   id: TeamID;
   tenantId: TenantID;
@@ -75,47 +66,9 @@ export interface Team {
   allowReassign: boolean;
 }
 
-export interface UserProfile {
-  id: UserID;
-  email: string;
-  displayName: string;
-  tenantId: TenantID;
-  role: Role;
-  teamIds?: TeamID[];
-}
-
-export interface AgentProfile {
-  userId: UserID;
-  level: number;
-  displayName: string;
-  email: string;
-  teamIds: TeamID[];
-  active: boolean;
-  avatarUrl?: string;
-}
-
-export interface TicketTemplate {
-  id: TemplateID;
-  productId: ProductID;
-  title: string;
-  categories: Category[];
-  formSchema: Record<string, unknown>;
-}
-
 export interface TicketTypePathItem {
   id: TicketTypeID;
   name: string;
-}
-
-export interface TicketType {
-  id: TicketTypeID;
-  productId: ProductID;
-  parentId?: TicketTypeID | null;
-  level: 1 | 2 | 3;
-  name: string;
-  description?: string | null;
-  sortOrder: number;
-  archivedAt?: string | null;
 }
 
 export interface Customer {
@@ -128,14 +81,6 @@ export interface Customer {
   meta?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface CategoryRoute {
-  id: string;
-  productId: ProductID;
-  category: string;
-  subcategory?: string;
-  teamId: TeamID;
 }
 
 export interface Ticket {
@@ -169,16 +114,6 @@ export interface TicketTimelineEntry {
   snapshot?: Record<string, unknown>;
 }
 
-export interface TicketReply {
-  id: string;
-  ticketId: TicketID;
-  senderId?: UserID;
-  senderEmail?: string;
-  content: string;
-  createdAt: string;
-  internal?: boolean;
-}
-
 // ============================================
 // SLA Types
 // ============================================
@@ -199,32 +134,6 @@ export interface SLAState {
   replyDeadline: string;
   acceptBreached?: boolean;
   replyBreached?: boolean;
-}
-
-// ============================================
-// Session Types
-// ============================================
-
-export interface SessionContext {
-  user: UserProfile;
-  agent?: AgentProfile;
-  tenantIds: TenantID[];
-  productIds: ProductID[];
-  teamIds: TeamID[];
-}
-
-// ============================================
-// Filter Types
-// ============================================
-
-export interface TicketFilter {
-  productId?: ProductID;
-  teamId?: TeamID;
-  status?: TicketStatus;
-  priority?: TicketPriority;
-  overdue?: boolean;
-  page?: number;
-  pageSize?: number;
 }
 
 // ============================================
@@ -255,7 +164,6 @@ export type Permission =
   | "role.manage"
   | "customer.read"
   | "customer.write"
-  | "category.map"
   | "agent.profile"
   | "email.config"
   | "spam.config"
@@ -288,7 +196,6 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "role.manage",
     "customer.read",
     "customer.write",
-    "category.map",
     "agent.profile",
     "email.config",
     "spam.config",
@@ -319,7 +226,6 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "role.manage",
     "customer.read",
     "customer.write",
-    "category.map",
     "agent.profile",
     "email.config",
     "spam.config",
@@ -345,7 +251,6 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "product.settings",
     "customer.read",
     "customer.write",
-    "category.map",
     "agent.profile",
     "email.config",
     "notification.manage",
@@ -361,7 +266,6 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "customer.read",
     "ticket_type.read",
     "ticket_type.route",
-    "category.map",
     "agent.profile",
   ],
   [Role.Agent]: [

@@ -25,9 +25,6 @@ const DROP_SUBTREE_TAGS = new Set([
   "button", "select", "textarea", "input",
 ]);
 
-/** Public serving prefix for stored reply attachments (images only). */
-export const ATTACHMENT_URL_PREFIX = "/api/attachments/";
-
 const NAMED_ENTITIES: Record<string, string> = {
   amp: "&",
   lt: "<",

@@ -17,7 +17,6 @@ export { CHANNEL_SECRET_KEYS, CHANNEL_TYPES, TRIGGER_EVENTS };
 type ChannelType = (typeof CHANNEL_TYPES)[number];
 
 export const channelTypeSchema = z.enum(CHANNEL_TYPES);
-export const triggerEventsSchema = z.array(z.enum(TRIGGER_EVENTS)).min(1);
 
 const sealedSecretPattern = /^v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 

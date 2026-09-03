@@ -184,18 +184,3 @@ export async function getChatHistory(
     .orderBy(aiChatMessages.createdAt)
     .limit(limit);
 }
-
-export async function clearChatSession(
-  db: Database,
-  userId: string,
-  sessionId: string
-): Promise<void> {
-  await db
-    .delete(aiChatMessages)
-    .where(
-      and(
-        eq(aiChatMessages.userId, userId),
-        eq(aiChatMessages.sessionId, sessionId)
-      )
-    );
-}

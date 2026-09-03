@@ -18,8 +18,6 @@ import {
   usageDailyBucketKey,
 } from "@/lib/ai-scope";
 
-export const AI_USAGE_RETENTION_PRESETS = [7, 30, 90, 180, 365] as const;
-
 export interface AIUsageRecordInput {
   credentialId: string;
   taskType: AITaskType;

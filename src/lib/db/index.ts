@@ -15,25 +15,9 @@ export const getDb = cache(() => {
 });
 
 /**
- * Get database instance asynchronously (for use in server components)
- */
-export const getDbAsync = cache(async () => {
-  const { env } = await getCloudflareContext({ async: true });
-  return drizzle(env.DB, { schema });
-});
-
-/**
  * Get Cloudflare environment bindings
  */
 export const getEnv = cache(() => {
   const { env } = getCloudflareContext();
-  return env;
-});
-
-/**
- * Get Cloudflare environment bindings asynchronously
- */
-export const getEnvAsync = cache(async () => {
-  const { env } = await getCloudflareContext({ async: true });
   return env;
 });
