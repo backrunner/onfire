@@ -42,7 +42,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         style={{ "--admin-chrome-h": preview ? "5.5rem" : "3.5rem" } as CSSProperties}
       >
         <AdminHeader onMobileMenu={() => setMobileOpen(true)} />
-        <main className="mx-auto w-full max-w-[1600px] flex-1 p-4 lg:p-6">
+        <main className="w-full flex-1 p-4 lg:p-6">
           {children}
         </main>
       </div>

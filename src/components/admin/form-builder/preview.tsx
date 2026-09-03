@@ -177,7 +177,7 @@ export function Preview({ schema }: PreviewProps) {
 
   if (schema.fields.length === 0) {
     return (
-      <div className="text-center text-sm text-muted-foreground py-8">
+      <div className="flex flex-1 items-center justify-center py-8 text-center text-sm text-muted-foreground">
         {t.formBuilder.emptyPreview}
       </div>
     );

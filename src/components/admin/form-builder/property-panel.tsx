@@ -197,7 +197,7 @@ export function PropertyPanel({
 
   if (!field) {
     return (
-      <div className="p-4 text-center text-sm text-muted-foreground">
+      <div className="flex min-h-24 items-center justify-center p-4 text-center text-sm text-muted-foreground md:h-full">
         {fb.selectFieldHint}
       </div>
     );
