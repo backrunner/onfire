@@ -527,6 +527,7 @@ export const zh = {
       generating: '正在生成表单草稿…',
       apply: '应用草稿',
       applied: '已应用草稿',
+      applyDisabled: '切换到默认语言后才能应用草稿',
       stop: '停止生成',
       notConfigured: '产品尚未配置 AI Agent',
       failed: '表单生成失败，请稍后重试。'

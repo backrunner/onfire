@@ -11,6 +11,8 @@ import type { AIMessage } from "./providers";
 export interface FormBuilderGenerationInput {
   message: string;
   currentSchema?: unknown;
+  /** Latest generated draft the user has not applied yet; revisions build on it. */
+  pendingDraft?: unknown;
   defaultLanguage: string;
   interfaceLanguage: string;
 }
@@ -60,6 +62,10 @@ export async function generateFormSchema(
   const provider = await getAIProvider(db, "agent", context);
   if (!provider) return null;
 
+  // An unapplied generated draft is the revision base when present.
+  const pendingDraft = input.pendingDraft
+    ? parseFormSchemaValue(input.pendingDraft)
+    : null;
   const messages: AIMessage[] = [
     {
       role: "system",
@@ -71,12 +77,20 @@ export async function generateFormSchema(
       role: "user",
       content: JSON.stringify({
         request: input.message,
-        currentSchema: normalizedDraft(input.currentSchema),
+        currentSchema: pendingDraft ?? normalizedDraft(input.currentSchema),
       }),
     },
   ];
-  const result = await provider.complete({ messages, temperature: 0.2, maxTokens: 6_000 });
-  const parsed = extractJsonObject(result.content);
+  const completion = { messages, temperature: 0.2 };
+  let result = await provider.complete({ ...completion, maxTokens: 12_000 });
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = extractJsonObject(result.content);
+  } catch {
+    // Large forms can truncate the first response; retry once with more room.
+    result = await provider.complete({ ...completion, maxTokens: 16_000 });
+    parsed = extractJsonObject(result.content);
+  }
   const schema = parseFormSchemaValue(parsed.schema);
   if (!schema) throw new Error("AI form response contains an invalid schema");
   const errors = validateFormSchema(schema);

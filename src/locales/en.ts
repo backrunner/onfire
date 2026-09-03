@@ -529,6 +529,7 @@ export const en: Translations = {
       generating: 'Generating form draft…',
       apply: 'Apply draft',
       applied: 'Draft applied',
+      applyDisabled: 'Switch to the default language to apply a draft',
       stop: 'Stop generating',
       notConfigured: 'The product AI agent is not configured',
       failed: 'Form generation failed. Please try again.'

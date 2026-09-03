@@ -8,6 +8,7 @@ import {
   createField,
   createEmptyFormSchema,
   localizeFormSchema,
+  mergeFormSchemaI18n,
   validateFormSchema,
   type SchemaError,
 } from "@/lib/form-schema";
@@ -240,7 +241,8 @@ export function FormBuilder({
   }, []);
 
   const handleApplyAssistantSchema = useCallback((nextSchema: FormSchema) => {
-    setSchema(nextSchema);
+    // Generated drafts carry no translations; keep companions whose base text survived.
+    setSchema((prev) => mergeFormSchemaI18n(prev, nextSchema));
     setSelectedFieldId(null);
     setValidationErrors([]);
   }, []);
@@ -303,25 +305,38 @@ export function FormBuilder({
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b p-3 sm:p-4">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <Button size="sm" className="h-8" onClick={handleSave}>
-            <Save className="size-4" />
-            {t.common.save}
-          </Button>
-
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" className="h-8">
-                <Eye className="size-4" />
-                {fb.preview}
+                <Upload className="size-4" />
+                {fb.import}
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[80vh] overflow-auto">
+            <DialogContent>
               <DialogHeader>
-                <DialogTitle>{fb.previewTitle}</DialogTitle>
+                <DialogTitle>{fb.importTitle}</DialogTitle>
               </DialogHeader>
-              <Preview schema={displaySchema} />
+              <div className="space-y-4">
+                <Textarea
+                  placeholder={fb.importPlaceholder}
+                  value={jsonInput}
+                  onChange={(e) => setJsonInput(e.target.value)}
+                  rows={10}
+                />
+                {importError && (
+                  <p className="text-sm text-destructive">{importError}</p>
+                )}
+                <Button onClick={handleImportJson} className="w-full">
+                  {fb.import}
+                </Button>
+              </div>
             </DialogContent>
           </Dialog>
+
+          <Button variant="outline" size="sm" className="h-8" onClick={handleExportJson}>
+            <FileJson className="size-4" />
+            {fb.export}
+          </Button>
 
           {languages && (
             <>
@@ -357,34 +372,21 @@ export function FormBuilder({
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" className="h-8">
-                <Upload className="size-4" />
-                {fb.import}
+                <Eye className="size-4" />
+                {fb.preview}
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-auto">
               <DialogHeader>
-                <DialogTitle>{fb.importTitle}</DialogTitle>
+                <DialogTitle>{fb.previewTitle}</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4">
-                <Textarea
-                  placeholder={fb.importPlaceholder}
-                  value={jsonInput}
-                  onChange={(e) => setJsonInput(e.target.value)}
-                  rows={10}
-                />
-                {importError && (
-                  <p className="text-sm text-destructive">{importError}</p>
-                )}
-                <Button onClick={handleImportJson} className="w-full">
-                  {fb.import}
-                </Button>
-              </div>
+              <Preview schema={displaySchema} />
             </DialogContent>
           </Dialog>
 
-          <Button variant="outline" size="sm" className="h-8" onClick={handleExportJson}>
-            <FileJson className="size-4" />
-            {fb.export}
+          <Button size="sm" className="h-8" onClick={handleSave}>
+            <Save className="size-4" />
+            {t.common.save}
           </Button>
         </div>
       </div>
@@ -410,7 +412,7 @@ export function FormBuilder({
       <div className="min-h-0 flex-1 overflow-y-auto md:flex md:overflow-hidden">
         {/* Left Panel - Field Palette */}
         <div className="w-full border-b p-3 md:w-56 md:shrink-0 md:overflow-auto md:border-r md:border-b-0 md:p-4">
-          <FieldPalette onAddField={handleAddField} disabled={Boolean(translationLang)} />
+          <FieldPalette onAddField={handleAddField} disabled={Boolean(translationLang) || translating} />
         </div>
 
         {/* Center - Canvas */}
@@ -432,19 +434,25 @@ export function FormBuilder({
                 onSelectField={setSelectedFieldId}
                 onReorderFields={handleReorderFields}
                 onDeleteField={handleDeleteField}
-                readOnly={Boolean(translationLang)}
+                readOnly={Boolean(translationLang) || translating}
               />
             </TabsContent>
-            <TabsContent value="preview" className="flex-1 mt-4 overflow-auto">
-              <div className="max-w-xl mx-auto p-4 border rounded-lg">
+            <TabsContent
+              value="preview"
+              className="flex-1 mt-4 overflow-auto data-[state=active]:flex data-[state=active]:flex-col"
+            >
+              <div className="mx-auto flex w-full max-w-xl flex-1 flex-col rounded-lg border p-4">
                 <Preview schema={displaySchema} />
               </div>
             </TabsContent>
           </Tabs>
         </div>
 
-        {/* Right Panel - Property Editor */}
-        <div className="w-full border-t md:w-72 md:shrink-0 md:overflow-auto md:border-t-0 md:border-l">
+        {/* Right Panel - Property Editor (locked while a translation batch runs) */}
+        <fieldset
+          disabled={translating}
+          className="w-full min-w-0 border-t md:w-72 md:shrink-0 md:overflow-auto md:border-t-0 md:border-l"
+        >
           <PropertyPanel
             field={selectedField || null}
             allFields={schema.fields}
@@ -452,7 +460,7 @@ export function FormBuilder({
             onDelete={() => selectedFieldId && handleDeleteField(selectedFieldId)}
             translationLang={translationLang}
           />
-        </div>
+        </fieldset>
 
         {enableAssistant && productId && defaultLanguage && (
           <FormBuilderAssistant
@@ -460,6 +468,7 @@ export function FormBuilder({
             defaultLanguage={defaultLanguage}
             schema={schema}
             onApply={handleApplyAssistantSchema}
+            applyDisabledReason={translationLang ? fb.assistant.applyDisabled : null}
           />
         )}
       </div>

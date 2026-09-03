@@ -12,6 +12,7 @@ const requestSchema = z.object({
   productId: z.string().min(1),
   message: z.string().trim().min(1).max(8_000),
   currentSchema: z.unknown().optional(),
+  pendingDraft: z.unknown().optional(),
   defaultLanguage: z.string().trim().min(2).max(16),
   interfaceLanguage: z.enum(["en", "zh"]),
 });

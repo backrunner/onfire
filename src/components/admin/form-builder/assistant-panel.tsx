@@ -23,6 +23,8 @@ interface FormBuilderAssistantProps {
   defaultLanguage: string;
   schema: FormSchema;
   onApply: (schema: FormSchema) => void;
+  /** When set (translation mode), drafts cannot be applied and this explains why. */
+  applyDisabledReason?: string | null;
 }
 
 interface FormSchemaDraftData {
@@ -36,6 +38,7 @@ interface DraftContextValue {
   applyLabel: string;
   appliedLabel: string;
   errorLabel: string;
+  applyDisabledReason: string | null;
 }
 
 const DraftContext = createContext<DraftContextValue | null>(null);
@@ -54,7 +57,8 @@ function FormSchemaDraft({
       variant={applied ? "secondary" : "outline"}
       className="mt-2 h-7 w-full text-xs"
       onClick={() => context.onApply(data.schema, data.id)}
-      disabled={applied}
+      disabled={applied || Boolean(context.applyDisabledReason)}
+      title={context.applyDisabledReason ?? undefined}
     >
       {applied ? <Check className="size-3" /> : <Sparkles className="size-3" />}
       {applied ? context.appliedLabel : context.applyLabel}
@@ -124,6 +128,7 @@ interface AssistantThreadProps {
   applyLabel: string;
   appliedLabel: string;
   errorLabel: string;
+  applyDisabledReason: string | null;
   onApply: (schema: FormSchema) => void;
 }
 
@@ -137,6 +142,7 @@ function AssistantThread({
   applyLabel,
   appliedLabel,
   errorLabel,
+  applyDisabledReason,
   onApply,
 }: AssistantThreadProps) {
   const [appliedId, setAppliedId] = useState<string | null>(null);
@@ -149,8 +155,8 @@ function AssistantThread({
     [onApply],
   );
   const draftContext = useMemo(
-    () => ({ appliedId, onApply: handleApply, applyLabel, appliedLabel, errorLabel }),
-    [appliedId, handleApply, applyLabel, appliedLabel, errorLabel],
+    () => ({ appliedId, onApply: handleApply, applyLabel, appliedLabel, errorLabel, applyDisabledReason }),
+    [appliedId, handleApply, applyLabel, appliedLabel, errorLabel, applyDisabledReason],
   );
   const messageComponents = useMemo(
     () => ({ UserMessage, AssistantMessage }),
@@ -165,7 +171,7 @@ function AssistantThread({
             aria-label={emptyLabel}
             className="min-h-0 flex-1 overflow-y-auto px-3 py-3"
           >
-            <div className="space-y-3">
+            <div className="flex min-h-full flex-col gap-3">
               <EmptyThread label={emptyLabel} />
               <ThreadPrimitive.Messages components={messageComponents} />
               <ThreadPrimitive.If running>
@@ -185,14 +191,14 @@ function AssistantThread({
                 />
                 <ThreadPrimitive.If running>
                   <ComposerPrimitive.Cancel asChild>
-                    <Button type="button" size="icon" variant="outline" aria-label={stopLabel}>
+                    <Button type="button" size="icon" variant="outline" aria-label={stopLabel} title={stopLabel}>
                       <Square className="size-3.5" />
                     </Button>
                   </ComposerPrimitive.Cancel>
                 </ThreadPrimitive.If>
                 <ThreadPrimitive.If running={false}>
                   <ComposerPrimitive.Send asChild>
-                    <Button type="submit" size="icon" aria-label={sendLabel}>
+                    <Button type="submit" size="icon" aria-label={sendLabel} title={sendLabel}>
                       <Send className="size-4" />
                     </Button>
                   </ComposerPrimitive.Send>
@@ -211,11 +217,14 @@ export function FormBuilderAssistant({
   defaultLanguage,
   schema,
   onApply,
+  applyDisabledReason = null,
 }: FormBuilderAssistantProps) {
   const { t, language } = useI18n();
   const a = t.formBuilder.assistant;
   const schemaRef = useRef(schema);
   schemaRef.current = schema;
+  // Latest generated draft not yet applied; follow-up requests revise it.
+  const pendingDraftRef = useRef<FormSchema | null>(null);
 
   const adapter = useMemo<ChatModelAdapter>(
     () => ({
@@ -245,9 +254,12 @@ export function FormBuilderAssistant({
               interfaceLanguage: language,
               message,
               currentSchema: schemaRef.current,
+              pendingDraft: pendingDraftRef.current ?? undefined,
             },
             { signal: abortSignal },
           );
+
+          pendingDraftRef.current = result.schema;
 
           return {
             content: [
@@ -298,7 +310,11 @@ export function FormBuilderAssistant({
         applyLabel={a.apply}
         appliedLabel={a.applied}
         errorLabel={a.failed}
-        onApply={(draft) => onApply(draft)}
+        applyDisabledReason={applyDisabledReason}
+        onApply={(draft) => {
+          pendingDraftRef.current = null;
+          onApply(draft);
+        }}
       />
     </aside>
   );
