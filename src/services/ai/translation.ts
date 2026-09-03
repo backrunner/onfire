@@ -50,10 +50,11 @@ export interface TranslateTicketFieldsResult {
   content: Record<string, string>;
 }
 
-const TRANSLATE_TEXTS_PROMPT = `You are a professional translator. Translate each text from {{sourceLang}} into every one of these target languages: {{targetLangs}}.
+const TRANSLATE_TEXTS_PROMPT = `You are a professional translator. Translate each text {{sourceClause}} into every one of these target languages: {{targetLangs}}.
 
 Rules:
 - Preserve the original meaning, tone, and line breaks of each text.
+- Keep placeholder variables of the form {{...}} and every HTML tag, attribute, and structure unchanged; translate only the human-readable text around them.
 - If a text is already in the target language, return it unchanged.
 - Use the exact "id" values and language codes from the user message as keys.
 
@@ -68,6 +69,7 @@ const TRANSLATE_TICKET_PROMPT = `You are a professional translator. Translate th
 
 Rules:
 - If the source text is already in {{targetLang}}, return it unchanged.
+- Keep placeholder variables of the form {{...}} unchanged.
 - "content" is the translated plain text.
 - When HTML is provided, translate only the text nodes and keep every HTML tag, attribute, and the overall document structure unchanged; return the translated markup as "contentHtml". When no HTML is provided, set "contentHtml" to null.
 {{languageRule}}
@@ -87,6 +89,7 @@ const TRANSLATE_TICKET_FIELDS_PROMPT = `You are a professional translator. Trans
 Rules:
 - {{sourceRule}}
 - Preserve meaning, tone, whitespace, and line breaks.
+- Keep placeholder variables of the form {{...}} unchanged.
 - If a field is already in a target language, return it unchanged for that target.
 - Use the exact target language codes as keys and include every requested target.
 
@@ -101,6 +104,17 @@ Respond in JSON format only:
 
 const TRANSLATION_CHUNK_SIZE = 4_000;
 const HTML_CHUNK_SIZE = 6_000;
+
+/**
+ * Source-language clause for TRANSLATE_TEXTS_PROMPT. A failed detection
+ * reports "unknown"; that hint would confuse the model, so the prompt then
+ * asks for detection instead of naming a language.
+ */
+function textBatchSourceClause(sourceLang: string | null | undefined): string {
+  return sourceLang && sourceLang !== "unknown"
+    ? `from ${sourceLang}`
+    : "from its original language";
+}
 
 function splitTextChunks(value: string, maxSize = TRANSLATION_CHUNK_SIZE): string[] {
   if (value.length <= maxSize) return [value];
@@ -218,8 +232,10 @@ async function translateHtmlTextNodes(
       messages: [
         {
           role: "system",
-          content: TRANSLATE_TEXTS_PROMPT.replace("{{sourceLang}}", sourceLang)
-            .replace("{{targetLangs}}", targetLang),
+          content: TRANSLATE_TEXTS_PROMPT.replace(
+            "{{sourceClause}}",
+            textBatchSourceClause(sourceLang)
+          ).replace("{{targetLangs}}", targetLang),
         },
         { role: "user", content: JSON.stringify(group) },
       ],
@@ -262,32 +278,26 @@ async function translateHtmlTextNodes(
   );
 }
 
-export async function translateTexts(
-  db: Database,
-  context: AIRuntimeContext,
-  input: TranslateTextsInput
-): Promise<TranslateTextsResult> {
-  const targetLangs = [...new Set(input.targetLangs)].filter(
-    (language) => language && language !== input.sourceLang
-  );
-  if (input.texts.length === 0 || targetLangs.length === 0) {
-    return {};
-  }
-  const provider = await getAIProvider(db, "translation", context);
-  if (!provider) {
-    throw new Error("Translation AI task is not configured");
-  }
+const TEXTS_BATCH_MAX_ITEMS = 20;
+const TEXTS_BATCH_MAX_CHARS = 8_000;
 
+/** Translate one bounded batch of texts; throws on an incomplete response. */
+async function translateTextsBatch(
+  provider: AIProvider,
+  sourceLang: string,
+  targetLangs: string[],
+  texts: { id: string; text: string }[]
+): Promise<TranslateTextsResult> {
   const result = await provider.complete({
     messages: [
       {
         role: "system",
         content: TRANSLATE_TEXTS_PROMPT.replace(
-          "{{sourceLang}}",
-          input.sourceLang
-        ).replace("{{targetLangs}}", targetLangs.join(", ")), 
+          "{{sourceClause}}",
+          textBatchSourceClause(sourceLang)
+        ).replace("{{targetLangs}}", targetLangs.join(", ")),
       },
-      { role: "user", content: JSON.stringify(input.texts) },
+      { role: "user", content: JSON.stringify(texts) },
     ],
     temperature: 0.2,
     maxTokens: 4096,
@@ -300,7 +310,7 @@ export async function translateTexts(
   }
 
   const allowedLangs = new Set(targetLangs);
-  const allowedIds = new Set(input.texts.map((item) => item.id));
+  const allowedIds = new Set(texts.map((item) => item.id));
   const translations: TranslateTextsResult = {};
   for (const [id, langMap] of Object.entries(
     rawTranslations as Record<string, unknown>
@@ -318,7 +328,7 @@ export async function translateTexts(
       translations[id] = cleaned;
     }
   }
-  for (const item of input.texts) {
+  for (const item of texts) {
     for (const language of targetLangs) {
       if (!translations[item.id]?.[language]?.trim()) {
         throw new Error(
@@ -327,6 +337,53 @@ export async function translateTexts(
       }
     }
   }
+  return translations;
+}
+
+export async function translateTexts(
+  db: Database,
+  context: AIRuntimeContext,
+  input: TranslateTextsInput
+): Promise<TranslateTextsResult> {
+  const targetLangs = [...new Set(input.targetLangs)].filter(
+    (language) => language && language !== input.sourceLang
+  );
+  if (input.texts.length === 0 || targetLangs.length === 0) {
+    return {};
+  }
+  const provider = await getAIProvider(db, "translation", context);
+  if (!provider) {
+    throw new Error("Translation AI task is not configured");
+  }
+
+  // A single call with up to 100 texts can exceed the completion token budget
+  // and come back truncated; batch by item count and input size and merge.
+  // A failed batch fails the whole translation, matching the existing
+  // blocking semantics.
+  const translations: TranslateTextsResult = {};
+  let batch: TranslateTextsInput["texts"] = [];
+  let batchChars = 0;
+  const flush = async () => {
+    if (batch.length === 0) return;
+    Object.assign(
+      translations,
+      await translateTextsBatch(provider, input.sourceLang, targetLangs, batch)
+    );
+    batch = [];
+    batchChars = 0;
+  };
+  for (const item of input.texts) {
+    if (
+      batch.length > 0 &&
+      (batch.length >= TEXTS_BATCH_MAX_ITEMS ||
+        batchChars + item.text.length > TEXTS_BATCH_MAX_CHARS)
+    ) {
+      await flush();
+    }
+    batch.push(item);
+    batchChars += item.text.length;
+  }
+  await flush();
   return translations;
 }
 

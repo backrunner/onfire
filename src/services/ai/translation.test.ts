@@ -188,6 +188,135 @@ describe("AI translation response validation", () => {
     ).rejects.toThrow("provider unavailable");
   });
 
+  it("splits translateTexts into batches by item count and merges them", async () => {
+    const texts = Array.from({ length: 45 }, (_, index) => ({
+      id: `t-${index}`,
+      text: `Text ${index}`,
+    }));
+    mocks.complete.mockImplementation(async (request) => {
+      const items = JSON.parse(request.messages[1].content) as typeof texts;
+      return {
+        content: JSON.stringify({
+          translations: Object.fromEntries(
+            items.map((item) => [item.id, { zh: `译${item.text}` }])
+          ),
+        }),
+      };
+    });
+
+    const result = await translateTexts(db, {}, {
+      sourceLang: "en",
+      targetLangs: ["zh"],
+      texts,
+    });
+
+    expect(mocks.complete.mock.calls.length).toBe(3);
+    expect(Object.keys(result).length).toBe(45);
+    expect(result["t-0"]).toEqual({ zh: "译Text 0" });
+    expect(result["t-44"]).toEqual({ zh: "译Text 44" });
+    for (const [request] of mocks.complete.mock.calls) {
+      const items = JSON.parse(request.messages[1].content) as typeof texts;
+      expect(items.length).toBeLessThanOrEqual(20);
+    }
+  });
+
+  it("splits translateTexts batches by total input size", async () => {
+    const texts = Array.from({ length: 5 }, (_, index) => ({
+      id: `big-${index}`,
+      text: "x".repeat(2_000),
+    }));
+    mocks.complete.mockImplementation(async (request) => {
+      const items = JSON.parse(request.messages[1].content) as typeof texts;
+      return {
+        content: JSON.stringify({
+          translations: Object.fromEntries(
+            items.map((item) => [item.id, { zh: item.id }])
+          ),
+        }),
+      };
+    });
+
+    const result = await translateTexts(db, {}, {
+      sourceLang: "en",
+      targetLangs: ["zh"],
+      texts,
+    });
+
+    expect(mocks.complete.mock.calls.length).toBe(2);
+    expect(Object.keys(result).length).toBe(5);
+    for (const [request] of mocks.complete.mock.calls) {
+      const items = JSON.parse(request.messages[1].content) as typeof texts;
+      const chars = items.reduce((total, item) => total + item.text.length, 0);
+      expect(chars).toBeLessThanOrEqual(8_000);
+    }
+  });
+
+  it("asks the batch translator to preserve placeholders and fails when any batch fails", async () => {
+    const texts = Array.from({ length: 25 }, (_, index) => ({
+      id: `t-${index}`,
+      text: `Text ${index}`,
+    }));
+    mocks.complete.mockImplementation(async (request) => {
+      expect(request.messages[0].content).toContain("{{...}}");
+      const items = JSON.parse(request.messages[1].content) as typeof texts;
+      if (items.some((item) => item.id === "t-21")) {
+        throw new Error("provider unavailable");
+      }
+      return {
+        content: JSON.stringify({
+          translations: Object.fromEntries(
+            items.map((item) => [item.id, { zh: item.text }])
+          ),
+        }),
+      };
+    });
+
+    await expect(
+      translateTexts(db, {}, {
+        sourceLang: "en",
+        targetLangs: ["zh"],
+        texts,
+      })
+    ).rejects.toThrow("provider unavailable");
+    expect(mocks.complete.mock.calls.length).toBe(2);
+  });
+
+  it("omits the source-language hint when detection reported unknown", async () => {
+    const plain = "Hello world. ".repeat(700);
+    const html = `<p>${"Hello world. ".repeat(400)}</p>`;
+    mocks.complete.mockImplementation(async (request) => {
+      const user = request.messages[1].content as string;
+      if (user.startsWith("Text:\n")) {
+        return {
+          content: JSON.stringify({ content: user.slice("Text:\n".length) }),
+        };
+      }
+      const items = JSON.parse(user) as Array<{ id: string; text: string }>;
+      return {
+        content: JSON.stringify({
+          translations: Object.fromEntries(
+            items.map((item) => [item.id, { zh: item.text }])
+          ),
+        }),
+      };
+    });
+
+    await translateTicketContent(db, {}, {
+      text: plain,
+      html,
+      targetLang: "zh",
+    });
+
+    const htmlBatchCalls = mocks.complete.mock.calls.filter(
+      ([request]) => !(request.messages[1].content as string).startsWith("Text:\n")
+    );
+    expect(htmlBatchCalls.length).toBeGreaterThan(0);
+    for (const [request] of htmlBatchCalls) {
+      expect(request.messages[0].content).toContain("from its original language");
+      expect(request.messages[0].content).not.toContain("unknown");
+    }
+  });
+
   it("chunks long rich text while preserving sanitized tags and attributes", async () => {
     const plain = "Hello world. ".repeat(700);
     const html = `<p>${"Hello world. ".repeat(700)}<a href="https://example.com/help">Open</a><img src="/api/attachments/abc123" alt="shot"></p><script>bad()</script>`;

@@ -59,6 +59,9 @@ export const POST = withAuth({}, async (req: NextRequest, ctx) => {
   if (invalidTargets.length > 0) {
     throw badRequest("Translations contain unsupported languages", invalidTargets);
   }
+  if (body.targetLangs.includes(product.defaultLanguage)) {
+    throw badRequest("Target languages cannot include the product default language");
+  }
 
   try {
     const translations = await translateTexts(
@@ -75,6 +78,7 @@ export const POST = withAuth({}, async (req: NextRequest, ctx) => {
     if (error instanceof Error && error.message.includes("not configured")) {
       throw new ApiError(503, "AI translation is not configured");
     }
-    throw error;
+    console.error("AI content translation failed:", error);
+    throw new ApiError(502, "AI content translation failed");
   }
 });
