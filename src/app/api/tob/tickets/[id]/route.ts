@@ -169,8 +169,10 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
     throw badRequest("Reply content is required");
   }
 
-  let translation: Awaited<ReturnType<typeof prepareReplyTranslation>> = {
-    detectedLanguage: productLanguageFallback(ticket.customerLanguage),
+  // Internal notes are never translated; they carry no detected language
+  // rather than borrowing the ticket's customer language.
+  let translation: { detectedLanguage: string | null; translations: string | null } = {
+    detectedLanguage: null,
     translations: null,
   };
   if (!body.internal) {
@@ -247,7 +249,3 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
     reply: { id: replyId, content, internal: body.internal, createdAt: now },
   });
 });
-
-function productLanguageFallback(language: string | null): string {
-  return language || "unknown";
-}
