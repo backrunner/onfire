@@ -1,8 +1,12 @@
 # OnFire Project Status
 
-Updated: 2026-08-26
+Updated: 2026-09-04
 
 ## Current State
+
+- Multilingual forms are hardened end to end: companion maps reject empty and default-language keys, the ToC form fallback strips translation maps, translation AI is only required when expanding a product beyond one language, and removing a language cleans orphaned companions on types and template versions in the same batch. `?lang=` and the language cookie normalize to lowercase base tags.
+- AI text translation is batched (20 items / 8k chars per call) with placeholder protection in every prompt; translate-content maps provider failures to 502 and rejects default-language targets. ToB search, suggestions, ticket lists, and MCP queries all cover translated content, and internal notes no longer borrow the ticket's customer language.
+- The form builder assistant revises the latest unapplied draft on follow-up messages, merges surviving i18n companions on apply, disables apply in translation mode, retries once after truncation, and locks the editor while translate-all runs. Admin content is left-aligned, and legacy template/category-route dead code (UI, API shells, locales, exports, types) is removed.
 
 - OnFire now has a stateless Streamable HTTP MCP endpoint at `/mcp` on the ToB
   origin. OAuth 2.1 authorization code with PKCE S256, dynamic public-client
@@ -104,7 +108,7 @@ Updated: 2026-08-26
 - Worker edge routing now rejects `/api/tob/*` on ToC/unknown hosts and `/api/toc/*` on ToB hosts; domain-level Zero Trust policies can therefore be applied without leaving the opposite API surface public.
 - Current deployment target is one OpenNext Worker attached to `onfire.alkinum.com` (ToB) and `support.alkinum.io` (ToC) as Custom Domains. Two physically independent Workers are intentionally not enabled yet; they require separate Wrangler environments/build entries and single-owner coordination for cron/email.
 - The fallback `workers.dev` hostname is disabled in production; traffic enters through the two configured Custom Domains only.
-- Worker version `98795abf-724a-4261-8f3f-9a6cedc1ab6e` is deployed at 100% traffic with both Custom Domains, the `*/5 * * * *` SLA cron, and all configured D1/R2/Vectorize/Email/service bindings. Deployment reported 32 ms startup time. The public ToC health endpoint returns 200, the ToC-to-ToB cross-surface probe returns 404, unauthenticated ticket-type requests return JSON 401, and Cloudflare Access intercepts unauthenticated ToB probes with its expected 302 login redirect.
+- Worker version `c3331ad6-bf56-4b68-ac8d-4b9b4b16182b` is deployed at 100% traffic with both Custom Domains, the `*/5 * * * *` SLA cron, and all configured D1/R2/Vectorize/Email/service bindings. The public ToC health endpoint returns 200, the ToC-to-ToB cross-surface probe returns 404, unauthenticated ticket-type requests return JSON 401, and Cloudflare Access intercepts unauthenticated ToB probes with its expected 302 login redirect.
 - Production `AUTH_SECRET` and `TURNSTILE_SECRET` are set as Worker secrets. The application database is initialized and contains its SuperAdmin account.
 - RBAC combines role permissions with tenant, product, and team scope. ProductAdmin scope comes from `user_products`; support-agent membership remains separate.
 - Product lifecycle and product settings are separate permissions. ProductAdmin can update scoped SLA, auto-close, and team associations without creating or deleting products.
@@ -185,7 +189,7 @@ snapshots. Production D1 has migrations `0000` through `0022` applied;
   checks, live reassignment membership, signed-consent structure, strict bearer
   scopes, canonical discovery, encoded-path isolation, MCP Origin checks,
   sensitive response no-store policy, and JSON media type.
-- Full `pnpm test`: passing, 83 files and 559 tests.
+- Full `pnpm test`: passing, 83 files and 583 tests.
 - `pnpm build:worker`: passing with OpenNext Cloudflare 1.20.2, Next 16.2.12, Wrangler 4.120.1, and Wrangler-generated workerd runtime types.
 - `pnpm cf-typegen --check`: passing with generated `CloudflareEnv`; `wrangler.types.env` keeps secret typing deterministic without storing values.
 - `pnpm exec drizzle-kit check`: passing.
