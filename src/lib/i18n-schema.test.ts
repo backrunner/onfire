@@ -10,6 +10,14 @@ describe("i18nRecordSchema", () => {
     expect(schema.safeParse({ "language-code-that-is-too-long": "ok" }).success).toBe(false);
   });
 
+  it("rejects empty and whitespace-only values so projections keep the base text", () => {
+    const schema = i18nRecordSchema(10);
+    expect(schema.safeParse({ zh: "" }).success).toBe(false);
+    expect(schema.safeParse({ zh: "   " }).success).toBe(false);
+    expect(schema.safeParse({ zh: " 姓名 " }).success).toBe(true);
+    expect(schema.parse({ zh: " 姓名 " })).toEqual({ zh: "姓名" });
+  });
+
   it("preserves nullable and optional route semantics", () => {
     const schema = nullableI18nField(10);
     expect(schema.safeParse(undefined).success).toBe(true);

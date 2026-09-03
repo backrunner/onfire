@@ -2,8 +2,12 @@ import { NextRequest } from "next/server";
 import { and, eq, isNull } from "drizzle-orm";
 import { products, ticketTypes } from "@/drizzle/schema";
 import { withCustomerAuth } from "@/lib/api/handler";
-import { notFound, ok } from "@/lib/api/response";
-import { localizeFormSchema, parseFormSchema } from "@/lib/form-schema";
+import { notFound, ok, ApiError } from "@/lib/api/response";
+import {
+  localizeFormSchema,
+  parseFormSchema,
+  stripFormSchemaI18n,
+} from "@/lib/form-schema";
 import {
   requestedTocLanguage,
   resolveProductLanguage,
@@ -31,13 +35,23 @@ export const GET = withCustomerAuth(async (req: NextRequest, { db, customer, par
     req.headers.get("accept-language")
   );
   const formSchema = parseFormSchema(current.version.formSchema);
+  // The strict parse failed: fall back to the raw schema with every `*I18n`
+  // companion stripped, so translation maps never leak to customers.
+  let fallbackSchema: unknown;
+  if (!formSchema) {
+    try {
+      fallbackSchema = stripFormSchemaI18n(
+        JSON.parse(current.version.formSchema)
+      );
+    } catch {
+      throw new ApiError(500, "Stored form schema is not valid JSON");
+    }
+  }
   return ok({
     ticketTypeId: type.id,
     templateVersionId: current.version.id,
     version: current.version.version,
-    formSchema: formSchema
-      ? localizeFormSchema(formSchema, lang)
-      : (JSON.parse(current.version.formSchema) as unknown),
+    formSchema: formSchema ? localizeFormSchema(formSchema, lang) : fallbackSchema,
   });
 });
 

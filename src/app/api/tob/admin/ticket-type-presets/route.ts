@@ -36,10 +36,12 @@ export const GET = withAuth({ permission: "ticket_type.preset.read" }, async (re
 export const POST = withAuth({ permission: "ticket_type.preset.write" }, async (req: NextRequest, ctx) => {
   const body = await parseBody(req, createSchema);
   await assertTenantAccess(ctx, body.tenantId);
-  // Presets belong to a tenant, not a product, so any UI language is allowed.
+  // Presets belong to a tenant, not a product, so any UI language is allowed;
+  // their base text is English, so `en` companions are still rejected.
   const unsupported = unsupportedI18nKeys(
     [body.nameI18n, body.descriptionI18n],
-    [...PRODUCT_LANGUAGES]
+    [...PRODUCT_LANGUAGES],
+    "en"
   );
   if (unsupported.length > 0) {
     throw badRequest("Translations contain unsupported languages", unsupported);

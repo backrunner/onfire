@@ -43,7 +43,8 @@ export const PATCH = withAuth({ permission: "ticket_type.write" }, async (req: N
     });
     const unsupported = unsupportedI18nKeys(
       [body.nameI18n, body.descriptionI18n],
-      parseSupportedLanguages(product?.supportedLanguages)
+      parseSupportedLanguages(product?.supportedLanguages),
+      product?.defaultLanguage
     );
     if (unsupported.length > 0) {
       throw badRequest("Translations contain unsupported languages", unsupported);

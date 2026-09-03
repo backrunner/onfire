@@ -23,12 +23,18 @@ import {
   teams,
   templates,
   tickets,
+  ticketTemplates,
+  ticketTemplateVersions,
   userProducts,
 } from "@/drizzle/schema";
 import { badRequest, conflict, ok, notFound, forbidden } from "@/lib/api/response";
 import { withAuth, parseBody, type AuthedContext } from "@/lib/api/handler";
 import { assertProductAccess, assertTeamAccess } from "@/lib/api/scope";
-import { parseSupportedLanguages } from "@/lib/product-language";
+import {
+  parseSupportedLanguages,
+  removeI18nRecordLanguages,
+} from "@/lib/product-language";
+import { removeFormSchemaLanguages } from "@/lib/form-schema";
 import {
   REMOTE_IDENTITY_SECRET_PURPOSE,
   safeIdentityEndpoint,
@@ -126,8 +132,8 @@ export const PATCH = withAuth({ permission: "product.settings" }, async (req: Ne
   const supportedLanguages = body.supportedLanguages
     ? [...new Set(body.supportedLanguages)]
     : undefined;
-  const effectiveSupported =
-    supportedLanguages ?? parseSupportedLanguages(product.supportedLanguages);
+  const previousSupported = parseSupportedLanguages(product.supportedLanguages);
+  const effectiveSupported = supportedLanguages ?? previousSupported;
   if (
     effectiveSupported.length > 0 &&
     !effectiveSupported.includes(defaultLanguage)
@@ -141,8 +147,13 @@ export const PATCH = withAuth({ permission: "product.settings" }, async (req: Ne
       );
     }
   }
+  // Only expanding the language set from single- to multi-language requires a
+  // translation AI route; unrelated edits on an already multi-language
+  // product must not be blocked by a later credential removal.
   if (
-    effectiveSupported.length > 1 &&
+    supportedLanguages !== undefined &&
+    supportedLanguages.length > 1 &&
+    previousSupported.length <= 1 &&
     !(await hasConfiguredAITask(ctx.db, "translation", {
       tenantId: product.tenantId,
       productId: product.id,
@@ -152,6 +163,13 @@ export const PATCH = withAuth({ permission: "product.settings" }, async (req: Ne
       "Translation AI must be configured before enabling multiple languages"
     );
   }
+  // Languages dropped by this request become orphaned i18n companions on
+  // existing types and template versions; clean them up below.
+  const removedLanguages = supportedLanguages
+    ? previousSupported.filter(
+        (lang) => !(supportedLanguages as string[]).includes(lang)
+      )
+    : [];
   const existingIdentity =
     await ctx.db.query.productIdentityConfigs.findFirst({
       where: eq(productIdentityConfigs.productId, product.id),
@@ -279,6 +297,59 @@ export const PATCH = withAuth({ permission: "product.settings" }, async (req: Ne
           set: { enabled, endpointUrl, authSecret, updatedAt: now },
         })
     );
+  }
+  if (removedLanguages.length > 0) {
+    const typeRows = await ctx.db
+      .select({
+        id: ticketTypes.id,
+        nameI18n: ticketTypes.nameI18n,
+        descriptionI18n: ticketTypes.descriptionI18n,
+      })
+      .from(ticketTypes)
+      .where(eq(ticketTypes.productId, product.id));
+    for (const row of typeRows) {
+      const nameI18n = removeI18nRecordLanguages(row.nameI18n, removedLanguages);
+      const descriptionI18n = removeI18nRecordLanguages(
+        row.descriptionI18n,
+        removedLanguages
+      );
+      if (nameI18n !== row.nameI18n || descriptionI18n !== row.descriptionI18n) {
+        statements.push(
+          ctx.db
+            .update(ticketTypes)
+            .set({ nameI18n, descriptionI18n })
+            .where(eq(ticketTypes.id, row.id))
+        );
+      }
+    }
+    const versionRows = await ctx.db
+      .select({
+        id: ticketTemplateVersions.id,
+        formSchema: ticketTemplateVersions.formSchema,
+      })
+      .from(ticketTemplateVersions)
+      .innerJoin(
+        ticketTemplates,
+        eq(ticketTemplates.id, ticketTemplateVersions.templateId)
+      )
+      .innerJoin(ticketTypes, eq(ticketTypes.id, ticketTemplates.ticketTypeId))
+      .where(eq(ticketTypes.productId, product.id));
+    for (const row of versionRows) {
+      try {
+        const parsed: unknown = JSON.parse(row.formSchema);
+        const cleaned = removeFormSchemaLanguages(parsed, removedLanguages);
+        if (JSON.stringify(cleaned) !== JSON.stringify(parsed)) {
+          statements.push(
+            ctx.db
+              .update(ticketTemplateVersions)
+              .set({ formSchema: JSON.stringify(cleaned) })
+              .where(eq(ticketTemplateVersions.id, row.id))
+          );
+        }
+      } catch {
+        // Leave unparseable legacy schemas untouched.
+      }
+    }
   }
   if (statements.length > 0) {
     await ctx.db.batch(statements as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);

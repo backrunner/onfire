@@ -28,10 +28,12 @@ const updateSchema = z.object({
 export const PATCH = withAuth({ permission: "ticket_type.preset.write" }, async (req: NextRequest, ctx) => {
   const preset = await loadAccessiblePreset(ctx, ctx.params.id);
   const body = await parseBody(req, updateSchema);
-  // Presets belong to a tenant, not a product, so any UI language is allowed.
+  // Presets belong to a tenant, not a product, so any UI language is allowed;
+  // their base text is English, so `en` companions are still rejected.
   const unsupportedLangs = unsupportedI18nKeys(
     [body.nameI18n, body.descriptionI18n],
-    [...PRODUCT_LANGUAGES]
+    [...PRODUCT_LANGUAGES],
+    "en"
   );
   if (unsupportedLangs.length > 0) {
     throw badRequest("Translations contain unsupported languages", unsupportedLangs);

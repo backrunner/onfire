@@ -1,10 +1,40 @@
 import { describe, expect, it } from "vitest";
+import { NextRequest } from "next/server";
 import {
   parseI18nRecord,
   parseSupportedLanguages,
+  removeI18nRecordLanguages,
+  requestedTocLanguage,
   resolveProductLanguage,
   unsupportedI18nKeys,
 } from "./product-language";
+
+describe("requestedTocLanguage", () => {
+  const request = (url: string, cookie?: string) =>
+    new NextRequest(url, cookie ? { headers: { cookie } } : undefined);
+
+  it("normalizes the lang query parameter to a lowercase base tag", () => {
+    expect(requestedTocLanguage(request("https://support.example/?lang=ZH"))).toBe("zh");
+    expect(requestedTocLanguage(request("https://support.example/?lang=zh-CN"))).toBe("zh");
+    expect(requestedTocLanguage(request("https://support.example/?lang=EN-us"))).toBe("en");
+  });
+
+  it("prefers the query parameter over the language cookie", () => {
+    expect(
+      requestedTocLanguage(
+        request("https://support.example/?lang=zh", "onfire-lang=en")
+      )
+    ).toBe("zh");
+  });
+
+  it("falls back to the cookie and returns null when neither is set", () => {
+    expect(requestedTocLanguage(request("https://support.example/", "onfire-lang=zh"))).toBe("zh");
+    expect(
+      requestedTocLanguage(request("https://support.example/", "other=1; onfire-lang=EN"))
+    ).toBe("en");
+    expect(requestedTocLanguage(request("https://support.example/"))).toBeNull();
+  });
+});
 
 describe("parseSupportedLanguages", () => {
   it("parses the JSON array column and tolerates malformed values", () => {
@@ -73,5 +103,29 @@ describe("unsupportedI18nKeys", () => {
 
   it("returns empty when nothing is outside the set", () => {
     expect(unsupportedI18nKeys([{ zh: "x" }], ["en", "zh"])).toEqual([]);
+  });
+
+  it("reports keys equal to the default language", () => {
+    expect(
+      unsupportedI18nKeys([{ en: "x", zh: "y" }], ["en", "zh"], "en")
+    ).toEqual(["en"]);
+    expect(unsupportedI18nKeys([{ zh: "y" }], ["en", "zh"], "en")).toEqual([]);
+  });
+});
+
+describe("removeI18nRecordLanguages", () => {
+  it("removes only the dropped languages from the stored column", () => {
+    expect(
+      removeI18nRecordLanguages('{"zh":"姓名","fr":"nom"}', ["zh"])
+    ).toBe('{"fr":"nom"}');
+    expect(
+      removeI18nRecordLanguages('{"zh":"姓名","fr":"nom"}', ["de"])
+    ).toBe('{"zh":"姓名","fr":"nom"}');
+  });
+
+  it("returns null when nothing remains or the column is unusable", () => {
+    expect(removeI18nRecordLanguages('{"zh":"姓名"}', ["zh"])).toBeNull();
+    expect(removeI18nRecordLanguages(null, ["zh"])).toBeNull();
+    expect(removeI18nRecordLanguages("oops", ["zh"])).toBeNull();
   });
 });

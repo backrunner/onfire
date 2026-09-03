@@ -4,7 +4,10 @@ import {
   isEmptyFieldValue,
   isFieldVisible,
   localizeFormSchema,
+  mergeFormSchemaI18n,
   parseFormSchemaValue,
+  removeFormSchemaLanguages,
+  stripFormSchemaI18n,
   validateFormSchemaLanguages,
   validateFormSubmission,
   validateFormSchema,
@@ -291,6 +294,125 @@ describe("localizeFormSchema", () => {
   });
 });
 
+describe("mergeFormSchemaI18n", () => {
+  const previous: FormSchema = {
+    version: "1.0",
+    fields: [
+      field({
+        id: "a",
+        key: "ka",
+        label: "Name",
+        labelI18n: { zh: "姓名" },
+        description: "Shown under the label",
+        descriptionI18n: { zh: "显示在标签下方" },
+        placeholder: "Your name",
+        placeholderI18n: { zh: "您的姓名" },
+        validation: {
+          patternMessage: "Letters only",
+          patternMessageI18n: { zh: "仅限字母" },
+        },
+      }),
+      field({
+        id: "b",
+        key: "kb",
+        type: "select",
+        options: [
+          { label: "Free", value: "free", labelI18n: { zh: "免费" } },
+          { label: "Pro", value: "pro", labelI18n: { zh: "专业" } },
+        ],
+      }),
+    ],
+    layout: {
+      sections: [
+        {
+          title: "Basics",
+          titleI18n: { zh: "基本信息" },
+          description: "Start here",
+          descriptionI18n: { zh: "从这里开始" },
+          fields: ["a", "b"],
+        },
+      ],
+    },
+  };
+
+  it("copies companions for fields whose base text is unchanged", () => {
+    const next: FormSchema = {
+      version: "1.0",
+      fields: [
+        field({
+          id: "a",
+          key: "ka",
+          label: "Name",
+          description: "Shown under the label",
+          required: true,
+        }),
+        field({
+          id: "b",
+          key: "kb",
+          type: "select",
+          options: [
+            { label: "Free", value: "free" },
+            { label: "Enterprise", value: "pro" },
+          ],
+        }),
+        field({ id: "c", key: "kc", label: "New" }),
+      ],
+      layout: {
+        sections: [{ title: "Basics", description: "Start here", fields: ["a"] }],
+      },
+    };
+    const merged = mergeFormSchemaI18n(previous, next);
+    expect(merged.fields[0].labelI18n).toEqual({ zh: "姓名" });
+    expect(merged.fields[0].descriptionI18n).toEqual({ zh: "显示在标签下方" });
+    // Base placeholder absent in next (was set in previous): treat as changed.
+    expect(merged.fields[0].placeholderI18n).toBeUndefined();
+    expect(merged.fields[0].validation?.patternMessageI18n).toBeUndefined();
+    // Options match by value; only the unchanged label keeps its translation.
+    expect(merged.fields[1].options?.[0].labelI18n).toEqual({ zh: "免费" });
+    expect(merged.fields[1].options?.[1].labelI18n).toBeUndefined();
+    // Unknown fields and untranslated sections pass through untouched.
+    expect(merged.fields[2]).toEqual(next.fields[2]);
+    expect(merged.layout?.sections?.[0].titleI18n).toEqual({ zh: "基本信息" });
+    expect(merged.layout?.sections?.[0].descriptionI18n).toEqual({
+      zh: "从这里开始",
+    });
+  });
+
+  it("drops companions when the base text changed", () => {
+    const next: FormSchema = {
+      version: "1.0",
+      fields: [
+        field({
+          id: "a",
+          key: "ka",
+          label: "Full name",
+          description: "Shown under the label",
+          placeholder: "Your name",
+          validation: { patternMessage: "Letters only" },
+        }),
+      ],
+    };
+    const merged = mergeFormSchemaI18n(previous, next);
+    expect(merged.fields[0].labelI18n).toBeUndefined();
+    // Unchanged companions survive even when a sibling text changed.
+    expect(merged.fields[0].descriptionI18n).toEqual({ zh: "显示在标签下方" });
+    expect(merged.fields[0].placeholderI18n).toEqual({ zh: "您的姓名" });
+    expect(merged.fields[0].validation?.patternMessageI18n).toEqual({
+      zh: "仅限字母",
+    });
+  });
+
+  it("does not mutate the inputs", () => {
+    const next: FormSchema = {
+      version: "1.0",
+      fields: [field({ id: "a", key: "ka", label: "Name" })],
+    };
+    mergeFormSchemaI18n(previous, next);
+    expect(previous.fields[0].labelI18n).toEqual({ zh: "姓名" });
+    expect(next.fields[0].labelI18n).toBeUndefined();
+  });
+});
+
 describe("validateFormSchemaLanguages", () => {
   it("accepts i18n keys inside the supported set", () => {
     const schema: FormSchema = {
@@ -325,5 +447,95 @@ describe("validateFormSchemaLanguages", () => {
       fields: [field({ helpTextI18n: { zh: "x" } })],
     };
     expect(validateFormSchemaLanguages(schema, [])).toEqual(["zh"]);
+  });
+
+  it("rejects companion keys equal to the default language", () => {
+    const schema: FormSchema = {
+      ...createEmptyFormSchema(),
+      fields: [field({ labelI18n: { zh: "姓名", en: "Name" } })],
+    };
+    expect(validateFormSchemaLanguages(schema, ["en", "zh"], "en")).toEqual([
+      "en",
+    ]);
+    expect(validateFormSchemaLanguages(schema, ["en", "zh"], "zh")).toEqual([
+      "zh",
+    ]);
+    expect(validateFormSchemaLanguages(schema, ["en", "zh"])).toEqual([]);
+  });
+});
+
+describe("stripFormSchemaI18n", () => {
+  it("removes companions everywhere without touching base fields", () => {
+    const raw = {
+      version: "1.0",
+      fields: [
+        {
+          id: "a",
+          key: "ka",
+          label: "Name",
+          labelI18n: { zh: "姓名" },
+          validation: { pattern: "^\\w+$", patternMessageI18n: { zh: "x" } },
+          options: [{ label: "Free", value: "free", labelI18n: { zh: "免费" } }],
+          anythingFutureI18n: { zh: "x" },
+        },
+      ],
+      layout: {
+        sections: [{ title: "Basics", titleI18n: { zh: "基本信息" }, fields: ["a"] }],
+      },
+    };
+    const stripped = stripFormSchemaI18n(raw);
+    expect(JSON.stringify(stripped)).not.toContain("I18n");
+    expect(stripped).toEqual({
+      version: "1.0",
+      fields: [
+        {
+          id: "a",
+          key: "ka",
+          label: "Name",
+          validation: { pattern: "^\\w+$" },
+          options: [{ label: "Free", value: "free" }],
+        },
+      ],
+      layout: { sections: [{ title: "Basics", fields: ["a"] }] },
+    });
+  });
+
+  it("drops malformed non-object companions and leaves scalars alone", () => {
+    expect(
+      stripFormSchemaI18n({ fields: [{ label: "A", labelI18n: "oops" }] })
+    ).toEqual({ fields: [{ label: "A" }] });
+    expect(stripFormSchemaI18n("plain")).toBe("plain");
+    expect(stripFormSchemaI18n(null)).toBeNull();
+  });
+});
+
+describe("removeFormSchemaLanguages", () => {
+  it("removes only the dropped languages and keeps the rest", () => {
+    const raw = {
+      version: "1.0",
+      fields: [
+        {
+          id: "a",
+          key: "ka",
+          label: "Name",
+          labelI18n: { zh: "姓名" },
+          helpTextI18n: { zh: "幫助", fr: "aide" },
+        },
+      ],
+      layout: { sections: [{ titleI18n: { fr: "titre" }, fields: ["a"] }] },
+    };
+    expect(removeFormSchemaLanguages(raw, ["zh"])).toEqual({
+      version: "1.0",
+      fields: [
+        { id: "a", key: "ka", label: "Name", helpTextI18n: { fr: "aide" } },
+      ],
+      layout: { sections: [{ titleI18n: { fr: "titre" }, fields: ["a"] }] },
+    });
+  });
+
+  it("does not mutate the input", () => {
+    const raw = { fields: [{ labelI18n: { zh: "x" } }] };
+    removeFormSchemaLanguages(raw, ["zh"]);
+    expect(raw).toEqual({ fields: [{ labelI18n: { zh: "x" } }] });
   });
 });

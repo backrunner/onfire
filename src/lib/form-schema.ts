@@ -340,20 +340,154 @@ export function localizeFormSchema(schema: FormSchema, lang: string): FormSchema
 }
 
 /**
+ * Merge the i18n companions of `previous` into `next`, used when a generated
+ * draft (which carries no translations) replaces the working schema. A field
+ * keeps its previous companions when its id matches and the base text is
+ * unchanged; options match by value, sections by title. Inputs are not
+ * mutated.
+ */
+export function mergeFormSchemaI18n(
+  previous: FormSchema,
+  next: FormSchema
+): FormSchema {
+  const previousFields = new Map(previous.fields.map((f) => [f.id, f]));
+  const fields = next.fields.map((field) => {
+    const prev = previousFields.get(field.id);
+    if (!prev) return field;
+    const merged: FormFieldSchema = { ...field };
+    if (merged.label === prev.label && prev.labelI18n) {
+      merged.labelI18n = prev.labelI18n;
+    }
+    if (merged.description === prev.description && prev.descriptionI18n) {
+      merged.descriptionI18n = prev.descriptionI18n;
+    }
+    if (merged.placeholder === prev.placeholder && prev.placeholderI18n) {
+      merged.placeholderI18n = prev.placeholderI18n;
+    }
+    if (merged.helpText === prev.helpText && prev.helpTextI18n) {
+      merged.helpTextI18n = prev.helpTextI18n;
+    }
+    if (
+      merged.validation &&
+      prev.validation &&
+      merged.validation.patternMessage === prev.validation.patternMessage &&
+      prev.validation.patternMessageI18n
+    ) {
+      merged.validation = {
+        ...merged.validation,
+        patternMessageI18n: prev.validation.patternMessageI18n,
+      };
+    }
+    if (merged.options && prev.options) {
+      const previousOptions = new Map(prev.options.map((o) => [o.value, o]));
+      merged.options = merged.options.map((option) => {
+        const prevOption = previousOptions.get(option.value);
+        return prevOption &&
+          option.label === prevOption.label &&
+          prevOption.labelI18n
+          ? { ...option, labelI18n: prevOption.labelI18n }
+          : option;
+      });
+    }
+    return merged;
+  });
+  const layout = next.layout
+    ? {
+        ...next.layout,
+        sections: next.layout.sections?.map((section) => {
+          const prev = previous.layout?.sections?.find(
+            (s) => (s.title ?? "") === (section.title ?? "")
+          );
+          if (!prev) return section;
+          const merged: FormSection = { ...section };
+          if (prev.titleI18n) merged.titleI18n = prev.titleI18n;
+          if (merged.description === prev.description && prev.descriptionI18n) {
+            merged.descriptionI18n = prev.descriptionI18n;
+          }
+          return merged;
+        }),
+      }
+    : undefined;
+  return { ...next, fields, layout };
+}
+
+/**
+ * Recursively rewrite `*I18n` companion maps inside a loosely-parsed schema
+ * value. Companions that are not plain objects are always dropped: they are
+ * never valid, and the ToC surface must not leak them.
+ */
+function rewriteI18nCompanions(
+  value: unknown,
+  rewrite: (map: Record<string, unknown>) => Record<string, unknown>
+): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => rewriteI18nCompanions(entry, rewrite));
+  }
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(value)) {
+      if (key.endsWith("I18n")) {
+        if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+          const rewritten = rewrite(entry as Record<string, unknown>);
+          if (Object.keys(rewritten).length > 0) out[key] = rewritten;
+        }
+        continue;
+      }
+      out[key] = rewriteI18nCompanions(entry, rewrite);
+    }
+    return out;
+  }
+  return value;
+}
+
+/**
+ * Strip every `*I18n` companion map from a loosely-parsed schema value. Used
+ * by the ToC fallback path, which must never expose translation maps even
+ * when the stored schema no longer passes the strict zod parse.
+ */
+export function stripFormSchemaI18n(value: unknown): unknown {
+  return rewriteI18nCompanions(value, () => ({}));
+}
+
+/**
+ * Remove `langs` from every `*I18n` companion map inside a loosely-parsed
+ * schema value; companions left empty are dropped entirely (matching the
+ * "empty companions are not stored" convention).
+ */
+export function removeFormSchemaLanguages(
+  value: unknown,
+  langs: string[]
+): unknown {
+  const removed = new Set(langs);
+  return rewriteI18nCompanions(value, (map) => {
+    const kept: Record<string, unknown> = {};
+    for (const [lang, text] of Object.entries(map)) {
+      if (!removed.has(lang)) kept[lang] = text;
+    }
+    return kept;
+  });
+}
+
+/**
  * Collect the language keys used by i18n companion fields that are not in
  * `supportedLanguages`. An empty result means the schema is valid; an empty
- * supported set forbids all i18n keys.
+ * supported set forbids all i18n keys. When `defaultLanguage` is given, a
+ * companion key equal to it is also reported: the base fields already carry
+ * the authoritative default-language text and must not be overridden.
  */
 export function validateFormSchemaLanguages(
   schema: FormSchema,
-  supportedLanguages: string[]
+  supportedLanguages: string[],
+  defaultLanguage?: string
 ): string[] {
   const supported = new Set(supportedLanguages);
   const unsupported = new Set<string>();
   const collect = (map: Record<string, string> | undefined) => {
     if (!map) return;
     for (const lang of Object.keys(map)) {
-      if (!supported.has(lang)) unsupported.add(lang);
+      if (!supported.has(lang) || lang === defaultLanguage) {
+        unsupported.add(lang);
+      }
     }
   };
   for (const field of schema.fields) {

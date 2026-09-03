@@ -16,7 +16,11 @@ import type { NextRequest } from "next/server";
 const LANGUAGE_COOKIE = "onfire-lang";
 
 export const PRODUCT_LANGUAGES = ["en", "zh"] as const;
-export type ProductLanguage = (typeof PRODUCT_LANGUAGES)[number];
+
+/** Lowercase base language tag (`ZH` / `zh-CN` → `zh`), matching parseAcceptLanguage. */
+function normalizeLanguageTag(value: string): string {
+  return value.trim().toLowerCase().split("-")[0];
+}
 
 /**
  * Explicit language choice on a ToC request: the `?lang=` query parameter
@@ -26,12 +30,12 @@ export type ProductLanguage = (typeof PRODUCT_LANGUAGES)[number];
  */
 export function requestedTocLanguage(req: NextRequest): string | null {
   const param = req.nextUrl.searchParams.get("lang");
-  if (param) return param;
+  if (param) return normalizeLanguageTag(param);
   const cookie = req.headers.get("cookie") ?? "";
   const match = cookie.match(
     new RegExp(`(?:^|;\\s*)${LANGUAGE_COOKIE}=([\\w-]+)`)
   );
-  return match?.[1] ?? null;
+  return match?.[1] ? normalizeLanguageTag(match[1]) : null;
 }
 
 /** Columns carrying the product language configuration. */
@@ -119,19 +123,43 @@ export function resolveProductLanguage(
 /**
  * Language keys used by the given i18n maps that fall outside
  * `supportedLanguages` (sorted, deduplicated). An empty supported set
- * forbids all i18n keys.
+ * forbids all i18n keys. When `defaultLanguage` is given, a key equal to it
+ * is also reported: base columns already carry the authoritative
+ * default-language text and must not be overridden by a companion.
  */
 export function unsupportedI18nKeys(
   maps: Array<Record<string, string> | null | undefined>,
-  supportedLanguages: string[]
+  supportedLanguages: string[],
+  defaultLanguage?: string
 ): string[] {
   const supported = new Set(supportedLanguages);
   const unsupported = new Set<string>();
   for (const map of maps) {
     if (!map) continue;
     for (const lang of Object.keys(map)) {
-      if (!supported.has(lang)) unsupported.add(lang);
+      if (!supported.has(lang) || lang === defaultLanguage) {
+        unsupported.add(lang);
+      }
     }
   }
   return [...unsupported].sort();
+}
+
+/**
+ * Remove `langs` from a stored JSON i18n companion column; returns null when
+ * nothing remains (matching the "empty companions are stored as null" rule).
+ * Unparseable content is treated as empty.
+ */
+export function removeI18nRecordLanguages(
+  raw: string | null | undefined,
+  langs: string[]
+): string | null {
+  const record = parseI18nRecord(raw);
+  if (!record) return null;
+  const removed = new Set(langs);
+  const kept: Record<string, string> = {};
+  for (const [lang, value] of Object.entries(record)) {
+    if (!removed.has(lang)) kept[lang] = value;
+  }
+  return Object.keys(kept).length > 0 ? JSON.stringify(kept) : null;
 }

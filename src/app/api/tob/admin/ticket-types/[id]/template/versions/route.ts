@@ -45,7 +45,8 @@ export const POST = withAuth({ permission: "ticket_template.write" }, async (req
   });
   const unsupportedLangs = validateFormSchemaLanguages(
     formSchema,
-    parseSupportedLanguages(product?.supportedLanguages)
+    parseSupportedLanguages(product?.supportedLanguages),
+    product?.defaultLanguage
   );
   if (unsupportedLangs.length > 0) {
     throw badRequest("Form schema contains unsupported languages", unsupportedLangs);
