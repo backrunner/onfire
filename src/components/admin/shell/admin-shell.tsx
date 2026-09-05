@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useState, type CSSProperties } from "react"
 import { AdminSidebar } from "@/components/admin/shell/admin-sidebar";
 import { AdminHeader } from "@/components/admin/shell/admin-header";
 import { usePreviewIdentity } from "@/lib/hooks/use-preview-identity";
+import { WebMcpProvider } from "@/components/admin/webmcp-provider";
 
 const COLLAPSE_KEY = "onfire-sidebar-collapsed";
 
@@ -29,6 +30,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="admin-shell flex min-h-screen bg-background">
+      <WebMcpProvider />
       <AdminSidebar
         collapsed={collapsed}
         onToggleCollapsed={toggleCollapsed}

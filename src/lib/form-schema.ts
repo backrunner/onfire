@@ -244,7 +244,7 @@ const formFieldSchema = z.object({
     .optional(),
 });
 
-const storedFormSchema = z.object({
+export const storedFormSchema = z.object({
   version: z.literal("1.0"),
   fields: z.array(formFieldSchema).max(50),
   layout: z
