@@ -1080,7 +1080,7 @@ pnpm deploy
 
 ## Current Predeployment Verification
 
-As of 2026-09-05, generated binding checks, TypeScript, 85 test files / 618 tests, and the OpenNext Worker build pass. Native Chromium Dashboard WebMCP smoke covers tool discovery, product/form/ticket writes, preview read-only enforcement, expiry cleanup, and desktop/mobile light/dark layouts. These WebMCP changes remain local and have not been deployed. Worker version `67fb9398-9bba-45c3-8d10-02876e83139f` serves 100% of traffic on both Custom Domains. The public ToC health probe returns 200 and the ToC-to-ToB surface guard returns 404. The remaining build warnings are expected: Vectorize has no local simulator, and OpenNext 1.20.1 still requires `src/middleware.ts` instead of Next 16 `proxy.ts`.
+As of 2026-09-05, generated binding checks, TypeScript, 85 test files / 619 tests, and the OpenNext Worker build pass. Native Chromium Dashboard WebMCP smoke covers tool discovery, product/form/ticket writes, preview read-only enforcement, expiry cleanup, and desktop/mobile light/dark layouts. Worker version `1f58a90e-9fee-4b00-b583-7bb905db37be` serves 100% of traffic on both Custom Domains. The public ToC health probe returns 200 and the ToC-to-ToB surface guard returns 404. The remaining build warnings are expected: Vectorize has no local simulator, and OpenNext 1.20.1 still requires `src/middleware.ts` instead of Next 16 `proxy.ts`.
 
 ## Contribution Convention
 
