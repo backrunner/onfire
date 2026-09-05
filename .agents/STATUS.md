@@ -1,8 +1,24 @@
 # OnFire Project Status
 
-Updated: 2026-09-04
+Updated: 2026-09-05
 
 ## Current State
+
+- Authenticated Dashboard pages now register 97 native WebMCP tools, filtered by
+  effective role and preview state. The catalogue covers ticket workflows,
+  products, ticket types, immutable form versions, internal states, tenant
+  presets, staff/customers, email, notification policy, scoped AI credentials
+  and task routes, and product knowledge. Every call verifies the live browser
+  identity and reuses the scoped ToB API; writes refresh Dashboard SWR data.
+- WebMCP supports current `document.modelContext` registration with abort
+  signals and earlier `navigator.modelContext` implementations with explicit
+  unregistration. Expiry, identity changes and page departure invalidate old
+  callbacks. Unsupported browsers retain normal Dashboard behavior. The
+  catalogue loads on demand, input schemas are cached, concurrent identity
+  checks are coalesced, and mutations refresh only affected SWR resources.
+  Identity polling pauses while the page is hidden. No schema, binding or
+  remote OAuth permission change is required. Browser setup and examples are
+  documented in `.agents/WEBMCP_INTEGRATION.md`.
 
 - Multilingual forms are hardened end to end: companion maps reject empty and default-language keys, the ToC form fallback strips translation maps, translation AI is only required when expanding a product beyond one language, and removing a language cleans orphaned companions on types and template versions in the same batch. `?lang=` and the language cookie normalize to lowercase base tags.
 - AI text translation is batched (20 items / 8k chars per call) with placeholder protection in every prompt; translate-content maps provider failures to 502 and rejects default-language targets. ToB search, suggestions, ticket lists, and MCP queries all cover translated content, and internal notes no longer borrow the ticket's customer language.
@@ -181,6 +197,20 @@ snapshots. Production D1 has migrations `0000` through `0022` applied;
 `0023` through `0025` remain pending operator application with the matching Worker.
 
 ## Verification
+
+- Dashboard WebMCP: 16 focused tests cover all 97 route/method mappings,
+  advertised schemas, five-role discovery, preview reads, live identity/scope
+  invalidation, expiry, path injection, version payloads, async cleanup and
+  mutation failure handling. Full suite: 85 files / 619 tests passing.
+- Native Chromium WebMCP smoke (real `document.modelContext`, no shim): all 97
+  tools discovered; product creation/settings, type creation, immutable form
+  save/history/clone/invalidation, team/user/agent administration, and ticket
+  priority/internal reply/closure/reopen passed against local D1. Dashboard
+  statistics refresh immediately after removing the stale HTTP cache. Preview
+  exposes reads only and the actual write API returns 403; session expiry
+  removes tools. Temporary fixture records were cleaned up.
+- Dashboard Playwright checks passed at 1440x900 and 390x844 in light and dark,
+  with no horizontal overflow, page exceptions or WebMCP registration warnings.
 
 - `pnpm lint`: passing.
 - Focused MCP/OAuth verification: 20 files and 241 tests passing, including real

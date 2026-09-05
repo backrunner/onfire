@@ -16,6 +16,25 @@
 - Validate every submitted tenant/product/team association on create and update. SuperAdmin bypasses visibility scope, never tenant-integrity checks.
 - Product creation may omit `tenantId`; the API assigns the creator's tenant as the default. An explicitly submitted tenant remains subject to the same existence, permission, and tenant-integrity validation.
 
+## Dashboard WebMCP
+
+- Register explicit, schema-described browser tools only inside authenticated
+  Dashboard pages, using native `document.modelContext` or the earlier
+  `navigator.modelContext` API when available.
+- Tool discovery follows the effective user's permissions; preview identities
+  expose only reads. Each invocation verifies live identity and then uses the
+  normal ToB API with server-side RBAC, target scope and business validation.
+- Cover structured ticket, product, type/form version, staff, email,
+  notification and AI/knowledge administration. Keep form schemas complete and
+  immutable version semantics identical to interactive saves.
+- Invalidate stale callbacks on role/scope/identity changes, logout, session
+  expiry and page departure. Refresh Dashboard data after writes without
+  turning a UI refresh failure into a retryable mutation failure.
+- No arbitrary URL/method proxy, cross-origin credential bridge or expanded
+  remote OAuth grant. Unsupported browsers continue to work normally.
+- Browser setup, tool families, exclusions and examples live in
+  `.agents/WEBMCP_INTEGRATION.md`.
+
 ## Account Security
 
 - The account page exposes one security-settings entry. Password changes, Passkey management, and authenticator TOTP management live inside that modal instead of separate page forms.

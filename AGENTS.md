@@ -107,6 +107,18 @@ with PKCE S256. The user grants atomic ticket and product-setting capabilities,
 then limits them to all currently accessible resources or selected tenants and
 products. Protocol and integration details live in `.agents/MCP_INTEGRATION.md`.
 
+### WebMCP - Logged-in Dashboard Automation
+
+Authenticated Dashboard pages register permission-filtered `onfire_*` browser
+tools for tickets, products, ticket types and immutable forms, staff, email,
+notifications, AI routes and knowledge. They use the current Better Auth browser
+session and the existing scoped ToB APIs. Every execution verifies live identity;
+preview mode exposes reads only. Logout/expiry and page departure invalidate
+tools, and writes revalidate Dashboard data. The current `document.modelContext`
+and earlier `navigator.modelContext` APIs are feature-detected; unsupported
+browsers retain the normal UI. This does not expand the separate OAuth `/mcp`
+grant or expose an unauthenticated bridge. See `.agents/WEBMCP_INTEGRATION.md`.
+
 For this deployment, ToC is `support.alkinum.io` and ToB is `onfire.alkinum.com`.
 Attach the Worker to both hostnames as Custom Domains and configure the matching
 `ADMIN_DOMAINS` and `TOC_DOMAINS` values. Cloudflare Access can protect the admin hostname;
@@ -1068,7 +1080,7 @@ pnpm deploy
 
 ## Current Predeployment Verification
 
-As of 2026-09-04, generated binding checks, TypeScript, 84 test files / 602 tests, and the OpenNext Worker build pass. Worker version `67fb9398-9bba-45c3-8d10-02876e83139f` serves 100% of traffic on both Custom Domains. The public ToC health probe returns 200 and the ToC-to-ToB surface guard returns 404. The remaining build warnings are expected: Vectorize has no local simulator, and OpenNext 1.20.1 still requires `src/middleware.ts` instead of Next 16 `proxy.ts`.
+As of 2026-09-05, generated binding checks, TypeScript, 85 test files / 618 tests, and the OpenNext Worker build pass. Native Chromium Dashboard WebMCP smoke covers tool discovery, product/form/ticket writes, preview read-only enforcement, expiry cleanup, and desktop/mobile light/dark layouts. These WebMCP changes remain local and have not been deployed. Worker version `67fb9398-9bba-45c3-8d10-02876e83139f` serves 100% of traffic on both Custom Domains. The public ToC health probe returns 200 and the ToC-to-ToB surface guard returns 404. The remaining build warnings are expected: Vectorize has no local simulator, and OpenNext 1.20.1 still requires `src/middleware.ts` instead of Next 16 `proxy.ts`.
 
 ## Contribution Convention
 
