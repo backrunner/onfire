@@ -47,8 +47,9 @@ export const GET = withAuth({ permission: "ticket.read" }, async (_req: NextRequ
     recentTickets,
   });
 
-  // Short-TTL private cache for dashboard data
-  response.headers.set("Cache-Control", "private, max-age=60");
+  // SWR owns the UI cache. HTTP caching would hide browser-tool mutations
+  // and could retain statistics from a previous role or preview identity.
+  response.headers.set("Cache-Control", "no-store");
 
   return response;
 });

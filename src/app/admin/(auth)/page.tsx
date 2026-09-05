@@ -156,7 +156,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-4">
         {isLoading
           ? Array.from({ length: 4 }).map((_, i) => (
               <Card key={i} aria-hidden="true">
@@ -171,26 +171,26 @@ export default function AdminDashboardPage() {
               </Card>
             ))
           : statCards.map((stat) => (
-              <Link key={stat.key} href={stat.href} className="group">
-                <Card className="transition-colors group-hover:border-foreground/20 group-hover:bg-accent/40">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
+              <Link key={stat.key} href={stat.href} className="group min-w-0">
+                <Card className="h-full transition-colors group-hover:border-foreground/20 group-hover:bg-accent/40">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 sm:p-6 sm:pb-2">
+                    <CardTitle className="truncate text-xs font-medium text-muted-foreground sm:text-sm">
                       {stat.title}
                     </CardTitle>
                     <span
                       className={cn(
-                        "flex size-8 items-center justify-center rounded-md",
+                        "flex size-7 shrink-0 items-center justify-center rounded-md sm:size-8",
                         stat.iconBg
                       )}
                     >
                       <stat.icon className={cn("size-4", stat.iconClass)} />
                     </span>
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-semibold tabular-nums">
+                  <CardContent className="p-3 pt-1 sm:p-6 sm:pt-0">
+                    <div className="text-xl font-semibold tabular-nums sm:text-2xl">
                       {stat.value}
                     </div>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
+                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground sm:text-xs">
                       {stat.hint}
                     </p>
                   </CardContent>
@@ -226,7 +226,20 @@ export default function AdminDashboardPage() {
               </p>
             </div>
           ) : (
-            <Table>
+            <>
+            <div className="divide-y sm:hidden">
+              {data.recentTickets.map((ticket) => (
+                <Link key={ticket.id} href={`/admin/tickets?ticket=${ticket.id}`} className="block space-y-2 py-3 first:pt-0 last:pb-0">
+                  <p className="truncate text-sm font-medium">{ticket.subject}</p>
+                  <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-2"><StatusBadge status={ticket.status} /><PriorityBadge priority={ticket.priority} /></span>
+                    <span className="shrink-0">{formatDateTime(ticket.createdAt)}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            <div className="-mx-2 hidden overflow-x-auto px-2 sm:mx-0 sm:block sm:px-0">
+            <Table className="min-w-[520px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>{t.dashboard.table.subject}</TableHead>
@@ -265,6 +278,8 @@ export default function AdminDashboardPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
+            </>
           )}
         </CardContent>
       </Card>
