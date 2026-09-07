@@ -49,6 +49,7 @@ export interface RichTextEditorHandle {
 
 interface RichTextEditorProps {
   onChange: (value: RichTextValue) => void;
+  onReady?: (ready: boolean) => void;
   placeholder?: string;
   disabled?: boolean;
   /** Cmd/Ctrl+Enter. */
@@ -71,7 +72,7 @@ export const RichTextEditor = forwardRef<
   RichTextEditorHandle,
   RichTextEditorProps
 >(function RichTextEditor(
-  { onChange, placeholder, disabled, onSubmit, onUploadImage, className },
+  { onChange, onReady, placeholder, disabled, onSubmit, onUploadImage, className },
   ref
 ) {
   const { t } = useI18n();
@@ -110,6 +111,11 @@ export const RichTextEditor = forwardRef<
       },
     },
   });
+
+  useEffect(() => {
+    onReady?.(Boolean(editor));
+    return () => onReady?.(false);
+  }, [editor, onReady]);
 
   // `editable` is only applied at creation in TipTap v3 — sync it manually.
   useEffect(() => {

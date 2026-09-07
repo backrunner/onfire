@@ -91,7 +91,7 @@ export function TicketTypeManagement({ productId }: { productId?: string }) {
   const m = t.management.ticketTypes;
   const router = useRouter();
   const { data, error, isLoading, mutate } = useSWR<TicketTypeAdminView[]>(
-    "/api/tob/admin/ticket-types",
+    productId ? `/api/tob/admin/ticket-types?productId=${encodeURIComponent(productId)}` : "/api/tob/admin/ticket-types",
     swrFetcher
   );
   const { data: products } = useSWR<ProductRef[]>("/api/tob/meta/products", swrFetcher);

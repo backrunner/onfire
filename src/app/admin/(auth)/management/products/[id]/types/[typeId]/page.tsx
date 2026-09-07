@@ -47,7 +47,7 @@ export default function TicketTypeTemplatePage() {
   const { can, isLoading: meLoading } = useMe();
   const { id: productId, typeId } = useParams<{ id: string; typeId: string }>();
   const { data: types, isLoading } = useSWR<TicketTypeAdminView[]>(
-    "/api/tob/admin/ticket-types",
+    `/api/tob/admin/ticket-types?productId=${encodeURIComponent(productId)}`,
     swrFetcher
   );
   const byId = useMemo(

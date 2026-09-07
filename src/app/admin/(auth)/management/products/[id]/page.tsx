@@ -223,11 +223,10 @@ export default function ProductConfigurationPage() {
   const { t } = useI18n();
   const { me, isLoading: meLoading } = useMe();
   const { id } = useParams<{ id: string }>();
-  const { data: products, isLoading } = useSWR<ProductView[]>(
-    "/api/tob/admin/products",
+  const { data: product, isLoading } = useSWR<ProductView>(
+    `/api/tob/admin/products/${encodeURIComponent(id)}`,
     swrFetcher
   );
-  const product = products?.find((item) => item.id === id);
 
   if (isLoading || meLoading) return <ConfigurationPageSkeleton tabs={9} />;
   if (!product) {

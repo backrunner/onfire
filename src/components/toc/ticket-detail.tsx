@@ -24,7 +24,7 @@ import {
   RichTextEditor,
   type RichTextEditorHandle,
   type RichTextValue,
-} from "@/components/rich-text-editor";
+} from "@/components/lazy-rich-text-editor";
 import { TicketStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";

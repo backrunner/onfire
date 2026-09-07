@@ -13,7 +13,7 @@ import {
   RichTextEditor,
   type RichTextEditorHandle,
   type RichTextValue,
-} from "@/components/rich-text-editor";
+} from "@/components/lazy-rich-text-editor";
 
 interface ReplyComposerProps {
   ticketId: string;
@@ -33,6 +33,7 @@ export function ReplyComposer({
 }: ReplyComposerProps) {
   const { t, language } = useI18n();
   const editorRef = useRef<RichTextEditorHandle>(null);
+  const [editorReady, setEditorReady] = useState(false);
   const [draft, setDraft] = useState<RichTextValue>({
     html: "",
     text: "",
@@ -138,6 +139,7 @@ export function ReplyComposer({
                 variant="ghost"
                 size="sm"
                 className="h-6 px-2 text-xs"
+                disabled={!editorReady}
                 onClick={() => {
                   editorRef.current?.setContent(aiSuggestion ?? "");
                   setAiDismissed(true);
@@ -164,6 +166,7 @@ export function ReplyComposer({
 
       <RichTextEditor
         ref={editorRef}
+        onReady={setEditorReady}
         onChange={setDraft}
         onSubmit={() => void send()}
         onUploadImage={uploadImage}

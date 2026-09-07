@@ -70,18 +70,20 @@ export const GET = withAuth({ permission: "ticket.read" }, async (req: NextReque
 
   const where = and(...conditions.filter(Boolean));
 
-  const [{ total }] = await ctx.db
-    .select({ total: count() })
-    .from(tickets)
-    .where(where);
-
-  const rows = await ctx.db
-    .select()
-    .from(tickets)
-    .where(where)
-    .orderBy(priorityWeight, desc(tickets.updatedAt))
-    .limit(query.pageSize)
-    .offset((query.page - 1) * query.pageSize);
+  // One snapshot and one D1 round trip for the count and requested page.
+  const [[{ total }], rows] = await ctx.db.batch([
+    ctx.db
+      .select({ total: count() })
+      .from(tickets)
+      .where(where),
+    ctx.db
+      .select()
+      .from(tickets)
+      .where(where)
+      .orderBy(priorityWeight, desc(tickets.updatedAt))
+      .limit(query.pageSize)
+      .offset((query.page - 1) * query.pageSize),
+  ]);
 
   const [names, customerRefs, productRows] = await Promise.all([
     resolveUserNames(

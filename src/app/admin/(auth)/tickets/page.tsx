@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { MousePointerClick } from "lucide-react";
 import { swrFetcher, qs } from "@/lib/api/client";
@@ -34,7 +34,6 @@ export default function AdminTicketsPage() {
  */
 function TicketsWorkspace() {
   const { t } = useI18n();
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
@@ -61,11 +60,10 @@ function TicketsWorkspace() {
         else next.set(key, value);
       }
       const search = next.toString();
-      router.replace(`${pathname}${search ? `?${search}` : ""}`, {
-        scroll: false,
-      });
+      // These parameters drive client-side SWR reads; no server navigation is needed.
+      window.history.replaceState(null, "", `${pathname}${search ? `?${search}` : ""}`);
     },
-    [router, pathname, searchParams]
+    [pathname, searchParams]
   );
 
   const applyFilters = useCallback(

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   products,
   ticketTemplates,
@@ -8,7 +8,7 @@ import {
   ticketTypeRoutes,
   ticketTypes,
 } from "@/drizzle/schema";
-import { parseBody, withAuth } from "@/lib/api/handler";
+import { parseBody, parseQuery, withAuth } from "@/lib/api/handler";
 import { badRequest, ok } from "@/lib/api/response";
 import { assertProductAccess, productScopeCondition } from "@/lib/api/scope";
 import { ensureUnclassifiedType } from "@/services/ticket-types";
@@ -33,19 +33,25 @@ const createSchema = z.object({
   sortOrder: z.number().int().min(-100000).max(100000).default(0),
 });
 
-export const GET = withAuth({ permission: "ticket_type.read" }, async (_req, ctx) => {
+export const GET = withAuth({ permission: "ticket_type.read" }, async (req, ctx) => {
+  const { productId } = parseQuery(req, z.object({ productId: z.string().min(1).optional() }));
   const productRows = await ctx.db
     .select({ id: products.id })
     .from(products)
-    .where(productScopeCondition(ctx));
+    .where(and(productScopeCondition(ctx), productId ? eq(products.id, productId) : undefined));
   const productIds = productRows.map((row) => row.id);
   if (productIds.length === 0) return ok([]);
-  await Promise.all(productIds.map((productId) => ensureUnclassifiedType(ctx.db, productId)));
-
   const types = await ctx.db
     .select()
     .from(ticketTypes)
     .where(inArray(ticketTypes.productId, productIds));
+  // Existing products already have their fallback. Avoid a separate SELECT per
+  // product on every page load, while still repairing legacy missing fallbacks.
+  const withFallback = new Set(types.filter((type) => type.systemKey === "unclassified").map((type) => type.productId));
+  const missingFallbacks = await Promise.all(
+    productIds.filter((id) => !withFallback.has(id)).map((id) => ensureUnclassifiedType(ctx.db, id))
+  );
+  types.push(...missingFallbacks);
   const typeIds = types.map((type) => type.id);
   const canReadTemplates = hasPermission(ctx.role, "ticket_template.read");
   const [templates, routes] = await Promise.all([

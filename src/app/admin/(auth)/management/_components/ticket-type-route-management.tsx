@@ -48,7 +48,7 @@ export function TicketTypeRouteManagement({ productId }: { productId?: string })
   const { t } = useI18n();
   const m = t.management.ticketTypeRoutes;
   const { data, error, isLoading, mutate } = useSWR<TicketTypeAdminView[]>(
-    "/api/tob/admin/ticket-types",
+    productId ? `/api/tob/admin/ticket-types?productId=${encodeURIComponent(productId)}` : "/api/tob/admin/ticket-types",
     swrFetcher
   );
   const { data: teams } = useSWR<TeamView[]>("/api/tob/meta/teams", swrFetcher);

@@ -33,7 +33,7 @@ export function TicketInternalStateManagement({ productId: fixedProductId }: { p
   const { t } = useI18n();
   const m = t.management.internalStates;
   const { data: products } = useSWR<ProductRef[]>("/api/tob/meta/products", swrFetcher);
-  const { data: types, error: typeError, isLoading: typeLoading, mutate: mutateTypes } = useSWR<TicketTypeAdminView[]>("/api/tob/admin/ticket-types", swrFetcher);
+  const { data: types, error: typeError, isLoading: typeLoading, mutate: mutateTypes } = useSWR<TicketTypeAdminView[]>(fixedProductId ? `/api/tob/admin/ticket-types?productId=${encodeURIComponent(fixedProductId)}` : "/api/tob/admin/ticket-types", swrFetcher);
   const [productId, setProductId] = useState("");
   const [typeId, setTypeId] = useState("");
   const selectedProductId = fixedProductId || productId || products?.[0]?.id || "";

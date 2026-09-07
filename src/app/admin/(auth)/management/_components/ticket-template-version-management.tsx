@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
+import { Skeleton } from "@/components/ui/skeleton";
 import useSWR from "swr";
 import { Archive, ArchiveRestore, Copy, FilePlus2, Pencil, ShieldX } from "lucide-react";
 import { toast } from "sonner";
@@ -11,7 +13,6 @@ import {
   createEmptyFormSchema,
   type FormSchema,
 } from "@/lib/form-schema";
-import { FormBuilder } from "@/components/admin/form-builder";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +51,11 @@ import {
   errorMessage,
   formatDateTime,
 } from "./manager-ui";
+
+const FormBuilder = dynamic(
+  () => import("@/components/admin/form-builder").then((module) => module.FormBuilder),
+  { loading: () => <Skeleton className="h-[600px] max-h-[70vh] w-full" /> }
+);
 
 interface VersionView {
   id: string;

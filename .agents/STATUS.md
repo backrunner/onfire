@@ -1,8 +1,24 @@
 # OnFire Project Status
 
-Updated: 2026-09-05
+Updated: 2026-09-06
 
 ## Current State
+
+- Page loading now has an authenticated route loading boundary. Ticket selection,
+  pagination and ticket/search filters update the URL through native history;
+  SWR starts the matching read without a server navigation. Filtered URLs remain
+  reloadable. ToB/ToC reply editors, the form builder and account security dialog
+  load on demand; applying an AI suggestion waits for the editor to be ready.
+- Product configuration reads its own product record and product-filtered ticket
+  types. Type listing keeps the unfiltered API compatible, intersects its optional
+  product filter with live scope, and repairs only missing system fallback types
+  instead of checking every product separately. Auth identity/membership,
+  Dashboard aggregates and ticket pagination use D1 batches, preserving live
+  authorization and current SLA semantics without adding an HTTP data cache.
+- Production entry JavaScript for tickets dropped from 610,961 to 484,541
+  gzip bytes (about 21%); the account entry saves about 17 KB gzip. These
+  are local build comparisons, not measured production response-time gains.
+  No migration, binding or dependency change is required.
 
 - Authenticated Dashboard pages now register 97 native WebMCP tools, filtered by
   effective role and preview state. The catalogue covers ticket workflows,
@@ -197,6 +213,22 @@ snapshots. Production D1 has migrations `0000` through `0022` applied;
 `0023` through `0025` remain pending operator application with the matching Worker.
 
 ## Verification
+
+- Page performance: frozen install, generated Worker type check, TypeScript,
+  86 test files / 632 tests and the OpenNext Worker build pass. Thirteen new
+  migrated-SQLite integration cases cover five-role Dashboard/pagination scope,
+  live role and membership changes, preview writes, optional type filtering,
+  existing fallback reuse and legacy fallback repair.
+- Local production Worker browser checks confirm zero RSC navigations for
+  ticket selection, ticket filtering and search edits; deep-link reloads retain
+  filters. Product type requests carry the selected product ID. TipTap is absent
+  before a ticket is selected, and the form and security dialogs load correctly.
+  Ticket, product and account layouts pass at 1440x900 and 390x844 in light/dark
+  modes with no page exceptions or horizontal overflow.
+- Final browser checks also pass for customer replies under `/support` at both
+  viewport sizes and themes. Holding the TipTap chunk verifies that AI suggestion
+  application stays disabled until the editor initializes, then correctly fills
+  the reply through its imperative ref. Browser drafts were left unsent.
 
 - Dashboard WebMCP: 16 focused tests cover all 97 route/method mappings,
   advertised schemas, five-role discovery, preview reads, live identity/scope

@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import {
   AlertTriangle,
@@ -69,7 +69,6 @@ export default function AdminSearchPage() {
 
 function SearchContent() {
   const { t } = useI18n();
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -97,9 +96,10 @@ function SearchContent() {
         else next.set(key, value);
       }
       const search = next.toString();
-      router.replace(`${pathname}${search ? `?${search}` : ""}`, { scroll: false });
+      // These parameters drive client-side SWR reads; no server navigation is needed.
+      window.history.replaceState(null, "", `${pathname}${search ? `?${search}` : ""}`);
     },
-    [router, pathname, searchParams]
+    [pathname, searchParams]
   );
 
   // Debounced keyword → URL

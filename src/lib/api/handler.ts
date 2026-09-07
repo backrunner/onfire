@@ -77,16 +77,19 @@ export async function resolveAuthedContext(
   userId: string,
   params: RouteParams
 ): Promise<AuthedContext | null> {
-  const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
+  // Read live identity and membership in one D1 round trip. Never cache this
+  // across requests: role changes and removed memberships apply immediately.
+  const [user, teamRows] = await db.batch([
+    db.query.users.findFirst({ where: eq(users.id, userId) }),
+    db.select({ teamId: agentTeams.teamId })
+      .from(agentTeams)
+      .where(eq(agentTeams.userId, userId)),
+  ]);
   if (!user) return null;
 
   const role = user.role as Role;
   const isSuper = role === Role.SuperAdmin;
 
-  const teamRows = await db
-    .select({ teamId: agentTeams.teamId })
-    .from(agentTeams)
-    .where(eq(agentTeams.userId, userId));
   const teamIds = teamRows.map((r) => r.teamId);
 
   let productIds: string[] = [];

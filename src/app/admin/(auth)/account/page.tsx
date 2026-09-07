@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import useSWR from "swr";
 import { toast } from "sonner";
 import {
@@ -24,7 +25,6 @@ import {
 } from "@/components/admin/notifications/channel-meta";
 import { EndpointDialog } from "@/components/admin/notifications/endpoint-dialog";
 import { EndpointTestDialog } from "@/components/admin/notifications/endpoint-test-dialog";
-import { SecuritySettingsDialog } from "@/components/admin/account/security-settings-dialog";
 import { ConnectedApplicationsCard } from "@/components/admin/oauth/connected-applications-card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +54,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+const SecuritySettingsDialog = dynamic(() =>
+  import("@/components/admin/account/security-settings-dialog").then((module) => module.SecuritySettingsDialog)
+);
 
 export default function AdminAccountPage() {
   const { t } = useI18n();
@@ -384,10 +388,10 @@ export default function AdminAccountPage() {
           </CardContent>
         </Card>
 
-        <SecuritySettingsDialog
+        {securityDialogOpen && <SecuritySettingsDialog
           open={securityDialogOpen}
           onOpenChange={setSecurityDialogOpen}
-        />
+        />}
         <EndpointDialog
           endpoint={editingEndpoint}
           defaultEmail={me?.user.email}
