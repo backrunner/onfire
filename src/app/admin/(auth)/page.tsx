@@ -105,7 +105,7 @@ export default function AdminDashboardPage() {
 
   if (error) {
     return (
-      <div className="space-y-6">
+      <div className="flex w-full flex-col gap-4 text-left">
         <PageHeading t={t} />
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
@@ -123,48 +123,19 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex w-full flex-col gap-4 text-left">
       <PageHeading t={t} />
-
-      {/* Keep this slot stable because the overdue count arrives client-side. */}
-      <div className="min-h-[66px] sm:min-h-[58px]">
-        {isLoading ? (
-          <div
-            className="flex min-h-[66px] flex-wrap items-center gap-3 rounded-lg border px-4 py-3 sm:min-h-[58px]"
-            aria-hidden="true"
-          >
-            <Skeleton className="size-4 shrink-0 rounded-full" />
-            <Skeleton className="h-4 min-w-40 flex-1" />
-            <Skeleton className="h-8 w-28" />
-          </div>
-        ) : (stats?.overdue ?? 0) > 0 ? (
-          <div className="flex min-h-[66px] flex-wrap items-center gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 sm:min-h-[58px]">
-            <AlertTriangle className="size-4 shrink-0 text-red-600 dark:text-red-400" />
-            <p className="flex-1 text-sm text-red-700 dark:text-red-400">
-              {t.dashboard.slaAlert.replace(
-                "{{count}}",
-                String(stats?.overdue ?? 0)
-              )}
-            </p>
-            <Button asChild size="sm" variant="outline" className="h-8">
-              <Link href="/admin/tickets?overdue=true">
-                {t.dashboard.slaAlertCta}
-              </Link>
-            </Button>
-          </div>
-        ) : null}
-      </div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-4">
         {isLoading
           ? Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} aria-hidden="true">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <Card key={i} className="h-full gap-0 py-0" aria-hidden="true">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2 sm:p-4 sm:pb-2">
                   <Skeleton className="h-4 w-24" />
-                  <Skeleton className="size-8 rounded-md" />
+                  <Skeleton className="size-7 rounded-md sm:size-8" />
                 </CardHeader>
-                <CardContent className="space-y-2">
+                <CardContent className="space-y-2 px-3 pb-3 sm:px-4 sm:pb-4">
                   <Skeleton className="h-8 w-12" />
                   <Skeleton className="h-3 w-28 max-w-full" />
                 </CardContent>
@@ -172,8 +143,8 @@ export default function AdminDashboardPage() {
             ))
           : statCards.map((stat) => (
               <Link key={stat.key} href={stat.href} className="group min-w-0">
-                <Card className="h-full transition-colors group-hover:border-foreground/20 group-hover:bg-accent/40">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 sm:p-6 sm:pb-2">
+                <Card className="h-full gap-0 py-0 transition-colors group-hover:border-foreground/20 group-hover:bg-accent/40">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2 sm:p-4 sm:pb-2">
                     <CardTitle className="truncate text-xs font-medium text-muted-foreground sm:text-sm">
                       {stat.title}
                     </CardTitle>
@@ -186,7 +157,7 @@ export default function AdminDashboardPage() {
                       <stat.icon className={cn("size-4", stat.iconClass)} />
                     </span>
                   </CardHeader>
-                  <CardContent className="p-3 pt-1 sm:p-6 sm:pt-0">
+                  <CardContent className="px-3 pb-3 sm:px-4 sm:pb-4">
                     <div className="text-xl font-semibold tabular-nums sm:text-2xl">
                       {stat.value}
                     </div>
@@ -199,9 +170,26 @@ export default function AdminDashboardPage() {
             ))}
       </div>
 
+      {!isLoading && (stats?.overdue ?? 0) > 0 && (
+        <div className="flex min-h-[66px] flex-wrap items-center gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 sm:min-h-[58px]">
+          <AlertTriangle className="size-4 shrink-0 text-red-600 dark:text-red-400" />
+          <p className="flex-1 text-sm text-red-700 dark:text-red-400">
+            {t.dashboard.slaAlert.replace(
+              "{{count}}",
+              String(stats?.overdue ?? 0)
+            )}
+          </p>
+          <Button asChild size="sm" variant="outline" className="h-8">
+            <Link href="/admin/tickets?overdue=true">
+              {t.dashboard.slaAlertCta}
+            </Link>
+          </Button>
+        </div>
+      )}
+
       {/* Recent tickets */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+      <Card className="gap-0 py-0">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 px-4 py-3">
           <CardTitle className="text-base">
             {t.dashboard.recentTickets}
           </CardTitle>
@@ -209,7 +197,7 @@ export default function AdminDashboardPage() {
             <Link href="/admin/tickets">{t.dashboard.viewAllTickets}</Link>
           </Button>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           {isLoading ? (
             <TableSkeleton
               rows={5}
