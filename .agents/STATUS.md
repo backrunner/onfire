@@ -1,8 +1,18 @@
 # OnFire Project Status
 
-Updated: 2026-09-06
+Updated: 2026-09-07
 
 ## Current State
+
+- Performance release `dc315d0` is deployed as Worker `b2548cbf-0ea9-44c1-84b4-55a1d1a97453`
+  with 100% traffic on both Custom Domains. Production health returns 200,
+  cross-surface ToB requests return 404, unauthenticated customer type reads
+  return JSON 401, and the admin hostname retains its Cloudflare Access 302.
+  The deployed lazy editor chunk matches the verified local build byte for byte.
+  Remote D1 reports no pending migrations; this release applied none.
+- CI now pins pnpm 11.25.0, matching the locally verified tool version. The
+  previous workflow stopped at setup because neither the action nor the
+  package manifest supplied a pnpm version.
 
 - Page loading now has an authenticated route loading boundary. Ticket selection,
   pagination and ticket/search filters update the URL through native history;
@@ -141,7 +151,7 @@ Updated: 2026-09-06
 - Worker edge routing now rejects `/api/tob/*` on ToC/unknown hosts and `/api/toc/*` on ToB hosts; domain-level Zero Trust policies can therefore be applied without leaving the opposite API surface public.
 - Current deployment target is one OpenNext Worker attached to `onfire.alkinum.com` (ToB) and `support.alkinum.io` (ToC) as Custom Domains. Two physically independent Workers are intentionally not enabled yet; they require separate Wrangler environments/build entries and single-owner coordination for cron/email.
 - The fallback `workers.dev` hostname is disabled in production; traffic enters through the two configured Custom Domains only.
-- Worker version `1f58a90e-9fee-4b00-b583-7bb905db37be` is deployed at 100% traffic with both Custom Domains, the `*/5 * * * *` SLA cron, and all configured D1/R2/Vectorize/Email/service bindings. The public ToC health endpoint returns 200, the ToC-to-ToB cross-surface probe returns 404, unauthenticated ticket-type requests return JSON 401, and Cloudflare Access intercepts unauthenticated ToB probes with its expected 302 login redirect.
+- Worker version `b2548cbf-0ea9-44c1-84b4-55a1d1a97453` is deployed at 100% traffic with both Custom Domains, the `*/5 * * * *` SLA cron, and all configured D1/R2/Vectorize/Email/service bindings. The public ToC health endpoint returns 200, the ToC-to-ToB cross-surface probe returns 404, unauthenticated ticket-type requests return JSON 401, and Cloudflare Access intercepts unauthenticated ToB probes with its expected 302 login redirect.
 - Production `AUTH_SECRET` and `TURNSTILE_SECRET` are set as Worker secrets. The application database is initialized and contains its SuperAdmin account.
 - RBAC combines role permissions with tenant, product, and team scope. ProductAdmin scope comes from `user_products`; support-agent membership remains separate.
 - Product lifecycle and product settings are separate permissions. ProductAdmin can update scoped SLA, auto-close, and team associations without creating or deleting products.
@@ -209,8 +219,8 @@ scoped AI usage tables, product/team scope columns, and rich-text attachment
 tables, product/ticket/reply translation columns, and AI route capability metadata.
 A separate non-empty legacy fixture also verifies unique migrated type keys,
 invalid legacy metadata tolerance, pinned version backfill, and historical path
-snapshots. Production D1 has migrations `0000` through `0022` applied;
-`0023` through `0025` remain pending operator application with the matching Worker.
+snapshots. Production D1 has migrations `0000` through `0026` applied;
+its remote migration list reports no pending migrations on 2026-09-07.
 
 ## Verification
 
@@ -301,10 +311,8 @@ snapshots. Production D1 has migrations `0000` through `0022` applied;
 
 - Target Cloudflare account is `Alkinum` (`b6754402d59fc29ee8b62119014fec89`). On 2026-07-13, the APAC `onfire-d1` D1 database (`3f3294ab-8c05-4935-93c0-677ee18641dd`), APAC Standard `onfire-storage` R2 bucket, and 1024-dimension cosine `onfire-knowledge` Vectorize index were created.
 - `wrangler.jsonc` contains the production D1 ID. Migrations `0000` through
-  `0022` are applied remotely; `0023` and `0024` must be applied with the
-  multilingual Worker release. The OAuth, scoped AI usage, team scope,
-  rich-text, and attachment tables are queryable, and the last remote migration
-  run completed without errors.
+  `0026` are applied remotely. The 2026-09-07 performance release confirmed
+  there were no pending migrations and did not apply any remote migration.
 - `wrangler deploy --dry-run` resolves all DB, R2, Vectorize, Email, service, and asset bindings against the production configuration.
 - Vectorize has no local simulator. Use a selected Cloudflare account and temporary remote binding only when remote development is intended; do not commit an account ID.
 - Enable Cloudflare Email Sending for the sender domain and route inbound email to the Worker. The current Wrangler OAuth token includes `email_sending:write` and `email_routing:write`.

@@ -1031,10 +1031,10 @@ On 2026-07-13, the APAC `onfire-d1` D1 database, APAC Standard
 `onfire-storage` R2 bucket, and 1024-dimension cosine `onfire-knowledge`
 Vectorize index were provisioned in the Alkinum account. The D1 ID is recorded
 in `wrangler.jsonc`, and migrations through `0026_organic_starbolt.sql` have
-been applied remotely. Worker version `67fb9398-9bba-45c3-8d10-02876e83139f`
-is deployed on both Custom Domains with the SLA cron and runtime secrets configured. Remaining
-external rollout steps are Cloudflare Email Sending/routing onboarding and the
-first `/admin/install` SuperAdmin setup. Cloudflare Access is enforced on ToB.
+been applied remotely. Worker version `b2548cbf-0ea9-44c1-84b4-55a1d1a97453`
+is deployed on both Custom Domains with the SLA cron and runtime secrets configured.
+The production database is initialized. Cloudflare Email Sending/routing onboarding
+remains an external rollout step, and Cloudflare Access is enforced on ToB.
 
 ---
 
@@ -1080,7 +1080,7 @@ pnpm deploy
 
 ## Current Predeployment Verification
 
-As of 2026-09-05, generated binding checks, TypeScript, 85 test files / 619 tests, and the OpenNext Worker build pass. Native Chromium Dashboard WebMCP smoke covers tool discovery, product/form/ticket writes, preview read-only enforcement, expiry cleanup, and desktop/mobile light/dark layouts. Worker version `1f58a90e-9fee-4b00-b583-7bb905db37be` serves 100% of traffic on both Custom Domains. The public ToC health probe returns 200 and the ToC-to-ToB surface guard returns 404. The remaining build warnings are expected: Vectorize has no local simulator, and OpenNext 1.20.1 still requires `src/middleware.ts` instead of Next 16 `proxy.ts`.
+As of 2026-09-07, generated binding checks, TypeScript, 86 test files / 632 tests, and the OpenNext Worker build pass. Native Chromium Dashboard WebMCP smoke covers tool discovery, product/form/ticket writes, preview read-only enforcement, expiry cleanup, and desktop/mobile light/dark layouts. Worker version `b2548cbf-0ea9-44c1-84b4-55a1d1a97453` serves 100% of traffic on both Custom Domains. The public ToC health probe returns 200, the ToC-to-ToB surface guard returns 404, and the deployed lazy editor asset matches the verified local build. Page-performance browser checks cover ticket selection/filter/search without RSC navigation, lazy editors, and desktop/mobile light/dark layouts for both ToB and ToC. CI pins pnpm 11.25.0 so setup can run without a packageManager field. The remaining build warnings are expected: Vectorize has no local simulator, and OpenNext 1.20.1 still requires `src/middleware.ts` instead of Next 16 `proxy.ts`.
 
 ## Contribution Convention
 
