@@ -2,7 +2,6 @@ allowBuilds:
   esbuild: true
   sharp: true
   workerd: true
-managePackageManagerVersions: false
 minimumReleaseAgeExclude:
   - '@ai-sdk/anthropic@4.0.7'
   - '@ai-sdk/gateway@4.0.11'
