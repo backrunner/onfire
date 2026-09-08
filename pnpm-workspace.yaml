@@ -27,6 +27,11 @@ minimumReleaseAgeExclude:
   - better-auth@1.7.0-rc.5
 
 overrides:
+  '@tiptap/react>@tiptap/extension-bubble-menu': 3.30.4
+  '@tiptap/react>@tiptap/extension-floating-menu': 3.30.4
+  'ajv>fast-uri': 3.1.6
+  'express>qs': 6.16.0
+  'body-parser>qs': 6.16.0
   hono: 4.13.1
   '@esbuild-kit/core-utils>esbuild': 0.25.12
   dompurify: 3.4.13
