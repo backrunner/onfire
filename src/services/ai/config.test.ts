@@ -19,6 +19,7 @@ function candidate(id: string, cooldownSeconds = 60): RoutedCredential {
     modelDimensions: null,
     priority: 0,
     cooldownSeconds,
+    blockedUntil: null,
   };
 }
 

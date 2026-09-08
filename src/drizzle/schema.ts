@@ -1051,6 +1051,11 @@ export const productKnowledge = sqliteTable("product_knowledge", {
   content: text("content").notNull(),
   knowledgeType: text("knowledge_type").$type<KnowledgeType>().notNull(),
   vectorizeIds: text("vectorize_ids"),
+  embeddingSpace: text("embedding_space"),
+  embeddingSourceUpdatedAt: text("embedding_source_updated_at"),
+  embeddingAttemptedAt: text("embedding_attempted_at"),
+  embeddingLease: text("embedding_lease"),
+  embeddingError: text("embedding_error"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
@@ -1089,12 +1094,12 @@ export type EmailProvider =
   | "cloudflare"
   | "smtp";
 export type InboundEmailProvider =
+  | "stalwart"
   | "maileroo"
   | "sendgrid"
   | "mailgun"
   | "resend"
   | "cloudflare"
-  | "stalwart"
   | "generic";
 export type EmailTemplateType =
   | "ticket_created"

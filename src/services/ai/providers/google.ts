@@ -112,7 +112,7 @@ export class GoogleProvider implements AIProvider {
             options?.inputType === "query"
               ? "RETRIEVAL_QUERY"
               : "RETRIEVAL_DOCUMENT",
-          outputDimensionality: EMBEDDING_DIMENSIONS,
+          outputDimensionality: this.config.embeddingDimensions ?? EMBEDDING_DIMENSIONS,
         }),
       },
       30_000

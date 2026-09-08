@@ -7,6 +7,19 @@
 import type { Database } from "@/lib/db";
 import type { AIFilterStrictness } from "@/drizzle/schema";
 import { getAIProvider } from "./config";
+import { z } from "zod";
+
+const verdictSchema = z.object({
+  isSupportRequest: z.boolean(),
+  isSpam: z.boolean(),
+  confidence: z.number().min(0).max(1),
+}).passthrough();
+
+function parseClassification(content: string): Partial<EmailClassification> {
+  const json = content.match(/\{[\s\S]*\}/)?.[0];
+  if (!json) throw new Error("Failed to parse email classification as JSON");
+  return verdictSchema.parse(JSON.parse(json));
+}
 
 export interface EmailClassification {
   isSupportRequest: boolean;
@@ -58,10 +71,9 @@ export async function classifyInboundEmail(
   candidates: EmailTicketTypeCandidate[] = [],
   context: { tenantId?: string | null; productId?: string | null } = {}
 ): Promise<EmailClassification | null> {
-  const provider = await getAIProvider(db, "prescreening", context);
-  if (!provider) return null;
-
   try {
+    const provider = await getAIProvider(db, "prescreening", context);
+    if (!provider) return null;
     const result = await provider.complete({
       messages: [
         { role: "system", content: FILTER_PROMPT },
@@ -72,11 +84,10 @@ export async function classifyInboundEmail(
       ],
       temperature: 0,
       maxTokens: 768,
+      validateResult: (result) => { parseClassification(result.content); },
     });
 
-    const jsonMatch = result.content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    const parsed = JSON.parse(jsonMatch[0]) as Partial<EmailClassification>;
+    const parsed = parseClassification(result.content);
     if (
       typeof parsed.isSupportRequest !== "boolean" ||
       typeof parsed.isSpam !== "boolean"

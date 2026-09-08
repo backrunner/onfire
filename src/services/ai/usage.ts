@@ -4,6 +4,7 @@ import {
   aiUsageEvents,
   aiUsageSettings,
   products,
+  tenants,
   type AITaskType,
   type AIProvider,
   type AIUsageDimension,
@@ -42,8 +43,11 @@ export async function recordAiUsage(
   const now = new Date().toISOString();
   const day = utcDay(now);
   const eventId = crypto.randomUUID();
-  const tenantId = input.tenantId ?? null;
   const productId = input.productId ?? null;
+  const product = productId
+    ? await db.query.products.findFirst({ where: eq(products.id, productId) })
+    : null;
+  const tenantId = product?.tenantId ?? input.tenantId ?? null;
 
   const dailyRows = [
     {
@@ -214,9 +218,10 @@ function cutoffIso(days: number): string {
 }
 
 export async function purgeExpiredAiUsage(db: Database): Promise<number> {
-  const [settings, productRows] = await Promise.all([
+  const [settings, productRows, tenantRows] = await Promise.all([
     db.select().from(aiUsageSettings),
     db.select({ id: products.id, tenantId: products.tenantId }).from(products),
+    db.select({ id: tenants.id }).from(tenants),
   ]);
   const settingByKey = new Map(
     settings.map((row) => [row.scopeKey, row.retentionDays] as const)
@@ -255,7 +260,7 @@ export async function purgeExpiredAiUsage(db: Database): Promise<number> {
     deleted += 1;
   }
 
-  const tenantIds = [...new Set(productRows.map((row) => row.tenantId))];
+  const tenantIds = tenantRows.map((row) => row.id);
   for (const tenantId of tenantIds) {
     const days = resolveDays(null, tenantId);
     if (days == null || days <= 0) continue;
@@ -269,6 +274,11 @@ export async function purgeExpiredAiUsage(db: Database): Promise<number> {
           sql`${aiUsageEvents.createdAt} < ${cutoff}`
         )
       );
+    await db.delete(aiUsageDaily).where(and(
+      eq(aiUsageDaily.dimension, "tenant"),
+      eq(aiUsageDaily.tenantId, tenantId),
+      sql`${aiUsageDaily.day} < ${cutoff.slice(0, 10)}`,
+    ));
   }
 
   const systemDays = resolveDays(null, null);

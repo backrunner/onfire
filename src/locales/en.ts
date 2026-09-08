@@ -677,7 +677,7 @@ export const en: Translations = {
       translation: 'Translation',
       translationHint: 'Translate ticket content and ticket type text',
       embedding: 'Vector Embedding',
-      embeddingHint: 'Knowledge base vector retrieval',
+      embeddingHint: 'Model changes rebuild knowledge. Fallback keys must use the same model and endpoint.',
       rerank: 'Document Reranking',
       rerankHint: 'Reorder retrieved knowledge by relevance'
     },
@@ -719,6 +719,13 @@ export const en: Translations = {
   },
 
   aiKnowledge: {
+    indexing: 'Search index',
+    indexPending: 'Pending',
+    indexFailed: 'Failed',
+    indexDisabled: 'Configure an embedding route to index knowledge.',
+    indexLoading: 'Loading index status…',
+    reindex: 'Rebuild index',
+    reindexQueued: 'Rebuild queued. Knowledge will be processed in background batches.',
     title: 'Product Knowledge Base',
     subtitle: 'Ground AI replies and automation to avoid hallucinations',
     selectProduct: 'Select product',
@@ -1117,6 +1124,8 @@ export const en: Translations = {
     securityVerify: 'Security Verification',
     noTurnstile: 'Turnstile not configured (NEXT_PUBLIC_TURNSTILE_SITE_KEY), skipping verification',
     loginFailed: 'Login failed, please check your credentials or try again later',
+    tooManyAttempts: 'Too many attempts. Please wait up to 15 minutes before trying again.',
+    temporarilyUnavailable: 'Sign-in is temporarily unavailable. Please try again later.',
     otpSubtitle: 'Complete two-step verification',
     otpCode: 'Six-digit code',
     backupCode: 'Recovery code',
@@ -1126,8 +1135,6 @@ export const en: Translations = {
     useBackupCode: 'Use a recovery code',
     useAuthenticator: 'Use authenticator code',
     turnstileError: 'Verification failed to load, please refresh the page',
-    tooManyAttempts: 'Too many attempts. Please wait up to 15 minutes before trying again.',
-    temporarilyUnavailable: 'Sign-in is temporarily unavailable. Please try again later.',
     footer: 'OnFire · Modern Ticket System'
   },
 

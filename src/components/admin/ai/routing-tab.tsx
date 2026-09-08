@@ -204,7 +204,7 @@ function TaskRoutingCard({
         model: defaultModelForTask(credential.provider, taskType),
         enabled: true,
         modelKind: modelKindForTask(taskType),
-        modelDimensions: taskType === "embedding" ? 1024 : undefined,
+        modelDimensions: undefined,
       },
     ]);
   };
@@ -294,7 +294,7 @@ function TaskRoutingCard({
       const result = await api.get<{
         models: Array<{ id: string; kind: AIModelKind; dimensions?: number }>;
       }>(
-        `/api/tob/admin/ai/models?credentialId=${encodeURIComponent(credentialId)}${scopeQuery}`,
+        `/api/tob/admin/ai/models?credentialId=${encodeURIComponent(credentialId)}&taskType=${taskType}${scopeQuery}`,
       );
       setCatalogs((current) => ({ ...current, [credentialId]: result.models }));
     } catch (error) {
@@ -400,7 +400,7 @@ function TaskRoutingCard({
                 ? fetchedModels
                     .filter((model) =>
                       model.kind === modelKindForTask(taskType) &&
-                      (model.kind !== "embedding" || model.dimensions === 1024)
+                      (model.kind !== "embedding" || model.dimensions !== undefined)
                     )
                     .map((model) => model.id)
                 : models;
@@ -467,7 +467,7 @@ function TaskRoutingCard({
                               ? defaultModelForTask(nextCredential.provider, taskType)
                               : "",
                             modelKind: nextCredential ? modelKindForTask(taskType) : undefined,
-                            modelDimensions: taskType === "embedding" ? 1024 : undefined,
+                            modelDimensions: undefined,
                           });
                         }}
                       >

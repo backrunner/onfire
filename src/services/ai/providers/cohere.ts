@@ -41,7 +41,7 @@ export class CohereEmbeddingProvider implements AIProvider {
           options?.inputType === "query" ? "search_query" : "search_document",
         embedding_types: ["float"],
         ...(this.config.model.startsWith("embed-v4")
-          ? { output_dimension: EMBEDDING_DIMENSIONS }
+          ? { output_dimension: this.config.embeddingDimensions ?? EMBEDDING_DIMENSIONS }
           : {}),
       }),
     }, 30_000);

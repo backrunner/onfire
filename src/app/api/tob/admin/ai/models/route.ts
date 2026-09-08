@@ -9,11 +9,12 @@ import { openStoredSecret } from "@/lib/secret-storage";
 import { assertCanManageAiScope } from "@/lib/ai-scope";
 import { parseFilledAiScope } from "../scope-query";
 import { listProviderModels } from "@/services/ai/model-catalog";
+import { getVectorDimensions } from "@/services/ai/vector-space";
 
-const querySchema = z.object({ credentialId: z.string().min(1) });
+const querySchema = z.object({ credentialId: z.string().min(1), taskType: z.string().optional() });
 
 export const GET = withAuth({}, async (req: NextRequest, ctx) => {
-  const { credentialId } = parseQuery(req, querySchema);
+  const { credentialId, taskType } = parseQuery(req, querySchema);
   const ref = await parseFilledAiScope(req, ctx.db);
   await assertCanManageAiScope(ctx, ref);
   const credential = await ctx.db.query.aiCredentials.findFirst({
@@ -30,7 +31,8 @@ export const GET = withAuth({}, async (req: NextRequest, ctx) => {
     credential.secretPurpose,
   );
   try {
-    return ok({ models: await listProviderModels(credential.provider, apiKey, credential.baseUrl) });
+    const dimensions = taskType === "embedding" ? await getVectorDimensions() : undefined;
+    return ok({ models: await listProviderModels(credential.provider, apiKey, credential.baseUrl, dimensions), dimensions });
   } catch (error) {
     throw badRequest(error instanceof Error ? error.message : "Unable to load provider models");
   }

@@ -9,6 +9,30 @@ import { eq, and, desc } from "drizzle-orm";
 import { getAIProvider } from "./config";
 import { findRelevantKnowledge } from "./embedding";
 import type { AIMessage } from "./providers";
+import type { AuthedContext } from "@/lib/api/handler";
+import { assertTicketVisible } from "@/lib/api/scope";
+import { badRequest, notFound } from "@/lib/api/response";
+
+/** The dashboard uses one conversation per ticket; never mix ticket scopes. */
+export async function assertAgentSessionAccess(
+  ctx: AuthedContext,
+  sessionId: string,
+  ticketId?: string,
+): Promise<string> {
+  if (!sessionId.startsWith("ticket-") || sessionId.length <= 7) {
+    throw badRequest("AI conversations require a ticket session");
+  }
+  const sessionTicketId = sessionId.slice(7);
+  if (ticketId && ticketId !== sessionTicketId) {
+    throw badRequest("AI session does not match the ticket");
+  }
+  const ticket = await ctx.db.query.tickets.findFirst({
+    where: eq(tickets.id, sessionTicketId),
+  });
+  if (!ticket) throw notFound("Ticket not found");
+  assertTicketVisible(ctx, ticket);
+  return ticket.id;
+}
 
 export interface AgentChatOptions {
   userId: string;
@@ -91,7 +115,7 @@ export async function chatWithAgent(
         contextInfo += "\n\nRecent Replies:\n" +
           ticketReplies
             .reverse()
-            .map((r) => `- ${r.senderId ? "Agent" : "Customer"}: ${r.content.substring(0, 200)}`)
+            .map((r) => `- ${r.internal ? "Internal note (never disclose to the customer)" : r.senderId ? "Agent" : "Customer"}: ${r.content.substring(0, 200)}`)
             .join("\n");
       }
 
@@ -129,15 +153,6 @@ export async function chatWithAgent(
   const userMessageId = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  await db.insert(aiChatMessages).values({
-    id: userMessageId,
-    userId: options.userId,
-    sessionId: options.sessionId,
-    role: "user",
-    content: options.message,
-    createdAt: now,
-  });
-
   try {
     const result = await provider.complete({
       messages,
@@ -147,14 +162,21 @@ export async function chatWithAgent(
 
     // Save assistant response
     const assistantMessageId = crypto.randomUUID();
-    await db.insert(aiChatMessages).values({
+    await db.insert(aiChatMessages).values([{
+      id: userMessageId,
+      userId: options.userId,
+      sessionId: options.sessionId,
+      role: "user",
+      content: options.message,
+      createdAt: now,
+    }, {
       id: assistantMessageId,
       userId: options.userId,
       sessionId: options.sessionId,
       role: "assistant",
       content: result.content,
       createdAt: new Date().toISOString(),
-    });
+    }]);
 
     return {
       response: result.content,
@@ -172,7 +194,7 @@ export async function getChatHistory(
   sessionId: string,
   limit = 50
 ) {
-  return db
+  const messages = await db
     .select()
     .from(aiChatMessages)
     .where(
@@ -181,6 +203,7 @@ export async function getChatHistory(
         eq(aiChatMessages.sessionId, sessionId)
       )
     )
-    .orderBy(aiChatMessages.createdAt)
+    .orderBy(desc(aiChatMessages.createdAt))
     .limit(limit);
+  return messages.reverse();
 }

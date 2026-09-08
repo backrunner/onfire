@@ -38,7 +38,7 @@ export class JinaEmbeddingProvider implements AIProvider {
         model: this.config.model,
         input: [text],
         task: options?.inputType === "query" ? "retrieval.query" : "retrieval.passage",
-        dimensions: EMBEDDING_DIMENSIONS,
+        dimensions: this.config.embeddingDimensions ?? EMBEDDING_DIMENSIONS,
       }),
     }, 30_000);
     if (!response.ok) {

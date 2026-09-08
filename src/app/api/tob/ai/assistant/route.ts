@@ -2,11 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { ok, ApiError } from "@/lib/api/response";
 import { withAuth, parseBody, parseQuery } from "@/lib/api/handler";
-import { chatWithAgent, getChatHistory } from "@/services/ai/agent";
-import { eq } from "drizzle-orm";
-import { tickets } from "@/drizzle/schema";
-import { assertTicketVisible } from "@/lib/api/scope";
-import { notFound } from "@/lib/api/response";
+import { assertAgentSessionAccess, chatWithAgent, getChatHistory } from "@/services/ai/agent";
 import { enforceRateLimit } from "@/lib/rate-limit";
 
 const chatSchema = z.object({
@@ -26,6 +22,7 @@ export const GET = withAuth(
   { permission: "ticket.read" },
   async (req: NextRequest, ctx) => {
     const { sessionId } = parseQuery(req, historyQuerySchema);
+    await assertAgentSessionAccess(ctx, sessionId);
     const messages = await getChatHistory(ctx.db, ctx.user.id, sessionId);
     return ok(messages);
   }
@@ -47,19 +44,13 @@ export const POST = withAuth(
     );
     const body = await parseBody(req, chatSchema);
 
-    if (body.ticketId) {
-      const ticket = await ctx.db.query.tickets.findFirst({
-        where: eq(tickets.id, body.ticketId),
-      });
-      if (!ticket) throw notFound("Ticket not found");
-      assertTicketVisible(ctx, ticket);
-    }
+    const ticketId = await assertAgentSessionAccess(ctx, body.sessionId, body.ticketId);
 
     const result = await chatWithAgent(ctx.db, {
       userId: ctx.user.id,
       sessionId: body.sessionId,
       message: body.message,
-      ticketId: body.ticketId,
+      ticketId,
     });
 
     if (!result) {

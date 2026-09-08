@@ -30,6 +30,7 @@ import {
   isProviderAllowedForTask,
   modelKindForTask,
   safeAIBaseUrl,
+  EMBEDDING_DIMENSIONS,
   type AIModelKind,
 } from "@/lib/ai-config";
 import {
@@ -37,6 +38,7 @@ import {
   resolveAiScopeChain,
 } from "@/lib/ai-scope";
 import { recordAiUsage } from "./usage";
+import { getVectorDimensions, vectorSpaceKey } from "./vector-space";
 
 export const AI_CREDENTIAL_SECRET_PURPOSE = (credentialId: string) =>
   `ai-credential:${credentialId}`;
@@ -54,6 +56,7 @@ export interface RoutedCredential {
   modelDimensions: number | null;
   priority: number;
   cooldownSeconds: number;
+  blockedUntil: string | null;
 }
 
 function normalizedBaseUrl(value: string | null): string | null {
@@ -120,7 +123,7 @@ export async function hasConfiguredAITask(
       row.credentialEnabled &&
       isProviderAllowedForTask(taskType, row.provider) &&
       kind === modelKindForTask(taskType) &&
-      (kind !== "embedding" || row.modelDimensions === 1024);
+      (kind !== "embedding" || (row.modelDimensions !== null && row.modelDimensions > 0));
   });
 }
 
@@ -168,7 +171,12 @@ async function listAvailableCredentials(
         eq(aiTaskCredentials.scopeKey, scopeKey)
       )
     )
-    .orderBy(asc(aiTaskCredentials.priority), asc(aiCredentials.lastUsedAt));
+    .orderBy(
+      asc(aiTaskCredentials.priority),
+      // Model identity must not rotate after a successful call when legacy
+      // routes contain tied priorities and different embedding models.
+      taskType === "embedding" ? asc(aiTaskCredentials.id) : asc(aiCredentials.lastUsedAt),
+    );
 
   const now = Date.now();
   return rows
@@ -178,12 +186,12 @@ async function listAvailableCredentials(
         row.routeEnabled &&
         row.credentialEnabled &&
         isProviderAllowedForTask(taskType, row.provider) &&
-        (!row.blockedUntil || Date.parse(row.blockedUntil) <= now)
+        (taskType === "embedding" || !row.blockedUntil || Date.parse(row.blockedUntil) <= now)
     )
     .map((row) => {
       const modelKind = row.modelKind ?? classifyAIModel(row.model);
       if (modelKind !== modelKindForTask(taskType)) return null;
-      if (modelKind === "embedding" && row.modelDimensions !== 1024) return null;
+      if (modelKind === "embedding" && (!row.modelDimensions || row.modelDimensions < 1)) return null;
       return {
         id: row.credentialId,
         name: row.credentialName,
@@ -197,6 +205,7 @@ async function listAvailableCredentials(
         modelDimensions: row.modelDimensions,
         priority: row.priority,
         cooldownSeconds: row.cooldownSeconds,
+        blockedUntil: row.blockedUntil,
       };
     })
     .filter((row): row is RoutedCredential => row !== null);
@@ -219,6 +228,7 @@ async function buildProvider(candidate: RoutedCredential): Promise<AIProvider> {
     apiKey,
     baseUrl,
     apiMode: candidate.apiMode,
+    embeddingDimensions: candidate.modelDimensions ?? undefined,
   };
   return createProvider(providerConfig);
 }
@@ -337,24 +347,51 @@ class FailoverAIProvider implements AIProvider {
     private readonly db: Database,
     private readonly candidates: readonly RoutedCredential[],
     private readonly taskType: AITaskType,
-    private readonly context: AIRuntimeContext
+    private readonly context: AIRuntimeContext,
+    public readonly embeddingSpace?: string,
+    private readonly embeddingDimensions = EMBEDDING_DIMENSIONS,
   ) {}
 
   complete(options: AICompletionOptions): Promise<AICompletionResult> {
-    return this.execute((provider) => provider.complete(options));
+    return this.execute(async (provider) => {
+      const result = await provider.complete(options);
+      options.validateResult?.(result);
+      return result;
+    });
   }
 
   embed(
     text: string,
     options?: AIEmbeddingOptions
   ): Promise<AIEmbeddingResult> {
-    return this.execute((provider) => provider.embed(text, options));
+    return this.execute(async (provider) => {
+      const result = await provider.embed(text, options);
+      if (!Array.isArray(result.embedding) ||
+        result.embedding.length !== this.embeddingDimensions ||
+        !result.embedding.every((value) => typeof value === "number" && Number.isFinite(value))) {
+        throw new Error(`Invalid embedding: expected ${this.embeddingDimensions} finite numbers`);
+      }
+      return { ...result, space: this.embeddingSpace };
+    });
   }
 
   rerank(options: AIRerankOptions): Promise<AIRerankResult> {
-    return this.execute((provider) => {
+    return this.execute(async (provider) => {
       if (!provider.rerank) throw new Error(`${provider.name} does not support reranking`);
-      return provider.rerank(options);
+      const result = await provider.rerank(options);
+      const seen = new Set<number>();
+      if (!Array.isArray(result.results) ||
+        (options.documents.length > 0 && result.results.length === 0) ||
+        !result.results.every((item) => {
+          if (!Number.isInteger(item.index) || item.index < 0 ||
+            item.index >= options.documents.length || seen.has(item.index) ||
+            !Number.isFinite(item.relevanceScore)) return false;
+          seen.add(item.index);
+          return true;
+        })) {
+        throw new Error("Invalid rerank response");
+      }
+      return result;
     });
   }
 
@@ -384,7 +421,11 @@ class FailoverAIProvider implements AIProvider {
       },
       (candidate) => recordSuccess(this.db, candidate.id),
       async (candidate, error, hasFallback) => {
-        await recordFailure(this.db, candidate, error, hasFallback);
+        try {
+          await recordFailure(this.db, candidate, error, hasFallback);
+        } catch (recordError) {
+          console.error("Failed to record AI credential failure:", recordError);
+        }
         try {
           await recordAiUsage(this.db, {
             credentialId: candidate.id,
@@ -412,7 +453,44 @@ export async function getAIProvider(
   context: AIRuntimeContext = {}
 ): Promise<AIProvider | null> {
   const candidates = await listAvailableCredentials(db, taskType, context);
+  if (taskType === "embedding" && candidates.length > 0) {
+    const profile = await resolveEmbeddingProfile(candidates);
+    const available = candidates.filter((candidate) =>
+      sameEmbeddingModel(candidate, profile.primary) &&
+      (!candidate.blockedUntil || Date.parse(candidate.blockedUntil) <= Date.now())
+    );
+    return available.length > 0
+      ? new FailoverAIProvider(db, available, taskType, context, profile.space, profile.dimensions)
+      : null;
+  }
   return candidates.length > 0
     ? new FailoverAIProvider(db, candidates, taskType, context)
     : null;
+}
+
+function sameEmbeddingModel(left: RoutedCredential, right: RoutedCredential): boolean {
+  return left.provider === right.provider && left.model === right.model &&
+    normalizedBaseUrl(left.baseUrl) === normalizedBaseUrl(right.baseUrl) &&
+    left.modelDimensions === right.modelDimensions;
+}
+
+async function resolveEmbeddingProfile(candidates: RoutedCredential[]) {
+  const dimensions = await getVectorDimensions();
+  const primary = candidates[0];
+  if (primary.modelDimensions !== dimensions) {
+    throw new Error(`Embedding route requests ${primary.modelDimensions} dimensions but the bound Vectorize index requires ${dimensions}; save a compatible route before rebuilding`);
+  }
+  const space = await vectorSpaceKey({
+    provider: primary.provider, model: primary.model,
+    baseUrl: normalizedBaseUrl(primary.baseUrl), dimensions,
+  });
+  return { primary, dimensions, space };
+}
+
+/** Cooling down a key must never silently switch the knowledge coordinate space. */
+export async function getEmbeddingProfile(db: Database, context: AIRuntimeContext) {
+  const candidates = await listAvailableCredentials(db, "embedding", context);
+  if (candidates.length === 0) return null;
+  const { primary, dimensions, space } = await resolveEmbeddingProfile(candidates);
+  return { space, dimensions, model: primary.model, provider: primary.provider };
 }

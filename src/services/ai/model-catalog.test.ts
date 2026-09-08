@@ -13,6 +13,15 @@ function json(body: unknown): Response {
 }
 
 describe("AI model catalog", () => {
+  it("does not overwrite a live fixed dimension with a static suggestion", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => json({ data: [
+      { id: "jina-embeddings-v4", dimensions: 768 },
+    ] }));
+    const models = await listProviderModels("jina", "secret", undefined, 1024);
+    expect(findCompatibleModel(models, "jina-embeddings-v4", "embedding", 1024)).toBeNull();
+    const compatible = await listProviderModels("jina", "secret", undefined, 768);
+    expect(findCompatibleModel(compatible, "jina-embeddings-v4", "embedding", 768)?.dimensions).toBe(768);
+  });
   it("combines OpenRouter text and embedding catalogs", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const url = String(input);
@@ -142,6 +151,12 @@ describe("AI model catalog", () => {
 });
 
 describe("resolveAssignableModel", () => {
+  it("accepts a fixed-size model when it matches the bound index", () => {
+    const fixed = [{ id: "fixed-embed", kind: "embedding" as const, dimensions: 768 }];
+    expect(resolveAssignableModel("openai", fixed, "fixed-embed", "embedding", 768)).toEqual(fixed[0]);
+    expect(resolveAssignableModel("openai", fixed, "fixed-embed", "embedding", 1536)).toBeNull();
+    expect(resolveAssignableModel("openai", [], "custom-embedding", "embedding", 1536)?.dimensions).toBe(1536);
+  });
   const catalog = [
     { id: "listed-chat", kind: "text" as const },
     { id: "listed-embed", kind: "embedding" as const, dimensions: 1024 },

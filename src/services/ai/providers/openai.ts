@@ -163,7 +163,7 @@ export class OpenAIProvider implements AIProvider {
       body: JSON.stringify({
         model: this.config.model,
         input: text,
-        dimensions: EMBEDDING_DIMENSIONS,
+        dimensions: this.config.embeddingDimensions ?? EMBEDDING_DIMENSIONS,
       }),
     }, 30_000);
 

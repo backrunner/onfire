@@ -38,7 +38,7 @@ export class QwenEmbeddingProvider implements AIProvider {
         model: this.config.model,
         input: text,
         encoding_format: "float",
-        dimensions: EMBEDDING_DIMENSIONS,
+        dimensions: this.config.embeddingDimensions ?? EMBEDDING_DIMENSIONS,
       }),
     }, 30_000);
     if (!response.ok) {

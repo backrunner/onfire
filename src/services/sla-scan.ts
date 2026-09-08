@@ -255,6 +255,13 @@ export async function runScheduledScan(db: Database): Promise<ScanReport> {
   }
 
   try {
+    const { rebuildKnowledgeEmbeddings } = await import("@/services/ai/embedding");
+    await rebuildKnowledgeEmbeddings(db);
+  } catch (error) {
+    console.error("Knowledge embedding rebuild failed:", error);
+  }
+
+  try {
     await purgeExpiredLoginLimits(db);
   } catch (error) {
     console.error("Login rate limit cleanup failed:", error);

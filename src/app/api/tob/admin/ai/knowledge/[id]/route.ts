@@ -55,31 +55,10 @@ export const PATCH = withAuth({ permission: "ai.knowledge" }, async (req: NextRe
 
   await ctx.db.update(productKnowledge).set(updates).where(eq(productKnowledge.id, existing.id));
 
-  // Keep Vectorize synchronized whenever embedded content changes.
+  // Old vectors are excluded by source version until this succeeds or cron retries.
   if (body.title || body.content) {
-    try {
-      const embedded = await embedKnowledge(ctx.db, existing.id);
-      if (!embedded && existing.vectorizeIds) {
-        await deleteEmbeddings(existing.vectorizeIds);
-        await ctx.db
-          .update(productKnowledge)
-          .set({ vectorizeIds: null, updatedAt: new Date().toISOString() })
-          .where(eq(productKnowledge.id, existing.id));
-      }
-    } catch (error) {
-      console.error("Failed to re-embed knowledge:", error);
-      if (existing.vectorizeIds) {
-        try {
-          await deleteEmbeddings(existing.vectorizeIds);
-          await ctx.db
-            .update(productKnowledge)
-            .set({ vectorizeIds: null, updatedAt: new Date().toISOString() })
-            .where(eq(productKnowledge.id, existing.id));
-        } catch (cleanupError) {
-          console.error("Failed to clear stale knowledge vector:", cleanupError);
-        }
-      }
-    }
+    try { await embedKnowledge(ctx.db, existing.id); }
+    catch (error) { console.error("Failed to re-embed knowledge:", error); }
   }
 
   return ok({ updated: true });

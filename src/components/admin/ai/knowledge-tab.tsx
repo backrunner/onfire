@@ -113,6 +113,21 @@ export function KnowledgeTab({ productId: fixedProductId }: { productId?: string
   const { data: products, isLoading: productsLoading } = useProducts();
   const [selectedProductId, setProductId] = useState("");
   const productId = fixedProductId ?? selectedProductId;
+  const [reindexing, setReindexing] = useState(false);
+  const { data: indexing, error: indexingError, mutate: mutateIndexing } = useSWR<{
+    profile: { model: string; dimensions: number } | null;
+    total: number; pending: number; failed: number;
+  }>(productId ? `/api/tob/admin/ai/knowledge/reindex${qs({ productId })}` : null, swrFetcher, { refreshInterval: 15_000 });
+  const reindex = async () => {
+    setReindexing(true);
+    try {
+      await api.post("/api/tob/admin/ai/knowledge/reindex", { productId });
+      toast.success(k.reindexQueued);
+      await mutateIndexing();
+    } catch (error) {
+      toast.error(error instanceof ApiClientError ? error.message : k.actionFailed);
+    } finally { setReindexing(false); }
+  };
 
   const entriesKey = productId
     ? `/api/tob/admin/ai/knowledge${qs({ productId })}`
@@ -287,6 +302,19 @@ export function KnowledgeTab({ productId: fixedProductId }: { productId?: string
               </Button>
             </CardHeader>
             <CardContent>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
+                <p className="min-w-0 text-xs text-muted-foreground" role="status">
+                  {indexingError ? k.loadFailed : indexing ? (
+                    indexing.profile
+                      ? `${k.indexing}: ${indexing.total - indexing.pending}/${indexing.total} · ${k.indexPending}: ${indexing.pending} · ${k.indexFailed}: ${indexing.failed}`
+                      : k.indexDisabled
+                  ) : k.indexLoading}
+                </p>
+                <Button variant="outline" size="sm" disabled={reindexing || !indexing?.profile || indexing.total === 0} onClick={reindex}>
+                  <RefreshCw className={cn("size-3.5", reindexing && "animate-spin")} />
+                  {k.reindex}
+                </Button>
+              </div>
               {entriesLoading ? (
                 <KnowledgeRowsSkeleton rows={3} />
               ) : entriesError ? (

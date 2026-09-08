@@ -15,6 +15,7 @@ import {
   modelKindForTask,
 } from "@/lib/ai-config";
 import { getEnv } from "@/lib/db";
+import { getVectorDimensions } from "@/services/ai/vector-space";
 import { openStoredSecret } from "@/lib/secret-storage";
 import {
   listProviderModels,
@@ -166,6 +167,7 @@ async function assertAssignableCredentials(
   const filled = await fillAiScopeRef(db, ref);
   const credentialIds = assignments.map((assignment) => assignment.credentialId);
   if (credentialIds.length === 0) return;
+  const dimensions = taskType === "embedding" ? await getVectorDimensions() : undefined;
   const credentials = await db
     .select({
       id: aiCredentials.id,
@@ -210,7 +212,7 @@ async function assertAssignableCredentials(
           getEnv().AUTH_SECRET,
           credential.secretPurpose,
         );
-        catalog = await listProviderModels(credential.provider, apiKey, credential.baseUrl);
+        catalog = await listProviderModels(credential.provider, apiKey, credential.baseUrl, dimensions);
       } catch {
         // An unreachable provider must not block saving: models outside the
         // catalog fall back to name-based capability classification below.
@@ -223,11 +225,21 @@ async function assertAssignableCredentials(
       catalog,
       assignment.model,
       modelKindForTask(taskType),
+      dimensions,
     );
     if (!resolved) throw badRequest(`Model is not compatible with the ${taskType} task`);
     assignment.model = resolved.id;
     assignment.modelKind = resolved.kind;
     assignment.modelDimensions = resolved.dimensions;
+  }
+  if (taskType === "embedding") {
+    const spaces = new Set(assignments.filter((assignment) => assignment.enabled ?? true).map((assignment) => {
+      const credential = credentials.find((item) => item.id === assignment.credentialId)!;
+      return JSON.stringify([credential.provider, credential.baseUrl?.replace(/\/+$/, "") || null, assignment.model, assignment.modelDimensions]);
+    }));
+    if (spaces.size > 1) {
+      throw badRequest("Embedding fallback credentials must use the same provider, endpoint, model and dimensions; changing models requires rebuilding knowledge");
+    }
   }
 }
 

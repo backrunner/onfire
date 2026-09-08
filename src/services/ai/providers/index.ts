@@ -14,6 +14,8 @@ export interface AICompletionOptions {
   temperature?: number;
   maxTokens?: number;
   stream?: boolean;
+  /** Task-specific output validation, executed inside credential failover. */
+  validateResult?: (result: AICompletionResult) => void;
 }
 
 export interface AICompletionResult {
@@ -27,6 +29,8 @@ export interface AICompletionResult {
 
 export interface AIEmbeddingResult {
   embedding: number[];
+  /** Identity of the coordinate space, supplied by the routed provider. */
+  space?: string;
   usage?: {
     totalTokens: number;
   };
@@ -49,6 +53,7 @@ export interface AIEmbeddingOptions {
 
 export interface AIProvider {
   name: string;
+  embeddingSpace?: string;
   complete(options: AICompletionOptions): Promise<AICompletionResult>;
   embed(text: string, options?: AIEmbeddingOptions): Promise<AIEmbeddingResult>;
   rerank?(options: AIRerankOptions): Promise<AIRerankResult>;
@@ -60,6 +65,7 @@ export interface ProviderConfig {
   apiKey: string;
   baseUrl?: string | null;
   apiMode?: "responses" | "chat";
+  embeddingDimensions?: number;
 }
 
 /** Language tasks must never persist or present an empty model response. */

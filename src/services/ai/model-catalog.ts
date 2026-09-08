@@ -98,10 +98,22 @@ function supportsOnFireDimensions(
   provider: AIProviderValue,
   id: string,
   value: Record<string, unknown>,
+  targetDimensions = EMBEDDING_DIMENSIONS,
 ): boolean {
   const dimensions = numericDimensions(value);
-  if (dimensions.includes(1024)) return true;
+  if (dimensions.includes(targetDimensions)) return true;
+  if ((provider === "openai" || provider === "openrouter") && /text-embedding-3-(?:small|large)$/i.test(id)) {
+    return targetDimensions > 0 && targetDimensions <= (/small$/i.test(id) ? 1536 : 3072);
+  }
+  if (provider === "google" && /^gemini-embedding-(?:001|2)$/i.test(id)) {
+    return targetDimensions > 0 && targetDimensions <= 3072;
+  }
+  if (provider === "cohere" && id === "embed-v4.0") {
+    return [256, 512, 1024, 1536].includes(targetDimensions);
+  }
   if (dimensions.length > 0) return false;
+  if (STATIC_MODELS[provider]?.some((model) => model.id === id && model.dimensions === targetDimensions)) return true;
+  if (targetDimensions !== EMBEDDING_DIMENSIONS) return false;
   return (
     (provider === "openai" || provider === "openrouter") && /text-embedding-3-(?:small|large)$/i.test(id)
   ) || (
@@ -115,6 +127,7 @@ function normalizeModels(
   provider: AIProviderValue,
   items: unknown[],
   forcedKind?: AIModelKind,
+  targetDimensions = EMBEDDING_DIMENSIONS,
 ): AIModelDescriptor[] {
   const result: AIModelDescriptor[] = [];
   for (const item of items) {
@@ -151,8 +164,8 @@ function normalizeModels(
           ? value.name
           : undefined,
       contextLength: typeof value.context_length === "number" ? value.context_length : undefined,
-      dimensions: kind === "embedding" && supportsOnFireDimensions(provider, id, value)
-        ? 1024
+      dimensions: kind === "embedding" && supportsOnFireDimensions(provider, id, value, targetDimensions)
+        ? targetDimensions
         : undefined,
     });
   }
@@ -192,7 +205,7 @@ async function listAnthropicModels(baseUrl: string, apiKey: string): Promise<AIM
   return models;
 }
 
-async function listGoogleModels(baseUrl: string, apiKey: string): Promise<AIModelDescriptor[]> {
+async function listGoogleModels(baseUrl: string, apiKey: string, dimensions: number): Promise<AIModelDescriptor[]> {
   const models: AIModelDescriptor[] = [];
   let pageToken: string | undefined;
   for (let page = 0; page < 20; page += 1) {
@@ -201,7 +214,7 @@ async function listGoogleModels(baseUrl: string, apiKey: string): Promise<AIMode
     url.searchParams.set("pageSize", "1000");
     if (pageToken) url.searchParams.set("pageToken", pageToken);
     const body = await fetchCatalogPage(url.toString(), { Accept: "application/json" });
-    if (Array.isArray(body.models)) models.push(...normalizeModels("google", body.models));
+    if (Array.isArray(body.models)) models.push(...normalizeModels("google", body.models, undefined, dimensions));
     if (typeof body.nextPageToken !== "string" || !body.nextPageToken) break;
     pageToken = body.nextPageToken;
   }
@@ -212,6 +225,7 @@ async function listOpenAiCompatibleModels(
   provider: AIProviderValue,
   baseUrl: string,
   apiKey: string,
+  dimensions: number,
 ): Promise<AIModelDescriptor[]> {
   const paths: Array<{ path: string; kind?: AIModelKind }> = provider === "openrouter"
     ? [{ path: "models", kind: "text" }, { path: "embeddings/models", kind: "embedding" }]
@@ -222,8 +236,8 @@ async function listOpenAiCompatibleModels(
       Accept: "application/json",
       Authorization: `Bearer ${apiKey}`,
     });
-    if (Array.isArray(body.data)) models.push(...normalizeModels(provider, body.data, item.kind));
-    if (Array.isArray(body.models)) models.push(...normalizeModels(provider, body.models, item.kind));
+    if (Array.isArray(body.data)) models.push(...normalizeModels(provider, body.data, item.kind, dimensions));
+    if (Array.isArray(body.models)) models.push(...normalizeModels(provider, body.models, item.kind, dimensions));
   }
   return models;
 }
@@ -232,9 +246,15 @@ export async function listProviderModels(
   provider: AIProviderValue,
   apiKey: string,
   configuredBaseUrl?: string | null,
+  dimensions = EMBEDDING_DIMENSIONS,
 ): Promise<AIModelDescriptor[]> {
   if (!configuredBaseUrl && STATIC_ONLY_PROVIDERS.has(provider)) {
-    return STATIC_MODELS[provider] ?? [];
+    return (STATIC_MODELS[provider] ?? []).map((model) => ({
+      ...model,
+      dimensions: model.kind === "embedding" &&
+        supportsOnFireDimensions(provider, model.id, { dimensions: model.dimensions }, dimensions)
+        ? dimensions : undefined,
+    }));
   }
   const baseUrl = configuredBaseUrl === undefined || configuredBaseUrl === null || configuredBaseUrl.trim() === ""
     ? DEFAULT_BASE_URLS[provider]
@@ -243,20 +263,16 @@ export async function listProviderModels(
   const models = provider === "anthropic"
     ? await listAnthropicModels(baseUrl, apiKey)
     : provider === "google"
-      ? await listGoogleModels(baseUrl, apiKey)
-      : await listOpenAiCompatibleModels(provider, baseUrl, apiKey);
+      ? await listGoogleModels(baseUrl, apiKey, dimensions)
+      : await listOpenAiCompatibleModels(provider, baseUrl, apiKey, dimensions);
   // Live catalogs remain authoritative for capability metadata. Static entries
   // enrich matching live records for providers whose catalog omits dimension
   // metadata; models outside the catalog are handled by the name-based
   // fallback in resolveAssignableModel at assignment time.
-  const staticModels = STATIC_MODELS[provider] ?? [];
   return models.reduce<AIModelDescriptor[]>((result, model) => {
-    const metadata = staticModels.find(
-      (item) => item.id === model.id && item.kind === model.kind,
-    );
-    const enriched = metadata && model.dimensions === undefined
-      ? { ...model, dimensions: metadata.dimensions }
-      : model;
+    // normalizeModels already applies static fallback only when the live
+    // catalog omits dimensions; never override an explicit incompatibility.
+    const enriched = model;
     const existing = result.find(
       (item) => item.id === enriched.id && item.kind === enriched.kind,
     );
@@ -272,10 +288,11 @@ export function findCompatibleModel(
   models: readonly AIModelDescriptor[],
   modelId: string,
   expectedKind: AIModelKind,
+  dimensions = EMBEDDING_DIMENSIONS,
 ): AIModelDescriptor | null {
   const match = models.find((model) => model.id === modelId && model.kind === expectedKind);
   if (!match) return null;
-  if (expectedKind === "embedding" && match.dimensions !== 1024) return null;
+  if (expectedKind === "embedding" && match.dimensions !== dimensions) return null;
   return match;
 }
 
@@ -285,18 +302,19 @@ export function findCompatibleModel(
  * unsupported dimensions stays rejected. Models absent from the catalog
  * (custom gateways, newly released models, or an unreachable provider) fall
  * back to name-based classification and must still match the task kind.
- * Custom embedding models are stored as 1024 dimensions, matching what the
- * adapters request.
+ * Custom embedding models request the bound index's dimension and runtime
+ * validates the actual vector before indexing.
  */
 export function resolveAssignableModel(
   provider: AIProviderValue,
   catalog: readonly AIModelDescriptor[],
   modelId: string,
   expectedKind: AIModelKind,
+  dimensions = EMBEDDING_DIMENSIONS,
 ): AIModelDescriptor | null {
   const id = normalizeProviderModelId(provider, modelId.trim());
   if (!id) return null;
-  const match = findCompatibleModel(catalog, id, expectedKind);
+  const match = findCompatibleModel(catalog, id, expectedKind, dimensions);
   if (match) return match;
   if (catalog.some((model) => model.id === id)) return null;
   const kind = classifyAIModel(id);
@@ -304,6 +322,6 @@ export function resolveAssignableModel(
   return {
     id,
     kind,
-    dimensions: kind === "embedding" ? EMBEDDING_DIMENSIONS : undefined,
+    dimensions: kind === "embedding" ? dimensions : undefined,
   };
 }

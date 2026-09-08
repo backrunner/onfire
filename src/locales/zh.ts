@@ -675,7 +675,7 @@ export const zh = {
       translation: '翻译',
       translationHint: '翻译工单内容与工单类型文本',
       embedding: '向量嵌入',
-      embeddingHint: '知识库向量化检索',
+      embeddingHint: '更换模型后重建知识索引；备用凭证须使用相同模型和端点。',
       rerank: '文档重排序',
       rerankHint: '按相关性重新排列检索结果'
     },
@@ -717,6 +717,13 @@ export const zh = {
   },
 
   aiKnowledge: {
+    indexing: '检索索引',
+    indexPending: '待处理',
+    indexFailed: '失败',
+    indexDisabled: '配置 Embedding 路由后即可建立知识索引。',
+    indexLoading: '正在加载索引状态…',
+    reindex: '重建索引',
+    reindexQueued: '已加入重建队列，知识将由后台分批处理。',
     title: '产品知识库',
     subtitle: '为 AI 预回复与自动处理提供依据，规避幻觉',
     selectProduct: '选择产品',
@@ -1115,6 +1122,8 @@ export const zh = {
     securityVerify: '安全验证',
     noTurnstile: '未配置 Turnstile（NEXT_PUBLIC_TURNSTILE_SITE_KEY），将跳过验证码',
     loginFailed: '登录失败，请检查账号或稍后重试',
+    tooManyAttempts: '尝试次数过多，请稍后重试，最长需等待 15 分钟。',
+    temporarilyUnavailable: '登录服务暂时不可用，请稍后重试。',
     otpSubtitle: '完成两步验证',
     otpCode: '六位验证码',
     backupCode: '恢复码',
@@ -1124,8 +1133,6 @@ export const zh = {
     useBackupCode: '使用恢复码',
     useAuthenticator: '使用认证器验证码',
     turnstileError: '验证码加载失败，请刷新页面重试',
-    tooManyAttempts: '尝试次数过多，请稍后重试，最长需等待 15 分钟。',
-    temporarilyUnavailable: '登录服务暂时不可用，请稍后重试。',
     footer: 'OnFire · 现代化客服工单系统'
   },
 

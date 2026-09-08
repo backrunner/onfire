@@ -7,6 +7,22 @@ import type { Database } from "@/lib/db";
 import { tickets } from "@/drizzle/schema";
 import { eq } from "drizzle-orm";
 import { getAIProvider } from "./config";
+import { z } from "zod";
+
+const prescreeningSchema = z.object({
+  issues: z.array(z.string()),
+  keywords: z.array(z.string()),
+  category: z.string().optional(),
+  sentiment: z.enum(["positive", "neutral", "negative"]).optional(),
+  urgency: z.enum(["low", "medium", "high"]).optional(),
+  summary: z.string().optional(),
+});
+
+function parsePrescreening(content: string): PrescreeningResult {
+  const json = content.match(/\{[\s\S]*\}/)?.[0];
+  if (!json) throw new Error("Failed to parse AI response as JSON");
+  return prescreeningSchema.parse(JSON.parse(json));
+}
 
 export interface PrescreeningResult {
   issues: string[];
@@ -48,22 +64,18 @@ export async function prescreenTicket(
     throw new Error(`Ticket not found: ${ticketId}`);
   }
 
-  const provider = await getAIProvider(db, "prescreening", {
-    tenantId: ticket.tenantId,
-    productId: ticket.productId,
-  });
-  if (!provider) {
-    console.log("Prescreening AI not configured");
-    return null;
-  }
-
-  // Update status to processing
-  await db
-    .update(tickets)
-    .set({ aiScreeningStatus: "processing" })
-    .where(eq(tickets.id, ticketId));
-
   try {
+    const provider = await getAIProvider(db, "prescreening", {
+      tenantId: ticket.tenantId,
+      productId: ticket.productId,
+    });
+    if (!provider) return null;
+
+    await db
+      .update(tickets)
+      .set({ aiScreeningStatus: "processing" })
+      .where(eq(tickets.id, ticketId));
+
     const result = await provider.complete({
       messages: [
         { role: "system", content: PRESCREENING_PROMPT },
@@ -74,15 +86,11 @@ export async function prescreenTicket(
       ],
       temperature: 0.3,
       maxTokens: 1024,
+      validateResult: (result) => { parsePrescreening(result.content); },
     });
 
     // Parse JSON response
-    const jsonMatch = result.content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("Failed to parse AI response as JSON");
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]) as PrescreeningResult;
+    const parsed = parsePrescreening(result.content);
 
     // Update ticket with results
     await db
@@ -92,7 +100,6 @@ export async function prescreenTicket(
         aiScreeningResult: JSON.stringify(parsed),
         aiExtractedIssues: JSON.stringify(parsed.issues || []),
         aiKeywords: JSON.stringify(parsed.keywords || []),
-        updatedAt: new Date().toISOString(),
       })
       .where(eq(tickets.id, ticketId));
 
