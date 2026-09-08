@@ -134,7 +134,9 @@ export function sanitizeRichHtml(html: string): string {
   let match: RegExpExecArray | null;
   while ((match = TOKEN_RE.exec(html)) !== null) {
     if (match[5] !== undefined) {
-      if (dropDepth === 0) out += escapeRichText(match[5]);
+      // Decode only after tokenization, then escape as text. Re-sanitizing
+      // stored HTML must not turn &amp; / &lt; into visible entity strings.
+      if (dropDepth === 0) out += escapeRichText(decodeEntities(match[5]));
       continue;
     }
     if (match[2] === undefined) continue; // comment, doctype, or malformed

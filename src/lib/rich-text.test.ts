@@ -6,6 +6,13 @@ import {
 } from "./rich-text";
 
 describe("sanitizeRichHtml", () => {
+  it("is stable when escaped translated content is sanitized repeatedly", () => {
+    const html = '<p>AT&amp;T &lt;script&gt;alert(1)&lt;/script&gt; &#60;img&#62;</p>';
+    const sanitized = sanitizeRichHtml(html);
+    expect(sanitized).toBe('<p>AT&amp;T &lt;script&gt;alert(1)&lt;/script&gt; &lt;img&gt;</p>');
+    expect(sanitizeRichHtml(sanitized)).toBe(sanitized);
+    expect(richHtmlToText(sanitized)).toBe('AT&T <script>alert(1)</script> <img>');
+  });
   it("keeps basic formatting tags", () => {
     expect(sanitizeRichHtml("<p>Hello <strong>world</strong></p>")).toBe(
       "<p>Hello <strong>world</strong></p>"

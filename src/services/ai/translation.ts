@@ -103,7 +103,6 @@ Respond in JSON format only:
 }`;
 
 const TRANSLATION_CHUNK_SIZE = 4_000;
-const HTML_CHUNK_SIZE = 6_000;
 
 /**
  * Source-language clause for TRANSLATE_TEXTS_PROMPT. A failed detection
@@ -261,7 +260,7 @@ async function translateHtmlTextNodes(
     groupSize = 0;
   };
   for (const item of items) {
-    if (group.length > 0 && groupSize + item.text.length > TRANSLATION_CHUNK_SIZE) {
+    if (group.length > 0 && (group.length >= 20 || groupSize + item.text.length > TRANSLATION_CHUNK_SIZE)) {
       await flush();
     }
     group.push(item);
@@ -524,9 +523,9 @@ export async function translateTicketFields(
     }
   }
   const detectedLanguage =
-    typeof parsed.detectedLanguage === "string" && parsed.detectedLanguage.trim()
+    input.sourceLang ?? (typeof parsed.detectedLanguage === "string" && parsed.detectedLanguage.trim()
       ? parsed.detectedLanguage.trim().toLowerCase().split("-")[0]
-      : input.sourceLang ?? "unknown";
+      : "unknown");
   return {
     detectedLanguage,
     subject: translatedSubject,
@@ -539,11 +538,22 @@ export async function translateTicketContent(
   context: AIRuntimeContext,
   input: TranslateTicketContentInput
 ): Promise<TranslateTicketContentResult> {
+  const sanitizedInputHtml = input.html ? sanitizeRichHtml(input.html) : undefined;
   if (input.sourceLang === input.targetLang) {
     return {
       detectedLanguage: input.sourceLang,
       content: input.text,
-      contentHtml: input.html ?? undefined,
+      contentHtml: sanitizedInputHtml,
+    };
+  }
+  // Image-only replies contain no language-bearing text and must remain usable
+  // even when the translation route is unavailable.
+  if (!input.text.trim() && sanitizedInputHtml &&
+    !decodeEntities(sanitizedInputHtml.replace(/<[^>]+>/g, "")).trim()) {
+    return {
+      detectedLanguage: input.sourceLang ?? "unknown",
+      content: input.text,
+      contentHtml: sanitizedInputHtml,
     };
   }
   const provider = await getAIProvider(db, "translation", context);
@@ -551,14 +561,9 @@ export async function translateTicketContent(
     throw new Error("Translation AI task is not configured");
   }
 
-  const sanitizedInputHtml = input.html ? sanitizeRichHtml(input.html) : undefined;
   const textChunks = splitTextChunks(input.text);
   const requiresChunks =
-    textChunks.length > 1 ||
-    Boolean(
-      sanitizedInputHtml &&
-        input.text.length + sanitizedInputHtml.length > HTML_CHUNK_SIZE
-    );
+    textChunks.length > 1 || Boolean(sanitizedInputHtml);
   if (requiresChunks) {
     const translatedParts: string[] = [];
     let detectedLanguage = input.sourceLang ?? "unknown";
@@ -593,48 +598,11 @@ export async function translateTicketContent(
     };
   }
 
-  const languageRule = input.sourceLang
-    ? `- The source language is known to be "${input.sourceLang}"; report it in "detectedLanguage" without detecting.`
-    : LANGUAGE_DETECTION_RULE;
-  const htmlRule = sanitizedInputHtml
-    ? "\n\nHTML:\n" + sanitizedInputHtml
-    : "";
-
-  const result = await provider.complete({
-    messages: [
-      {
-        role: "system",
-        content: TRANSLATE_TICKET_PROMPT.replace(
-          /\{\{targetLang\}\}/g,
-          input.targetLang
-        ).replace("{{languageRule}}", languageRule),
-      },
-      { role: "user", content: `Text:\n${input.text}${htmlRule}` },
-    ],
-    temperature: 0.2,
-    maxTokens: 4096,
-  });
-
-  const parsed = extractJsonObject(result.content);
-  if (typeof parsed.content !== "string" || !parsed.content.trim()) {
-    throw new Error("AI translation response has no translated content");
-  }
-
-  let contentHtml: string | undefined;
-  if (input.html) {
-    if (typeof parsed.contentHtml !== "string") {
-      throw new Error("AI translation response has no translated HTML");
-    }
-    contentHtml = sanitizeRichHtml(parsed.contentHtml);
-    if (!contentHtml) {
-      throw new Error("AI translation response has no usable translated HTML");
-    }
-  }
-
-  const detectedLanguage =
-    typeof parsed.detectedLanguage === "string" && parsed.detectedLanguage.trim()
-      ? parsed.detectedLanguage.trim().toLowerCase().split("-")[0]
-      : input.sourceLang || "unknown";
-
-  return { detectedLanguage, content: parsed.content, contentHtml };
+  const translated = await translateContentChunk(
+    provider, input.text, input.sourceLang ?? null, input.targetLang,
+  );
+  return {
+    ...translated,
+    detectedLanguage: input.sourceLang ?? translated.detectedLanguage,
+  };
 }

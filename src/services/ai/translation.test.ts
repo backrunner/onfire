@@ -88,24 +88,25 @@ describe("AI translation response validation", () => {
     ).rejects.toThrow("incomplete for zh");
   });
 
-  it("normalizes detected language tags and sanitizes translated HTML", async () => {
-    mocks.complete.mockResolvedValue({
-      content: JSON.stringify({
-        detectedLanguage: "zh-CN",
-        content: "Hello",
-        contentHtml: '<p>Hello</p><script>alert("x")</script>',
-      }),
+  it("preserves short reply links and images while escaping translated text nodes", async () => {
+    mocks.complete.mockResolvedValueOnce({
+      content: JSON.stringify({ detectedLanguage: "zh-CN", content: "Hello" }),
+    }).mockResolvedValueOnce({
+      content: JSON.stringify({ translations: { "html-0": { en: "Hello<script>bad()</script>" } } }),
     });
-
     const result = await translateTicketContent(db, {}, {
       text: "你好",
-      html: "<p>你好</p>",
+      html: '<p><a href="https://example.com/help">你好</a><img src="/api/attachments/abc123"></p>',
       targetLang: "en",
     });
-
     expect(result.detectedLanguage).toBe("zh");
-    expect(result.contentHtml).toContain("<p>Hello</p>");
-    expect(result.contentHtml).not.toContain("script");
+    expect(result.contentHtml).toContain('href="https://example.com/help"');
+    expect(result.contentHtml).toContain('/api/attachments/abc123');
+    expect(result.contentHtml).toContain('Hello&lt;script&gt;');
+    expect(result.contentHtml).not.toContain('<script>');
+    for (const [request] of mocks.complete.mock.calls) {
+      expect(request.messages[1].content).not.toContain('href=');
+    }
   });
 
   it("does not call a provider when source and target languages match", async () => {
@@ -122,6 +123,24 @@ describe("AI translation response validation", () => {
       contentHtml: "<p>Already translated</p>",
     });
     expect(mocks.getAIProvider).not.toHaveBeenCalled();
+  });
+
+  it("preserves image-only replies without requiring a language model", async () => {
+    mocks.getAIProvider.mockResolvedValue(null);
+    const result = await translateTicketContent(db, {}, {
+      text: "", html: '<p><img src="/api/attachments/abc123"></p>', targetLang: "zh",
+    });
+    expect(result.content).toBe("");
+    expect(result.contentHtml).toContain('/api/attachments/abc123');
+    expect(mocks.getAIProvider).not.toHaveBeenCalled();
+  });
+
+  it("sanitizes HTML even when the source language already matches", async () => {
+    const result = await translateTicketContent(db, {}, {
+      text: "Hello", html: '<p>Hello</p><script>alert(1)</script>',
+      sourceLang: "en", targetLang: "en",
+    });
+    expect(result.contentHtml).toBe("<p>Hello</p>");
   });
 
   it("translates a 50k ticket body in ordered chunks and detects only once", async () => {

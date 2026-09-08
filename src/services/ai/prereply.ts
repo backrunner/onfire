@@ -5,7 +5,7 @@
 
 import type { Database } from "@/lib/db";
 import { tickets, replies } from "@/drizzle/schema";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc, or, isNull } from "drizzle-orm";
 import { getAIProvider } from "./config";
 import { findRelevantKnowledge } from "./embedding";
 
@@ -63,7 +63,10 @@ export async function generatePrereply(
   const previousReplies = await db
     .select()
     .from(replies)
-    .where(eq(replies.ticketId, options.ticketId))
+    .where(and(
+      eq(replies.ticketId, options.ticketId),
+      or(eq(replies.internal, false), isNull(replies.internal)),
+    ))
     .orderBy(desc(replies.createdAt))
     .limit(5);
 
@@ -101,7 +104,7 @@ export async function generatePrereply(
 
   const systemPrompt = PREREPLY_PROMPT
     .replace("{{tone}}", options.tone || "professional")
-    .replace("{{language}}", options.language === "zh" ? "Chinese" : "English")
+    .replace("{{language}}", (options.language ?? ticket.customerLanguage) === "zh" ? "Chinese" : "English")
     .replace("{{knowledge}}", knowledgeContext);
 
   try {
@@ -121,7 +124,6 @@ export async function generatePrereply(
       .update(tickets)
       .set({
         aiSuggestedReply: suggestedReply,
-        updatedAt: new Date().toISOString(),
       })
       .where(eq(tickets.id, options.ticketId));
 
