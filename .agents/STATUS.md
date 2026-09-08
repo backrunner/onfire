@@ -4,6 +4,8 @@ Updated: 2026-09-08
 
 ## Current State
 
+- Global toasts now clear the app header and optional preview bar with a 16px
+  gap plus mobile safe-area insets. Their colors follow the current app theme.
 - Email settings reset/save actions now sit after the form in normal document
   flow with a top divider, inline save status, and stacked mobile actions.
   The loading skeleton follows the same layout; saving exposes a live status
@@ -277,6 +279,13 @@ snapshots. Production D1 has migrations `0000` through `0026` applied;
 its remote migration list reports no pending migrations on 2026-09-07.
 
 ## Verification
+
+- Toast placement (2026-09-08): Playwright checks pass at 1440x900 and
+  390x844 in English/Chinese and light/dark. Success, warning, long error,
+  stacked notifications, preview-header clearance, live theme switching, and
+  emulated asymmetric safe-area insets are verified. Header actions remain
+  clickable during toast animation. Email mutations and preview identity use
+  browser fixtures; no production settings were changed.
 
 - Inline email form actions (2026-09-08): frozen install, generated bindings,
   TypeScript, 91 files / 689 tests, and the OpenNext Worker build pass.

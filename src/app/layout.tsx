@@ -4,7 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { I18nProvider, LANGUAGE_COOKIE, type Language } from "@/lib/i18n";
-import { Toaster } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { isTheme, THEME_COOKIE, type Theme } from "@/lib/theme";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -59,7 +59,7 @@ export default async function RootLayout({
           <TooltipProvider>
             <I18nProvider initialLanguage={language}>{children}</I18nProvider>
           </TooltipProvider>
-          <Toaster richColors position="top-center" />
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

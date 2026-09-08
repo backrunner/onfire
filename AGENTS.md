@@ -981,6 +981,7 @@ Using shadcn/ui as the base component library, including:
 - Split view for ticket list (list + details)
 - Product configuration hosts per-product email, ticket-type, access, and knowledge settings
 - Page-form reset/save actions stay in normal flow after the fields, with a top divider and responsive status/actions; do not use floating save bars.
+- Toasts clear the app header and preview bar, respect mobile safe areas, and follow the current theme.
 - Focused OAuth consent page with atomic permission and tenant/product selectors
 - Connected MCP application review and revocation on the account page
 - Responsive design

@@ -43,6 +43,8 @@ Avoid generic AI-dashboard composition: no oversized headings inside operational
   separated by a top border. Status sits on the left and actions on the right;
   mobile stacks status above two equal-width buttons. Do not float this footer
   over page content. Loading placeholders follow the same layout.
+- Toasts sit below the active app header and preview bar with a 16px gap,
+  respect mobile safe areas, and follow the current light/dark theme.
 - Sandbox HTML preview and offer desktop/mobile widths without shifting editor layout.
 - Theme rendering is SSR-safe: `onfire-theme=light|dark` is the shared source for server markup and client hydration; first-visit system preference is applied before paint, with no light-to-dark flash.
 - Turnstile-protected actions reserve widget space and remain disabled until a token exists; expiry or retry resets the token without shifting the surrounding form.

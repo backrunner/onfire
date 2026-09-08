@@ -4,6 +4,15 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Toasts clear the 56px app header, its border, and the optional preview bar. */
+body:has([data-toast-header]) {
+  --toast-header-height: calc(3.5rem + 1px);
+}
+
+body:has([data-toast-header][data-preview="true"]) {
+  --toast-header-height: calc(5.5rem + 1px);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
