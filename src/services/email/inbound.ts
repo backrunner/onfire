@@ -444,14 +444,18 @@ async function loadStoredContext(db: Database, row: InboundEmailRow): Promise<St
 
 export async function processInboundEmail(
   db: Database,
-  payload: InboundEmailPayload
+  payload: InboundEmailPayload,
+  authorizedProductId?: string,
 ): Promise<ProcessResult> {
   const normalizedFrom = payload.fromEmail.trim().toLowerCase();
   const normalizedTo = payload.toEmail.trim().toLowerCase();
   const normalizedMessageId = payload.messageId?.trim().slice(0, 998);
   const normalizedSubject = payload.subject.replace(/[\r\n]+/g, " ").trim().slice(0, 998);
   const config = await db.query.emailConfigs.findFirst({
-    where: sql`lower(${emailConfigs.inboundAddress}) = ${normalizedTo}`,
+    where: and(
+      sql`lower(${emailConfigs.inboundAddress}) = ${normalizedTo}`,
+      authorizedProductId === undefined ? undefined : eq(emailConfigs.productId, authorizedProductId),
+    ),
   });
   if (!config || !config.inboundEnabled) {
     return { success: false, action: "rejected", reason: "Inbound email is not configured" };

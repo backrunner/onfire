@@ -1094,6 +1094,7 @@ export type InboundEmailProvider =
   | "mailgun"
   | "resend"
   | "cloudflare"
+  | "stalwart"
   | "generic";
 export type EmailTemplateType =
   | "ticket_created"

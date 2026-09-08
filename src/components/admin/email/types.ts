@@ -1,6 +1,7 @@
 /** Client-side view types for the email configuration pages. */
 
 export type InboundProvider =
+  | "stalwart"
   | "maileroo"
   | "sendgrid"
   | "mailgun"

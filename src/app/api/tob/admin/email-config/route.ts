@@ -17,7 +17,7 @@ const querySchema = z.object({
 const upsertSchema = z.object({
   productId: z.string().min(1),
   inboundEnabled: z.boolean().optional(),
-  inboundProvider: z.enum(["maileroo", "resend", "cloudflare", "generic"]).nullable().optional(),
+  inboundProvider: z.enum(["maileroo", "resend", "cloudflare", "generic", "stalwart"]).nullable().optional(),
   inboundAddress: z.string().email().nullable().optional(),
   inboundWebhookSecret: z.string().max(500).nullable().optional(),
   inboundApiKey: z.string().max(500).nullable().optional(),

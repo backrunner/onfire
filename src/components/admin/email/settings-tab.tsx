@@ -53,6 +53,7 @@ import { showEmailMutationFailure } from "./toast";
 
 const INBOUND_PROVIDERS: InboundProvider[] = [
   "cloudflare",
+  "stalwart",
   "maileroo",
   "resend",
   "generic",
@@ -72,6 +73,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   resend: "Resend",
   smtp: "SMTP",
   cloudflare: "Cloudflare Email Routing",
+  stalwart: "Stalwart",
 };
 const OUTBOUND_LABELS: Record<string, string> = {
   ...PROVIDER_LABELS,
@@ -278,7 +280,10 @@ export function EmailSettingsTab({
   };
 
   const copyWebhookUrl = async () => {
-    await navigator.clipboard.writeText("/api/toc/webhooks/maileroo");
+    const url = form.inboundProvider === "stalwart"
+      ? `/api/toc/webhooks/stalwart/${productId}/mta-hook`
+      : "/api/toc/webhooks/maileroo";
+    await navigator.clipboard.writeText(url);
     toast.success(tc.inbound.copied);
   };
 
@@ -342,9 +347,13 @@ export function EmailSettingsTab({
               <Label className="text-xs">{tc.inbound.provider}</Label>
               <Select
                 value={form.inboundProvider}
-                onValueChange={(v) =>
-                  set("inboundProvider", v as InboundProvider)
-                }
+                onValueChange={(v) => {
+                  // Radix's hidden native select may emit an empty value while
+                  // synchronizing asynchronously loaded configuration.
+                  if (INBOUND_PROVIDERS.includes(v as InboundProvider)) {
+                    set("inboundProvider", v as InboundProvider);
+                  }
+                }}
               >
                 <SelectTrigger className="h-8 text-sm">
                   <SelectValue />
@@ -378,6 +387,39 @@ export function EmailSettingsTab({
               <ShieldCheck className="mt-0.5 size-4 shrink-0" />
               <p className="text-xs leading-5">{tc.inbound.cloudflareHint}</p>
             </div>
+          )}
+
+          {form.inboundProvider === "stalwart" && (
+            <>
+              <div className="flex gap-3 rounded-lg border border-sky-500/20 bg-sky-500/[0.06] px-3 py-2.5 text-sky-800 dark:text-sky-300">
+                <ShieldCheck className="mt-0.5 size-4 shrink-0" />
+                <p className="text-xs leading-5">{tc.inbound.stalwartHint}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <KeyRound className="size-4 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">{tc.inbound.webhookUrl}</p>
+                  <code className="block break-all font-mono text-xs text-muted-foreground">
+                    /api/toc/webhooks/stalwart/{productId}/mta-hook
+                  </code>
+                </div>
+                <Button type="button" size="sm" variant="outline" className="h-8" onClick={copyWebhookUrl}>
+                  <Copy className="mr-1.5 size-3.5" />{tc.inbound.copyUrl}
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <KeyRound className="size-4 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">{tc.inbound.eventsWebhookUrl}</p>
+                  <code className="block break-all font-mono text-xs text-muted-foreground">
+                    /api/toc/webhooks/stalwart/{productId}/events
+                  </code>
+                </div>
+                <Button type="button" size="sm" variant="outline" className="h-8" onClick={async () => { await navigator.clipboard.writeText(`/api/toc/webhooks/stalwart/${productId}/events`); toast.success(tc.inbound.copied); }}>
+                  <Copy className="mr-1.5 size-3.5" />{tc.inbound.copyUrl}
+                </Button>
+              </div>
+            </>
           )}
 
           {form.inboundProvider === "maileroo" && (
@@ -452,6 +494,7 @@ export function EmailSettingsTab({
           )}
 
           {(form.inboundProvider === "generic" ||
+            form.inboundProvider === "stalwart" ||
             form.inboundProvider === "sendgrid" ||
             form.inboundProvider === "mailgun") && (
             <>
@@ -520,9 +563,9 @@ export function EmailSettingsTab({
               <Label className="text-xs">{tc.outbound.provider}</Label>
               <Select
                 value={form.outboundProvider}
-                onValueChange={(v) =>
-                  set("outboundProvider", v as OutboundProvider)
-                }
+                onValueChange={(v) => {
+                  if (isOutboundProvider(v)) set("outboundProvider", v);
+                }}
               >
                 <SelectTrigger className="h-8 w-full text-sm">
                   <SelectValue placeholder={tc.outbound.providerPlaceholder}>
@@ -714,9 +757,9 @@ export function EmailSettingsTab({
             <Label className="text-xs">{tc.aiFilter.strictness}</Label>
             <Select
               value={form.aiFilterStrictness}
-              onValueChange={(v) =>
-                set("aiFilterStrictness", v as AiFilterStrictness)
-              }
+              onValueChange={(v) => {
+                if (v === "low" || v === "medium" || v === "high") set("aiFilterStrictness", v);
+              }}
             >
               <SelectTrigger className="h-8 text-sm">
                 <SelectValue />
