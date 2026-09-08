@@ -8,6 +8,7 @@ import {
   Copy,
   Inbox,
   KeyRound,
+  Loader2,
   RotateCcw,
   Save,
   Send,
@@ -774,23 +775,24 @@ export function EmailSettingsTab({
         </CardContent>
       </Card>
 
-      <div className="sticky bottom-3 z-20 flex items-center justify-between gap-3 rounded-lg border border-border/80 bg-background/90 px-3 py-2 shadow-[0_8px_30px_rgb(0_0_0/0.08)] backdrop-blur-xl">
-        <p className="text-xs text-muted-foreground">
-          {isDirty ? tc.unsaved : tc.upToDate}
+      <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <p role="status" className="text-xs text-muted-foreground">
+          {saving ? tc.saving : isDirty ? tc.unsaved : tc.upToDate}
         </p>
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
           <Button
             type="button"
             size="sm"
-            variant="ghost"
+            variant="outline"
+            className="h-10 sm:h-8"
             onClick={resetForm}
             disabled={!isDirty || saving}
           >
             <RotateCcw className="size-3.5" />
             {tc.reset}
           </Button>
-          <Button type="submit" size="sm" disabled={!isDirty || saving}>
-            <Save className="size-3.5" />
+          <Button type="submit" size="sm" className="h-10 sm:h-8" disabled={!isDirty || saving}>
+            {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
             {tc.save}
           </Button>
         </div>

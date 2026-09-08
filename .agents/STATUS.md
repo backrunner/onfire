@@ -4,6 +4,10 @@ Updated: 2026-09-08
 
 ## Current State
 
+- Email settings reset/save actions now sit after the form in normal document
+  flow with a top divider, inline save status, and stacked mobile actions.
+  The loading skeleton follows the same layout; saving exposes a live status
+  and spinner while both actions remain disabled.
 - Production release `b53a8e9` is deployed as Worker
   `b073cea0-9b4e-44fe-85e4-d265a750f8c6` with 100% traffic on both Custom
   Domains. Remote migration `0027` is applied with no pending migrations.
@@ -273,6 +277,13 @@ snapshots. Production D1 has migrations `0000` through `0026` applied;
 its remote migration list reports no pending migrations on 2026-09-07.
 
 ## Verification
+
+- Inline email form actions (2026-09-08): frozen install, generated bindings,
+  TypeScript, 91 files / 689 tests, and the OpenNext Worker build pass.
+  Playwright covers 1440x900 and 390x844, English/Chinese, light/dark, normal
+  document flow, no horizontal overflow, reset, save progress/success, and
+  retained drafts after a failed save. Email reads/writes use browser fixtures;
+  no production settings were changed.
 
 - Embedding migration (2026-09-08): 91 files / 686 tests pass, including
   variable index dimensions, catalog compatibility, same-model credential

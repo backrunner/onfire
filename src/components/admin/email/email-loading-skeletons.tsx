@@ -70,11 +70,11 @@ export function EmailSettingsSkeleton() {
       <SettingsCardSkeleton fields={2} footer />
       <SettingsCardSkeleton fields={5} footer />
       <SettingsCardSkeleton fields={1} />
-      <div className="sticky bottom-3 flex min-h-12 items-center justify-between gap-3 rounded-lg border bg-background/90 px-3 py-2 shadow-sm">
-        <Skeleton className="h-3 w-28" />
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-8 w-20" />
-          <Skeleton className="h-8 w-24" />
+      <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <Skeleton className="my-0.5 h-3 w-28" />
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+          <Skeleton className="h-10 sm:h-8 sm:w-20" />
+          <Skeleton className="h-10 sm:h-8 sm:w-24" />
         </div>
       </div>
     </div>

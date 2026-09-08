@@ -39,6 +39,10 @@ Avoid generic AI-dashboard composition: no oversized headings inside operational
 - Prefetch likely routes and avoid unnecessary server navigation.
 - Search suggestions show a stable ticket identifier plus subject/customer context, support keyboard highlight/selection, and expose clear loading, no-result, and error states.
 - Keep dialog actions stable and expose unsaved/disabled states.
+- Page forms place reset/save actions in normal document flow after the fields,
+  separated by a top border. Status sits on the left and actions on the right;
+  mobile stacks status above two equal-width buttons. Do not float this footer
+  over page content. Loading placeholders follow the same layout.
 - Sandbox HTML preview and offer desktop/mobile widths without shifting editor layout.
 - Theme rendering is SSR-safe: `onfire-theme=light|dark` is the shared source for server markup and client hydration; first-visit system preference is applied before paint, with no light-to-dark flash.
 - Turnstile-protected actions reserve widget space and remain disabled until a token exists; expiry or retry resets the token without shifting the surrounding form.

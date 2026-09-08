@@ -178,6 +178,7 @@ export const zh = {
     save: '保存设置',
     reset: '重置',
     unsaved: '有未保存的更改',
+    saving: '正在保存更改…',
     upToDate: '所有更改已保存',
     discardConfirm: '要放弃尚未保存的邮件设置吗？',
     saved: '邮件设置已保存',

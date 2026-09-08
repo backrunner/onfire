@@ -180,6 +180,7 @@ export const en: Translations = {
     save: 'Save Settings',
     reset: 'Reset',
     unsaved: 'Unsaved changes',
+    saving: 'Saving changes…',
     upToDate: 'All changes saved',
     discardConfirm: 'Discard unsaved email settings?',
     saved: 'Email settings saved',
