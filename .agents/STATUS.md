@@ -4,6 +4,14 @@ Updated: 2026-09-08
 
 ## Current State
 
+- Production release `b53a8e9` is deployed as Worker
+  `b073cea0-9b4e-44fe-85e4-d265a750f8c6` with 100% traffic on both Custom
+  Domains. Remote migration `0027` is applied with no pending migrations.
+  Post-deployment probes confirm health 200, cross-surface ToB 404,
+  unauthenticated customer reads and Stalwart intake 401, and admin Cloudflare
+  Access 302. The deployed login locale chunk matches the verified build byte
+  for byte. Vectorize index/bindings and secrets are unchanged. GitHub CI run
+  `34235992785` passed bindings, type checks, tests, and the Worker build.
 - Release review (2026-09-08) covers ToB login protection, scoped Stalwart
   intake/telemetry, AI pipeline hardening, and dimension-aware knowledge
   rebuilding. Review fixes pin Stalwart processing to the authenticated product,
@@ -30,7 +38,8 @@ Updated: 2026-09-08
   cron batches rebuild legacy entries and effective route changes. Product
   knowledge settings expose progress/manual rebuild; D1/rerank fallback covers
   pending entries. See `.agents/EMBEDDING_MIGRATION.md` for index replacement and
-  rollback. Production index/bindings and remote D1 remain unchanged.
+  rollback. Production index/bindings remain unchanged; remote D1 has the
+  additive `0027` migration applied.
 
 - AI pipeline audit fixes malformed prescreening/email output acceptance,
   embedding/rerank protocol failover, missing tenant usage attribution and
@@ -43,7 +52,7 @@ Updated: 2026-09-08
   translates only text nodes in bounded batches. Image-only replies do not
   require AI. Repeated rich HTML sanitization no longer double-encodes entities.
   These fixes require no migration or binding changes.
-- Performance release `dc315d0` is deployed as Worker `b2548cbf-0ea9-44c1-84b4-55a1d1a97453`
+- Earlier performance release `dc315d0` was deployed as Worker `b2548cbf-0ea9-44c1-84b4-55a1d1a97453`
   with 100% traffic on both Custom Domains. Production health returns 200,
   cross-surface ToB requests return 404, unauthenticated customer type reads
   return JSON 401, and the admin hostname retains its Cloudflare Access 302.
