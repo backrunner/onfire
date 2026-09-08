@@ -10,14 +10,17 @@ Updated: 2026-09-08
   flow with a top divider, inline save status, and stacked mobile actions.
   The loading skeleton follows the same layout; saving exposes a live status
   and spinner while both actions remain disabled.
-- Production release `b53a8e9` is deployed as Worker
-  `b073cea0-9b4e-44fe-85e4-d265a750f8c6` with 100% traffic on both Custom
+- Production release `f49cfc1` is deployed as Worker
+  `3550481c-6c67-44d2-b7e0-5baa6b8e2774` with 100% traffic on both Custom
   Domains. Remote migration `0027` is applied with no pending migrations.
-  Post-deployment probes confirm health 200, cross-surface ToB 404,
-  unauthenticated customer reads and Stalwart intake 401, and admin Cloudflare
-  Access 302. The deployed login locale chunk matches the verified build byte
-  for byte. Vectorize index/bindings and secrets are unchanged. GitHub CI run
-  `34235992785` passed bindings, type checks, tests, and the Worker build.
+  This release applies no migrations. Post-deployment probes confirm direct
+  and proxied health 200, portal 200, cross-surface ToB 404, unauthenticated
+  customer reads 401, and admin Cloudflare Access 302. The deployed email
+  settings and toast JavaScript/CSS match the verified build byte for byte.
+  Vectorize index/bindings and secrets are unchanged. The prior Worker version
+  is `b073cea0-9b4e-44fe-85e4-d265a750f8c6` (commit `b53a8e9`).
+  GitHub CI run `34243706170` passed bindings, TypeScript, all 689 tests,
+  and the Worker build. Final local dry-run and startup profiling also pass.
 - Release review (2026-09-08) covers ToB login protection, scoped Stalwart
   intake/telemetry, AI pipeline hardening, and dimension-aware knowledge
   rebuilding. Review fixes pin Stalwart processing to the authenticated product,
@@ -267,16 +270,18 @@ Updated: 2026-09-08
   metadata on AI task routes, with legacy Google and Jina model ID normalization.
 - `0026_organic_starbolt.sql`: sealed per-product `email_configs.inbound_api_key`
   for the Resend inbound receiving API.
+- `0027_knowledge_embedding_rebuild.sql`: knowledge embedding identity, source
+  version, rebuild lease, attempt count, and last error.
 
-A fresh local D1 applied all 26 migrations from `0000` through `0025`, with no
+A fresh local D1 applied all 28 migrations from `0000` through `0027`, with no
 foreign-key violations, and confirmed the Better Auth 1.7 OAuth/resource
 tables, `account.issuer`, MCP grant version, authorization binding table,
 scoped AI usage tables, product/team scope columns, and rich-text attachment
 tables, product/ticket/reply translation columns, and AI route capability metadata.
 A separate non-empty legacy fixture also verifies unique migrated type keys,
 invalid legacy metadata tolerance, pinned version backfill, and historical path
-snapshots. Production D1 has migrations `0000` through `0026` applied;
-its remote migration list reports no pending migrations on 2026-09-07.
+snapshots. Production D1 has migrations `0000` through `0027` applied;
+its remote migration list reports no pending migrations on 2026-09-08.
 
 ## Verification
 
@@ -405,7 +410,7 @@ its remote migration list reports no pending migrations on 2026-09-07.
 
 - Target Cloudflare account is `Alkinum` (`b6754402d59fc29ee8b62119014fec89`). On 2026-07-13, the APAC `onfire-d1` D1 database (`3f3294ab-8c05-4935-93c0-677ee18641dd`), APAC Standard `onfire-storage` R2 bucket, and 1024-dimension cosine `onfire-knowledge` Vectorize index were created.
 - `wrangler.jsonc` contains the production D1 ID. Migrations `0000` through
-  `0026` are applied remotely. The 2026-09-07 performance release confirmed
+  `0027` are applied remotely. The 2026-09-08 email/toast release confirmed
   there were no pending migrations and did not apply any remote migration.
 - `wrangler deploy --dry-run` resolves all DB, R2, Vectorize, Email, service, and asset bindings against the production configuration.
 - Vectorize has no local simulator. Use a selected Cloudflare account and temporary remote binding only when remote development is intended; do not commit an account ID.

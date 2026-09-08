@@ -1060,8 +1060,8 @@ NEXT_PUBLIC_TURNSTILE_SITE_KEY=xxx  # Pair with TURNSTILE_SECRET; leave both uns
 On 2026-07-13, the APAC `onfire-d1` D1 database, APAC Standard
 `onfire-storage` R2 bucket, and 1024-dimension cosine `onfire-knowledge`
 Vectorize index were provisioned in the Alkinum account. The D1 ID is recorded
-in `wrangler.jsonc`, and migrations through `0026_organic_starbolt.sql` have
-been applied remotely. Worker version `b2548cbf-0ea9-44c1-84b4-55a1d1a97453`
+in `wrangler.jsonc`, and migrations through `0027_knowledge_embedding_rebuild.sql` have
+been applied remotely. Worker version `3550481c-6c67-44d2-b7e0-5baa6b8e2774`
 is deployed on both Custom Domains with the SLA cron and runtime secrets configured.
 The production database is initialized. Cloudflare Email Sending/routing onboarding
 remains an external rollout step, and Cloudflare Access is enforced on ToB.
@@ -1110,7 +1110,7 @@ pnpm deploy
 
 ## Current Predeployment Verification
 
-As of 2026-09-08, frozen install, generated binding checks, TypeScript, 91 test files / 689 tests, and the OpenNext Worker build pass. The release includes ToB login abuse controls, scoped Stalwart intake, AI pipeline fixes and knowledge embedding rebuilding. Migration `0027` adds five nullable knowledge-index fields and must precede the Worker release. All 28 migrations apply on fresh local D1 without foreign-key violations; Drizzle metadata, deployment dry-run, and startup profiling pass. Production dependency audit reports no known vulnerabilities after TipTap 3.30.4 and scoped fast-uri/qs updates; peer dependency checks pass. Desktop/mobile browser checks cover login limit feedback, Stalwart configuration, clean email snapshots, knowledge rebuild progress, and the upgraded reply editor. CI pins pnpm 12.3.4. Vectorize has no local emulator; browser index status uses fixtures, with retrieval and migration behavior covered by integration tests.
+As of 2026-09-08, frozen install, generated binding checks, TypeScript, 91 test files / 689 tests, and the OpenNext Worker build pass. The current release includes inline email form actions and header-safe, theme-aware toasts. Migration `0027` is already applied in production; this release requires no migration or binding changes. All 28 migrations apply on fresh local D1 without foreign-key violations; Drizzle metadata, deployment dry-run, and startup profiling pass. Production dependency audit reports no known vulnerabilities after TipTap 3.30.4 and scoped fast-uri/qs updates; peer dependency checks pass. Desktop/mobile browser checks cover email form actions and toast placement in both languages/themes, including long and stacked feedback, preview mode, live theme changes, and asymmetric safe-area insets. CI pins pnpm 12.3.4. Vectorize has no local emulator; browser index status uses fixtures, with retrieval and migration behavior covered by integration tests.
 
 ## Contribution Convention
 
