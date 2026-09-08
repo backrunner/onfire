@@ -9,6 +9,7 @@ OnFire is a minimalist modern ticket system designed to enable users to quickly 
 - **Database**: Cloudflare D1 (SQLite) + Drizzle ORM
 - **Authentication**: Better Auth + OAuth 2.1 (ToB/MCP) / JWT + API Key (ToC)
 - **ToB Account Security**: Password + Passkey login, with optional authenticator TOTP, trusted devices, and recovery codes
+- **ToB Login Protection**: D1-backed atomic limits before authentication: 30 requests/IP/minute, 100 requests/IP/15 minutes, and 10 password attempts/normalized email/15 minutes (including successful attempts). Account keys use HMAC; unknown accounts follow the same policy. TOTP and recovery codes share Better Auth's 10-failure/15-minute account lockout. Limiter failures reject authentication, 429 responses include `Retry-After`, and scheduled maintenance purges expired login counters.
 - **Frontend**: React 19 + TypeScript
 - **UI Components**: shadcn/ui (zinc theme)
 - **Styling**: Tailwind CSS 4
@@ -598,6 +599,17 @@ metadata only and is verified with the product's Svix signing secret
 Resend API key (`inboundApiKey`, sealed). Non-`email.received` events are
 acknowledged with 200 and ignored.
 
+Stalwart is supported through two product-scoped endpoints using the generated
+webhook secret. Configure its DATA-stage MTA Hook at
+`/api/toc/webhooks/stalwart/:productId/mta-hook` with Bearer authentication;
+the endpoint rebuilds the raw MIME message from Stalwart's headers and
+`contents`, then runs the normal inbound pipeline. Configure Stalwart's
+Telemetry Webhook at `/api/toc/webhooks/stalwart/:productId/events` with the
+same secret; it verifies the native `X-Signature` Base64 HMAC-SHA256 header and
+acknowledges supported `message-ingest.*`, `delivery.*`, and `smtp.*` events
+for observability. Telemetry events do not contain the complete MIME body and
+do not create tickets; MTA Hook DATA events are the ticket-ingestion path.
+
 A blank plain-text MIME alternative falls back to usable HTML-derived text; it never overwrites valid content with an empty body.
 
 Custom product templates use the same escaped variable renderer for preview and delivery. Template authoring uses a locally bundled Monaco HTML editor that lazy-loads when a template opens, formats HTML by default, provides format/minify actions and shortcuts, and supports cursor-aware quick-variable insertion with highlighted `{{variable}}` tokens. Email settings discard restores the persisted product snapshot when the settings tab is revisited, and secret drafts clear after a successful save. Preview runs in a sandboxed iframe with scripts and external requests disabled. User-correctable validation and HTTP 4xx feedback use warning toasts; authorization, network, and server failures use error toasts.
@@ -606,14 +618,28 @@ Custom product templates use the same escaped variable renderer for preview and 
 
 ## AI System
 
+- Dashboard assistant sessions use `ticket-<ticketId>` and recheck current ticket
+  visibility for both history and generation; a session cannot be reused with
+  another ticket. Failed completions do not persist an unmatched user message.
+- Prescreening and email verdicts validate model output before credential
+  success. Invalid embedding dimensions/values and rerank responses trigger
+  credential failover. Email classification failures remain best-effort.
+- Pre-reply context excludes internal notes and defaults to the customer's
+  language. AI screening/suggestion writes do not reset ticket inactivity.
+- Rich reply translation keeps sanitized HTML structure, links and images
+  locally and translates text nodes only. Image-only replies skip translation;
+  repeated HTML sanitization preserves escaped text without double encoding.
+- Product-only AI calls resolve their owning tenant for usage accounting;
+  retention also purges tenant aggregates and tenants without products.
 - Language tasks (`agent`, `prescreening`, `prereply`, `translation`) support OpenAI, OpenRouter, Anthropic, Google, xAI, and DeepSeek.
 - OpenAI explicitly selects `responses` or `chat`; new configurations default to Responses API.
-- Embedding is separate and supports OpenAI, OpenRouter, Qwen/DashScope, Jina AI, Cohere, and Google. Only catalog-confirmed models that can produce 1024 dimensions may be assigned.
+- Embedding is separate and supports OpenAI, OpenRouter, Qwen/DashScope, Jina AI, Cohere, and Google. Models must support the dimension of the bound Vectorize index, discovered at runtime.
 - Reranking is separate and supports Cohere and Jina AI. Knowledge retrieval reranks a bounded candidate set and preserves vector/D1 order when no rerank route is configured or reranking fails.
-- Provider-specific model catalogs are fetched with each provider's required authentication and pagination. Route saves persist server-verified text, embedding, or rerank capability metadata for catalog-listed models; models outside the catalog are accepted when name-based classification matches the task capability (custom embedding models are stored as 1024 dimensions), while catalog-listed models with the wrong capability or non-1024 dimensions stay rejected.
+- Provider-specific model catalogs are fetched with each provider's required authentication and pagination. Route saves persist server-verified text, embedding, or rerank capability metadata for catalog-listed models; models outside the catalog are accepted when name-based classification matches the task capability (custom embedding models request the bound index dimension), while catalog-listed models with the wrong capability or incompatible dimensions stay rejected.
 - Provider credentials are stored once in an encrypted credential pool and can be reused by multiple AI tasks.
 - Each task has an ordered credential route and a model per route entry. Provider failures fall through to the next available credential; failed credentials enter their configured cooldown only when another route entry is available.
-- All adapters request 1024 dimensions. Vectorize uses a 1024-dimension cosine index with product namespaces.
+- Adapters request the bound Vectorize index dimension (currently 1024 in production). Runtime validates dimensions and finite values; hashed product/model namespaces isolate coordinate spaces.
+- Embedding model/endpoint/dimension changes trigger a durable, leased, retryable knowledge rebuild in the scheduled scan. Fallback keys must share the same coordinate space. Knowledge settings expose rebuild progress and manual retry. See `.agents/EMBEDDING_MIGRATION.md` for dimension changes and index replacement.
 - Knowledge mutations synchronize Vectorize. AI assistant and pre-reply use semantic retrieval with scoped D1 fallback.
 - System AI credentials and routes require SuperAdmin. Tenant and product scopes can manage their own credentials, inherit the parent route, or select parent-scope keys. Product knowledge requires `ai.knowledge` plus product scope.
 - Every AI call records token usage events and daily rollups at system, tenant, and product dimensions. Retention is configurable in days and defaults to permanent.
@@ -763,6 +789,8 @@ POST /tasks/sla-scan      - SLA breach scan + auto-close (cron-invoked; Bearer A
 POST /webhooks/maileroo   - Maileroo inbound email webhook (validation_url callback auth)
 POST /webhooks/resend     - Resend inbound email webhook (Svix signature auth)
 POST /webhooks/inbound    - Generic inbound email webhook (requires auth)
+POST /webhooks/stalwart/:productId/mta-hook - Stalwart DATA-stage MTA Hook (Bearer auth)
+POST /webhooks/stalwart/:productId/events   - Stalwart Telemetry Webhook (X-Signature auth)
 ```
 
 ### MCP API
@@ -1080,7 +1108,7 @@ pnpm deploy
 
 ## Current Predeployment Verification
 
-As of 2026-09-07, generated binding checks, TypeScript, 86 test files / 632 tests, and the OpenNext Worker build pass. Native Chromium Dashboard WebMCP smoke covers tool discovery, product/form/ticket writes, preview read-only enforcement, expiry cleanup, and desktop/mobile light/dark layouts. Worker version `b2548cbf-0ea9-44c1-84b4-55a1d1a97453` serves 100% of traffic on both Custom Domains. The public ToC health probe returns 200, the ToC-to-ToB surface guard returns 404, and the deployed lazy editor asset matches the verified local build. Page-performance browser checks cover ticket selection/filter/search without RSC navigation, lazy editors, and desktop/mobile light/dark layouts for both ToB and ToC. CI pins pnpm 11.25.0 so setup can run without a packageManager field. The remaining build warnings are expected: Vectorize has no local simulator, and OpenNext 1.20.1 still requires `src/middleware.ts` instead of Next 16 `proxy.ts`.
+As of 2026-09-08, frozen install, generated binding checks, TypeScript, 91 test files / 689 tests, and the OpenNext Worker build pass. The release includes ToB login abuse controls, scoped Stalwart intake, AI pipeline fixes and knowledge embedding rebuilding. Migration `0027` adds five nullable knowledge-index fields and must precede the Worker release. All 28 migrations apply on fresh local D1 without foreign-key violations; Drizzle metadata, deployment dry-run, and startup profiling pass. Production dependency audit reports no known vulnerabilities after TipTap 3.30.4 and scoped fast-uri/qs updates; peer dependency checks pass. Desktop/mobile browser checks cover login limit feedback, Stalwart configuration, clean email snapshots, knowledge rebuild progress, and the upgraded reply editor. CI pins pnpm 12.3.4. Vectorize has no local emulator; browser index status uses fixtures, with retrieval and migration behavior covered by integration tests.
 
 ## Contribution Convention
 

@@ -38,6 +38,7 @@
 ## Account Security
 
 - The account page exposes one security-settings entry. Password changes, Passkey management, and authenticator TOTP management live inside that modal instead of separate page forms.
+- ToB authentication endpoints use D1-backed fixed-window abuse controls before Better Auth dispatch: per-IP one-minute and 15-minute limits, a normalized per-account password-attempt bucket, bounded request bodies, and fail-closed behavior when the limiter is unavailable. Expired login buckets are purged by the scheduled scan; responses are non-cacheable and do not reveal whether an account exists.
 - ToB login supports password and Passkey. Password sign-in for a TOTP-enabled account must complete the Better Auth second-factor challenge before a session is created; recovery codes remain available as the fallback.
 - Passkeys use the exact `BETTER_AUTH_URL` hostname as the WebAuthn RP ID and its origin as the allowed origin. Registration requires an authenticated session, and users may list, rename, and delete only their own credentials.
 - TOTP enrollment requires the current password and a verified first code. Recovery codes are shown only when generated, trusted-device state lasts 30 days, and disabling or regenerating TOTP credentials requires the current password.
@@ -228,7 +229,7 @@
 - Store provider credentials independently from task routing so one encrypted credential can be reused by multiple AI functions.
 - Each AI task owns an ordered credential route with a model per route entry. Runtime calls skip disabled or cooling-down credentials and try the next configured entry after a provider failure.
 - When a failed credential has another available route entry, place it in a configurable cooldown. Do not cooldown the final credential, and never repeat a successful provider call because health bookkeeping failed.
-- Only catalog-confirmed embedding models capable of the fixed 1024-dimension contract may be assigned. All embedding adapters request and validate exactly 1024 dimensions and distinguish document/query input where supported.
+- Embedding dimensions follow the bound Vectorize index (currently 1024, maximum 1536), discovered via describe. Adapters request and validate that length and finite values; never pad/truncate locally. Models, endpoints, and dimensions define isolated coordinate spaces; fallback credentials must match. Effective route changes automatically queue durable, leased knowledge rebuilding, including inherited routes. Pending entries remain available through scoped D1/rerank fallback. The knowledge tab shows progress and offers manual rebuilding. See `.agents/EMBEDDING_MIGRATION.md`.
 - Store and query vectors in product namespaces, with a scoped D1 fallback. Knowledge retrieval reranks a bounded candidate set when a rerank route exists and preserves vector/D1 order when reranking is unavailable or fails.
 - Every language provider treats a successful HTTP response with an empty completion as a protocol error; do not store or display an empty model answer as success.
 - A feature that depends on an AI task cannot be enabled until that task has at least one enabled credential route. Email AI filtering requires configured prescreening credentials; knowledge mutations require configured embedding credentials. Enabling an AI task itself requires at least one assigned credential.

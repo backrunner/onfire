@@ -1,9 +1,48 @@
 # OnFire Project Status
 
-Updated: 2026-09-07
+Updated: 2026-09-08
 
 ## Current State
 
+- Release review (2026-09-08) covers ToB login protection, scoped Stalwart
+  intake/telemetry, AI pipeline hardening, and dimension-aware knowledge
+  rebuilding. Review fixes pin Stalwart processing to the authenticated product,
+  stabilize embedding identity across tied route priorities, preserve verified
+  knowledge on transient metadata failure, and ignore empty select events while
+  email settings load. TipTap 3.30.4 plus scoped fast-uri 3.1.6 / qs 6.16.0
+  overrides resolve the seven production dependency advisories.
+- Release validation: 91 test files / 689 tests, generated bindings, TypeScript,
+  frozen install, OpenNext Worker build, Drizzle metadata, all 28 migrations on
+  fresh local D1 with no foreign-key violations, deployment dry-run, startup
+  profiling, production audit (zero known vulnerabilities), and peer dependency
+  checks pass. Desktop/mobile light/dark browser checks cover Stalwart URLs,
+  clean persisted email settings, knowledge rebuild controls, and the upgraded
+  unsent reply editor. Vectorize status is mocked in browser QA; live Stalwart
+  and AI-provider end-to-end delivery remain integration setup checks.
+- Production preflight found only migration `0027` pending, a 1024-dimension
+  cosine index, and zero structured knowledge entries. Previous Worker version
+  is `f1c29f51-a798-4cf7-a920-a1d9c361620e` (commit `7e7d93b`).
+
+- Embedding dimensions now follow the bound Vectorize index rather than a
+  universal 1024 constant. Provider/endpoint/model/dimension identities isolate
+  vector namespaces and same-model fallback keys. Migration `0027` records
+  knowledge embedding identity, source version, lease, attempts and errors;
+  cron batches rebuild legacy entries and effective route changes. Product
+  knowledge settings expose progress/manual rebuild; D1/rerank fallback covers
+  pending entries. See `.agents/EMBEDDING_MIGRATION.md` for index replacement and
+  rollback. Production index/bindings and remote D1 remain unchanged.
+
+- AI pipeline audit fixes malformed prescreening/email output acceptance,
+  embedding/rerank protocol failover, missing tenant usage attribution and
+  tenant-retention cleanup. Pre-reply excludes internal notes, defaults to the
+  customer language, and no longer resets ticket inactivity; screening likewise
+  leaves activity timestamps intact. Assistant history/generation recheck the
+  session ticket's current scope, reject cross-ticket session reuse, return the
+  latest history window, and persist successful chat turns together.
+- All rich reply translation now preserves sanitized markup/URLs locally and
+  translates only text nodes in bounded batches. Image-only replies do not
+  require AI. Repeated rich HTML sanitization no longer double-encodes entities.
+  These fixes require no migration or binding changes.
 - Performance release `dc315d0` is deployed as Worker `b2548cbf-0ea9-44c1-84b4-55a1d1a97453`
   with 100% traffic on both Custom Domains. Production health returns 200,
   cross-surface ToB requests return 404, unauthenticated customer type reads
@@ -136,11 +175,13 @@ Updated: 2026-09-07
 - Personal endpoints support email, PushDeer, Bark, ntfy, Telegram, Discord, Slack, Microsoft Teams, Feishu, DingTalk, and WeCom through a centralized provider registry. Secrets are sealed and omitted from browser responses.
 - Installation and administrator-created users receive an enabled account-email endpoint by default; migration `0015_default_user_email_endpoint.sql` backfills existing users who have no email endpoint without overriding existing endpoint preferences.
 - Account security is consolidated behind one modal entry with password changes, Passkey add/rename/delete management, and authenticator TOTP enrollment, recovery-code regeneration, and disable actions. Login supports password, Passkey, TOTP challenges, trusted devices, and recovery-code fallback.
+- ToB sign-in now applies D1-backed abuse controls before Better Auth: 30 requests per IP/minute, 100 per IP/15 minutes, and 10 password attempts per normalized account/15 minutes. Password, Passkey, and second-factor request bodies are bounded; malformed or encoded auth paths are rejected; limiter failures fail closed; expired login buckets are purged during the scheduled scan. Authentication responses are forced `no-store`.
 - Personal endpoints expose an owner-only test action. Email tests select a visible product and reuse its outbound provider; other channels test their stored provider configuration directly.
 - Notification administration now has explicit metadata and endpoint load failures, fixed-action dialogs with inline validation and discard confirmation, compact policy summaries, and searchable/batched compliance details.
 - Recipient resolution supports current assignee, ticket team, all product agents, specific teams, and specific agents. Overlapping policies deduplicate endpoints, while missing selected methods create failed delivery logs.
 - Cloudflare Email Routing inbound mail is parsed once, normalized, authenticated through the internal task endpoint, deduplicated, threaded, filtered, and persisted.
-- Inbound mail arrives through four paths: the authenticated generic webhook, Cloudflare Email Routing, Maileroo (authenticated by its one-shot `validation_url` callback pinned to `inbound-api.maileroo.net`), and Resend (Svix-signed `email.received` metadata plus body fetch from the receiving API with the product's sealed `inboundApiKey`).
+- Alongside Stalwart MTA Hooks, inbound mail arrives through four other paths: the authenticated generic webhook, Cloudflare Email Routing, Maileroo (authenticated by its one-shot `validation_url` callback pinned to `inbound-api.maileroo.net`), and Resend (Svix-signed `email.received` metadata plus body fetch from the receiving API with the product's sealed `inboundApiKey`).
+- Stalwart is supported through a product-scoped DATA-stage MTA Hook (Bearer authentication, raw MIME reconstruction, normal ticket pipeline) and a native Telemetry Webhook endpoint (Base64 HMAC `X-Signature`, acknowledgement of supported telemetry events). Stalwart telemetry does not include full MIME content and is observability-only; MTA Hook DATA is the ingestion path. Setup and limits are documented in `.agents/STALWART_INTEGRATION.md`. The 13 Stalwart adapter tests and all 50 inbound regression tests pass; live Stalwart delivery has not been exercised.
 - Outbound email supports Resend, SendGrid, Mailgun, Maileroo, SMTP, and the Cloudflare `SEND_EMAIL` binding with shared logs, text fallbacks, and thread headers.
 - Email settings discard restores the persisted product snapshot, including after leaving and re-entering the settings tab; secret drafts clear after a successful save.
 - Each product can override four system email templates with custom HTML in a locally bundled Monaco editor. The editor lazy-loads when opened, formats HTML by default, provides format/minify actions and shortcuts, supports cursor-aware quick variables and placeholder highlighting, and has a sandboxed live desktop/mobile preview.
@@ -223,6 +264,30 @@ snapshots. Production D1 has migrations `0000` through `0026` applied;
 its remote migration list reports no pending migrations on 2026-09-07.
 
 ## Verification
+
+- Embedding migration (2026-09-08): 91 files / 686 tests pass, including
+  variable index dimensions, catalog compatibility, same-model credential
+  fallback, inherited route rebuilding, leases/concurrent edits, stale-vector
+  rejection and manual retry state. Frozen install, Worker type generation,
+  TypeScript, OpenNext Worker build, Wrangler deploy dry-run/startup profiling
+  (about 30 ms active local startup CPU), Drizzle metadata checks, and all 28 migrations on a fresh local
+  D1 pass; `0027` also applied successfully to the existing local database.
+  Playwright checks of rebuild progress/action pass at 1440x900 and 390x844 in
+  light/dark themes using mocked index status (Vectorize has no local emulator).
+  No remote index, provider call, binding change, or migration was performed.
+- The embedding-only audit initially reported seven dependency advisories;
+  the release review above updates the affected packages and clears the audit.
+
+- ToB login protection: frozen install, generated Worker types, TypeScript, all 90 test files / 675 tests, and the OpenNext Worker build pass. Fourteen new migrated-SQLite route tests cover concurrent attempts, account/IP buckets, forwarding-header spoofing, expiry, storage failure, path/body validation, response preservation, session reads, and cleanup. Playwright checks cover password/TOTP/recovery-code limit feedback and service-unavailable feedback at 1440x900 and 390x844 in English/Chinese and light/dark. A real local Better Auth sign-in returns 200; the eleventh password attempt for one email returns 429 with Retry-After. No migration, binding, or secret change is required; this change has not been deployed.
+
+- AI pipeline audit (2026-09-08): frozen install, generated Worker type check,
+  TypeScript, full Vitest suite (90 files / 675 tests), and OpenNext Worker build
+  pass. New migrated-SQLite tests exercise invalid-output credential failover,
+  screening/prereply persistence, assistant scope/history/failure behavior, and
+  tenant usage/retention. Translation/sanitizer tests cover short rich replies,
+  preserved links/images, image-only replies, and repeated entity escaping.
+  Provider responses are mocked; no live AI-provider or remote Vectorize calls
+  and no deployment were performed for this audit.
 
 - Page performance: frozen install, generated Worker type check, TypeScript,
   86 test files / 632 tests and the OpenNext Worker build pass. Thirteen new
