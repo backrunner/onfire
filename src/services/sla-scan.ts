@@ -3,6 +3,7 @@ import type { Database } from "@/lib/db";
 import { tickets, history, products } from "@/drizzle/schema";
 import { TicketStatus } from "@/lib/types";
 import { emitTicketEventSync } from "@/services/ticket-events";
+import { purgeExpiredLoginLimits } from "@/lib/auth/login-protection";
 
 export interface ScanReport {
   acceptWarnings: number;
@@ -251,6 +252,12 @@ export async function runScheduledScan(db: Database): Promise<ScanReport> {
     await purgeExpiredAiUsage(db);
   } catch (error) {
     console.error("AI usage retention purge failed:", error);
+  }
+
+  try {
+    await purgeExpiredLoginLimits(db);
+  } catch (error) {
+    console.error("Login rate limit cleanup failed:", error);
   }
 
   return report;

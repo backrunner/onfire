@@ -1124,6 +1124,8 @@ export const en: Translations = {
     useBackupCode: 'Use a recovery code',
     useAuthenticator: 'Use authenticator code',
     turnstileError: 'Verification failed to load, please refresh the page',
+    tooManyAttempts: 'Too many attempts. Please wait up to 15 minutes before trying again.',
+    temporarilyUnavailable: 'Sign-in is temporarily unavailable. Please try again later.',
     footer: 'OnFire · Modern Ticket System'
   },
 

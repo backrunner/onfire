@@ -24,6 +24,7 @@ import {
   normalizeMcpRevocationResponse,
 } from "@/lib/mcp/revocation";
 import { withNoStore } from "@/lib/http-cache";
+import { protectLoginRequest } from "@/lib/auth/login-protection";
 import {
   isMcpPublicClientMetadata,
   matchesRegisteredMcpRedirectUri,
@@ -1097,6 +1098,10 @@ async function enforceOAuthRateLimit(
 export async function GET(request: NextRequest) {
   const rejected = validateOAuthSurface(request);
   if (rejected) return withNoStore(rejected);
+  const protectedRequest = await protectLoginRequest(request);
+  if (protectedRequest instanceof Response) return protectedRequest;
+  request = protectedRequest;
+
   const path = oauthPath(request);
   const configurationError = validateOAuthConfiguration(path);
   if (configurationError) return withNoStore(configurationError);
@@ -1119,12 +1124,15 @@ export async function GET(request: NextRequest) {
     await handler.GET(oauthRequest),
     oauthRequest,
   );
-  return path ? withNoStore(response) : response;
+  return withNoStore(response);
 }
 
 export async function POST(request: NextRequest) {
   const rejected = validateOAuthSurface(request);
   if (rejected) return withNoStore(rejected);
+  const protectedRequest = await protectLoginRequest(request);
+  if (protectedRequest instanceof Response) return protectedRequest;
+  request = protectedRequest;
 
   const path = oauthPath(request);
   const configurationError = validateOAuthConfiguration(path);
@@ -1156,5 +1164,5 @@ export async function POST(request: NextRequest) {
     path === "/oauth2/revoke"
       ? await normalizeMcpRevocationResponse(response)
       : response;
-  return path ? withNoStore(normalized) : normalized;
+  return withNoStore(normalized);
 }

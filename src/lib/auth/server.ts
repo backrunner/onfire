@@ -59,7 +59,14 @@ export const getAuth = () => {
       autoSignIn: false,
     },
     plugins: [
-      twoFactor({ issuer: "OnFire" }),
+      twoFactor({
+        issuer: "OnFire",
+        accountLockout: {
+          enabled: true,
+          maxFailedAttempts: 10,
+          durationSeconds: 15 * 60,
+        },
+      }),
       passkey(getPasskeyRelyingParty(env.BETTER_AUTH_URL)),
       oauthProvider({
         loginPage: "/admin/login",

@@ -35,6 +35,10 @@ export default function AdminLoginPage() {
   const [useBackupCode, setUseBackupCode] = useState(false);
   const [trustDevice, setTrustDevice] = useState(false);
 
+  const authErrorMessage = (error: { status?: number }, fallback: string) =>
+    error.status === 429 ? t.login.tooManyAttempts :
+      error.status === 503 ? t.login.temporarilyUnavailable : fallback;
+
   const finishSignIn = (data: unknown) => {
     const returnedUrl =
       data &&
@@ -79,7 +83,7 @@ export default function AdminLoginPage() {
     try {
       const result = await signIn.email({ email, password });
       if (result.error) {
-        setError(t.login.loginFailed);
+        setError(authErrorMessage(result.error, t.login.loginFailed));
       } else if (
         result.data &&
         "twoFactorRedirect" in result.data &&
@@ -106,7 +110,7 @@ export default function AdminLoginPage() {
           !("code" in result.error) ||
           result.error.code !== "AUTH_CANCELLED"
         ) {
-          setError(t.login.passkeyFailed);
+          setError(authErrorMessage(result.error, t.login.passkeyFailed));
         }
         return;
       }
@@ -133,7 +137,7 @@ export default function AdminLoginPage() {
             trustDevice,
           });
       if (result.error) {
-        setError(t.login.otpFailed);
+        setError(authErrorMessage(result.error, t.login.otpFailed));
         return;
       }
       finishSignIn(result.data);

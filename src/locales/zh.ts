@@ -1122,6 +1122,8 @@ export const zh = {
     useBackupCode: '使用恢复码',
     useAuthenticator: '使用认证器验证码',
     turnstileError: '验证码加载失败，请刷新页面重试',
+    tooManyAttempts: '尝试次数过多，请稍后重试，最长需等待 15 分钟。',
+    temporarilyUnavailable: '登录服务暂时不可用，请稍后重试。',
     footer: 'OnFire · 现代化客服工单系统'
   },
 
