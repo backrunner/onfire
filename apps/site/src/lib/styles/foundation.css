@@ -1,4 +1,5 @@
 :root {
+  --of-shell-width: min(1160px, calc(100% - 64px));
   --sd-bg: #f7f6f3;
   --sd-panel: #fff;
   --sd-ink: #292629;
@@ -216,5 +217,10 @@ button {
   .of-footer-bottom {
     flex-wrap: wrap;
     font-size: 10px;
+  }
+}
+@media (max-width: 600px) {
+  :root {
+    --of-shell-width: calc(100% - 24px);
   }
 }

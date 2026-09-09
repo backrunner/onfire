@@ -2,7 +2,7 @@
   position: sticky;
   top: 16px;
   z-index: 40;
-  width: min(1160px, calc(100% - 64px));
+  width: var(--of-shell-width);
   margin: 16px auto 0;
   border: 1px solid var(--sd-line);
   border-radius: 14px;
@@ -164,7 +164,6 @@
 }
 @media (max-width: 600px) {
   .of-header {
-    width: calc(100% - 24px);
     top: 10px;
     margin-top: 10px;
     border-radius: 12px;

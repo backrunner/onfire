@@ -31,6 +31,10 @@ Updated: 2026-09-09
   Font and icon licenses ship with the static build.
 - `https://onfire.pwp.sh` is the canonical origin. `apps/site/wrangler.jsonc`
   deploys only the `onfire` Pages project; application Workers are separate.
+- The article grid and navbar share one responsive container width. Equal
+  desktop side columns center the article and align the menu/TOC outer edges
+  with the navbar. Browser measurements at 320–1920px, light/dark screenshots,
+  Svelte checks, and the static build pass after the alignment fix.
 - Final site verification: `apps/site` install with the frozen lockfile, Svelte
   check (0 errors/warnings), 16-page content check (0 errors/warnings), static
   build, production audit (no known vulnerabilities), and Playwright interaction
