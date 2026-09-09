@@ -46,7 +46,7 @@ code copy, table of contents, and theme state retain the svedocs behavior.
 - `src/lib/WorkspacePreview.svelte`: sample conversations and three working
   preview modes. These never call the production ticket APIs.
 - `src/lib/messages.ts`: paired English/Chinese theme copy.
-- `static/onfire-mark.svg`: the generated split-flame mark, used by
+- `static/onfire-mark.svg`: the generated continuous-flame mark, used by
   `BrandMark.svelte`. Edit `../../docs/assets/onfire-mark.svg` and run
   `node scripts/sync-brand.mjs` from the repository root to update the site,
   application, favicons, and README banner together.

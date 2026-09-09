@@ -26,7 +26,7 @@ Updated: 2026-09-09
 - `apps/site` owns its svedocs navigation, sidebar, reading layout, footer,
   search presentation, and responsive light/dark styles. It imports only
   `svedocs/theme/base.css` and retains the framework's behavior controllers.
-- The site uses the shared split-flame SVG mark, warm zinc and terracotta tokens,
+- The site uses the shared continuous-flame SVG mark, warm zinc and terracotta tokens,
   self-hosted Geist fonts, and interactive sample ticket/portal/routing views.
   Font and icon licenses ship with the static build.
 - `https://onfire.pwp.sh` is the canonical origin. `apps/site/wrangler.jsonc`
@@ -44,12 +44,14 @@ Updated: 2026-09-09
 
 ## Current State
 
-- Brand refresh (2026-09-09): the flat orange/white split-flame mark in
+- Brand refresh (2026-09-09): the flat orange/white continuous-flame mark in
   `docs/assets/onfire-mark.svg` is the shared source for application/site favicons,
   the README banner, and the inline React `OnFireLogo`. Run
   `node scripts/sync-brand.mjs` to synchronize generated assets. Login, install,
   sidebar, OAuth consent, and customer portal headers now use the same mark as
   the site navigation, footer, landing, and sample workspace.
+  The current revision uses a single rounded flame silhouette in response to
+  the requested removal of the diagonal cut.
   Brand synchronization, type generation, TypeScript, 92 test files / 705 tests,
   both Worker builds, and site checks/build pass. Browser screenshots cover
   site/docs and local login/install/customer portal fixtures at desktop/mobile
