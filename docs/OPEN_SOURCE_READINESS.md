@@ -1,6 +1,7 @@
 # Open-source readiness review
 
-Review date: **2026-09-09**  
+Review date: **2026-09-09**
+
 Revision reviewed: `faddc3b` plus the current uncommitted email-agent worktree.
 
 This is a repository and distribution review, not a legal opinion or a security

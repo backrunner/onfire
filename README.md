@@ -14,6 +14,10 @@
   <img src="https://img.shields.io/badge/Cloudflare-Workers-f38020" alt="Cloudflare Workers" />
 </p>
 
+The [OnFire website](apps/site/README.md) contains the product landing page and
+the bilingual svedocs handbook. Run it independently from the ticket application
+with `pnpm --dir apps/site dev`.
+
 <p align="center">
   English · <a href="README.zh-CN.md">简体中文</a><br />
   <a href="#local-development">Get started</a> ·
