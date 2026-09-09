@@ -202,7 +202,16 @@ preserved in ignored files named `wrangler.production.local.jsonc` beside each
 public Wrangler file. They exist only in that operator's workspace. Before
 continuing an existing deployment, reconcile those files with current code and
 use the matching build environment. The email agent can select its local copy
-with `-c workers/email-agent/wrangler.production.local.jsonc`. For the application,
-restore or merge the selected values into `wrangler.jsonc` before running the
-normal OpenNext build/type-generation commands; recheck the target before deploy.
-Do not commit the local copies or the resulting private configuration.
+with `-c workers/email-agent/wrangler.production.local.jsonc`. The installed
+OpenNext CLI supports selecting the application configuration directly:
+
+```sh
+pnpm exec opennextjs-cloudflare build --config wrangler.production.local.jsonc
+pnpm exec wrangler deploy --dry-run --config wrangler.production.local.jsonc
+pnpm exec wrangler deploy --config wrangler.production.local.jsonc
+```
+
+Set the matching production domain and Turnstile build variables described
+above before building, and recheck the target before deploying. This keeps the
+tracked example configuration intact. Do not commit the local copies or other
+private configuration.

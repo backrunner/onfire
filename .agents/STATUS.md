@@ -55,8 +55,23 @@ Updated: 2026-09-09
   Brand synchronization, type generation, TypeScript, 92 test files / 705 tests,
   both Worker builds, and site checks/build pass. Browser screenshots cover
   site/docs and local login/install/customer portal fixtures at desktop/mobile
-  widths in light/dark themes. This release deploys the static site only;
-  application UI assets take effect on the next application Worker deployment.
+  widths in light/dark themes. The static site is deployed at
+  `https://onfire.pwp.sh` (Pages deployment `9427967f`); the application release
+  below also publishes the new assets.
+
+- Brand application release (2026-09-09): commit `e38ee15` is deployed through
+  Wrangler as Worker `8c888312-969e-4519-87e4-44611e3f2ad8` at 100% traffic on
+  `support.alkinum.io` and `onfire.alkinum.com`. OpenNext was rebuilt with the
+  ignored production configuration and matching production domain variables;
+  the deployment dry-run passed and Worker startup took 45 ms.
+  Remote D1 has no pending migrations; this release applied none. The prior
+  application version is `aee948c8-91b8-4a40-b716-d6f6fa56760a`.
+  Post-deployment probes confirm direct/proxied portal and health 200,
+  cross-surface ToB 404, unauthenticated customer tickets 401, and the expected
+  admin Cloudflare Access 302. Both customer favicon paths and the documentation
+  mark match the canonical SVG byte for byte. All six JavaScript chunks with
+  the new inline mark match the production build. Authenticated production
+  dashboard rendering was not exercised through Cloudflare Access.
 
 - Subdomain email agent release (2026-09-09): Cloudflare Email Routing is enabled for `wifibuddy.alkinum.com`; apex `alkinum.com` MX remains on Stalwart. `support@wifibuddy.alkinum.com` routes to `onfire-email-agent`, which uses R2 plus inbound/outbound Queues and Cloudflare Email Sending. Main Worker `aee948c8-91b8-4a40-b716-d6f6fa56760a` and agent `b30d1128-0503-4abd-bcd9-4e9964ffab1b` are deployed. Remote migrations `0028` and `0029` are applied. WiFiBuddy product email config uses Cloudflare inbound/outbound with AI filtering disabled. See `.agents/EMAIL_AGENT_INTEGRATION.md`.
 - Email agent verification: TypeScript, 92 test files / 705 tests, OpenNext and agent dry-runs pass. Local inbound queue, durable outbox, named RPC receipt replay, and desktop/mobile email settings/logs browser checks pass. Real mailbox delivery remains pending an authorized test recipient.
