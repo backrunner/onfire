@@ -40,10 +40,11 @@ ${message.url ? `<p><a href="${escapeHtml(message.url)}">${escapeHtml(message.ur
       to: this.email,
       subject: message.title,
       html,
-    });
+    }, message.logId);
 
     return {
       success: result.success,
+      queued: result.queued,
       error: result.error,
     };
   }

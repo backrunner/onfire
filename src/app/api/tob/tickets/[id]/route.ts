@@ -22,6 +22,7 @@ import {
 import { resolveUserNames, resolveCustomerExternalIds } from "@/lib/tickets/names";
 import { isOpen } from "@/lib/tickets/state-machine";
 import { emitTicketEvent } from "@/services/ticket-events";
+import { prepareReplyEmailIntent } from "@/services/email/agent-outbox";
 import { parseFormSchema } from "@/lib/form-schema";
 import { serializeState } from "@/services/ticket-internal-states";
 import { sanitizeRichHtml, richHtmlToText, richTextIsEmpty } from "@/lib/rich-text";
@@ -194,6 +195,7 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
 
   const now = new Date().toISOString();
   const replyId = crypto.randomUUID();
+  const mailIntent = body.internal ? undefined : await prepareReplyEmailIntent(ctx.db, ticket.id, ticket.productId, replyId);
 
   const statements = [
     ctx.db.insert(replies).values({
@@ -221,6 +223,7 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
   } else {
     await ctx.db.batch([
       ...statements,
+      ...(mailIntent ? [mailIntent.statement] : []),
       ctx.db
         .update(tickets)
         .set({

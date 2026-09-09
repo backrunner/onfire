@@ -203,18 +203,20 @@ export async function sendRecipientNotifications(
         db,
         productId: ticket.productId,
       });
-      const result = await provider.send(message);
+      const result = await provider.send({ ...message, logId });
       await db
         .update(notificationLogs)
         .set(
-          result.success
+          result.queued
+            ? { status: "pending" }
+            : result.success
             ? { status: "sent", sentAt: new Date().toISOString() }
             : {
                 status: "failed",
                 errorMessage: result.error?.slice(0, 2_000),
               }
         )
-        .where(eq(notificationLogs.id, logId));
+        .where(and(eq(notificationLogs.id, logId), eq(notificationLogs.status, "pending")));
     } catch (error) {
       await db
         .update(notificationLogs)

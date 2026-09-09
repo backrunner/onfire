@@ -5,10 +5,12 @@ export interface NotificationMessage {
   title: string;
   body: string;
   url?: string;
+  logId?: string;
 }
 
 export interface SendResult {
   success: boolean;
+  queued?: boolean;
   error?: string;
 }
 

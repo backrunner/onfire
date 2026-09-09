@@ -23,12 +23,12 @@ function parseDomains(value: string | undefined, fallback: string[]): string[] {
 
 const ADMIN_DOMAINS = parseDomains(
   process.env.ADMIN_DOMAINS || process.env.NEXT_PUBLIC_ADMIN_DOMAINS,
-  ["onfire.alkinum.com", "admin.localhost", "admin.127.0.0.1"]
+  ["admin.example.com", "admin.localhost", "admin.127.0.0.1"]
 );
 
 const TOC_DOMAINS = parseDomains(
   process.env.TOC_DOMAINS || process.env.NEXT_PUBLIC_TOC_DOMAINS,
-  ["support.alkinum.io", "localhost", "127.0.0.1"]
+  ["support.example.com", "localhost", "127.0.0.1"]
 );
 
 const TOC_PORT = process.env.NEXT_PUBLIC_TOC_PORT || "3000";

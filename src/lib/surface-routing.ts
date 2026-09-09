@@ -1,12 +1,12 @@
 export type Surface = "tob" | "toc";
 
 const DEFAULT_ADMIN_DOMAINS = [
-  "onfire.alkinum.com",
+  "admin.example.com",
   "admin.localhost",
   "admin.127.0.0.1",
 ];
 const DEFAULT_TOC_DOMAINS = [
-  "support.alkinum.io",
+  "support.example.com",
   "localhost",
   "127.0.0.1",
 ];

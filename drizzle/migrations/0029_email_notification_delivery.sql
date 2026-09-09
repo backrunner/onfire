@@ -1,0 +1,1 @@
+ALTER TABLE `outbound_emails` ADD `notification_log_id` text;

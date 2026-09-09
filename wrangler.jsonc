@@ -1,6 +1,7 @@
+// Public deployment template. Replace example domains, addresses and resource IDs.
+// See docs/DEPLOYMENT.md before deploying.
 {
   "name": "onfire",
-  "account_id": "b6754402d59fc29ee8b62119014fec89",
   "main": "worker.ts",
   "workers_dev": false,
   "compatibility_date": "2026-07-12",
@@ -11,11 +12,11 @@
   },
   "routes": [
     {
-      "pattern": "support.alkinum.io",
+      "pattern": "support.example.com",
       "custom_domain": true
     },
     {
-      "pattern": "onfire.alkinum.com",
+      "pattern": "admin.example.com",
       "custom_domain": true
     }
   ],
@@ -23,7 +24,7 @@
     {
       "binding": "DB",
       "database_name": "onfire-d1",
-      "database_id": "3f3294ab-8c05-4935-93c0-677ee18641dd",
+      "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "drizzle/migrations"
     }
   ],
@@ -31,7 +32,8 @@
     {
       "binding": "R2",
       "bucket_name": "onfire-storage"
-    }
+    },
+    { "binding": "EMAIL_STORAGE", "bucket_name": "onfire-email-storage" }
   ],
   "vectorize": [
     {
@@ -56,11 +58,13 @@
   //   wrangler secret put TURNSTILE_SECRET
   // and locally via .dev.vars — never commit them as plaintext vars.
   "vars": {
-    "BETTER_AUTH_URL": "https://onfire.alkinum.com",
+    "BETTER_AUTH_URL": "https://admin.example.com",
     "JWT_ISSUER": "onfire",
     "JWT_AUDIENCE": "onfire-toc",
-    "ADMIN_DOMAINS": "onfire.alkinum.com",
-    "TOC_DOMAINS": "support.alkinum.io"
+    "ADMIN_DOMAINS": "admin.example.com",
+    "TOC_DOMAINS": "support.example.com",
+    "EMAIL_AGENT_ADDRESSES": "support@example.com",
+    "EMAIL_AGENT_PRODUCTS": { "support@example.com": "REPLACE_WITH_PRODUCT_ID" }
   },
   "services": [
     {
@@ -68,6 +72,14 @@
       "service": "onfire"
     }
   ],
+  "queues": {
+    "producers": [
+      { "binding": "EMAIL_INBOUND_QUEUE", "queue": "onfire-email-inbound" },
+      { "binding": "EMAIL_OUTBOUND_QUEUE", "queue": "onfire-email-outbound" }
+    ],
+    "consumers": [{ "queue": "onfire-email-inbound", "max_batch_size": 1, "max_batch_timeout": 1, "max_retries": 12, "retry_delay": 60, "max_concurrency": 2, "dead_letter_queue": "onfire-email-inbound-dlq" }]
+  },
+  "limits": { "cpu_ms": 300000 },
   "observability": {
     "enabled": true,
     "logs": { "head_sampling_rate": 1 },

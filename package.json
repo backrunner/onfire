@@ -3,6 +3,14 @@
   "name": "onfire",
   "version": "0.2.0",
   "private": true,
+  "description": "A modern multi-tenant ticket system for Cloudflare Workers",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/backrunner/onfire.git"
+  },
+  "bugs": {
+    "url": "https://github.com/backrunner/onfire/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=22.0.0"
@@ -14,8 +22,8 @@
     "dev:toc": "next dev --turbopack -p 3000",
     "dev:tob": "NEXT_DIST_DIR=.next-tob next dev --turbopack -p 3001",
     "build": "next build",
-    "build:worker": "opennextjs-cloudflare build",
-    "cf-typegen": "wrangler types worker-configuration.d.ts --env-interface CloudflareEnv --env-file wrangler.types.env",
+    "build:worker": "opennextjs-cloudflare build && pnpm build:email-agent",
+    "cf-typegen": "node scripts/cf-typegen.mjs",
     "start": "next start",
     "lint": "tsc --noEmit",
     "test": "vitest run",
@@ -29,7 +37,9 @@
     "db:seed": "node --experimental-strip-types --no-warnings scripts/local-dev.ts seed",
     "db:seed:tickets": "node --experimental-strip-types --no-warnings scripts/local-dev.ts tickets",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "build:email-agent": "wrangler deploy --dry-run -c workers/email-agent/wrangler.jsonc --outdir .wrangler/email-agent",
+    "deploy:email-agent": "wrangler deploy -c workers/email-agent/wrangler.jsonc"
   },
   "dependencies": {
     "@assistant-ui/react": "^0.15.16",

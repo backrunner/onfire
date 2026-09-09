@@ -7,13 +7,13 @@
 The current OpenNext bundle can serve both surfaces from one Worker:
 
 ```text
-onfire.alkinum.com   -> ToB pages and /api/tob/*
-support.alkinum.io   -> ToC pages and /api/toc/*
+admin.example.com   -> ToB pages and /api/tob/*
+support.example.com   -> ToC pages and /api/toc/*
 ```
 
 Attach both hostnames to the Worker, set `ADMIN_DOMAINS` and `TOC_DOMAINS` in
 the deployment variables, and apply a Cloudflare Access self-hosted
-application policy to `onfire.alkinum.com`. Access can require an identity,
+application policy to `admin.example.com`. Access can require an identity,
 device posture, or service token before the request reaches the Worker. The
 Worker still enforces Better Auth and RBAC, and its edge guard rejects the
 opposite API surface even if a path is guessed on the other hostname.
@@ -75,7 +75,7 @@ export default {
     ) {
       const upstream = new URL(request.url);
       upstream.protocol = "https:";
-      upstream.host = "support.alkinum.io";
+      upstream.host = "support.example.com";
       return fetch(new Request(upstream, request));
     }
     return env.PRODUCT_ORIGIN.fetch(request);
@@ -87,15 +87,15 @@ export default {
 
 ```nginx
 location = /support {
-  proxy_pass https://support.alkinum.io/support;
-  proxy_set_header Host support.alkinum.io;
+  proxy_pass https://support.example.com/support;
+  proxy_set_header Host support.example.com;
   proxy_set_header X-Forwarded-Proto $scheme;
 }
 
 location ^~ /support/ {
   # No trailing path on proxy_pass: preserve the complete /support/* URI.
-  proxy_pass https://support.alkinum.io;
-  proxy_set_header Host support.alkinum.io;
+  proxy_pass https://support.example.com;
+  proxy_set_header Host support.example.com;
   proxy_set_header X-Forwarded-Proto $scheme;
 }
 ```

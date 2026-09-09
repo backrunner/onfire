@@ -6,7 +6,7 @@ OnFire exposes one remote, stateless Streamable HTTP MCP resource on the ToB
 origin:
 
 ```text
-https://onfire.alkinum.com/mcp
+https://admin.example.com/mcp
 ```
 
 Clients authenticate with OAuth 2.1 authorization code flow and PKCE S256. No
@@ -65,7 +65,7 @@ URL and let the client perform discovery:
 {
   "mcpServers": {
     "onfire": {
-      "url": "https://onfire.alkinum.com/mcp"
+      "url": "https://admin.example.com/mcp"
     }
   }
 }

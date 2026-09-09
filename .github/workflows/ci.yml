@@ -6,7 +6,27 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Scan Git history with Gitleaks
+        run: >-
+          docker run --rm -v "$GITHUB_WORKSPACE:/repo:ro"
+          -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/repo
+          ghcr.io/gitleaks/gitleaks:v8.30.1
+          git /repo --log-opts="--all --full-history" --redact=100 --no-banner
+
   quality:
     name: Quality checks
     runs-on: ubuntu-latest
@@ -36,6 +56,9 @@ jobs:
 
       - name: Unit and integration tests
         run: pnpm test
+
+      - name: Production dependency audit
+        run: pnpm audit --prod
 
       - name: Build Worker bundle
         run: pnpm build:worker

@@ -473,7 +473,10 @@ export async function processInboundEmail(
       ),
     });
     const stale = existing?.processingStatus === "pending" &&
-      Date.now() - new Date(existing.createdAt).getTime() > 5 * 60_000;
+      Date.now() - new Date(existing.createdAt).getTime() > 20 * 60_000;
+    if (existing?.processingStatus === "pending" && !stale) {
+      return { success: false, action: "error", reason: "Email processing is already in progress" };
+    }
     if (existing && existing.processingStatus !== "error" && !stale) {
       return {
         success: true,
@@ -537,7 +540,7 @@ export async function processInboundEmail(
         .values(inboundValues)
         .onConflictDoNothing()
         .returning({ id: inboundEmails.id });
-  if (inserted.length === 0) return { success: true, action: "duplicate" };
+  if (inserted.length === 0) return { success: false, action: "error", reason: "Email processing is already in progress" };
 
   try {
     const row = await db.query.inboundEmails.findFirst({ where: eq(inboundEmails.id, emailId) });

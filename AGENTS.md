@@ -120,17 +120,15 @@ and earlier `navigator.modelContext` APIs are feature-detected; unsupported
 browsers retain the normal UI. This does not expand the separate OAuth `/mcp`
 grant or expose an unauthenticated bridge. See `.agents/WEBMCP_INTEGRATION.md`.
 
-For this deployment, ToC is `support.alkinum.io` and ToB is `onfire.alkinum.com`.
-Attach the Worker to both hostnames as Custom Domains and configure the matching
-`ADMIN_DOMAINS` and `TOC_DOMAINS` values. Cloudflare Access can protect the admin hostname;
-the Worker edge guard independently rejects `/api/tob/*` on ToC/unknown hosts
-and `/api/toc/*` on ToB hosts. The application still uses Better Auth/RBAC;
-Zero Trust is an additional network boundary, not a replacement for either.
-This is one Worker with two hostnames. Two physically independent Workers are
-possible but require separate Wrangler/OpenNext environments and an explicit
-single owner for the cron trigger and Cloudflare Email handler. The production
-config disables the fallback `workers.dev` hostname so the two Custom Domains
-are the public entry points.
+The checked-in configuration uses `support.example.com` (ToC) and
+`admin.example.com` (ToB) as deployment placeholders. Replace them with your
+own Custom Domains and matching runtime/build-time domain variables. Cloudflare
+Access can protect the admin hostname; the Worker edge guard independently
+rejects cross-surface APIs. The web surfaces share one Worker. The current source
+also includes `workers/email-agent` for queue-backed Cloudflare mail transport,
+with restricted `MailAgentGateway` access and no D1 or application secret on the
+agent. The main Worker owns cron and inbound queue processing. See
+`docs/DEPLOYMENT.md` for bindings, migration and deployment order.
 
 ---
 
@@ -578,11 +576,22 @@ Returns a newly generated webhook secret. Store it securely.
 
 ### Cloudflare Email Routing
 
-Cloudflare Email Routing delivers inbound mail directly to the Worker's
-`email()` handler. The handler parses MIME once, trusts the SMTP envelope for
-sender identity, and forwards normalized content through the same inbound
-pipeline as webhooks. Cloudflare-routed inbound mail does not use a webhook
+Cloudflare Email Routing delivers inbound mail to the main Worker or the
+independent `workers/email-agent` Worker. Both persist raw MIME and the SMTP
+envelope in R2, then enqueue a reference for the main Worker to parse and process
+through the existing inbound pipeline. Product subdomains can use Cloudflare MX
+while the apex domain keeps Stalwart. Cloudflare-routed mail needs no webhook
 secret.
+
+Configured agent senders use a D1 outbox and outbound Queue. Public ToB/MCP
+replies persist a mail intent in the reply transaction; cron repairs interrupted
+rendering/enqueue. The agent sends through Cloudflare Email Sending and saves a
+receipt before confirming via the main Worker's restricted `MailAgentGateway`
+RPC. It has no D1 binding or application secret. Reply and notification delivery
+flags update on confirmation, and ambiguous sends remain `uncertain` for operator
+review. Exact address/product bindings prevent cross-product use. Deployment,
+retention, DLQ replay and limitations are documented in
+`.agents/EMAIL_AGENT_INTEGRATION.md`.
 
 ### Provider Inbound Webhooks
 
@@ -805,79 +814,12 @@ POST /mcp                  - Stateless MCP Streamable HTTP JSON-RPC
 
 ---
 
-## SDK Usage
+## Customer Integration
 
-### Installation
-
-```typescript
-import { OnfireClient } from '@onfire/sdk';
-```
-
-### Initialization
-
-```typescript
-const client = new OnfireClient({
-  baseUrl: 'https://support.alkinum.io/api/toc',
-  token: 'jwt-token',  // Optional, for logged-in users
-  tocBaseUrl: 'https://support.alkinum.io'  // ToC frontend URL
-});
-```
-
-### Main Methods
-
-```typescript
-// Get the product ticket type tree and selected type form
-const types = await client.listTicketTypes();
-const form = await client.getTicketTypeForm(ticketTypeId);
-
-// Create ticket
-await client.createTicket({
-  productId: 'prod-xxx',
-  ticketTypeId: 'type-xxx',
-  templateVersionId: form.templateVersionId,
-  subject: 'Issue title',
-  content: 'Issue description',
-  priority: 'medium',
-  metadata: { environment: 'production' },
-  customer: {
-    email: 'user@example.com',
-    externalId: 'user-123',
-    level: 80
-  },
-  turnstileToken: 'cf-turnstile-token'
-});
-
-// Get ticket list
-await client.listTickets({ status: 'new', productId: 'prod-xxx' });
-
-// Get ticket details
-await client.getTicket(ticketId);
-
-// Reply to ticket
-await client.reply(ticketId, { content: 'Reply content', turnstileToken: 'token' });
-
-// Issue JWT (server-side use)
-await client.issueCustomerJwt({
-  apiKey: 'key-id.secret',
-  email: 'user@example.com',
-  externalId: 'user-123',
-  level: 80
-});
-
-// Generate ToC page URL
-const url = client.buildTocUrl(productId, jwt, { tab: 'list' });
-
-// Issue JWT and generate URL (one step)
-const url = await client.buildTocUrlWithSigning(productId, {
-  apiKey: 'key-id.secret',
-  email: 'user@example.com'
-});
-
-// Remote identity mode: credential stays in the URL fragment
-const portalUrl =
-  `https://product.example.com/support?productId=${encodeURIComponent(productId)}` +
-  `#credential=${encodeURIComponent(opaqueCredential)}`;
-```
+This repository does not currently include or publish an `@onfire/sdk` package.
+Use the HTTP APIs and `.agents/TOC_INTEGRATION.md` for server-side API-key JWT
+issuance, fragment-held credentials, and reverse-proxy integration. Do not present
+historical SDK examples as an installable dependency.
 
 ---
 
@@ -1038,7 +980,7 @@ TURNSTILE_SECRET=xxx     # Cloudflare Turnstile secret (unset = CAPTCHA disabled
 ### Vars (wrangler.jsonc)
 
 ```env
-BETTER_AUTH_URL=https://onfire.alkinum.com  # Canonical ToB, OAuth issuer, and MCP origin
+BETTER_AUTH_URL=https://admin.example.com  # Canonical ToB, OAuth issuer, and MCP origin
 JWT_ISSUER=onfire        # Customer JWT issuer
 JWT_AUDIENCE=onfire-toc  # Customer JWT audience
 ```
@@ -1057,14 +999,16 @@ NEXT_PUBLIC_TURNSTILE_SITE_KEY=xxx  # Pair with TURNSTILE_SECRET; leave both uns
 - `SEND_EMAIL` — Cloudflare Email Sending binding for the native outbound provider
 - `WORKER_SELF_REFERENCE` — service binding used by the cron trigger to invoke `/api/toc/tasks/sla-scan`
 
-On 2026-07-13, the APAC `onfire-d1` D1 database, APAC Standard
-`onfire-storage` R2 bucket, and 1024-dimension cosine `onfire-knowledge`
-Vectorize index were provisioned in the Alkinum account. The D1 ID is recorded
-in `wrangler.jsonc`, and migrations through `0027_knowledge_embedding_rebuild.sql` have
-been applied remotely. Worker version `3550481c-6c67-44d2-b7e0-5baa6b8e2774`
-is deployed on both Custom Domains with the SLA cron and runtime secrets configured.
-The production database is initialized. Cloudflare Email Sending/routing onboarding
-remains an external rollout step, and Cloudflare Access is enforced on ToB.
+- `EMAIL_STORAGE` — shared R2 bucket for inbound MIME and email transport records
+- `EMAIL_INBOUND_QUEUE` — inbound jobs consumed by the application Worker
+- `EMAIL_OUTBOUND_QUEUE` — outbound jobs consumed by the email agent
+- `MAIN_MAIL` — email-agent-only service binding to `MailAgentGateway`
+
+Public Wrangler files contain example deployment values. The operator's prior
+configuration was preserved in ignored `wrangler.production.local.jsonc` files
+beside each public config during open-source preparation. Do not deploy the
+placeholders to an existing environment. Follow `docs/DEPLOYMENT.md`; historical
+production records remain in `.agents/STATUS.md`.
 
 ---
 
@@ -1110,7 +1054,15 @@ pnpm deploy
 
 ## Current Predeployment Verification
 
-As of 2026-09-08, frozen install, generated binding checks, TypeScript, 91 test files / 689 tests, and the OpenNext Worker build pass. The current release includes inline email form actions and header-safe, theme-aware toasts. Migration `0027` is already applied in production; this release requires no migration or binding changes. All 28 migrations apply on fresh local D1 without foreign-key violations; Drizzle metadata, deployment dry-run, and startup profiling pass. Production dependency audit reports no known vulnerabilities after TipTap 3.30.4 and scoped fast-uri/qs updates; peer dependency checks pass. Desktop/mobile browser checks cover email form actions and toast placement in both languages/themes, including long and stacked feedback, preview mode, live theme changes, and asymmetric safe-area insets. CI pins pnpm 12.3.4. Vectorize has no local emulator; browser index status uses fixtures, with retrieval and migration behavior covered by integration tests.
+The 2026-09-09 open-source review covers the current worktree, including the
+uncommitted email-agent work and migrations `0028`/`0029`. Frozen install,
+generated binding checks, TypeScript, 92 test files / 703 tests, both Worker
+builds, Drizzle metadata, 30 local migrations, deployment dry-run and startup
+profiling pass. Production and full dependency audits report zero known
+vulnerabilities. Gitleaks scans of 141 existing commits and the publication
+candidate found no secrets. See `docs/OPEN_SOURCE_READINESS.md` for the final
+validation scope and publication follow-up; these results do not assert a new
+production deployment.
 
 ## Contribution Convention
 

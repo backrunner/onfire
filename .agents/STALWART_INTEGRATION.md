@@ -2,14 +2,14 @@
 
 Select **Stalwart** as the product's inbound provider, set the mailbox address,
 save, and generate a webhook secret. The endpoint paths shown in Email settings
-must be prefixed with the public ToC origin (`https://support.alkinum.io` for
+must be prefixed with the public ToC origin (`https://support.example.com` for
 this deployment).
 
 ## MTA Hooks: ticket intake
 
 Configure a Stalwart MTA Hook:
 
-- URL: `https://support.alkinum.io/api/toc/webhooks/stalwart/PRODUCT_ID/mta-hook`
+- URL: `https://support.example.com/api/toc/webhooks/stalwart/PRODUCT_ID/mta-hook`
 - Stage: `data` only
 - HTTP authentication: Bearer, with the product's generated webhook secret
 - Temporary failure on endpoint error: enabled
@@ -37,7 +37,7 @@ persisted, and `cid:` inline images follow the existing sanitizer rules.
 
 Configure a Stalwart Telemetry Webhook:
 
-- URL: `https://support.alkinum.io/api/toc/webhooks/stalwart/PRODUCT_ID/events`
+- URL: `https://support.example.com/api/toc/webhooks/stalwart/PRODUCT_ID/events`
 - Signature key: the product's generated webhook secret
 - Events: the desired `message-ingest.*`, `delivery.*`, or `smtp.*` events
 

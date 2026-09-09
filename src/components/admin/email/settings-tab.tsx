@@ -261,10 +261,10 @@ export function EmailSettingsTab({
     }
     setTesting(true);
     try {
-      await api.post(`/api/tob/admin/email-config/${productId}/test`, {
+      const result = await api.post<{ queued?: boolean }>(`/api/tob/admin/email-config/${productId}/test`, {
         to: testTo.trim(),
       });
-      toast.success(tc.outbound.testSent);
+      toast.success(result.queued ? tc.outbound.testQueued : tc.outbound.testSent);
       setTestOpen(false);
       setTestTo("");
     } catch (err) {

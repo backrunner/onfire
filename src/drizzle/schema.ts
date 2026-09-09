@@ -1115,6 +1115,9 @@ export type EmailProcessingStatus =
   | "error";
 export type EmailDeliveryStatus =
   | "pending"
+  | "queued"
+  | "sending"
+  | "uncertain"
   | "sent"
   | "delivered"
   | "bounced"
@@ -1272,6 +1275,7 @@ export const outboundEmails = sqliteTable(
     productId: text("product_id").notNull(),
     ticketId: text("ticket_id"),
     replyId: text("reply_id"),
+    notificationLogId: text("notification_log_id"),
     // Email details
     toEmail: text("to_email").notNull(),
     toName: text("to_name"),
@@ -1296,6 +1300,25 @@ export const outboundEmails = sqliteTable(
     index("outbound_emails_ticket_idx").on(t.ticketId),
   ],
 );
+
+/** Durable outbox. Bodies stay in outbound_emails; Queues carries only the id. */
+export const emailDispatches = sqliteTable("email_dispatches", {
+  id: text("id").primaryKey(),
+  replyTo: text("reply_to"),
+  headers: text("headers", { mode: "json" }).$type<Record<string, string>>(),
+  attemptToken: text("attempt_token"),
+  attemptStartedAt: text("attempt_started_at"),
+  attempts: integer("attempts").notNull().default(0),
+  queuedAt: text("queued_at"),
+  createdAt: text("created_at").notNull(),
+});
+
+/** Inserted in the same transaction as a public reply, before asynchronous rendering. */
+export const emailReplyIntents = sqliteTable("email_reply_intents", {
+  replyId: text("reply_id").primaryKey(),
+  ticketId: text("ticket_id").notNull(),
+  createdAt: text("created_at").notNull(),
+});
 
 // ==================== Notification Feature Tables ====================
 

@@ -208,7 +208,7 @@
 - Reserve `/support` as the reverse-proxy mount. The upstream proxy preserves the prefix; OnFire maps only ToC pages, `/api/toc`, scoped static assets, the icon, and service worker. Never expose ToB pages or APIs below this prefix.
 - Keep reverse-proxied portal traffic same-origin. Do not add wildcard or reflected CORS; direct cross-origin browser APIs remain unsupported.
 - Enforce the same surface split at the Worker edge: ToC hosts cannot reach `/api/tob/*`, and ToB hosts cannot reach `/api/toc/*`. Middleware API bypass must not weaken this guard.
-- Production hostnames are `onfire.alkinum.com` (ToB) and `support.alkinum.io` (ToC), both attached to the same OpenNext Worker as Cloudflare Custom Domains. Cloudflare Access should protect the ToB hostname. Treat two independent Workers as a separate deployment project with explicit shared-binding and cron/email ownership decisions.
+- Public configuration uses `admin.example.com` (ToB) and `support.example.com` (ToC) placeholders. Operators must set matching build-time and runtime domains for their own two Custom Domains. Both web surfaces share the application Worker; the separate email agent is transport-only. The main Worker owns cron and inbound queue processing. See `docs/DEPLOYMENT.md`.
 - Scope the reverse-proxy service worker to `/support/`; it must never control the product origin root.
 
 ## Customer Identity
@@ -282,3 +282,22 @@
 - After a Wrangler binding or variable change, regenerate `CloudflareEnv` and require `pnpm cf-typegen --check` in CI.
 - Before a release, require frozen install, generated-type check, TypeScript, tests, OpenNext build, Drizzle consistency, fresh local migration apply, Wrangler dry-run, production dependency audit, and startup profiling.
 - Deployment, remote D1 migration, Cloudflare resource creation, secret changes, and commits remain explicit operator actions.
+
+## Open-source Distribution
+
+- OnFire source is Apache-2.0; retain `LICENSE`, `NOTICE`, and third-party notices.
+- Public configuration uses example domains/resource IDs. Never commit local
+  deployment configuration, secrets, customer data, database exports or raw mail.
+- README setup and deployment instructions must describe shipped source, including
+  optional-service limits; historical planning is not evidence of a shipped SDK.
+- Regenerate the full installed dependency-license inventory after dependency
+  changes, including optional native packages. Bundled distributions require
+  upstream license/NOTICE retention and applicable MPL/LGPL obligations.
+
+## Subdomain Email Agent
+
+- Product support subdomains may use Cloudflare Email Routing/Sending while apex MX remains on Stalwart.
+- Main and independent email Workers spool raw MIME to R2 and queue only references; main owns ticket processing and cron.
+- Configured agent senders use a durable D1 outbox, an outbound Queue, exact address/product ownership and a restricted RPC gateway. Public reply mail intents commit with the reply.
+- At-least-once deliveries use deduplication, atomic claims and persisted receipts. Confirmed sending updates reply/notification flags; ambiguous outcomes require operator verification before resend.
+- Keep raw email/receipts for 30 days and Queues/DLQs for 14 days. See `.agents/EMAIL_AGENT_INTEGRATION.md` for deployment and recovery.

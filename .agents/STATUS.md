@@ -1,8 +1,31 @@
 # OnFire Project Status
 
-Updated: 2026-09-08
+Updated: 2026-09-09
+
+## Open-source preparation — 2026-09-09
+
+- Added English/Chinese README, a repository-native SVG banner, Apache-2.0
+  LICENSE/NOTICE, contribution and security policies, and public deployment docs.
+- Public Wrangler configs and routing fallbacks use example domains/resource IDs.
+  Original operator configs are preserved only in ignored local files. The
+  historical deployment entries below describe earlier releases; they are not
+  deploy instructions for the new public templates.
+- Repaired local environment examples and documented the current email-agent
+  source/bindings and migrations `0028`/`0029`, which were already uncommitted
+  when the documentation review began. No email behavior was changed by this
+  preparation, and no remote migration or deployment was performed.
+- Added third-party attribution and a reproducible full installed dependency
+  inventory. Native libvips (LGPL), Lightning CSS (MPL), caniuse-lite (CC-BY),
+  and Lucide/Feather notices require retention when applicable to distributions.
+- CI now uses read-only repository permissions, scans full Git history with
+  Gitleaks, and audits production dependencies. Final evidence and remaining
+  maintainer publication steps are in `docs/OPEN_SOURCE_READINESS.md`.
 
 ## Current State
+
+- Subdomain email agent release (2026-09-09): Cloudflare Email Routing is enabled for `wifibuddy.alkinum.com`; apex `alkinum.com` MX remains on Stalwart. `support@wifibuddy.alkinum.com` routes to `onfire-email-agent`, which uses R2 plus inbound/outbound Queues and Cloudflare Email Sending. Main Worker `aee948c8-91b8-4a40-b716-d6f6fa56760a` and agent `b30d1128-0503-4abd-bcd9-4e9964ffab1b` are deployed. Remote migrations `0028` and `0029` are applied. WiFiBuddy product email config uses Cloudflare inbound/outbound with AI filtering disabled. See `.agents/EMAIL_AGENT_INTEGRATION.md`.
+- Email agent verification: TypeScript, 92 test files / 705 tests, OpenNext and agent dry-runs pass. Local inbound queue, durable outbox, named RPC receipt replay, and desktop/mobile email settings/logs browser checks pass. Real mailbox delivery remains pending an authorized test recipient.
+
 
 - Global toasts now clear the app header and optional preview bar with a 16px
   gap plus mobile safe-area insets. Their colors follow the current app theme.

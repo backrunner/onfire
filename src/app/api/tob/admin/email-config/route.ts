@@ -9,6 +9,7 @@ import type { Database } from "@/lib/db";
 import { getEnv } from "@/lib/db";
 import { hasConfiguredAITask } from "@/services/ai/config";
 import { sealEmailConfigFields } from "@/services/email/config-secrets";
+import { assertAgentProduct } from "@/services/email/agent-outbox";
 
 const querySchema = z.object({
   productId: z.string().min(1),
@@ -184,6 +185,8 @@ async function validateConfiguration(
   fields: Record<string, unknown>
 ): Promise<void> {
   const merged = { ...(existing ?? {}), ...definedOnly(fields) } as Partial<EmailConfigRow>;
+  assertAgentProduct(merged.inboundAddress, productId);
+  assertAgentProduct(merged.outboundSenderEmail, productId);
 
   if (merged.inboundAddress) {
     const duplicate = await db.query.emailConfigs.findFirst({

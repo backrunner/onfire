@@ -20,8 +20,8 @@ describe("surface routing", () => {
   });
 
   it("uses the production ToB and ToC hostnames by default", () => {
-    expect(classifySurface("onfire.alkinum.com")).toBe("tob");
-    expect(classifySurface("support.alkinum.io")).toBe("toc");
+    expect(classifySurface("admin.example.com")).toBe("tob");
+    expect(classifySurface("support.example.com")).toBe("toc");
   });
 
   it("defaults unknown hosts to ToC but never exposes the other API surface", () => {

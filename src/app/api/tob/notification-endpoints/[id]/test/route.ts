@@ -30,5 +30,5 @@ export const POST = withAuth({}, async (req: NextRequest, ctx) => {
 
   const result = await sendEndpointTest(ctx.db, endpoint, body.productId);
   if (!result.success) return err(result.error ?? "Test notification failed", 502);
-  return ok({ sent: true });
+  return ok({ sent: !result.queued, queued: result.queued ?? false });
 });

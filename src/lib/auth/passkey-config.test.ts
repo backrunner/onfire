@@ -4,11 +4,11 @@ import { getPasskeyRelyingParty } from "./passkey-config";
 describe("getPasskeyRelyingParty", () => {
   it("uses the production auth host as the WebAuthn RP boundary", () => {
     expect(
-      getPasskeyRelyingParty("https://onfire.alkinum.com/api/tob/auth"),
+      getPasskeyRelyingParty("https://admin.example.com/api/tob/auth"),
     ).toEqual({
-      rpID: "onfire.alkinum.com",
+      rpID: "admin.example.com",
       rpName: "OnFire",
-      origin: "https://onfire.alkinum.com",
+      origin: "https://admin.example.com",
     });
   });
 

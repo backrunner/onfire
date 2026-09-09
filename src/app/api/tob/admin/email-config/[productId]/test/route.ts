@@ -28,5 +28,5 @@ export const POST = withAuth({ permission: "email.config" }, async (req: NextReq
   if (!result.success) {
     return err(result.error ?? "Test send failed", 502);
   }
-  return ok({ sent: true, messageId: result.messageId });
+  return ok({ sent: !result.queued, queued: result.queued ?? false, emailId: result.emailId, messageId: result.messageId });
 });

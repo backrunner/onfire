@@ -45,6 +45,7 @@ import { assertPublicAgentReply } from "@/lib/tickets/agent-reply";
 import { Role, TicketPriority, TicketStatus } from "@/lib/types";
 import { chooseEscalationAssignee } from "@/services/allocation";
 import { emitTicketEvent } from "@/services/ticket-events";
+import { prepareReplyEmailIntent } from "@/services/email/agent-outbox";
 import { serializeState } from "@/services/ticket-internal-states";
 import { prepareReplyTranslation } from "@/services/ticket-translation";
 import { translationSearchCondition } from "@/lib/tickets/search";
@@ -315,6 +316,7 @@ export async function replyToMcpTicket(
 
   const now = new Date().toISOString();
   const replyId = crypto.randomUUID();
+  const mailIntent = input.internal ? undefined : await prepareReplyEmailIntent(ctx.db, ticket.id, ticket.productId, replyId);
   const statements = [
     ctx.db.insert(replies).values({
       id: replyId,
@@ -340,6 +342,7 @@ export async function replyToMcpTicket(
   } else {
     await ctx.db.batch([
       ...statements,
+      ...(mailIntent ? [mailIntent.statement] : []),
       ctx.db
         .update(tickets)
         .set({

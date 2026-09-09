@@ -40,10 +40,10 @@ export function EndpointTestDialog({
     if (!endpoint) return;
     setPending(true);
     try {
-      await api.post(`/api/tob/notification-endpoints/${endpoint.id}/test`, {
+      const result = await api.post<{ queued?: boolean }>(`/api/tob/notification-endpoints/${endpoint.id}/test`, {
         ...(endpoint.channelType === "email" && { productId }),
       });
-      toast.success(t.notifChannels.testSent);
+      toast.success(result.queued ? t.notifChannels.testQueued : t.notifChannels.testSent);
       onOpenChange(false);
     } catch (error) {
       toast.error(

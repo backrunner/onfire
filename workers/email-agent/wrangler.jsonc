@@ -1,0 +1,22 @@
+// Public deployment template. Replace example domains, addresses and resource IDs.
+// See docs/DEPLOYMENT.md before deploying.
+{
+  "name": "onfire-email-agent",
+  "main": "index.ts",
+  "workers_dev": false,
+  "preview_urls": false,
+  "compatibility_date": "2026-07-12",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "EMAIL_AGENT_ADDRESSES": "support@example.com"
+  },
+  "r2_buckets": [{ "binding": "EMAIL_STORAGE", "bucket_name": "onfire-email-storage" }],
+  "send_email": [{ "name": "SEND_EMAIL", "allowed_sender_addresses": ["support@example.com"] }],
+  "services": [{ "binding": "MAIN_MAIL", "service": "onfire", "entrypoint": "MailAgentGateway" }],
+  "queues": {
+    "producers": [{ "binding": "EMAIL_INBOUND_QUEUE", "queue": "onfire-email-inbound" }],
+    "consumers": [{ "queue": "onfire-email-outbound", "max_batch_size": 1, "max_batch_timeout": 1, "max_retries": 12, "retry_delay": 60, "max_concurrency": 2, "dead_letter_queue": "onfire-email-outbound-dlq" }]
+  },
+  "observability": { "enabled": true },
+  "limits": { "cpu_ms": 30000 }
+}
