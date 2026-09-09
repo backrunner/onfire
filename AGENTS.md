@@ -1054,19 +1054,19 @@ pnpm deploy
 
 ## Current Predeployment Verification
 
-The 2026-09-09 open-source review covers the current worktree, including the
-uncommitted email-agent work and migrations `0028`/`0029`. Frozen install,
-generated binding checks, TypeScript, 92 test files / 703 tests, both Worker
-builds, Drizzle metadata, 30 local migrations, deployment dry-run and startup
-profiling pass. Production and full dependency audits report zero known
-vulnerabilities. Gitleaks scans of 141 existing commits and the publication
-candidate found no secrets. See `docs/OPEN_SOURCE_READINESS.md` for the final
-validation scope and publication follow-up; these results do not assert a new
-production deployment.
+The 2026-09-09 CI recovery updates the application dependencies to patched
+versions and records one exact historical Gitleaks false-positive fingerprint.
+Frozen install, generated binding checks, TypeScript, 92 test files / 705 tests,
+both Worker builds, Drizzle metadata, 30 local migrations, deployment dry-run,
+startup profiling, and desktop/mobile editor browser checks pass. Production
+and full dependency audits report zero known vulnerabilities; Gitleaks scans
+150 commits with no remaining findings. See `docs/OPEN_SOURCE_READINESS.md`
+for the validation scope and publication follow-up, and `.agents/STATUS.md`
+for the separately recorded production deployment.
 
 ## Contribution Convention
 
 - Use `xxx(comp): desc`, for example `feat(ai): add qwen embeddings` or `fix(rbac): scope assistant tickets`.
 - Do not commit, deploy, apply remote migrations, or create remote Cloudflare resources unless explicitly requested.
-- OpenNext Cloudflare 1.20.1 supports Next 16.2 but not Next 16 Node `proxy.ts`. Keep `src/middleware.ts` Web API-only until upstream support lands; its domain routing is covered by `src/middleware.test.ts`.
+- The verified OpenNext Cloudflare 1.20.6 / Next 16.3.4 build uses Web API-only `src/middleware.ts`. Verify adapter support before migrating to Node `proxy.ts`; domain routing is covered by `src/middleware.test.ts`.
 - Track `pnpm-lock.yaml`, `wrangler.types.env`, and generated `worker-configuration.d.ts`; regenerate types after Wrangler config changes. pnpm 11 overrides belong in `pnpm-workspace.yaml`.

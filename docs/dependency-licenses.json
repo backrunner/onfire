@@ -851,7 +851,7 @@
     {
       "name": "@cloudflare/workerd-darwin-arm64",
       "versions": [
-        "1.20260804.1"
+        "1.20260820.1"
       ],
       "license": "Apache-2.0",
       "homepage": "https://github.com/cloudflare/workerd#readme"
@@ -1021,7 +1021,7 @@
     {
       "name": "@img/sharp-darwin-arm64",
       "versions": [
-        "0.35.0"
+        "0.35.4"
       ],
       "license": "Apache-2.0",
       "author": "Lovell Fuller",
@@ -1030,7 +1030,7 @@
     {
       "name": "@img/sharp-libvips-darwin-arm64",
       "versions": [
-        "1.3.0"
+        "1.3.3"
       ],
       "license": "LGPL-3.0-or-later",
       "author": "Lovell Fuller",
@@ -1205,7 +1205,7 @@
     {
       "name": "@next/env",
       "versions": [
-        "16.2.12"
+        "16.3.4"
       ],
       "license": "MIT",
       "author": "Next.js Team",
@@ -1214,7 +1214,7 @@
     {
       "name": "@next/swc-darwin-arm64",
       "versions": [
-        "16.2.12"
+        "16.3.4"
       ],
       "license": "MIT",
       "homepage": "https://github.com/vercel/next.js#readme"
@@ -1302,7 +1302,7 @@
     {
       "name": "@opennextjs/aws",
       "versions": [
-        "4.1.0"
+        "4.1.4"
       ],
       "license": "MIT",
       "homepage": "https://opennext.js.org/aws"
@@ -1310,7 +1310,7 @@
     {
       "name": "@opennextjs/cloudflare",
       "versions": [
-        "1.20.2"
+        "1.20.6"
       ],
       "license": "MIT",
       "homepage": "https://github.com/opennextjs/opennextjs-cloudflare"
@@ -2390,7 +2390,7 @@
     {
       "name": "@swc/helpers",
       "versions": [
-        "0.5.15"
+        "0.5.23"
       ],
       "license": "Apache-2.0",
       "author": "강동윤",
@@ -2431,7 +2431,7 @@
     {
       "name": "@tiptap/core",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2439,7 +2439,7 @@
     {
       "name": "@tiptap/extension-blockquote",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2447,7 +2447,7 @@
     {
       "name": "@tiptap/extension-bold",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2455,7 +2455,7 @@
     {
       "name": "@tiptap/extension-bubble-menu",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2463,7 +2463,7 @@
     {
       "name": "@tiptap/extension-bullet-list",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2471,7 +2471,7 @@
     {
       "name": "@tiptap/extension-code",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2479,7 +2479,7 @@
     {
       "name": "@tiptap/extension-code-block",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2487,7 +2487,7 @@
     {
       "name": "@tiptap/extension-document",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2495,7 +2495,7 @@
     {
       "name": "@tiptap/extension-dropcursor",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2503,7 +2503,7 @@
     {
       "name": "@tiptap/extension-floating-menu",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2511,7 +2511,7 @@
     {
       "name": "@tiptap/extension-gapcursor",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2519,7 +2519,7 @@
     {
       "name": "@tiptap/extension-hard-break",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2527,7 +2527,7 @@
     {
       "name": "@tiptap/extension-heading",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2535,7 +2535,7 @@
     {
       "name": "@tiptap/extension-horizontal-rule",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2543,7 +2543,7 @@
     {
       "name": "@tiptap/extension-image",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2551,7 +2551,7 @@
     {
       "name": "@tiptap/extension-italic",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2559,7 +2559,7 @@
     {
       "name": "@tiptap/extension-link",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2567,7 +2567,7 @@
     {
       "name": "@tiptap/extension-list",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2575,7 +2575,7 @@
     {
       "name": "@tiptap/extension-list-item",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2583,7 +2583,7 @@
     {
       "name": "@tiptap/extension-list-keymap",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2591,7 +2591,7 @@
     {
       "name": "@tiptap/extension-ordered-list",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2599,7 +2599,7 @@
     {
       "name": "@tiptap/extension-paragraph",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2607,7 +2607,7 @@
     {
       "name": "@tiptap/extension-strike",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2615,7 +2615,7 @@
     {
       "name": "@tiptap/extension-text",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2623,7 +2623,7 @@
     {
       "name": "@tiptap/extension-underline",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2631,7 +2631,7 @@
     {
       "name": "@tiptap/extensions",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2639,7 +2639,7 @@
     {
       "name": "@tiptap/pm",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2647,7 +2647,7 @@
     {
       "name": "@tiptap/react",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2655,7 +2655,7 @@
     {
       "name": "@tiptap/starter-kit",
       "versions": [
-        "3.30.4"
+        "3.30.5"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2844,7 +2844,7 @@
     {
       "name": "@vitest/expect",
       "versions": [
-        "4.1.10"
+        "4.1.11"
       ],
       "license": "MIT",
       "homepage": "https://vitest.dev/api/expect"
@@ -2852,7 +2852,7 @@
     {
       "name": "@vitest/mocker",
       "versions": [
-        "4.1.10"
+        "4.1.11"
       ],
       "license": "MIT",
       "homepage": "https://github.com/vitest-dev/vitest/tree/main/packages/mocker"
@@ -2860,7 +2860,7 @@
     {
       "name": "@vitest/pretty-format",
       "versions": [
-        "4.1.10"
+        "4.1.11"
       ],
       "license": "MIT",
       "homepage": "https://github.com/vitest-dev/vitest/tree/main/packages/pretty-format"
@@ -2868,7 +2868,7 @@
     {
       "name": "@vitest/runner",
       "versions": [
-        "4.1.10"
+        "4.1.11"
       ],
       "license": "MIT",
       "homepage": "https://vitest.dev/api/advanced/runner"
@@ -2876,7 +2876,7 @@
     {
       "name": "@vitest/snapshot",
       "versions": [
-        "4.1.10"
+        "4.1.11"
       ],
       "license": "MIT",
       "homepage": "https://vitest.dev/guide/snapshot"
@@ -2884,7 +2884,7 @@
     {
       "name": "@vitest/spy",
       "versions": [
-        "4.1.10"
+        "4.1.11"
       ],
       "license": "MIT",
       "homepage": "https://vitest.dev/api/mock"
@@ -2892,7 +2892,7 @@
     {
       "name": "@vitest/utils",
       "versions": [
-        "4.1.10"
+        "4.1.11"
       ],
       "license": "MIT",
       "homepage": "https://github.com/vitest-dev/vitest/tree/main/packages/utils"
@@ -4421,7 +4421,7 @@
     {
       "name": "hono",
       "versions": [
-        "4.13.1"
+        "4.13.7"
       ],
       "license": "MIT",
       "author": "Yusuke Wada",
@@ -4775,7 +4775,7 @@
     {
       "name": "js-yaml",
       "versions": [
-        "4.3.1"
+        "4.3.2"
       ],
       "license": "MIT",
       "author": "Vladimir Zapparov",
@@ -5327,7 +5327,7 @@
     {
       "name": "miniflare",
       "versions": [
-        "5.20260804.0-alpha"
+        "5.20260820.0-alpha"
       ],
       "license": "MIT",
       "author": "MrBBot",
@@ -5441,7 +5441,7 @@
     {
       "name": "next",
       "versions": [
-        "16.2.12"
+        "16.3.4"
       ],
       "license": "MIT",
       "homepage": "https://nextjs.org"
@@ -6338,7 +6338,7 @@
     {
       "name": "sharp",
       "versions": [
-        "0.35.0"
+        "0.35.4"
       ],
       "license": "Apache-2.0",
       "author": "Lovell Fuller",
@@ -7074,7 +7074,7 @@
     {
       "name": "vitest",
       "versions": [
-        "4.1.10"
+        "4.1.11"
       ],
       "license": "MIT",
       "author": "Anthony Fu",
@@ -7147,7 +7147,7 @@
     {
       "name": "workerd",
       "versions": [
-        "1.20260804.1"
+        "1.20260820.1"
       ],
       "license": "Apache-2.0",
       "homepage": "https://github.com/cloudflare/workerd#readme"
@@ -7155,7 +7155,7 @@
     {
       "name": "wrangler",
       "versions": [
-        "4.120.1"
+        "4.125.0"
       ],
       "license": "MIT OR Apache-2.0",
       "author": "wrangler@cloudflare.com",

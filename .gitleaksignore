@@ -1,0 +1,4 @@
+# False positive in a generated svedocs reference, deleted in 4858a61:
+# The finding is prose describing the home configuration, not a credential.
+# This fingerprint excludes only that historical prose finding.
+f1523a3a7e8eeb909eff08c7762c5b686ed447a0:apps/site/.agents/skills/configure-svedocs/references/config-reference.md:generic-api-key:66

@@ -42,6 +42,27 @@ Updated: 2026-09-09
   search, language and anchor preservation, theme state, copy controls, TOC,
   menus, and 320/768px overflow checks.
 
+## CI recovery — 2026-09-09
+
+- GitHub CI failures were in the production dependency audit and the historical
+  secret scan. Type generation, TypeScript, and all 705 tests already passed.
+- Updated Next.js to 16.3.4 with OpenNext 1.20.6 and Wrangler 4.125.0, kept the
+  Tiptap packages aligned at 3.30.5, and updated Vitest to 4.1.11. Overrides use
+  patched Hono 4.13.7, Sharp 0.35.4, and scoped js-yaml 4.3.2. Regenerated Worker
+  runtime types, Next environment declarations, and the dependency-license
+  inventory. Both production and full dependency audits now report zero findings.
+- The Gitleaks finding is ordinary home-option prose in a generated svedocs
+  reference introduced by `f1523a3` and deleted by `4858a61`. `.gitleaksignore`
+  names only that commit/file/rule/line fingerprint. CI explicitly loads it,
+  retains the full-history scan and redaction, and prints finding diagnostics.
+  Local Gitleaks 8.30.1 scanned 150 commits with no remaining findings.
+- Frozen install, generated-type check, TypeScript, 92 test files / 705 tests,
+  both Worker builds, Drizzle metadata, 30 fresh local D1 migrations with no
+  foreign-key violations, deployment dry-run, and startup profiling pass.
+  Browser checks against the built local Worker cover the shared rich-text
+  editor, bold formatting, current logo, hydration, and overflow at 1440/390px
+  in light/dark themes using customer API fixtures; no reply was submitted.
+
 ## Current State
 
 - Brand refresh (2026-09-09): the flat orange/white continuous-flame mark in

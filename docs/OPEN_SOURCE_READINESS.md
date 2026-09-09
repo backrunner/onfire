@@ -4,6 +4,23 @@ Review date: **2026-09-09**
 
 Revision reviewed: `f1523a3` plus the follow-up site cleanup commit.
 
+### CI recovery follow-up — 2026-09-09
+
+The application dependency update resolves the nine production audit findings
+below and the development-only js-yaml advisory. Next.js 16.3.4, OpenNext 1.20.6,
+Wrangler 4.125.0, aligned Tiptap 3.30.5 packages, Vitest 4.1.11, Hono 4.13.7,
+Sharp 0.35.4, and scoped js-yaml 4.3.2 pass both full and production audits.
+The installed dependency-license inventory has been regenerated.
+
+Gitleaks identified one false positive in ordinary configuration prose from a
+deleted generated svedocs reference. A documented, exact historical fingerprint
+in `.gitleaksignore` excludes only that finding; CI still scans the complete Git
+history. Local scanning covers 150 commits with no remaining findings.
+Frozen install, binding/type checks, all 705 tests, both Worker builds, fresh
+local migrations, deployment dry-run/startup profiling, and desktop/mobile
+editor browser checks pass. These results supersede the dependency-audit
+blocker recorded in the earlier website-theme review.
+
 ### Website theme follow-up — 2026-09-09
 
 The new standalone site theme retains Apache-2.0 attribution and ships its local
@@ -12,15 +29,14 @@ font/icon notices and generated bundle licenses. Its frozen install, type check,
 the site's Sharp to 0.35.4 and cookie to 0.7.2; its production dependency audit now
 reports no known vulnerabilities.
 
-The application still passes type generation, TypeScript, 92 test files / 705
-tests, and both Worker builds. **Its current production lockfile audit reports
-9 advisories: 2 critical, 2 high, and 5 moderate.** These supersede the earlier
-clean-audit result below. The affected packages and reported fixed minimums are
+At the time of the theme review, the application passed type generation,
+TypeScript, 92 test files / 705 tests, and both Worker builds, while its
+production lockfile audit reported 9 advisories: 2 critical, 2 high, and 5
+moderate. The affected packages and reported fixed minimums were
 Next.js 16.3.3, Sharp 0.35.4, Hono 4.13.5, Tiptap core 3.30.5, and Vitest/mocker
-4.1.11. Audit findings require applicability review and a tested application
-dependency update before its release can claim a clean dependency audit. This
-theme release changes only the independent static site's runtime dependencies;
-it does not deploy the application or email Workers.
+4.1.11. The CI recovery above supplies the tested application dependency update.
+The theme release itself changed only the independent static site's runtime
+dependencies and did not deploy the application or email Workers.
 
 This is a repository and distribution review, not a legal opinion or a security
 assessment of a deployed service.

@@ -49,11 +49,11 @@
     "@marsidev/react-turnstile": "^1.5.4",
     "@modelcontextprotocol/sdk": "1.30.0",
     "@monaco-editor/react": "^4.7.0",
-    "@opennextjs/cloudflare": "^1.20.2",
-    "@tiptap/extension-image": "3.30.4",
-    "@tiptap/extensions": "3.30.4",
-    "@tiptap/react": "3.30.4",
-    "@tiptap/starter-kit": "3.30.4",
+    "@opennextjs/cloudflare": "1.20.6",
+    "@tiptap/extension-image": "3.30.5",
+    "@tiptap/extensions": "3.30.5",
+    "@tiptap/react": "3.30.5",
+    "@tiptap/starter-kit": "3.30.5",
     "better-auth": "1.7.0-rc.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -61,7 +61,7 @@
     "jose": "^6.2.7",
     "lucide-react": "^1.28.0",
     "monaco-editor": "^0.56.0",
-    "next": "^16.2.12",
+    "next": "16.3.4",
     "postal-mime": "^2.7.5",
     "qrcode": "1.5.4",
     "radix-ui": "^1.6.7",
@@ -86,7 +86,7 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
     "vite": "^8.2.0",
-    "vitest": "^4.1.10",
-    "wrangler": "^4.120.1"
+    "vitest": "4.1.11",
+    "wrangler": "4.125.0"
   }
 }
