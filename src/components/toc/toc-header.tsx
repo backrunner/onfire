@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useTheme } from "@/components/ui/theme-provider";
-import { Flame, Languages, Moon, Sun, UserRound } from "lucide-react";
+import { Languages, Moon, Sun, UserRound } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { OnFireLogo } from "@/components/brand/onfire-logo";
 
 interface TocHeaderProps {
   productName?: string | null;
@@ -83,9 +84,7 @@ export function TocHeader({ productName, customerEmail, loading, languages }: To
     <header data-toast-header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75">
       <div className="mx-auto flex h-14 max-w-2xl items-center justify-between gap-3 px-4">
         <div className="flex min-w-0 items-center gap-2.5">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Flame className="size-4" />
-          </div>
+          <OnFireLogo label="OnFire" />
           <div className="min-w-0">
             {loading ? (
               <Skeleton className="h-4 w-28" />

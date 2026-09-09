@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Flame, Loader2, X } from "lucide-react";
+import { Check, Loader2, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeToggle } from "@/components/admin/shell/theme-toggle";
 import { LanguageToggle } from "@/components/admin/shell/language-toggle";
+import { OnFireLogo } from "@/components/brand/onfire-logo";
 
 export default function AdminInstallPage() {
   const { t } = useI18n();
@@ -107,9 +108,7 @@ export default function AdminInstallPage() {
       <div className="w-full max-w-lg space-y-6 py-8">
         {/* Brand */}
         <div className="flex flex-col items-center gap-2 text-center">
-          <span className="flex size-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-            <Flame className="size-5" />
-          </span>
+          <OnFireLogo size={44} label="OnFire" />
           <div>
             <h1 className="text-lg font-semibold">
               {t.install.title}

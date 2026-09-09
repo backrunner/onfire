@@ -26,7 +26,7 @@ Updated: 2026-09-09
 - `apps/site` owns its svedocs navigation, sidebar, reading layout, footer,
   search presentation, and responsive light/dark styles. It imports only
   `svedocs/theme/base.css` and retains the framework's behavior controllers.
-- The site uses a flame/conversation SVG mark, warm zinc and terracotta tokens,
+- The site uses the shared split-flame SVG mark, warm zinc and terracotta tokens,
   self-hosted Geist fonts, and interactive sample ticket/portal/routing views.
   Font and icon licenses ship with the static build.
 - `https://onfire.pwp.sh` is the canonical origin. `apps/site/wrangler.jsonc`
@@ -43,6 +43,18 @@ Updated: 2026-09-09
   menus, and 320/768px overflow checks.
 
 ## Current State
+
+- Brand refresh (2026-09-09): the flat orange/white split-flame mark in
+  `docs/assets/onfire-mark.svg` is the shared source for application/site favicons,
+  the README banner, and the inline React `OnFireLogo`. Run
+  `node scripts/sync-brand.mjs` to synchronize generated assets. Login, install,
+  sidebar, OAuth consent, and customer portal headers now use the same mark as
+  the site navigation, footer, landing, and sample workspace.
+  Brand synchronization, type generation, TypeScript, 92 test files / 705 tests,
+  both Worker builds, and site checks/build pass. Browser screenshots cover
+  site/docs and local login/install/customer portal fixtures at desktop/mobile
+  widths in light/dark themes. This release deploys the static site only;
+  application UI assets take effect on the next application Worker deployment.
 
 - Subdomain email agent release (2026-09-09): Cloudflare Email Routing is enabled for `wifibuddy.alkinum.com`; apex `alkinum.com` MX remains on Stalwart. `support@wifibuddy.alkinum.com` routes to `onfire-email-agent`, which uses R2 plus inbound/outbound Queues and Cloudflare Email Sending. Main Worker `aee948c8-91b8-4a40-b716-d6f6fa56760a` and agent `b30d1128-0503-4abd-bcd9-4e9964ffab1b` are deployed. Remote migrations `0028` and `0029` are applied. WiFiBuddy product email config uses Cloudflare inbound/outbound with AI filtering disabled. See `.agents/EMAIL_AGENT_INTEGRATION.md`.
 - Email agent verification: TypeScript, 92 test files / 705 tests, OpenNext and agent dry-runs pass. Local inbound queue, durable outbox, named RPC receipt replay, and desktop/mobile email settings/logs browser checks pass. Real mailbox delivery remains pending an authorized test recipient.

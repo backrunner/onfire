@@ -7,7 +7,6 @@ import {
   Boxes,
   Building2,
   Check,
-  Flame,
   Loader2,
   LockKeyhole,
   MonitorCheck,
@@ -28,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { OnFireLogo } from "@/components/brand/onfire-logo";
 
 interface OAuthAuthorizationContext {
   client: { id: string; name: string | null; uri: string | null };
@@ -68,9 +68,7 @@ export function OAuthAuthorizeForm({ oauthQuery }: OAuthAuthorizeFormProps) {
       <header className="border-b bg-background/95">
         <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-2 text-sm font-semibold">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Flame className="size-4" />
-            </span>
+            <OnFireLogo />
             OnFire
           </div>
           <div className="flex items-center gap-1">

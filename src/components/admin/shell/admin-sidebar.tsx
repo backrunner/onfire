@@ -8,7 +8,6 @@ import {
   Ticket,
   Users,
   Settings,
-  Flame,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
@@ -19,6 +18,7 @@ import type { Permission } from "@/lib/types";
 import { canAccessManagement, managementEntryHref } from "@/lib/staff-access";
 import { isAdminNavItemActive } from "./admin-navigation";
 import { Button } from "@/components/ui/button";
+import { OnFireLogo } from "@/components/brand/onfire-logo";
 import {
   Tooltip,
   TooltipContent,
@@ -122,14 +122,8 @@ export function AdminSidebar({
             compact && "justify-center px-0"
           )}
         >
-          <Link href="/admin" className="flex items-center gap-2 font-semibold">
-            <span
-              className={cn(
-                "flex size-7 items-center justify-center rounded-md bg-gradient-to-br from-orange-500 to-red-600 text-white shadow-sm shadow-orange-500/20"
-              )}
-            >
-              <Flame className="size-4" />
-            </span>
+          <Link href="/admin" aria-label="OnFire" className="flex items-center gap-2 font-semibold">
+            <OnFireLogo size={28} />
             {!compact && <span className="text-sm">OnFire</span>}
           </Link>
         </div>

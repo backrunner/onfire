@@ -79,8 +79,6 @@
 .of-art-mark {
   align-self: center;
   padding: 28px 0 36px;
-  transform: rotate(-8deg);
-  filter: drop-shadow(6px 16px 12px rgb(65 39 18 / 12%));
 }
 .of-art-receipt {
   display: flex;

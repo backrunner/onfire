@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Fingerprint,
-  Flame,
   KeyRound,
   Loader2,
   ShieldCheck,
@@ -21,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/admin/shell/theme-toggle";
 import { LanguageToggle } from "@/components/admin/shell/language-toggle";
+import { OnFireLogo } from "@/components/brand/onfire-logo";
 
 export default function AdminLoginPage() {
   const { t } = useI18n();
@@ -161,9 +161,7 @@ export default function AdminLoginPage() {
       <div className="w-full max-w-sm space-y-6">
         {/* Brand */}
         <div className="flex flex-col items-center gap-2 text-center">
-          <span className="flex size-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-            <Flame className="size-5" />
-          </span>
+          <OnFireLogo size={44} label="OnFire" />
           <div>
             <h1 className="text-lg font-semibold">{t.login.title}</h1>
             <p className="text-sm text-muted-foreground">

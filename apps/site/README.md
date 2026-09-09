@@ -46,8 +46,10 @@ code copy, table of contents, and theme state retain the svedocs behavior.
 - `src/lib/WorkspacePreview.svelte`: sample conversations and three working
   preview modes. These never call the production ticket APIs.
 - `src/lib/messages.ts`: paired English/Chinese theme copy.
-- `static/onfire-mark.svg`: the flame/conversation mark, also used by
-  `BrandMark.svelte`. Keep `static/favicon.svg` in sync when changing it.
+- `static/onfire-mark.svg`: the generated split-flame mark, used by
+  `BrandMark.svelte`. Edit `../../docs/assets/onfire-mark.svg` and run
+  `node scripts/sync-brand.mjs` from the repository root to update the site,
+  application, favicons, and README banner together.
 
 Geist and Geist Mono are bundled locally. Their SIL OFL notices and the Lucide
 notice ship in `/licenses/`. Vite emits bundled dependency notices at
@@ -64,8 +66,10 @@ pnpm --dir apps/site install --frozen-lockfile
 pnpm --dir apps/site check
 pnpm --dir apps/site check:content
 pnpm --dir apps/site build
-pnpm exec wrangler pages deploy --config apps/site/wrangler.jsonc --project-name onfire --branch main
+cd apps/site
+../../node_modules/.bin/wrangler pages deploy build --project-name onfire --branch main
 ```
 
-The site-specific Wrangler file keeps the Pages deployment separate from the
-application and email Workers.
+Wrangler discovers the site-specific configuration from `apps/site`; Pages does
+not accept a custom `--config` path. This keeps the Pages deployment separate
+from the application and email Workers.
