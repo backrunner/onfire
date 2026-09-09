@@ -4,6 +4,24 @@ Review date: **2026-09-09**
 
 Revision reviewed: `f1523a3` plus the follow-up site cleanup commit.
 
+### Website theme follow-up — 2026-09-09
+
+The new standalone site theme retains Apache-2.0 attribution and ships its local
+font/icon notices and generated bundle licenses. Its frozen install, type check,
+16-page bilingual content check, and static build pass. Scoped overrides update
+the site's Sharp to 0.35.4 and cookie to 0.7.2; its production dependency audit now
+reports no known vulnerabilities.
+
+The application still passes type generation, TypeScript, 92 test files / 705
+tests, and both Worker builds. **Its current production lockfile audit reports
+9 advisories: 2 critical, 2 high, and 5 moderate.** These supersede the earlier
+clean-audit result below. The affected packages and reported fixed minimums are
+Next.js 16.3.3, Sharp 0.35.4, Hono 4.13.5, Tiptap core 3.30.5, and Vitest/mocker
+4.1.11. Audit findings require applicability review and a tested application
+dependency update before its release can claim a clean dependency audit. This
+theme release changes only the independent static site's runtime dependencies;
+it does not deploy the application or email Workers.
+
 This is a repository and distribution review, not a legal opinion or a security
 assessment of a deployed service.
 

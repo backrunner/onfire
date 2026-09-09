@@ -1,5 +1,5 @@
 ---
-title: OnFire — 让支持更出色，让协作更简单。
+title: OnFire — 从第一个问题，到最后一次回复。
 description: 为产品团队打造的开源多租户工单系统，在 Cloudflare Workers 上连接客户门户、客服工作台、邮件和 AI。
 ---
 

@@ -1,6 +1,8 @@
 <script lang="ts">
-  import 'svedocs/theme/styles.css';
-  import '$lib/theme.css';
+  import "@fontsource-variable/geist";
+  import "@fontsource-variable/geist-mono";
+  import "svedocs/theme/base.css";
+  import "$lib/theme.css";
 </script>
 
 <slot />

@@ -20,7 +20,7 @@ current site uses local search and does not enable Ask AI.
 
 Set `SITE_URL` in `.env.local` or the deployment environment before publishing
 so canonical links, sitemap entries, and alternate-language metadata use the
-public origin. The planned public origin is `https://onfire.pwp.sh` (see
+public origin. The default public origin is `https://onfire.pwp.sh` (see
 `.env.example`). English is the default route; Chinese pages use `/zh` for the
 landing page and `/docs/zh/...` for documentation.
 
@@ -30,5 +30,42 @@ build command, and `build` as the output directory. Set `SITE_URL` to
 `onfire.pwp.sh` as the Pages custom domain. The site is static and does not
 need a Worker binding.
 
-The landing preview is intentionally static and uses sample ticket data. It is
-not connected to a production OnFire account.
+The landing preview uses local sample ticket data and supports switching tickets,
+the customer portal, and routing views. It is not connected to a production
+OnFire account.
+
+## OnFire theme
+
+The theme owns its navigation, sidebar, reading layout, footer, and CSS. It
+imports only `svedocs/theme/base.css`; search, route loading, syntax highlighting,
+code copy, table of contents, and theme state retain the svedocs behavior.
+
+- `src/lib/styles`: shared light/dark tokens, navigation, landing, workspace,
+  reading, and dialog styles.
+- `src/lib/theme`: typed svedocs component replacements registered in Vite.
+- `src/lib/WorkspacePreview.svelte`: sample conversations and three working
+  preview modes. These never call the production ticket APIs.
+- `src/lib/messages.ts`: paired English/Chinese theme copy.
+- `static/onfire-mark.svg`: the flame/conversation mark, also used by
+  `BrandMark.svelte`. Keep `static/favicon.svg` in sync when changing it.
+
+Geist and Geist Mono are bundled locally. Their SIL OFL notices and the Lucide
+notice ship in `/licenses/`. Vite emits bundled dependency notices at
+`/third-party-licenses.txt`.
+
+Scoped pnpm overrides keep svedocs on Sharp 0.35.4 and SvelteKit on cookie 0.7.2
+for published security fixes. Recheck `pnpm audit --prod` when upgrading upstream
+and remove the overrides once its minimum versions include the fixes.
+
+Deploy a verified build from the repository root with the existing Wrangler login:
+
+```sh
+pnpm --dir apps/site install --frozen-lockfile
+pnpm --dir apps/site check
+pnpm --dir apps/site check:content
+pnpm --dir apps/site build
+pnpm exec wrangler pages deploy --config apps/site/wrangler.jsonc --project-name onfire --branch main
+```
+
+The site-specific Wrangler file keeps the Pages deployment separate from the
+application and email Workers.

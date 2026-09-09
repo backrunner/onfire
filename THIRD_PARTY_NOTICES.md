@@ -13,6 +13,11 @@ of every source file. Keep the lockfile and upstream license/NOTICE files when
 redistributing dependencies; include the applicable texts and notices alongside
 bundled/minified distributions.
 
+The independent `apps/site` build emits `/third-party-licenses.txt` for its
+bundled modules. It also ships the unmodified Geist/Geist Mono SIL OFL notices
+and Lucide ISC/MIT notices under `apps/site/static/licenses/`. The font files
+are self-hosted and unmodified.
+
 ## Terms requiring particular attention
 
 | Component | License / attribution | Redistribution |

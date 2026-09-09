@@ -21,6 +21,23 @@ Updated: 2026-09-09
   Gitleaks, and audits production dependencies. Final evidence and remaining
   maintainer publication steps are in `docs/OPEN_SOURCE_READINESS.md`.
 
+## Documentation website theme — 2026-09-09
+
+- `apps/site` owns its svedocs navigation, sidebar, reading layout, footer,
+  search presentation, and responsive light/dark styles. It imports only
+  `svedocs/theme/base.css` and retains the framework's behavior controllers.
+- The site uses a flame/conversation SVG mark, warm zinc and terracotta tokens,
+  self-hosted Geist fonts, and interactive sample ticket/portal/routing views.
+  Font and icon licenses ship with the static build.
+- `https://onfire.pwp.sh` is the canonical origin. `apps/site/wrangler.jsonc`
+  deploys only the `onfire` Pages project; application Workers are separate.
+- Final site verification: `apps/site` install with the frozen lockfile, Svelte
+  check (0 errors/warnings), 16-page content check (0 errors/warnings), static
+  build, production audit (no known vulnerabilities), and Playwright interaction
+  checks all pass. The interaction matrix covers desktop/dark/mobile layouts,
+  search, language and anchor preservation, theme state, copy controls, TOC,
+  menus, and 320/768px overflow checks.
+
 ## Current State
 
 - Subdomain email agent release (2026-09-09): Cloudflare Email Routing is enabled for `wifibuddy.alkinum.com`; apex `alkinum.com` MX remains on Stalwart. `support@wifibuddy.alkinum.com` routes to `onfire-email-agent`, which uses R2 plus inbound/outbound Queues and Cloudflare Email Sending. Main Worker `aee948c8-91b8-4a40-b716-d6f6fa56760a` and agent `b30d1128-0503-4abd-bcd9-4e9964ffab1b` are deployed. Remote migrations `0028` and `0029` are applied. WiFiBuddy product email config uses Cloudflare inbound/outbound with AI filtering disabled. See `.agents/EMAIL_AGENT_INTEGRATION.md`.

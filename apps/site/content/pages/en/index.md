@@ -1,5 +1,5 @@
 ---
-title: OnFire — support, without the clutter.
+title: OnFire — From first question to final reply.
 description: An open-source, multi-tenant ticket system for product teams. Customer portal, support dashboard, email, and AI on Cloudflare Workers.
 ---
 

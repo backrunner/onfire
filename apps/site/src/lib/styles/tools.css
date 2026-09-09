@@ -1,0 +1,129 @@
+.sd-search-dialog {
+  position: fixed;
+  width: min(620px, calc(100% - 32px));
+  max-height: min(650px, calc(100dvh - 80px));
+  top: 12vh;
+  bottom: auto;
+  padding: 0;
+  margin: 0 auto;
+  border: 1px solid var(--sd-line);
+  border-radius: 14px;
+  background: var(--sd-panel);
+  color: var(--sd-ink);
+  box-shadow: 0 30px 90px rgb(0 0 0 / 20%);
+  overflow: hidden;
+}
+.sd-search-dialog::backdrop {
+  background: rgb(24 23 25 / 35%);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.of-search-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--sd-line);
+  padding: 15px 18px;
+  color: var(--sd-muted);
+}
+.sd-search-box {
+  flex: 1;
+  min-width: 0;
+}
+.sd-search-box input {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--sd-ink);
+  font-size: 16px;
+  outline: none;
+}
+.sd-search-results {
+  overflow: auto;
+  max-height: min(480px, calc(80dvh - 150px));
+  padding: 9px;
+}
+.sd-search-results > a {
+  display: block;
+  padding: 14px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+}
+.sd-search-results > a.sd-active {
+  background: var(--of-subtle);
+  border-color: var(--sd-line);
+}
+.sd-search-results > a > span {
+  font-size: 14px;
+  font-weight: 550;
+}
+.sd-search-results small {
+  display: block;
+  margin-top: 5px;
+  color: var(--of-accent);
+  font-size: 11px;
+}
+.sd-search-results p {
+  margin: 9px 0 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--sd-muted);
+  overflow-wrap: anywhere;
+}
+.sd-empty-state {
+  padding: 20px;
+}
+.sd-floating-toolbar {
+  position: fixed;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  right: 24px;
+  z-index: 30;
+}
+.sd-floating-tool {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--sd-line);
+  border-radius: 10px;
+  background: var(--sd-panel);
+  box-shadow: var(--of-shadow);
+}
+.sd-floating-tool svg {
+  width: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+}
+.sd-error-panel,
+.sd-page,
+.sd-render-error {
+  background: var(--sd-panel);
+  border-radius: 12px;
+}
+.sd-error-panel {
+  padding: 34px;
+}
+.sd-error-panel h1 {
+  font-weight: 550;
+  font-size: 34px;
+}
+.sd-error-description {
+  color: var(--sd-muted);
+  line-height: 1.8;
+}
+.sd-error-actions a,
+.sd-render-error-actions button {
+  display: inline-flex;
+  padding: 10px 15px;
+  border: 1px solid var(--sd-line);
+  border-radius: 7px;
+  background: var(--of-subtle);
+  font-size: 13px;
+}
+@media (max-width: 550px) {
+  .sd-search-dialog {
+    top: 24px;
+  }
+}
