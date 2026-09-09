@@ -2,7 +2,7 @@
 
 Review date: **2026-09-09**
 
-Revision reviewed: `faddc3b` plus the current uncommitted email-agent worktree.
+Revision reviewed: `f1523a3` plus the follow-up site cleanup commit.
 
 This is a repository and distribution review, not a legal opinion or a security
 assessment of a deployed service.
@@ -14,6 +14,9 @@ assessment of a deployed service.
   points to third-party notices.
 - `README.md` and `README.zh-CN.md` describe the shipped architecture, setup,
   integrations, current limitations, and Cloudflare deployment model.
+- `apps/site` contains the bilingual svedocs landing and handbook. Its static
+  build is isolated from the Next.js Worker and uses the same Apache 2.0 notice
+  and repository links.
 - `docs/DEPLOYMENT.md` documents the two-Worker mail arrangement, required
   bindings, queues, migrations, domain separation, Access exceptions, secrets,
   and deployment order.
@@ -46,6 +49,9 @@ assessment of a deployed service.
 | `pnpm audit` / `pnpm audit --prod` | Pass — no known vulnerabilities in the reviewed lockfile |
 | Gitleaks current publication candidate | Pass |
 | Gitleaks Git history (`--all --full-history`) | Pass — 141 commits, no findings |
+| `pnpm --dir apps/site check` | Pass — 0 errors, 0 warnings |
+| `pnpm --dir apps/site check:content` | Pass — 16 pages, 0 errors, 0 warnings |
+| `pnpm --dir apps/site build` | Pass — static svedocs output |
 | Clean-checkout install/seed smoke | Pass — local D1, demo seed and 12 sample tickets |
 | Sequential local dev smoke | Pass — ToB and ToC health endpoints returned 200 |
 
