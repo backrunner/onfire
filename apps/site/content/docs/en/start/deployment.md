@@ -10,9 +10,26 @@ OnFire is designed for Cloudflare Workers. The public repository contains exampl
 
 Create D1, R2, Queues, and a 1024-dimension cosine Vectorize index in your own account. Keep the application Worker as the sole owner of D1 and cron. The optional email Worker receives only a restricted named RPC service binding.
 
-## Configure domains and secrets
+## Configure application domains and secrets
 
 Set one admin Custom Domain and one customer Custom Domain. `BETTER_AUTH_URL`, `ADMIN_DOMAINS`, `TOC_DOMAINS`, and the production Next.js environment must agree. Store `AUTH_SECRET` and the paired Turnstile secret with Wrangler; never commit them.
+
+## Publish the documentation site
+
+The public landing page and handbook are a separate static SvelteKit site in
+`apps/site`. The planned public origin is `https://onfire.pwp.sh`.
+
+For Cloudflare Pages, configure:
+
+- project root: `apps/site`
+- build command: `pnpm install --frozen-lockfile && pnpm build`
+- output directory: `build`
+- production variable: `SITE_URL=https://onfire.pwp.sh`
+
+Attach `onfire.pwp.sh` as the Pages custom domain. The build emits the English
+site at `/`, the Chinese site at `/zh`, and documentation at `/docs` and
+`/docs/zh/...`; `SITE_URL` makes canonical, sitemap, and alternate-language
+URLs use the custom domain.
 
 ## Build and migrate
 

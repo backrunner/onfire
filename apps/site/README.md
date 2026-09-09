@@ -20,8 +20,15 @@ current site uses local search and does not enable Ask AI.
 
 Set `SITE_URL` in `.env.local` or the deployment environment before publishing
 so canonical links, sitemap entries, and alternate-language metadata use the
-public origin. English is the default route; Chinese pages use `/zh` for the
+public origin. The planned public origin is `https://onfire.pwp.sh` (see
+`.env.example`). English is the default route; Chinese pages use `/zh` for the
 landing page and `/docs/zh/...` for documentation.
+
+For Cloudflare Pages, use `apps/site` as the project root, `pnpm build` as the
+build command, and `build` as the output directory. Set `SITE_URL` to
+`https://onfire.pwp.sh` in the production environment, then attach
+`onfire.pwp.sh` as the Pages custom domain. The site is static and does not
+need a Worker binding.
 
 The landing preview is intentionally static and uses sample ticket data. It is
 not connected to a production OnFire account.
