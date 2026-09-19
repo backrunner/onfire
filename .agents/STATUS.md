@@ -32,12 +32,24 @@ Updated: 2026-09-19
   dry-run, Drizzle metadata and production dependency audit (zero findings) pass.
   All 30 migrations apply to fresh local D1 with no foreign-key violations;
   remote D1 has no pending migrations. Production deploy dry-run passes; local
-  Worker startup profiles at 23.8 ms active CPU. Deployment is pending the
-  reviewed commit and final secret scan.
+  Worker startup profiles at 23.8 ms active CPU. The staged-content secret scan
+  passes with no findings.
   Provider tests use fixtures, not a real TypeSafe key. Browser QA could not run:
   the browser connector rejects this session's API-key authentication and native
   Edge returns `cgWindowNotFound`. Desktop/mobile/light/dark interaction and real
   English/Chinese model accuracy remain unverified.
+- Production release: commit `d19eb1b` is deployed as Worker
+  `2032a255-d84e-48f9-9a94-3a2190d0f008` at 100% traffic on
+  `support.alkinum.io` and `onfire.alkinum.com`, using the ignored production
+  configuration and production-configured build. Deployment startup took 33 ms;
+  no remote migration or email-agent deployment was needed. The previous Worker
+  version is `8c888312-969e-4519-87e4-44611e3f2ad8`.
+  Post-deployment probes confirm direct/proxied portal and health 200,
+  cross-surface ToB and proxied admin 404, unauthenticated customer tickets 401,
+  and the expected admin Cloudflare Access 302. All four JavaScript chunks
+  containing TypeSafe UI/configuration match the production build by SHA-256.
+  Authenticated production dashboard rendering and real TypeSafe inference
+  remain unverified as noted above.
 
 ## Open-source preparation — 2026-09-09
 
