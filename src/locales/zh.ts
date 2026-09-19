@@ -667,6 +667,7 @@ export const zh = {
       credentialDisabled: '该凭据已停用',
       loadModels: '刷新模型列表',
       loadModelsFailed: '供应商模型列表拉取失败',
+      typesafeHint: 'Jev 判断分类、固定标签与垃圾内容，不生成摘要或问题描述。',
       customModelHint: '也可以直接输入列表外的自定义模型',
       saved: '功能路由已保存',
       saveFailed: '功能路由保存失败'
@@ -716,6 +717,7 @@ export const zh = {
       google: 'Google AI',
       xai: 'xAI (Grok)',
       deepseek: 'DeepSeek',
+      typesafe: 'TypeSafe (Jev)',
       qwen: '通义千问 / DashScope',
       jina: 'Jina AI',
       cohere: 'Cohere'

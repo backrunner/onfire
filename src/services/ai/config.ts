@@ -14,6 +14,8 @@ import {
 import { and, asc, eq, sql } from "drizzle-orm";
 import {
   createProvider,
+  screenWithProvider,
+  type AIScreeningOptions,
   type AICompletionOptions,
   type AICompletionResult,
   type AIEmbeddingOptions,
@@ -122,7 +124,7 @@ export async function hasConfiguredAITask(
       row.routeEnabled &&
       row.credentialEnabled &&
       isProviderAllowedForTask(taskType, row.provider) &&
-      kind === modelKindForTask(taskType) &&
+      kind === modelKindForTask(taskType, row.provider) &&
       (kind !== "embedding" || (row.modelDimensions !== null && row.modelDimensions > 0));
   });
 }
@@ -190,7 +192,7 @@ async function listAvailableCredentials(
     )
     .map((row) => {
       const modelKind = row.modelKind ?? classifyAIModel(row.model);
-      if (modelKind !== modelKindForTask(taskType)) return null;
+      if (modelKind !== modelKindForTask(taskType, row.provider)) return null;
       if (modelKind === "embedding" && (!row.modelDimensions || row.modelDimensions < 1)) return null;
       return {
         id: row.credentialId,
@@ -360,6 +362,13 @@ class FailoverAIProvider implements AIProvider {
     });
   }
 
+  screen(options: AIScreeningOptions): Promise<AICompletionResult> {
+    if (this.taskType !== "prescreening") {
+      return Promise.reject(new Error("Screening requires the prescreening task"));
+    }
+    return this.execute((provider) => screenWithProvider(provider, options));
+  }
+
   embed(
     text: string,
     options?: AIEmbeddingOptions
@@ -407,7 +416,8 @@ class FailoverAIProvider implements AIProvider {
             taskType: this.taskType,
             tenantId: this.context.tenantId,
             productId: this.context.productId,
-            model: candidate.model,
+            model: result && typeof result === "object" && "model" in result && typeof result.model === "string"
+              ? result.model : candidate.model,
             provider: candidate.provider,
             promptTokens: tokens.promptTokens,
             completionTokens: tokens.completionTokens,

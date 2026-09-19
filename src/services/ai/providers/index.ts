@@ -20,6 +20,8 @@ export interface AICompletionOptions {
 
 export interface AICompletionResult {
   content: string;
+  /** Actual model version when the provider resolves an alias. */
+  model?: string;
   usage?: {
     promptTokens: number;
     completionTokens: number;
@@ -51,12 +53,35 @@ export interface AIEmbeddingOptions {
   inputType?: "document" | "query";
 }
 
+export interface AIScreeningOptions {
+  kind: "ticket" | "email";
+  subject: string;
+  content: string;
+  fromEmail?: string;
+  candidates?: Array<{ id: string; path: string; description?: string | null }>;
+  /** Existing text-model prompt and validation used by generative fallbacks. */
+  completion: AICompletionOptions;
+}
+
 export interface AIProvider {
   name: string;
   embeddingSpace?: string;
   complete(options: AICompletionOptions): Promise<AICompletionResult>;
+  screen?(options: AIScreeningOptions): Promise<AICompletionResult>;
   embed(text: string, options?: AIEmbeddingOptions): Promise<AIEmbeddingResult>;
   rerank?(options: AIRerankOptions): Promise<AIRerankResult>;
+}
+
+/** Keep structured decisions and text-model fallbacks in the same task route. */
+export async function screenWithProvider(
+  provider: AIProvider,
+  options: AIScreeningOptions,
+): Promise<AICompletionResult> {
+  const result = provider.screen
+    ? await provider.screen(options)
+    : await provider.complete(options.completion);
+  options.completion.validateResult?.(result);
+  return result;
 }
 
 export interface ProviderConfig {
@@ -81,6 +106,10 @@ export function requireCompletionContent(
 
 export async function createProvider(config: ProviderConfig): Promise<AIProvider> {
   switch (config.provider) {
+    case "typesafe": {
+      const { TypeSafeProvider } = await import("./typesafe");
+      return new TypeSafeProvider(config);
+    }
     case "openai": {
       const { OpenAIProvider } = await import("./openai");
       return new OpenAIProvider(config);

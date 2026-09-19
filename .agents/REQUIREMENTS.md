@@ -223,6 +223,13 @@
 ## AI
 
 - Language providers: OpenAI, OpenRouter, Anthropic, Google, xAI, DeepSeek.
+- TypeSafe Jev is a decision provider for prescreening only. Use its native
+  System One API for spam/support probabilities, candidate type selection and
+  fixed support tags; do not present it as a generative provider. Validate all
+  typed answers before credential success and preserve raw judgments/model
+  versions for audit. Inbound rejection applies each adverse probability
+  independently to the product strictness threshold; uncertain type choices
+  retain the unclassified fallback. See `docs/TYPESAFE.md`.
 - OpenAI persists `responses` or `chat`; default to Responses, retain Chat for compatible gateways.
 - Embedding providers: OpenAI, OpenRouter, Qwen/DashScope, Jina AI, Cohere, Google.
 - Rerank providers: Cohere and Jina AI. Every route must use a model matching its text, embedding, or rerank capability; provider-specific catalogs are fetched and exact model capabilities are verified by the server before assignment.

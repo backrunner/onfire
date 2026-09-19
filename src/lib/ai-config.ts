@@ -34,15 +34,17 @@ export const ALL_AI_PROVIDERS = [
   "qwen",
   "jina",
   "cohere",
+  "typesafe",
 ] as const;
 
 export const OPENAI_API_MODES = ["responses", "chat"] as const;
 export const EMBEDDING_DIMENSIONS = 1024;
 
-export type AIModelKind = "text" | "embedding" | "rerank";
+export type AIModelKind = "text" | "embedding" | "rerank" | "decision";
 
 /** The capability expected by each route. Keep this server-side contract in one place. */
-export function modelKindForTask(taskType: AITaskTypeValue): AIModelKind {
+export function modelKindForTask(taskType: AITaskTypeValue, provider?: AIProviderValue): AIModelKind {
+  if (taskType === "prescreening" && provider === "typesafe") return "decision";
   if (taskType === "embedding") return "embedding";
   if (taskType === "rerank") return "rerank";
   return "text";
@@ -51,6 +53,7 @@ export function modelKindForTask(taskType: AITaskTypeValue): AIModelKind {
 /** Legacy-row fallback only. New and updated routes use provider catalog metadata. */
 export function classifyAIModel(model: string): AIModelKind {
   const value = model.toLowerCase();
+  if (/^jev-(?:latest|preview|\d+\.\d+\.\d+)$/.test(value)) return "decision";
   if (/rerank|cross[-_ ]?encoder|ranker/.test(value)) return "rerank";
   if (/embed|embedding|bge[-_ ]?m3|e5[-_ ]|gte[-_ ]|multilingual[-_ ]?e5|text[-_ ]embedding/.test(value)) {
     return "embedding";
@@ -81,6 +84,7 @@ export function isProviderAllowedForTask(
   taskType: AITaskTypeValue,
   provider: AIProviderValue
 ): boolean {
+  if (provider === "typesafe") return taskType === "prescreening";
   const providers = taskType === "embedding"
     ? EMBEDDING_AI_PROVIDERS
     : taskType === "rerank"

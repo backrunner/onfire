@@ -1,6 +1,43 @@
 # OnFire Project Status
 
-Updated: 2026-09-09
+Updated: 2026-09-19
+
+## TypeSafe Jev screening — 2026-09-19
+
+- Installed the requested `typesafe-ai` project skill using the skills CLI and
+  recorded it in `skills-lock.json`; AGENTS.md points to its live-doc workflow.
+- Added TypeSafe credentials, native `/v1/systemone` screening, live model
+  discovery and pinned Jev versions. Decision capabilities are restricted to
+  prescreening in route writes, credential changes, runtime resolution and UI.
+- Jev batches independent spam/support probabilities, category/sentiment/urgency,
+  fixed support tags and product ticket-type choices. No-match and low-confidence
+  types retain the unclassified fallback; speculative support insights are
+  ignored on non-support/spam branches. Generated summaries and issue prose are
+  intentionally unavailable from Jev. Setup and current API references are in
+  `docs/TYPESAFE.md`.
+- Structured response validation runs inside existing credential failover.
+  Scoped inheritance, mixed Jev/language-model fallback, cooldowns, token usage,
+  independent rejection thresholds and recoverable quarantine are preserved.
+  Raw answers and resolved model versions remain in internal screening audit.
+- Review fixes allow metadata-only credential edits (including disabling a key)
+  during provider outages and suppress raw TypeSafe model-catalog errors that
+  could echo request credentials. Six real-handler SQLite tests verify sealed
+  keys, hidden read payloads, rotation with pinned versions, failure atomicity,
+  incompatible task/provider edits and tenant/product authorization.
+- No SQL migration, binding or runtime dependency change is required. Existing
+  TEXT columns accept the new provider/capability values without a storage change.
+  No live TypeSafe inference or production credential change was performed.
+- Validation: frozen install, generated Worker type check, TypeScript, all
+  94 test files / 747 tests, production-configured application build, email-agent
+  dry-run, Drizzle metadata and production dependency audit (zero findings) pass.
+  All 30 migrations apply to fresh local D1 with no foreign-key violations;
+  remote D1 has no pending migrations. Production deploy dry-run passes; local
+  Worker startup profiles at 23.8 ms active CPU. Deployment is pending the
+  reviewed commit and final secret scan.
+  Provider tests use fixtures, not a real TypeSafe key. Browser QA could not run:
+  the browser connector rejects this session's API-key authentication and native
+  Edge returns `cgWindowNotFound`. Desktop/mobile/light/dark interaction and real
+  English/Chinese model accuracy remain unverified.
 
 ## Open-source preparation — 2026-09-09
 

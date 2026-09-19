@@ -7,9 +7,12 @@ import type { Database } from "@/lib/db";
 import { tickets } from "@/drizzle/schema";
 import { eq } from "drizzle-orm";
 import { getAIProvider } from "./config";
+import { screenWithProvider } from "./providers";
+import { decisionAuditSchema } from "./screening-contract";
 import { z } from "zod";
 
 const prescreeningSchema = z.object({
+  decision: decisionAuditSchema.optional(),
   issues: z.array(z.string()),
   keywords: z.array(z.string()),
   category: z.string().optional(),
@@ -25,6 +28,7 @@ function parsePrescreening(content: string): PrescreeningResult {
 }
 
 export interface PrescreeningResult {
+  decision?: z.infer<typeof decisionAuditSchema>;
   issues: string[];
   keywords: string[];
   category?: string;
@@ -76,17 +80,22 @@ export async function prescreenTicket(
       .set({ aiScreeningStatus: "processing" })
       .where(eq(tickets.id, ticketId));
 
-    const result = await provider.complete({
-      messages: [
-        { role: "system", content: PRESCREENING_PROMPT },
-        {
-          role: "user",
-          content: `Subject: ${ticket.subject}\n\nContent:\n${ticket.content}`,
-        },
-      ],
-      temperature: 0.3,
-      maxTokens: 1024,
-      validateResult: (result) => { parsePrescreening(result.content); },
+    const result = await screenWithProvider(provider, {
+      kind: "ticket",
+      subject: ticket.subject,
+      content: ticket.content,
+      completion: {
+        messages: [
+          { role: "system", content: PRESCREENING_PROMPT },
+          {
+            role: "user",
+            content: `Subject: ${ticket.subject}\n\nContent:\n${ticket.content}`,
+          },
+        ],
+        temperature: 0.3,
+        maxTokens: 1024,
+        validateResult: (result) => { parsePrescreening(result.content); },
+      },
     });
 
     // Parse JSON response

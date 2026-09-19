@@ -13,6 +13,24 @@ function json(body: unknown): Response {
 }
 
 describe("AI model catalog", () => {
+  it("reads TypeSafe model names as decision capabilities and accepts pinned Jev versions", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(json({
+      models: [{ name: "jev-latest", description: "Stable Jev", release_date: "2026-09-01" }],
+    }));
+    const models = await listProviderModels("typesafe", "secret");
+    expect(models).toEqual([{ id: "jev-latest", kind: "decision" }]);
+    expect(fetchMock.mock.calls[0]).toMatchObject([
+      "https://api.typesafe.ai/v1/models", { headers: { Authorization: "Bearer secret" }, redirect: "error" },
+    ]);
+    expect(resolveAssignableModel("typesafe", models, "jev-1.13.0", "decision")?.kind).toBe("decision");
+    expect(resolveAssignableModel("typesafe", [], "jev-latest", "text")).toBeNull();
+    expect(resolveAssignableModel("typesafe", [], "gpt-5", "decision")).toBeNull();
+  });
+
+  it("rejects malformed TypeSafe catalogs", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(json({ data: [{ id: "jev-latest" }] }));
+    await expect(listProviderModels("typesafe", "secret")).rejects.toThrow(/Invalid TypeSafe/);
+  });
   it("does not overwrite a live fixed dimension with a static suggestion", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async () => json({ data: [
       { id: "jina-embeddings-v4", dimensions: 768 },

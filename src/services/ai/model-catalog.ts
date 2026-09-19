@@ -2,6 +2,7 @@ import type { AIModelKind, AIProviderValue } from "@/lib/ai-config";
 import { classifyAIModel, EMBEDDING_DIMENSIONS, safeAIBaseUrl } from "@/lib/ai-config";
 import { fetchWithTimeout } from "@/lib/fetch-timeout";
 import { readResponseJson, readResponseText } from "@/lib/response-body";
+import { z } from "zod";
 
 export interface AIModelDescriptor {
   id: string;
@@ -19,6 +20,7 @@ const DEFAULT_BASE_URLS: Record<AIProviderValue, string> = {
   google: "https://generativelanguage.googleapis.com/v1beta",
   xai: "https://api.x.ai/v1",
   deepseek: "https://api.deepseek.com",
+  typesafe: "https://api.typesafe.ai/v1",
   qwen: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
   jina: "https://api.jina.ai/v1",
   cohere: "https://api.cohere.com/v2",
@@ -186,6 +188,22 @@ async function fetchCatalogPage(url: string, headers: Record<string, string>): P
   return data as Record<string, unknown>;
 }
 
+async function listTypeSafeModels(baseUrl: string, apiKey: string): Promise<AIModelDescriptor[]> {
+  let body: Record<string, unknown>;
+  try {
+    body = await fetchCatalogPage(endpoint(baseUrl, "models"), {
+      Accept: "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    });
+  } catch {
+    // Catalog errors can echo request credentials; never forward their bodies.
+    throw new Error("Unable to load TypeSafe model catalog");
+  }
+  const models = z.array(z.object({ name: z.string().trim().min(1).max(200) })).safeParse(body.models);
+  if (!models.success) throw new Error("Invalid TypeSafe model catalog");
+  return models.data.map((item) => ({ id: item.name, kind: "decision" }));
+}
+
 async function listAnthropicModels(baseUrl: string, apiKey: string): Promise<AIModelDescriptor[]> {
   const models: AIModelDescriptor[] = [];
   let afterId: string | undefined;
@@ -260,11 +278,13 @@ export async function listProviderModels(
     ? DEFAULT_BASE_URLS[provider]
     : safeAIBaseUrl(configuredBaseUrl);
   if (!baseUrl) throw new Error("AI base URL is unsafe or invalid");
-  const models = provider === "anthropic"
-    ? await listAnthropicModels(baseUrl, apiKey)
-    : provider === "google"
-      ? await listGoogleModels(baseUrl, apiKey, dimensions)
-      : await listOpenAiCompatibleModels(provider, baseUrl, apiKey, dimensions);
+  const models = provider === "typesafe"
+    ? await listTypeSafeModels(baseUrl, apiKey)
+    : provider === "anthropic"
+      ? await listAnthropicModels(baseUrl, apiKey)
+      : provider === "google"
+        ? await listGoogleModels(baseUrl, apiKey, dimensions)
+        : await listOpenAiCompatibleModels(provider, baseUrl, apiKey, dimensions);
   // Live catalogs remain authoritative for capability metadata. Static entries
   // enrich matching live records for providers whose catalog omits dimension
   // metadata; models outside the catalog are handled by the name-based
@@ -318,6 +338,7 @@ export function resolveAssignableModel(
   if (match) return match;
   if (catalog.some((model) => model.id === id)) return null;
   const kind = classifyAIModel(id);
+  if (provider === "typesafe" && kind !== "decision") return null;
   if (kind !== expectedKind) return null;
   return {
     id,

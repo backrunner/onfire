@@ -627,6 +627,16 @@ Custom product templates use the same escaped variable renderer for preview and 
 
 ## AI System
 
+- Use the installed `.agents/skills/typesafe-ai/SKILL.md` when working on
+  TypeSafe/Jev capabilities. Read its live API and question guidance before
+  changing the integration.
+- TypeSafe Jev uses native System One typed decisions for prescreening only,
+  including fixed-label tagging and inbound spam/support/type classification.
+  It is not a text-generation, translation, embedding or rerank provider.
+  Decision routes retain scoped credentials, failover, cooldown and usage;
+  raw probabilities and resolved model versions remain in internal audit JSON.
+  See `docs/TYPESAFE.md` for setup, thresholds, limits and evaluation.
+
 - Dashboard assistant sessions use `ticket-<ticketId>` and recheck current ticket
   visibility for both history and generation; a session cannot be reused with
   another ticket. Failed completions do not persist an unmatched user message.

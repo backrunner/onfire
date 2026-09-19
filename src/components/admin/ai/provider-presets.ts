@@ -1,7 +1,5 @@
 import {
-  EMBEDDING_AI_PROVIDERS,
-  LANGUAGE_AI_PROVIDERS,
-  RERANK_AI_PROVIDERS,
+  isProviderAllowedForTask,
   type AIProviderValue,
   type AITaskTypeValue,
 } from "@/lib/ai-config";
@@ -9,6 +7,7 @@ import {
 interface ProviderPreset {
   baseUrl: string;
   languageModels?: string[];
+  decisionModels?: string[];
   embeddingModels?: string[];
   rerankModels?: string[];
 }
@@ -41,6 +40,10 @@ export const PROVIDER_PRESETS: Record<AIProviderValue, ProviderPreset> = {
     baseUrl: "https://api.deepseek.com",
     languageModels: ["deepseek-chat"],
   },
+  typesafe: {
+    baseUrl: "https://api.typesafe.ai/v1",
+    decisionModels: ["jev-latest", "jev-1.13.0", "jev-preview"],
+  },
   qwen: {
     baseUrl: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
     embeddingModels: ["text-embedding-v4", "text-embedding-v3"],
@@ -66,12 +69,7 @@ export function providerSupportsTask(
   provider: AIProviderValue,
   taskType: AITaskTypeValue
 ): boolean {
-  const providers = taskType === "embedding"
-    ? EMBEDDING_AI_PROVIDERS
-    : taskType === "rerank"
-      ? RERANK_AI_PROVIDERS
-      : LANGUAGE_AI_PROVIDERS;
-  return providers.some((value) => value === provider);
+  return isProviderAllowedForTask(taskType, provider);
 }
 
 export function modelsForTask(
@@ -79,6 +77,8 @@ export function modelsForTask(
   taskType: AITaskTypeValue
 ): string[] {
   const preset = PROVIDER_PRESETS[provider];
+  if (!providerSupportsTask(provider, taskType)) return [];
+  if (provider === "typesafe") return preset.decisionModels ?? [];
   if (taskType === "embedding") return preset.embeddingModels ?? [];
   if (taskType === "rerank") return preset.rerankModels ?? [];
   return preset.languageModels ?? [];

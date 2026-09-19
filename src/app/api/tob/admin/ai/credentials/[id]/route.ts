@@ -17,6 +17,7 @@ import { openStoredSecret, sealSecret } from "@/lib/secret-storage";
 import { AI_CREDENTIAL_SECRET_PURPOSE } from "@/services/ai/config";
 import { assertCanManageAiScope } from "@/lib/ai-scope";
 import {
+  resolveAssignableModel,
   findCompatibleModel,
   listProviderModels,
   normalizeProviderModelId,
@@ -76,13 +77,13 @@ export const PATCH = withAuth(
       })
       .from(aiTaskCredentials)
       .where(eq(aiTaskCredentials.credentialId, existing.id));
-    const modelChanges = body.provider !== undefined ||
+    const modelChanges = (body.provider !== undefined && body.provider !== existing.provider) ||
       body.apiKey !== undefined ||
-      body.baseUrl !== undefined;
+      (body.baseUrl !== undefined && safeAIBaseUrl(body.baseUrl) !== safeAIBaseUrl(existing.baseUrl));
     const verifiedRoutes: Array<{
       id: string;
       model: string;
-      kind: "text" | "embedding" | "rerank";
+      kind: "text" | "embedding" | "rerank" | "decision";
       dimensions?: number;
     }> = [];
     if (modelChanges && routes.length > 0) {
@@ -112,11 +113,9 @@ export const PATCH = withAuth(
       }
       for (const route of routes) {
         const model = normalizeProviderModelId(nextProvider, route.model);
-        const match = findCompatibleModel(
-          models,
-          model,
-          modelKindForTask(route.taskType),
-        );
+        const match = nextProvider === "typesafe"
+          ? resolveAssignableModel(nextProvider, models, model, modelKindForTask(route.taskType, nextProvider))
+          : findCompatibleModel(models, model, modelKindForTask(route.taskType, nextProvider));
         if (!match) {
           throw badRequest(
             "Remove or update incompatible task routes before changing this credential",

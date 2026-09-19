@@ -7,9 +7,14 @@
 import type { Database } from "@/lib/db";
 import type { AIFilterStrictness } from "@/drizzle/schema";
 import { getAIProvider } from "./config";
+import { screenWithProvider } from "./providers";
+import { decisionAuditSchema } from "./screening-contract";
 import { z } from "zod";
 
 const verdictSchema = z.object({
+  decision: decisionAuditSchema.optional(),
+  spamProbability: z.number().min(0).max(1).optional(),
+  supportProbability: z.number().min(0).max(1).optional(),
   isSupportRequest: z.boolean(),
   isSpam: z.boolean(),
   confidence: z.number().min(0).max(1),
@@ -22,6 +27,9 @@ function parseClassification(content: string): Partial<EmailClassification> {
 }
 
 export interface EmailClassification {
+  decision?: z.infer<typeof decisionAuditSchema>;
+  spamProbability?: number;
+  supportProbability?: number;
   isSupportRequest: boolean;
   isSpam: boolean;
   confidence: number;
@@ -74,17 +82,24 @@ export async function classifyInboundEmail(
   try {
     const provider = await getAIProvider(db, "prescreening", context);
     if (!provider) return null;
-    const result = await provider.complete({
-      messages: [
-        { role: "system", content: FILTER_PROMPT },
-        {
-          role: "user",
-          content: `Ticket type candidates:\n${JSON.stringify(candidates)}\n\nFrom: ${input.fromEmail}\nSubject: ${input.subject}\n\n${input.content.slice(0, 8000)}`,
-        },
-      ],
-      temperature: 0,
-      maxTokens: 768,
-      validateResult: (result) => { parseClassification(result.content); },
+    const result = await screenWithProvider(provider, {
+      kind: "email",
+      subject: input.subject,
+      content: input.content.slice(0, 8000),
+      fromEmail: input.fromEmail,
+      candidates,
+      completion: {
+        messages: [
+          { role: "system", content: FILTER_PROMPT },
+          {
+            role: "user",
+            content: `Ticket type candidates:\n${JSON.stringify(candidates)}\n\nFrom: ${input.fromEmail}\nSubject: ${input.subject}\n\n${input.content.slice(0, 8000)}`,
+          },
+        ],
+        temperature: 0,
+        maxTokens: 768,
+        validateResult: (result) => { parseClassification(result.content); },
+      },
     });
 
     const parsed = parseClassification(result.content);
@@ -95,6 +110,9 @@ export async function classifyInboundEmail(
       return null;
     }
     return {
+      decision: parsed.decision,
+      spamProbability: parsed.spamProbability,
+      supportProbability: parsed.supportProbability,
       isSupportRequest: parsed.isSupportRequest,
       isSpam: parsed.isSpam,
       confidence:
@@ -140,6 +158,10 @@ export function shouldRejectEmail(
   strictness: AIFilterStrictness
 ): boolean {
   const threshold = REJECT_CONFIDENCE[strictness] ?? REJECT_CONFIDENCE.medium;
+  if (classification.spamProbability !== undefined && classification.supportProbability !== undefined) {
+    return (classification.spamProbability > 0.5 && classification.spamProbability >= threshold) ||
+      (classification.supportProbability < 0.5 && 1 - classification.supportProbability >= threshold);
+  }
   if (classification.isSpam && classification.confidence >= threshold) {
     return true;
   }

@@ -203,7 +203,7 @@ function TaskRoutingCard({
         credentialId: credential.id,
         model: defaultModelForTask(credential.provider, taskType),
         enabled: true,
-        modelKind: modelKindForTask(taskType),
+        modelKind: modelKindForTask(taskType, credential?.provider),
         modelDimensions: undefined,
       },
     ]);
@@ -399,7 +399,7 @@ function TaskRoutingCard({
               const availableModels = fetchedModels
                 ? fetchedModels
                     .filter((model) =>
-                      model.kind === modelKindForTask(taskType) &&
+                      model.kind === modelKindForTask(taskType, credential?.provider) &&
                       (model.kind !== "embedding" || model.dimensions !== undefined)
                     )
                     .map((model) => model.id)
@@ -466,7 +466,7 @@ function TaskRoutingCard({
                             model: nextCredential
                               ? defaultModelForTask(nextCredential.provider, taskType)
                               : "",
-                            modelKind: nextCredential ? modelKindForTask(taskType) : undefined,
+                            modelKind: nextCredential ? modelKindForTask(taskType, nextCredential.provider) : undefined,
                             modelDimensions: undefined,
                           });
                         }}
@@ -531,6 +531,9 @@ function TaskRoutingCard({
                           });
                         }}
                       />
+                      {credential?.provider === "typesafe" && (
+                        <p className="text-[11px] text-muted-foreground">{r.typesafeHint}</p>
+                      )}
                     </div>
                   </div>
                 </div>

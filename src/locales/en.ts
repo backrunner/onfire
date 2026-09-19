@@ -669,6 +669,7 @@ export const en: Translations = {
       credentialDisabled: 'Credential is disabled',
       loadModels: 'Refresh model list',
       loadModelsFailed: 'Failed to load provider models',
+      typesafeHint: 'Jev selects categories and fixed tags, and checks spam. It does not generate summaries or issue descriptions.',
       customModelHint: 'You can also type a custom model not in the list',
       saved: 'Function routing saved',
       saveFailed: 'Failed to save function routing'
@@ -718,6 +719,7 @@ export const en: Translations = {
       google: 'Google AI',
       xai: 'xAI (Grok)',
       deepseek: 'DeepSeek',
+      typesafe: 'TypeSafe (Jev)',
       qwen: 'Qwen / DashScope',
       jina: 'Jina AI',
       cohere: 'Cohere'

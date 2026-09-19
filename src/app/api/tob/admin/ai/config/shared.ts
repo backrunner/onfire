@@ -34,7 +34,7 @@ import {
 const assignmentSchema = z.object({
   credentialId: z.string().min(1),
   model: z.string().trim().min(1).max(200),
-  modelKind: z.enum(["text", "embedding", "rerank"]).optional(),
+  modelKind: z.enum(["text", "embedding", "rerank", "decision"]).optional(),
   modelDimensions: z.number().int().positive().max(16_384).optional(),
   enabled: z.boolean().optional(),
 });
@@ -224,7 +224,7 @@ async function assertAssignableCredentials(
       credential.provider,
       catalog,
       assignment.model,
-      modelKindForTask(taskType),
+      modelKindForTask(taskType, credential.provider),
       dimensions,
     );
     if (!resolved) throw badRequest(`Model is not compatible with the ${taskType} task`);

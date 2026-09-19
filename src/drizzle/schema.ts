@@ -878,6 +878,7 @@ export type AIProvider =
   | "google"
   | "xai"
   | "deepseek"
+  | "typesafe"
   | "qwen"
   | "jina"
   | "cohere";
@@ -941,7 +942,7 @@ export const aiTaskCredentials = sqliteTable(
     taskType: text("task_type").$type<AITaskType>().notNull(),
     credentialId: text("credential_id").notNull(),
     model: text("model").notNull(),
-    modelKind: text("model_kind").$type<"text" | "embedding" | "rerank">(),
+    modelKind: text("model_kind").$type<"text" | "embedding" | "rerank" | "decision">(),
     modelDimensions: integer("model_dimensions"),
     priority: integer("priority").notNull().default(0),
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
