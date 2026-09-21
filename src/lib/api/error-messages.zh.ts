@@ -4,6 +4,13 @@
  * source literals — a mismatch silently falls back to English.
  */
 export const zhErrorMessages: Record<string, string> = {
+  "TypeSafe model catalog request timed out. Try again later.": "TypeSafe 模型列表请求超时，请稍后重试。",
+  "Could not connect to the TypeSafe model catalog. Check the API base URL or try again later.": "无法连接 TypeSafe 模型列表接口，请检查 API 地址或稍后重试。",
+  "Invalid TypeSafe model catalog": "TypeSafe 返回的模型列表为空或格式无效。",
+  "TypeSafe model catalog request failed (HTTP 401). Check the saved API key.": "TypeSafe 模型列表请求失败（HTTP 401），请检查已保存的 API 密钥。",
+  "TypeSafe model catalog request failed (HTTP 403). Check the API key and account permissions.": "TypeSafe 模型列表请求被拒绝（HTTP 403），请检查 API 密钥和账户权限。",
+  "TypeSafe model catalog request failed (HTTP 404). Check the API base URL.": "TypeSafe 模型列表接口不存在（HTTP 404），请检查 API 地址。",
+  "TypeSafe model catalog request failed (HTTP 429). Rate limit reached. Try again later.": "TypeSafe 模型列表请求触发限流（HTTP 429），请稍后重试。",
   "API key does not permit this operation": "此 API 密钥未获准执行该操作",
   "Key expiry must be in the future and within 365 days": "密钥到期时间必须在未来 365 天内",
   "API keys can only be managed in your own browser session": "只能在自己的浏览器登录会话中管理 API 密钥",

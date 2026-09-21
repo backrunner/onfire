@@ -12,33 +12,43 @@ interface ProviderPreset {
   rerankModels?: string[];
 }
 
+// Suggestions checked against official catalogs/docs on 2026-09-21.
+// Existing routes keep their saved IDs; refresh loads the credential's catalog.
 export const PROVIDER_PRESETS: Record<AIProviderValue, ProviderPreset> = {
   openai: {
     baseUrl: "https://api.openai.com/v1",
-    languageModels: ["gpt-5.4-mini", "gpt-4.1-mini"],
+    languageModels: ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-6-astra"],
     embeddingModels: ["text-embedding-3-small", "text-embedding-3-large"],
   },
   openrouter: {
     baseUrl: "https://openrouter.ai/api/v1",
-    languageModels: ["openai/gpt-4o-mini", "anthropic/claude-3.5-haiku"],
+    languageModels: [
+      "openai/gpt-5.6-luna",
+      "google/gemini-3.8-flash",
+      "deepseek/deepseek-v4.1-flash",
+      "anthropic/claude-sonnet-5",
+      "anthropic/claude-fable-5.1",
+      "openai/gpt-6-astra",
+      "x-ai/grok-4.7",
+    ],
     embeddingModels: ["openai/text-embedding-3-small"],
   },
   anthropic: {
     baseUrl: "https://api.anthropic.com/v1",
-    languageModels: ["claude-sonnet-4-5", "claude-haiku-4-5"],
+    languageModels: ["claude-sonnet-5", "claude-opus-5", "claude-fable-5-1", "claude-haiku-4-5"],
   },
   google: {
     baseUrl: "https://generativelanguage.googleapis.com/v1beta",
-    languageModels: ["gemini-2.5-flash"],
+    languageModels: ["gemini-3.8-flash", "gemini-3.5-flash-lite"],
     embeddingModels: ["gemini-embedding-2", "gemini-embedding-001"],
   },
   xai: {
     baseUrl: "https://api.x.ai/v1",
-    languageModels: ["grok-4-fast"],
+    languageModels: ["grok-4.7"],
   },
   deepseek: {
     baseUrl: "https://api.deepseek.com",
-    languageModels: ["deepseek-chat"],
+    languageModels: ["deepseek-flash", "deepseek-v4-pro"],
   },
   typesafe: {
     baseUrl: "https://api.typesafe.ai/v1",

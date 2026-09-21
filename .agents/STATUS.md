@@ -2,6 +2,35 @@
 
 Updated: 2026-09-21
 
+## Model catalog refresh and current suggestions — 2026-09-21
+
+- Reproduced the reported TypeSafe and OpenRouter refresh failures through the
+  authenticated production API. OpenRouter exposed the shared cause: Workers
+  rejects `redirect: "error"` before issuing the fetch; TypeSafe hid it behind
+  its generic catalog error. Both saved credentials successfully read their
+  official catalogs from Node, so the failure was not a stale key or endpoint.
+- Catalog fetches now use `manual` and reject all non-2xx responses, preserving
+  the no-redirect credential boundary. TypeSafe screening had the same runtime
+  incompatibility and is corrected too. TypeSafe discovery retries one bounded
+  transient failure; safe bilingual errors distinguish HTTP status, connection,
+  timeout and invalid/empty responses without exposing upstream bodies.
+- Updated language suggestions for OpenAI, OpenRouter, Anthropic, Google, xAI
+  and DeepSeek from their current official catalogs/docs. Jev aliases and the
+  pinned 1.13.0 suggestion remain current. Existing saved routes retain their
+  model IDs. Sources and behavior are documented in `docs/AI_MODELS.md`.
+- Verification: frozen install, generated bindings, TypeScript, 95 Vitest files
+  / 804 tests, and an isolated rerun of 80 affected tests pass. Real workerd
+  reproduces the old redirect failure, loads TypeSafe/OpenRouter fixture
+  catalogs after the fix, and rejects redirected catalogs and TypeSafe screening
+  with a single outbound request. Direct workerd Internet egress in this local
+  harness fails with an internal runtime error; live provider catalog reads
+  were verified separately through Node. No model inference was invoked.
+- No production configuration/credential changes, migration, commit or
+  deployment was performed for this fix. Both Worker builds pass in an isolated
+  snapshot; all code and tests for this fix match the working tree byte for
+  byte. The isolated build avoids another in-progress workspace build and
+  includes successful Next.js TypeScript validation and email-agent dry-run.
+
 ## Account API keys production release — 2026-09-21
 
 - With explicit deployment authorization, applied migration

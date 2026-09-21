@@ -155,7 +155,8 @@ export class TypeSafeProvider implements AIProvider {
       method: "POST",
       headers: { Authorization: `Bearer ${this.config.apiKey}`, "Content-Type": "application/json" },
       body,
-      redirect: "error",
+      // Reject 3xx below; Workers does not implement redirect: "error".
+      redirect: "manual",
       signal: AbortSignal.timeout(20_000),
     });
     // The credential route handles failures/cooldown; do not multiply attempts

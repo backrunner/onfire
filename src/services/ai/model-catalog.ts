@@ -1,7 +1,7 @@
 import type { AIModelKind, AIProviderValue } from "@/lib/ai-config";
 import { classifyAIModel, EMBEDDING_DIMENSIONS, safeAIBaseUrl } from "@/lib/ai-config";
 import { fetchWithTimeout } from "@/lib/fetch-timeout";
-import { readResponseJson, readResponseText } from "@/lib/response-body";
+import { readResponseJson } from "@/lib/response-body";
 import { z } from "zod";
 
 export interface AIModelDescriptor {
@@ -178,10 +178,13 @@ async function fetchCatalogPage(url: string, headers: Record<string, string>): P
   const response = await fetchWithTimeout(url, {
     method: "GET",
     headers,
-    redirect: "error",
+    // Workers supports manual/follow only. Non-2xx responses below reject
+    // redirects without forwarding credentials to the Location destination.
+    redirect: "manual",
   }, 15_000);
   if (!response.ok) {
-    throw new Error(`Model catalog request failed: ${await readResponseText(response)}`);
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error(`Model catalog request failed (HTTP ${response.status})`);
   }
   const data = await readResponseJson<unknown>(response);
   if (!data || typeof data !== "object" || Array.isArray(data)) return {};
@@ -189,19 +192,56 @@ async function fetchCatalogPage(url: string, headers: Record<string, string>): P
 }
 
 async function listTypeSafeModels(baseUrl: string, apiKey: string): Promise<AIModelDescriptor[]> {
-  let body: Record<string, unknown>;
-  try {
-    body = await fetchCatalogPage(endpoint(baseUrl, "models"), {
-      Accept: "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    });
-  } catch {
-    // Catalog errors can echo request credentials; never forward their bodies.
-    throw new Error("Unable to load TypeSafe model catalog");
+  // Retry one transient failure. Keep status diagnostics, but never forward
+  // upstream bodies or transport messages: either can contain the API key.
+  for (let attempt = 0; ; attempt += 1) {
+    let response: Response;
+    try {
+      response = await fetchWithTimeout(endpoint(baseUrl, "models"), {
+        method: "GET",
+        headers: { Accept: "application/json", Authorization: `Bearer ${apiKey}` },
+        redirect: "manual",
+      }, 15_000);
+    } catch (error) {
+      if (attempt === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        continue;
+      }
+      const timedOut = error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name);
+      throw new Error(timedOut
+        ? "TypeSafe model catalog request timed out. Try again later."
+        : "Could not connect to the TypeSafe model catalog. Check the API base URL or try again later.");
+    }
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
+      const retryAfter = response.headers.get("retry-after");
+      const retryMs = retryAfter === null ? 250 : /^\d+$/.test(retryAfter)
+        ? Number(retryAfter) * 1000 : Date.parse(retryAfter) - Date.now();
+      if (attempt === 0 && [408, 429, 500, 502, 503, 504, 529].includes(response.status) &&
+        Number.isFinite(retryMs) && retryMs <= 1000) {
+        await new Promise((resolve) => setTimeout(resolve, Math.max(250, retryMs)));
+        continue;
+      }
+      const hints: Record<number, string> = {
+        401: "Check the saved API key.",
+        403: "Check the API key and account permissions.",
+        404: "Check the API base URL.",
+        429: "Rate limit reached. Try again later.",
+      };
+      throw new Error(`TypeSafe model catalog request failed (HTTP ${response.status}). ${hints[response.status] ?? "Try again later."}`);
+    }
+    let body: unknown;
+    try {
+      body = await readResponseJson<unknown>(response);
+    } catch {
+      throw new Error("Invalid TypeSafe model catalog");
+    }
+    const catalog = z.object({
+      models: z.array(z.object({ name: z.string().trim().min(1).max(200) })).min(1),
+    }).safeParse(body);
+    if (!catalog.success) throw new Error("Invalid TypeSafe model catalog");
+    return catalog.data.models.map((item) => ({ id: item.name, kind: "decision" }));
   }
-  const models = z.array(z.object({ name: z.string().trim().min(1).max(200) })).safeParse(body.models);
-  if (!models.success) throw new Error("Invalid TypeSafe model catalog");
-  return models.data.map((item) => ({ id: item.name, kind: "decision" }));
 }
 
 async function listAnthropicModels(baseUrl: string, apiKey: string): Promise<AIModelDescriptor[]> {

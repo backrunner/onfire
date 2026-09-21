@@ -51,7 +51,7 @@ describe("TypeSafe HTTP protocol", () => {
     const result = await provider().screen(options);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("https://api.typesafe.ai/v1/systemone");
-    expect(init).toMatchObject({ method: "POST", redirect: "error", headers: { Authorization: "Bearer fake-api-key" } });
+    expect(init).toMatchObject({ method: "POST", redirect: "manual", headers: { Authorization: "Bearer fake-api-key" } });
     expect(init?.signal).toBeInstanceOf(AbortSignal);
     const request = JSON.parse(String(init?.body));
     expect(request).not.toHaveProperty("messages");
@@ -94,7 +94,7 @@ describe("TypeSafe HTTP protocol", () => {
     await expect(provider().screen(options)).rejects.toThrow(/TypeSafe/);
   });
 
-  it.each([401, 429, 529])("reports HTTP %s without exposing echoed secrets", async (status) => {
+  it.each([302, 307, 308, 401, 429, 529])("reports HTTP %s without exposing echoed secrets", async (status) => {
     fetchMock.mockResolvedValue(new Response("fake-api-key private customer content", { status }));
     await expect(provider().screen(options)).rejects.toThrow(`TypeSafe screening failed (HTTP ${status})`);
     expect(fetchMock).toHaveBeenCalledOnce();

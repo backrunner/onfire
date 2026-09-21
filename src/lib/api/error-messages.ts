@@ -61,6 +61,14 @@ function zhStatus(word: string): string {
  */
 const zhErrorPatterns: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
   [
+    /^Model catalog request failed \(HTTP (\d{3})\)$/,
+    (m) => `模型列表请求失败（HTTP ${m[1]}）`,
+  ],
+  [
+    /^TypeSafe model catalog request failed \(HTTP (\d{3})\)\. Try again later\.$/,
+    (m) => `TypeSafe 模型列表请求失败（HTTP ${m[1]}），请稍后重试。`,
+  ],
+  [
     /^Ticket is already in status "(\w+)"$/,
     (m) => `工单已处于「${zhStatus(m[1])}」状态`,
   ],

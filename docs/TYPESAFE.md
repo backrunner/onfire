@@ -13,6 +13,11 @@ authentication and typed questions; it is not an OpenAI-compatible chat API.
    choose `jev-latest`; pin `jev-1.13.0` when calibrating against a fixed version.
    The live `/v1/models` catalog currently lists aliases; pinned Jev version IDs
    are also supported. Optional gateways must use the same TypeSafe protocol.
+   Model discovery retries one transient connection/server failure with a
+   bounded delay. Authentication errors and redirects are not retried; failures
+   preserve the selected model and any existing suggestions. HTTP status and
+   safe English/Chinese diagnostics distinguish provider failures without
+   returning upstream bodies or credentials.
 3. Put an existing language-model credential later in the same route if desired.
    Both directions of failover are supported. Scoped inheritance, cooldowns,
    usage attribution and disabled credentials work as for other AI providers.

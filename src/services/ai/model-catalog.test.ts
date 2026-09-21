@@ -20,17 +20,83 @@ describe("AI model catalog", () => {
     const models = await listProviderModels("typesafe", "secret");
     expect(models).toEqual([{ id: "jev-latest", kind: "decision" }]);
     expect(fetchMock.mock.calls[0]).toMatchObject([
-      "https://api.typesafe.ai/v1/models", { headers: { Authorization: "Bearer secret" }, redirect: "error" },
+      "https://api.typesafe.ai/v1/models", { headers: { Authorization: "Bearer secret" }, redirect: "manual" },
     ]);
     expect(resolveAssignableModel("typesafe", models, "jev-1.13.0", "decision")?.kind).toBe("decision");
     expect(resolveAssignableModel("typesafe", [], "jev-latest", "text")).toBeNull();
     expect(resolveAssignableModel("typesafe", [], "gpt-5", "decision")).toBeNull();
   });
 
-  it("rejects malformed TypeSafe catalogs", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(json({ data: [{ id: "jev-latest" }] }));
+  it.each([{ data: [{ id: "jev-latest" }] }, { models: [] }, { models: [{ name: "" }] }])("rejects malformed or empty TypeSafe catalogs (%j)", async (body) => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(json(body));
     await expect(listProviderModels("typesafe", "secret")).rejects.toThrow(/Invalid TypeSafe/);
   });
+
+  it.each([502, 503, 529])("recovers a TypeSafe refresh after temporary HTTP %s", async (status) => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response("upstream unavailable", { status }))
+      .mockResolvedValueOnce(json({ models: [{ name: "jev-latest" }, { name: "jev-preview" }] }));
+    expect(await listProviderModels("typesafe", "secret")).toEqual([
+      { id: "jev-latest", kind: "decision" }, { id: "jev-preview", kind: "decision" },
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries a TypeSafe connection failure once without following redirects", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(new TypeError("connection reset"))
+      .mockResolvedValueOnce(json({ models: [{ name: "jev-latest" }] }));
+    await expect(listProviderModels("typesafe", "secret", "https://gateway.example.com/v1/")).resolves.toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [url, init] of fetchMock.mock.calls) {
+      expect(url).toBe("https://gateway.example.com/v1/models");
+      expect(init).toMatchObject({ redirect: "manual", headers: { Authorization: "Bearer secret" } });
+    }
+  });
+
+  it.each([401, 403, 404, 429])("reports TypeSafe HTTP %s without echoing keys or retrying rejected requests", async (status) => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      new Response("secret echoed here", { status, headers: { "Retry-After": "60" } }));
+    await expect(listProviderModels("typesafe", "secret")).rejects.toThrow(`HTTP ${status}`);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("caps TypeSafe retries and preserves HTTP status without exposing the response body", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      new Response("secret echoed here", { status: 503 }));
+    await expect(listProviderModels("typesafe", "secret")).rejects.toThrow(
+      "TypeSafe model catalog request failed (HTTP 503). Try again later.",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports persistent TypeSafe timeouts without leaking transport details", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockRejectedValue(new DOMException("secret echoed here", "AbortError"));
+    await expect(listProviderModels("typesafe", "secret")).rejects.toThrow(
+      "TypeSafe model catalog request timed out. Try again later.",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("hides invalid JSON fragments returned by TypeSafe", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("secret echoed here"));
+    await expect(listProviderModels("typesafe", "secret")).rejects.toThrow("Invalid TypeSafe model catalog");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it.each(["typesafe", "openrouter", "anthropic", "google"] as const)(
+    "rejects %s catalog redirects without forwarding credentials or retrying", async (provider) => {
+      const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response("secret echoed here", { status: 307, headers: { Location: "https://other.example.com/models" } }),
+      );
+      const error = await listProviderModels(provider, "secret").catch((error: unknown) => error);
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain("HTTP 307");
+      expect((error as Error).message).not.toContain("secret");
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(fetchMock.mock.calls[0][1]?.redirect).toBe("manual");
+    },
+  );
   it("does not overwrite a live fixed dimension with a static suggestion", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async () => json({ data: [
       { id: "jina-embeddings-v4", dimensions: 768 },
@@ -77,7 +143,7 @@ describe("AI model catalog", () => {
         "x-api-key": "secret",
         "anthropic-version": "2023-06-01",
       }),
-      redirect: "error",
+      redirect: "manual",
     });
   });
 
