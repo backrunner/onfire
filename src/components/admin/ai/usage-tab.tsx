@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
+import type { AIProvider, AITaskType } from "@/drizzle/schema";
 import { Save } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { api, ApiClientError, swrFetcher } from "@/lib/api/client";
@@ -16,9 +17,13 @@ import { aiScopeQuery } from "./scope";
 import { AiUsageSkeleton } from "./ai-loading-skeletons";
 
 interface DailyRow {
+  bucketKey: string;
   day: string;
   credentialId: string;
-  taskType: string;
+  taskType: AITaskType;
+  credentialName: string | null;
+  provider: AIProvider | null;
+  model: string | null;
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
@@ -40,6 +45,9 @@ interface SettingsResponse {
   retentionDays: number | null;
   configured: boolean;
 }
+
+const ALL = "__all__";
+const modelKey = (row: DailyRow) => JSON.stringify([row.provider, row.model]);
 
 const PRESETS = [7, 30, 90, 180, 365] as const;
 
@@ -75,16 +83,45 @@ export function UsageTab({
     swrFetcher
   );
   const [inherit, setInherit] = useState<boolean | null>(null);
-  const [retention, setRetention] = useState<string>("forever");
+  const [retention, setRetention] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   const inheritValue = inherit ?? settings.data?.inherit ?? scope !== "system";
-  const retentionValue =
-    retention === "forever" && settings.data && !settings.data.inherit
-      ? settings.data.retentionDays == null
-        ? "forever"
-        : String(settings.data.retentionDays)
-      : retention;
+  const retentionValue = retention ?? (settings.data?.retentionDays == null
+    ? "forever" : String(settings.data.retentionDays));
+  const [credentialFilter, setCredentialFilter] = useState(ALL);
+  const [modelFilter, setModelFilter] = useState(ALL);
+  const [view, setView] = useState("summary");
+  const credentialLabel = (row: DailyRow) => row.credentialName ?? `${u.deletedCredential} (${row.credentialId})`;
+  const modelLabel = (row: DailyRow) => row.model == null
+    ? u.legacyModel
+    : `${row.provider ? t.aiConfig.providers[row.provider] : ""} / ${row.model}`;
+  const credentialOptions = Array.from(new Map(
+    data?.items.map((row) => [row.credentialId, row]) ?? []
+  ).values());
+  const credentialRows = (data?.items ?? []).filter((row) => credentialFilter === ALL || row.credentialId === credentialFilter);
+  const modelOptions = Array.from(new Map(credentialRows.map((row) => [modelKey(row), row])).values());
+  const filteredRows = credentialRows.filter((row) => modelFilter === ALL || modelKey(row) === modelFilter);
+  const totals = { requestCount: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+  const groups = new Map<string, DailyRow>();
+  for (const row of filteredRows) {
+    totals.requestCount += row.requestCount;
+    totals.promptTokens += row.promptTokens;
+    totals.completionTokens += row.completionTokens;
+    totals.totalTokens += row.totalTokens;
+    const key = JSON.stringify([row.credentialId, row.provider, row.model]);
+    const group = groups.get(key);
+    if (group) {
+      group.requestCount += row.requestCount;
+      group.promptTokens += row.promptTokens;
+      group.completionTokens += row.completionTokens;
+      group.totalTokens += row.totalTokens;
+    } else {
+      groups.set(key, { ...row, bucketKey: key });
+    }
+  }
+  const rows = view === "daily" ? filteredRows : Array.from(groups.values())
+    .sort((a, b) => b.totalTokens - a.totalTokens || a.bucketKey.localeCompare(b.bucketKey));
 
   const saveSettings = async () => {
     setPending(true);
@@ -113,7 +150,7 @@ export function UsageTab({
 
   return (
     <div className="space-y-4">
-      <Card className="gap-0 py-0">
+      <Card className="min-w-0 gap-0 py-0">
         <CardHeader className="px-5 py-4">
           <CardTitle className="text-sm">{u.retentionTitle}</CardTitle>
           <CardDescription className="text-xs">{u.retentionHint}</CardDescription>
@@ -154,7 +191,7 @@ export function UsageTab({
         </CardContent>
       </Card>
 
-      <Card className="gap-0 py-0">
+      <Card className="min-w-0 gap-0 py-0">
         <CardHeader className="px-5 py-4">
           <CardTitle className="text-sm">{u.title}</CardTitle>
           <CardDescription className="text-xs">
@@ -166,30 +203,67 @@ export function UsageTab({
             <p className="py-8 text-center text-sm text-muted-foreground">{u.loadFailed}</p>
           ) : (
             <>
-              <div className="mb-4 grid gap-3 sm:grid-cols-3">
-                <Stat label={u.requests} value={data?.totals.requestCount ?? 0} />
-                <Stat label={u.promptTokens} value={data?.totals.promptTokens ?? 0} />
-                <Stat label={u.totalTokens} value={data?.totals.totalTokens ?? 0} />
+              <div className="mb-3 flex flex-wrap gap-2">
+                <Select value={credentialFilter} onValueChange={(value) => { setCredentialFilter(value); setModelFilter(ALL); }}>
+                  <SelectTrigger size="sm" className="w-full sm:w-48" aria-label={t.aiConfig.routing.credential}><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>{u.allCredentials}</SelectItem>
+                    {credentialOptions.map((row) => <SelectItem key={row.credentialId} value={row.credentialId}>{credentialLabel(row)}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={modelFilter} onValueChange={setModelFilter}>
+                  <SelectTrigger size="sm" className="w-full sm:w-64" aria-label={t.aiConfig.model}><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>{u.allModels}</SelectItem>
+                    {modelOptions.map((row) => <SelectItem key={modelKey(row)} value={modelKey(row)}>{modelLabel(row)}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={view} onValueChange={setView}>
+                  <SelectTrigger size="sm" className="w-full sm:ml-auto sm:w-48" aria-label={u.grouping}><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="summary">{u.byCredentialModel}</SelectItem>
+                    <SelectItem value="daily">{u.dailyDetails}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              {(data?.items.length ?? 0) === 0 ? (
+              <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Stat label={u.requests} value={totals.requestCount} />
+                <Stat label={u.promptTokens} value={totals.promptTokens} />
+                <Stat label={u.completionTokens} value={totals.completionTokens} />
+                <Stat label={u.totalTokens} value={totals.totalTokens} />
+              </div>
+              {rows.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">{u.empty}</p>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>{u.day}</TableHead>
-                      <TableHead>{u.task}</TableHead>
+                      {view === "daily" && <TableHead>{u.day}</TableHead>}
+                      <TableHead>{t.aiConfig.routing.credential}</TableHead>
+                      <TableHead>{t.aiConfig.model}</TableHead>
+                      {view === "daily" && <TableHead>{u.task}</TableHead>}
                       <TableHead className="text-right">{u.requests}</TableHead>
+                      <TableHead className="text-right">{u.promptTokens}</TableHead>
+                      <TableHead className="text-right">{u.completionTokens}</TableHead>
                       <TableHead className="text-right">{u.totalTokens}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {data?.items.map((row) => (
-                      <TableRow key={`${row.day}-${row.credentialId}-${row.taskType}`}>
-                        <TableCell>{row.day}</TableCell>
-                        <TableCell>{t.aiConfig.tasks[row.taskType as "agent"] ?? row.taskType}</TableCell>
-                        <TableCell className="text-right tabular-nums">{row.requestCount}</TableCell>
-                        <TableCell className="text-right tabular-nums">{row.totalTokens}</TableCell>
+                    {rows.map((row) => (
+                      <TableRow key={row.bucketKey}>
+                        {view === "daily" && <TableCell>{row.day}</TableCell>}
+                        <TableCell title={row.credentialId}>
+                          <span className="block max-w-48 truncate" title={credentialLabel(row)}>{credentialLabel(row)}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="block max-w-72 truncate" title={row.model ?? u.legacyModel}>{row.model ?? u.legacyModel}</span>
+                          {row.provider && <span className="text-[11px] text-muted-foreground">{t.aiConfig.providers[row.provider]}</span>}
+                        </TableCell>
+                        {view === "daily" && <TableCell>{t.aiConfig.tasks[row.taskType]}</TableCell>}
+                        <TableCell className="text-right tabular-nums">{row.requestCount.toLocaleString()}</TableCell>
+                        <TableCell className="text-right tabular-nums">{row.promptTokens.toLocaleString()}</TableCell>
+                        <TableCell className="text-right tabular-nums">{row.completionTokens.toLocaleString()}</TableCell>
+                        <TableCell className="text-right tabular-nums">{row.totalTokens.toLocaleString()}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

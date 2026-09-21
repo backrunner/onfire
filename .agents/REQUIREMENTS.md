@@ -271,6 +271,11 @@
 - A feature that depends on an AI task cannot be enabled until that task has at least one enabled credential route. Email AI filtering requires configured prescreening credentials; knowledge mutations require configured embedding credentials. Enabling an AI task itself requires at least one assigned credential.
 - AI credentials and task routes exist at system, tenant, and product scope. Tenant and product routes default to the parent scope and can independently override it, including selecting parent-scope credentials. Runtime resolution walks product → tenant → system.
 - Every AI call writes a detail usage event and increments daily token rollups for the system, tenant, and product dimensions of that request, regardless of which scope owns the key. Retention is configurable in days and defaults to permanent; expired detail and daily rows are purged by the scheduled scan.
+- Task routes use one compact row per credential/model assignment. Usage rollups
+  distinguish credential, provider and model, with input/output/total tokens and
+  request counts. The usage view supports credential/model filters and daily
+  details. Recover historical model attribution from retained events; keep any
+  unrecoverable remainder explicitly unknown without altering recorded totals.
 
 ## Email
 

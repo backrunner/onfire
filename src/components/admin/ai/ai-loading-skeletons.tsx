@@ -62,27 +62,32 @@ export function AiCredentialsSkeleton() {
 
 function TaskRoutingSkeleton() {
   return (
-    <Card className="flex min-h-[360px] flex-col gap-0 rounded-lg py-0">
-      <CardHeader className="px-4 py-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <Skeleton className="size-8 shrink-0 rounded-md" />
-            <div className="min-w-0 space-y-1.5">
+    <Card className="min-w-0 gap-0 rounded-lg py-0">
+      <CardHeader className="px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Skeleton className="size-8 rounded-md" />
+            <div className="space-y-1.5">
               <Skeleton className="h-4 w-28" />
               <Skeleton className="h-3 w-48 max-w-full" />
             </div>
           </div>
-          <Skeleton className="size-5 shrink-0 rounded-full" />
+          <Skeleton className="h-5 w-9 rounded-full" />
         </div>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-4 px-4 pb-4">
-        <div className="flex min-h-40 flex-1 flex-col gap-3 rounded-md border border-dashed px-3 py-3">
-          <Skeleton className="h-4 w-40 max-w-full" />
-          <Skeleton className="h-3 w-56 max-w-full" />
-          <Skeleton className="mt-2 h-3 w-32" />
-          <Skeleton className="h-3 w-44 max-w-full" />
+      <CardContent className="space-y-3 px-4 pb-3">
+        <div className="space-y-2 overflow-hidden">
+          <Skeleton className="h-4 w-full" />
+          {[0, 1].map((index) => (
+            <div key={index} className="flex items-center gap-3 py-2">
+              <Skeleton className="size-6 shrink-0" />
+              <Skeleton className="h-8 flex-1" />
+              <Skeleton className="h-8 flex-1" />
+              <Skeleton className="h-8 w-32 shrink-0" />
+            </div>
+          ))}
         </div>
-        <div className="mt-auto flex items-center justify-between border-t pt-3">
+        <div className="flex items-center justify-between border-t pt-3">
           <Skeleton className="h-8 w-28" />
           <Skeleton className="h-8 w-16" />
         </div>
@@ -93,7 +98,7 @@ function TaskRoutingSkeleton() {
 
 export function AiRoutingSkeleton() {
   return (
-    <div className="grid gap-4 lg:grid-cols-2" aria-hidden="true">
+    <div className="grid min-w-0 gap-3" aria-hidden="true">
       {AI_TASK_TYPES.map((taskType) => (
         <TaskRoutingSkeleton key={taskType} />
       ))}
@@ -134,8 +139,13 @@ export function AiUsageSkeleton({
           <Skeleton className="h-3 w-72 max-w-full" />
         </CardHeader>
         <CardContent className="px-5 pb-4">
-          <div className="mb-4 grid gap-3 sm:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, index) => (
+          <div className="mb-3 flex flex-wrap gap-2">
+            <Skeleton className="h-8 w-full sm:w-48" />
+            <Skeleton className="h-8 w-full sm:w-64" />
+            <Skeleton className="h-8 w-full sm:ml-auto sm:w-48" />
+          </div>
+          <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
               <div key={index} className="space-y-1 rounded-md border px-3 py-2">
                 <Skeleton className="h-3 w-20" />
                 <Skeleton className="h-6 w-16" />
@@ -144,8 +154,8 @@ export function AiUsageSkeleton({
           </div>
           <TableSkeleton
             rows={4}
-            columns={4}
-            columnWidths={["w-32", "", "w-28", "w-32"]}
+            columns={6}
+            columnWidths={["w-40", "w-56", "w-24", "w-28", "w-28", "w-28"]}
           />
         </CardContent>
       </Card>

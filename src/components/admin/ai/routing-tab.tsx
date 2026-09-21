@@ -7,6 +7,8 @@ import {
   ArrowDown,
   ArrowUp,
   GitBranch,
+  Info,
+  TriangleAlert,
   Loader2,
   Plus,
   RefreshCw,
@@ -34,6 +36,7 @@ import { Label } from "@/components/ui/label";
 import { ModelCombobox } from "./model-combobox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { aiScopeQuery } from "./scope";
 import { AiRoutingSkeleton } from "./ai-loading-skeletons";
 
@@ -118,7 +121,7 @@ export function RoutingTab({
   }
 
   return (
-    <div className="grid items-stretch gap-4 lg:grid-cols-2">
+    <div className="grid min-w-0 gap-3">
       {AI_TASK_TYPES.map((taskType) => (
         <TaskRoutingCard
           key={taskType}
@@ -305,8 +308,8 @@ function TaskRoutingCard({
   };
 
   return (
-    <Card className="flex h-full min-h-[360px] flex-col gap-0 rounded-lg py-0">
-      <CardHeader className="px-4 py-4">
+    <Card className="flex min-w-0 flex-col gap-0 rounded-lg py-0">
+      <CardHeader className="px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
             <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
@@ -342,9 +345,9 @@ function TaskRoutingCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-4 px-4 pb-4">
+      <CardContent className="flex min-w-0 flex-1 flex-col gap-3 px-4 pb-3">
         {inherit ? (
-          <div className="flex min-h-40 flex-1 flex-col gap-3">
+          <div className="flex min-h-24 flex-1 flex-col gap-3">
             <div className="rounded-md border border-dashed px-3 py-3">
               <p className="text-sm font-medium">
                 {r.usingParent.replace(
@@ -362,7 +365,7 @@ function TaskRoutingCard({
                       <span className="truncate">
                         {index + 1}. {assignment.credentialName}
                       </span>
-                      <span className="shrink-0 text-muted-foreground">{assignment.model}</span>
+                      <span className="min-w-0 truncate text-muted-foreground" title={assignment.model}>{assignment.model}</span>
                     </li>
                   ))}
                 </ul>
@@ -379,7 +382,7 @@ function TaskRoutingCard({
             </Button>
           </div>
         ) : assignments.length === 0 ? (
-          <div className="flex min-h-40 flex-1 flex-col items-center justify-center gap-2 rounded-md border border-dashed px-6 text-center">
+          <div className="flex min-h-24 flex-1 flex-col items-center justify-center gap-2 rounded-md border border-dashed px-6 text-center">
             <GitBranch className="size-6 text-muted-foreground/45" />
             <p className="text-sm font-medium">{r.empty}</p>
             <p className="text-xs text-muted-foreground">
@@ -387,7 +390,14 @@ function TaskRoutingCard({
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="overflow-x-auto">
+            <div className="min-w-[640px]">
+              <div className="grid grid-cols-[1.5rem_minmax(10rem,1fr)_minmax(14rem,1.5fr)_8.5rem] items-center gap-3 border-b pb-1.5 text-[11px] text-muted-foreground">
+                <span className="text-center">#</span>
+                <span>{r.credential}</span>
+                <span>{t.aiConfig.model}</span>
+                <span className="sr-only">{t.aiConfig.enabled}</span>
+              </div>
             {assignments.map((assignment, index) => {
               const credential = credentials.find(
                 (item) => item.id === assignment.credentialId
@@ -418,43 +428,12 @@ function TaskRoutingCard({
                 <div
                   key={assignment.id}
                   className={cn(
-                    "rounded-md border p-3",
+                    "grid grid-cols-[1.5rem_minmax(10rem,1fr)_minmax(14rem,1.5fr)_8.5rem] items-center gap-3 border-b py-2 last:border-0",
                     !assignment.enabled && "opacity-60"
                   )}
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded bg-muted text-[11px] font-medium text-muted-foreground">
-                      {index + 1}
-                    </span>
-                    <div className="flex shrink-0 items-center gap-0.5">
-                      <span className="flex size-8 items-center justify-center">
-                        <Switch
-                          size="sm"
-                          checked={assignment.enabled}
-                          onCheckedChange={(value) => updateAssignment(index, { enabled: value })}
-                          aria-label={t.aiConfig.enabled}
-                        />
-                      </span>
-                      <Button variant="ghost" size="icon-sm" onClick={() => move(index, -1)} disabled={index === 0} aria-label={r.moveUp}>
-                        <ArrowUp className="size-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon-sm" onClick={() => move(index, 1)} disabled={index === assignments.length - 1} aria-label={r.moveDown}>
-                        <ArrowDown className="size-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => setAssignments((current) => current.filter((_, itemIndex) => itemIndex !== index))}
-                        aria-label={t.common.delete}
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <div className="min-w-0 space-y-1.5">
-                      <Label className="text-[11px]">{r.credential}</Label>
+                  <span className="text-center text-[11px] tabular-nums text-muted-foreground">{index + 1}</span>
+                  <div className="flex min-w-0 items-center gap-1.5">
                       <Select
                         value={assignment.credentialId}
                         onValueChange={(credentialId) => {
@@ -493,15 +472,21 @@ function TaskRoutingCard({
                         </SelectContent>
                       </Select>
                       {(blocked || credential?.enabled === false) && (
-                        <p className="text-[11px] text-amber-600 dark:text-amber-400">
-                          {blocked ? r.coolingDown : r.credentialDisabled}
-                        </p>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" className="shrink-0 text-amber-600 dark:text-amber-400" aria-label={blocked ? r.coolingDown : r.credentialDisabled}>
+                              <TriangleAlert className="size-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>{blocked ? r.coolingDown : r.credentialDisabled}</TooltipContent>
+                        </Tooltip>
                       )}
                     </div>
-                    <div className="min-w-0 space-y-1.5">
-                      <Label htmlFor={`model-${taskType}-${assignment.id}`} className="text-[11px]">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <Label htmlFor={`model-${taskType}-${assignment.id}`} className="sr-only">
                         {t.aiConfig.model}
                       </Label>
+                      <div className="min-w-0 flex-1">
                       <ModelCombobox
                         id={`model-${taskType}-${assignment.id}`}
                         value={assignment.model}
@@ -531,18 +516,51 @@ function TaskRoutingCard({
                           });
                         }}
                       />
+                      </div>
                       {credential?.provider === "typesafe" && (
-                        <p className="text-[11px] text-muted-foreground">{r.typesafeHint}</p>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" className="shrink-0 text-muted-foreground" aria-label={r.typesafeHint}>
+                              <Info className="size-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-72">{r.typesafeHint}</TooltipContent>
+                        </Tooltip>
                       )}
                     </div>
-                  </div>
+                    <div className="flex shrink-0 items-center gap-0.5">
+                      <span className="flex size-8 items-center justify-center">
+                        <Switch
+                          size="sm"
+                          checked={assignment.enabled}
+                          onCheckedChange={(value) => updateAssignment(index, { enabled: value })}
+                          aria-label={t.aiConfig.enabled}
+                        />
+                      </span>
+                      <Button variant="ghost" size="icon-sm" onClick={() => move(index, -1)} disabled={index === 0} aria-label={r.moveUp} title={r.moveUp}>
+                        <ArrowUp className="size-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon-sm" onClick={() => move(index, 1)} disabled={index === assignments.length - 1} aria-label={r.moveDown} title={r.moveDown}>
+                        <ArrowDown className="size-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => setAssignments((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                        aria-label={t.common.delete} title={t.common.delete}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </div>
                 </div>
               );
             })}
+            </div>
           </div>
         )}
 
-        <div className="mt-auto flex items-center justify-between border-t pt-3">
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t pt-3">
           {inherit ? (
             <span />
           ) : (

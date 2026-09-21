@@ -2,6 +2,36 @@
 
 Updated: 2026-09-21
 
+## Compact AI routes and model-level token usage — 2026-09-21
+
+- Each credential/model assignment occupies one 49px row with ordering,
+  enable/disable and delete controls. Shared column labels replace repeated
+  labels and nested cards; provider/health explanations use accessible hints.
+  Small screens scroll the row region without overflowing the page. Loading
+  skeletons follow the compact layout.
+- Usage defaults to credential/provider/model totals across the current 30-day
+  range, with credential/model filters, input/output/total tokens and request
+  counts. Daily task details remain available. Credential names are projected
+  without secrets; deleted credentials retain their ID and usage history.
+- Migration `0031_ai_usage_models.sql` adds model/provider daily dimensions,
+  backfills from retained events and preserves any unidentifiable remainder as
+  historical unknown-model usage. It preserves totals and does not recreate
+  scope buckets already removed by retention. New calls increment the same
+  recovered buckets, including escaped/custom model names. Apply the migration
+  before deploying the matching Worker.
+- Verification: frozen install, generated bindings, TypeScript, all 97 Vitest
+  files / 808 tests, both Worker builds, Drizzle metadata, all 32 migrations on
+  fresh local D1, deploy dry-run, startup profiling and production dependency
+  audit pass. An additional four-test rerun covers final migration indexing,
+  model attribution, deleted credentials, secret projection and scope isolation.
+- Playwright checks at 1440x900 and 390x844 cover English/Chinese and light/dark,
+  row alignment, routing actions, credential/model filtering, daily details,
+  totals, long names, horizontal scrolling, and empty/error states. Screenshots
+  were inspected; there is no page overflow or page exception. Usage reads use
+  the actual local Worker and seeded D1; model catalogs and routing writes use
+  browser fixtures, with no real AI calls. Evidence is in
+  `/tmp/onfire-ai-usage-qa`. No remote migration, deployment or commit performed.
+
 ## Model catalog refresh and current suggestions — 2026-09-21
 
 - Reproduced the reported TypeSafe and OpenRouter refresh failures through the

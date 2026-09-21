@@ -80,6 +80,8 @@ export function usageDailyBucketKey(input: {
   productId?: string | null;
   credentialId: string;
   taskType: string;
+  provider: string;
+  model: string;
 }): string {
   return [
     input.day,
@@ -88,6 +90,7 @@ export function usageDailyBucketKey(input: {
     input.productId ?? "",
     input.credentialId,
     input.taskType,
+    JSON.stringify([input.provider, input.model]),
   ].join("|");
 }
 

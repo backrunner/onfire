@@ -681,6 +681,11 @@ Custom product templates use the same escaped variable renderer for preview and 
 - Knowledge mutations synchronize Vectorize. AI assistant and pre-reply use semantic retrieval with scoped D1 fallback.
 - System AI credentials and routes require SuperAdmin. Tenant and product scopes can manage their own credentials, inherit the parent route, or select parent-scope keys. Product knowledge requires `ai.knowledge` plus product scope.
 - Every AI call records token usage events and daily rollups at system, tenant, and product dimensions. Retention is configurable in days and defaults to permanent.
+- AI task assignments render as compact single rows. Daily usage distinguishes
+  credentials, providers and models; the usage UI provides filtered totals and
+  daily details with input/output tokens. Migration `0031_ai_usage_models.sql`
+  recovers retained historical events and leaves expired-detail remainders
+  explicitly unattributed while preserving totals.
 - Credentials and task routes are scoped to system, tenant, or product. Product and tenant routes may inherit the parent route or select parent-scope credentials. Usage events and daily token rollups are recorded for system, tenant, and product dimensions and rotate by the configured retention.
 - Successful HTTP responses with empty provider completions are treated as protocol failures across all language adapters.
 

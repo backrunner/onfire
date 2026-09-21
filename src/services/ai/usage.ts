@@ -1,5 +1,6 @@
-import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { and, eq, getTableColumns, gte, lte, sql } from "drizzle-orm";
 import {
+  aiCredentials,
   aiUsageDaily,
   aiUsageEvents,
   aiUsageSettings,
@@ -12,7 +13,6 @@ import {
 import type { Database } from "@/lib/db";
 import {
   type AIRuntimeContext,
-  type AIScope,
   type AIScopeRef,
   aiScopeKey,
   resolveAiScopeChain,
@@ -69,6 +69,8 @@ export async function recordAiUsage(
       productId: bucket.productId,
       credentialId: input.credentialId,
       taskType: input.taskType,
+      provider: input.provider,
+      model: input.model,
     });
     return {
       id: crypto.randomUUID(),
@@ -79,6 +81,8 @@ export async function recordAiUsage(
       productId: bucket.productId,
       credentialId: input.credentialId,
       taskType: input.taskType,
+      provider: input.provider,
+      model: input.model,
       promptTokens: input.promptTokens,
       completionTokens: input.completionTokens,
       totalTokens: input.totalTokens,
@@ -207,10 +211,14 @@ export async function listUsageDaily(
     filters.push(eq(aiUsageDaily.credentialId, query.credentialId));
   }
   return db
-    .select()
+    .select({
+      ...getTableColumns(aiUsageDaily),
+      credentialName: aiCredentials.name,
+    })
     .from(aiUsageDaily)
+    .leftJoin(aiCredentials, eq(aiCredentials.id, aiUsageDaily.credentialId))
     .where(and(...filters))
-    .orderBy(aiUsageDaily.day);
+    .orderBy(aiUsageDaily.day, aiUsageDaily.credentialId, aiUsageDaily.provider, aiUsageDaily.model, aiUsageDaily.taskType);
 }
 
 function cutoffIso(days: number): string {

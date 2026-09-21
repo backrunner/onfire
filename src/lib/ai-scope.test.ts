@@ -18,8 +18,10 @@ describe("AI scope keys", () => {
         dimension: "system",
         credentialId: "c1",
         taskType: "agent",
+        provider: "openai",
+        model: "gpt-4o",
       })
-    ).toBe("2026-08-16|system|||c1|agent");
+    ).toBe('2026-08-16|system|||c1|agent|["openai","gpt-4o"]');
     expect(
       usageDailyBucketKey({
         day: "2026-08-16",
@@ -28,7 +30,9 @@ describe("AI scope keys", () => {
         productId: "p1",
         credentialId: "c1",
         taskType: "agent",
+        provider: "openai",
+        model: "gpt-4o",
       })
-    ).toBe("2026-08-16|product|t1|p1|c1|agent");
+    ).toBe('2026-08-16|product|t1|p1|c1|agent|["openai","gpt-4o"]');
   });
 });

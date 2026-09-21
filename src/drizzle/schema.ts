@@ -1022,6 +1022,9 @@ export const aiUsageDaily = sqliteTable(
     productId: text("product_id"),
     credentialId: text("credential_id").notNull(),
     taskType: text("task_type").$type<AITaskType>().notNull(),
+    // Null only for historical rollups whose detail events were already purged.
+    provider: text("provider").$type<AIProvider>(),
+    model: text("model"),
     promptTokens: integer("prompt_tokens").notNull().default(0),
     completionTokens: integer("completion_tokens").notNull().default(0),
     totalTokens: integer("total_tokens").notNull().default(0),
