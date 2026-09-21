@@ -2,6 +2,38 @@
 
 Updated: 2026-09-21
 
+## AI routing and usage production release — 2026-09-21
+
+- Submitted and pushed three functional commits to `main`: `b766da9` for
+  scoped account API keys and expiry controls, `d2f691c` for Workers-compatible
+  model catalog refresh, and `a0157f0` for compact AI routes and usage grouped
+  by credential/provider/model. The previous unpushed Jev commits are now on
+  the remote branch too.
+- Backed up production D1 privately before applying `0031_ai_usage_models.sql`.
+  Time Travel bookmark:
+  `00004fff-00000000-000050ed-e33c776bae30e0d0a49ae7f760e88b88`.
+  The exported database had no AI usage rows; replaying the migration preserves
+  its totals. Production has both new columns, no pending migrations, no
+  temporary backfill tables and no foreign-key violations.
+- Built source `a0157f0` with the ignored production configuration, matching
+  real domains and production Turnstile site key, with debug/port routing
+  disabled. Deployed Worker `01cf0d15-6da1-43a5-ac87-465d2c69bb9c` at 100%
+  traffic on `onfire.alkinum.com` and `support.alkinum.io`; startup took 45 ms.
+  Previous Worker: `246484d1-fb74-45da-b2f8-f1aeb58687e9`. Existing application
+  secrets, cron, queues and mail bindings are preserved. The unchanged email
+  agent passed its production-configured dry-run and was not redeployed.
+- Release checks pass: frozen install, generated bindings, TypeScript,
+  97 Vitest files / 808 tests, seven Python client tests, Drizzle metadata,
+  fresh local migrations, production build/dry-run/startup profile, production
+  dependency audit and redacted Gitleaks scan of all 156 Git commits.
+- Post-deployment portal and direct/proxied health return 200; cross-surface
+  ToB and proxied admin return 404; unauthenticated customer tickets return
+  401. Admin retains the expected Cloudflare Access 302. All five feature
+  JavaScript chunks match the verified build by SHA-256, including the actual
+  routing and usage components. Local bilingual desktop/mobile visual and
+  interaction checks are recorded below. This release did not exercise
+  authenticated production mutations or billable model inference.
+
 ## Compact AI routes and model-level token usage — 2026-09-21
 
 - Each credential/model assignment occupies one 49px row with ordering,
