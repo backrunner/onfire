@@ -5,7 +5,7 @@ import {
 } from "@/lib/auth/api-key";
 import type { Database } from "@/lib/db";
 
-function fakeDb(row: { id: string; secretHash: string; productId: string; revoked?: boolean } | null) {
+function fakeDb(row: { id: string; secretHash: string; productId: string; revoked?: boolean; expiresAt?: string | null } | null) {
   return {
     query: {
       productKeys: {
@@ -53,6 +53,18 @@ describe("product API keys", () => {
     expect(await verifyProductApiKey(db, "no-dot-here")).toBeNull();
     expect(await verifyProductApiKey(db, ".starts-with-dot")).toBeNull();
     expect(await verifyProductApiKey(db, "ends-with-dot.")).toBeNull();
+  });
+
+  it.each(["2000-01-01T00:00:00Z", "invalid"])("rejects expired or malformed stored expiry %s", async (expiresAt) => {
+    const key = await generateProductKeySecret();
+    expect(await verifyProductApiKey(fakeDb({ ...key, productId: "p1", expiresAt }), key.plaintext)).toBeNull();
+  });
+
+  it("preserves legacy keys and accepts future expiry", async () => {
+    const key = await generateProductKeySecret();
+    for (const expiresAt of [null, new Date(Date.now() + 60000).toISOString()]) {
+      expect(await verifyProductApiKey(fakeDb({ ...key, productId: "p1", expiresAt }), key.plaintext)).toMatchObject({ productId: "p1" });
+    }
   });
 
   it("never stores the plaintext secret", async () => {

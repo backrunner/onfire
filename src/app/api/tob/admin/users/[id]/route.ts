@@ -5,6 +5,7 @@ import {
   users,
   user as authUser,
   account,
+  accountApiKeys,
   session,
   agents,
   agentTeams,
@@ -228,6 +229,7 @@ export const DELETE = withAuth(
       ctx.db.delete(passkey).where(eq(passkey.userId, user.id)),
       ctx.db.delete(twoFactor).where(eq(twoFactor.userId, user.id)),
       ctx.db.delete(session).where(eq(session.userId, user.id)),
+      ctx.db.delete(accountApiKeys).where(eq(accountApiKeys.userId, user.id)),
       ctx.db.delete(account).where(eq(account.userId, user.id)),
       ctx.db.delete(authUser).where(eq(authUser.id, user.id)),
     ]);

@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { getAuth } from "@/lib/auth";
 import {
   account,
+  accountApiKeys,
   mcpOauthAuthorizations,
   mcpOauthGrants,
   oauthAccessToken,
@@ -77,6 +78,7 @@ export async function deleteManagedAuthUser(
   userId: string,
 ): Promise<void> {
   await db.batch([
+    db.delete(accountApiKeys).where(eq(accountApiKeys.userId, userId)),
     db.delete(oauthAccessToken).where(eq(oauthAccessToken.userId, userId)),
     db.delete(oauthRefreshToken).where(eq(oauthRefreshToken.userId, userId)),
     db.delete(oauthConsent).where(eq(oauthConsent.userId, userId)),

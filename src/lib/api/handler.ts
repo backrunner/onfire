@@ -33,6 +33,10 @@ import {
   authenticateCustomer,
   type CustomerTokenPayload,
 } from "@/lib/auth/customer";
+import {
+  authorizeApiKeyRequest,
+  verifyAccountApiKey,
+} from "@/lib/api-keys/auth";
 
 type RouteParams = Record<string, string>;
 
@@ -57,6 +61,14 @@ export interface AuthedContext {
   productIds: string[];
   /** Optional OAuth delegation; always intersects the live role scope. */
   delegatedResourceScope?: DelegatedResourceScope;
+  apiKey?: {
+    id: string;
+    name: string;
+    permissions: string[];
+    expiresAt: string;
+    resourceMode: "all" | "products";
+    productIds: string[];
+  };
   /** Browser-only preview overlay. Actor session stays the Better Auth user. */
   preview?: { actorId: string; targetUserId: string };
   params: RouteParams;
@@ -75,13 +87,14 @@ export interface CustomerContext {
 export async function resolveAuthedContext(
   db: Database,
   userId: string,
-  params: RouteParams
+  params: RouteParams,
 ): Promise<AuthedContext | null> {
   // Read live identity and membership in one D1 round trip. Never cache this
   // across requests: role changes and removed memberships apply immediately.
   const [user, teamRows] = await db.batch([
     db.query.users.findFirst({ where: eq(users.id, userId) }),
-    db.select({ teamId: agentTeams.teamId })
+    db
+      .select({ teamId: agentTeams.teamId })
       .from(agentTeams)
       .where(eq(agentTeams.userId, userId)),
   ]);
@@ -121,7 +134,7 @@ export async function resolveAuthedContext(
 
 async function applyPreviewOverlay(
   req: NextRequest,
-  actor: AuthedContext
+  actor: AuthedContext,
 ): Promise<{ ctx: AuthedContext; clearCookie: boolean }> {
   const raw = req.cookies.get(PREVIEW_COOKIE_NAME)?.value;
   if (!raw) return { ctx: actor, clearCookie: false };
@@ -146,7 +159,7 @@ async function applyPreviewOverlay(
   const previewed = await resolveAuthedContext(
     actor.db,
     targetUser.id,
-    actor.params
+    actor.params,
   );
   if (!previewed) return { ctx: actor, clearCookie: true };
   return {
@@ -162,21 +175,21 @@ function attachClearedPreviewCookie(response: NextResponse, req: NextRequest) {
   response.cookies.set(
     PREVIEW_COOKIE_NAME,
     "",
-    previewCookieOptions(0, req.nextUrl.protocol === "https:")
+    previewCookieOptions(0, req.nextUrl.protocol === "https:"),
   );
 }
 
 function toResponse(
   error: unknown,
   route: string,
-  req?: NextRequest
+  req?: NextRequest,
 ): NextResponse {
   const lang = req ? requestLanguage(req) : "en";
   if (error instanceof ApiError) {
     return err(
       localizeApiErrorMessage(error.message, lang),
       error.status,
-      error.details
+      error.details,
     );
   }
   console.error(`API error in ${route}:`, error);
@@ -184,58 +197,107 @@ function toResponse(
 }
 
 /**
- * Wrap a ToB route handler with session authentication, role permission
+ * Wrap a ToB route handler with session or scoped API-key authentication, role permission
  * check, user context resolution, and uniform error handling.
  *
  * Usage:
  *   export const GET = withAuth({ permission: "ticket.read" }, async (req, ctx) => ok(...));
  */
 export function withAuth(
-  options: { permission?: Permission },
-  handler: (req: NextRequest, ctx: AuthedContext) => Promise<NextResponse>
+  options: { permission?: Permission; sessionOnly?: boolean },
+  handler: (req: NextRequest, ctx: AuthedContext) => Promise<NextResponse>,
 ) {
   return async (
     req: NextRequest,
-    route?: NextRouteContext
+    route?: NextRouteContext,
   ): Promise<NextResponse> => {
-    try {
-      const auth = getAuth();
-      const session = await auth.api.getSession({ headers: req.headers });
-      if (!session?.user) return localizedErr(req, "Unauthorized", 401);
+    const run = async (): Promise<NextResponse> => {
+      try {
+        // An explicit credential is authoritative: never fall back to cookies.
+        if (req.headers.has("authorization")) {
+          if (options.sessionOnly) return localizedErr(req, "Forbidden", 403);
+          const db = getDb();
+          const key = await verifyAccountApiKey(db, req);
+          const ctx = await resolveAuthedContext(
+            db,
+            key.userId,
+            route?.params ? await route.params : {},
+          );
+          if (!ctx) return localizedErr(req, "Unauthorized", 401);
+          await authorizeApiKeyRequest(req, ctx, key);
+          if (
+            options.permission &&
+            !hasPermission(ctx.role, options.permission)
+          )
+            return localizedErr(req, "Forbidden", 403);
+          return await handler(req, ctx);
+        }
+        const auth = getAuth();
+        const session = await auth.api.getSession({ headers: req.headers });
+        if (!session?.user) return localizedErr(req, "Unauthorized", 401);
 
-      const db = getDb();
-      const params = route?.params ? await route.params : {};
-      const actor = await resolveAuthedContext(db, session.user.id, params);
-      if (!actor) return localizedErr(req, "User profile not found", 404);
+        const db = getDb();
+        const params = route?.params ? await route.params : {};
+        const actor = await resolveAuthedContext(db, session.user.id, params);
+        if (!actor) return localizedErr(req, "User profile not found", 404);
 
-      const pathname = new URL(req.url).pathname;
-      if (isPreviewControlPath(pathname)) {
-        if (options.permission && !hasPermission(actor.role, options.permission)) {
+        const pathname = new URL(req.url).pathname;
+        if (isPreviewControlPath(pathname)) {
+          if (
+            options.permission &&
+            !hasPermission(actor.role, options.permission)
+          ) {
+            return localizedErr(req, "Forbidden", 403);
+          }
+          return await handler(req, actor);
+        }
+
+        const previewed = await applyPreviewOverlay(req, actor);
+        const ctx = previewed.ctx;
+        if (
+          ctx.preview &&
+          isWriteMethod(req.method) &&
+          !isPreviewControlPath(pathname)
+        ) {
+          return localizedErr(req, PREVIEW_READONLY_MESSAGE, 403, {
+            code: PREVIEW_READONLY_CODE,
+          });
+        }
+
+        if (
+          options.permission &&
+          !hasPermission(ctx.role, options.permission)
+        ) {
           return localizedErr(req, "Forbidden", 403);
         }
-        return await handler(req, actor);
-      }
 
-      const previewed = await applyPreviewOverlay(req, actor);
-      const ctx = previewed.ctx;
-      if (
-        ctx.preview &&
-        isWriteMethod(req.method) &&
-        !isPreviewControlPath(pathname)
-      ) {
-        return localizedErr(req, PREVIEW_READONLY_MESSAGE, 403, { code: PREVIEW_READONLY_CODE });
+        const response = await handler(req, ctx);
+        if (previewed.clearCookie) attachClearedPreviewCookie(response, req);
+        return response;
+      } catch (error) {
+        const response = toResponse(error, new URL(req.url).pathname, req);
+        if (
+          error instanceof ApiError &&
+          error.status === 429 &&
+          error.details &&
+          typeof error.details === "object" &&
+          "retryAfter" in error.details
+        ) {
+          response.headers.set("Retry-After", String(error.details.retryAfter));
+        }
+        return response;
       }
-
-      if (options.permission && !hasPermission(ctx.role, options.permission)) {
-        return localizedErr(req, "Forbidden", 403);
-      }
-
-      const response = await handler(req, ctx);
-      if (previewed.clearCookie) attachClearedPreviewCookie(response, req);
-      return response;
-    } catch (error) {
-      return toResponse(error, new URL(req.url).pathname, req);
+    };
+    const response = await run();
+    if (
+      req.headers.has("authorization") ||
+      options.sessionOnly ||
+      new URL(req.url).pathname === "/api/tob/api-key"
+    ) {
+      response.headers.set("Cache-Control", "no-store");
+      response.headers.set("Pragma", "no-cache");
     }
+    return response;
   };
 }
 
@@ -243,11 +305,11 @@ export function withAuth(
  * Wrap a ToC route handler with customer JWT authentication.
  */
 export function withCustomerAuth(
-  handler: (req: NextRequest, ctx: CustomerContext) => Promise<NextResponse>
+  handler: (req: NextRequest, ctx: CustomerContext) => Promise<NextResponse>,
 ) {
   return async (
     req: NextRequest,
-    route?: NextRouteContext
+    route?: NextRouteContext,
   ): Promise<NextResponse> => {
     try {
       const token = await authenticateCustomer(req);
@@ -290,12 +352,12 @@ export function withCustomerAuth(
 export function withPublic(
   handler: (
     req: NextRequest,
-    ctx: { db: Database; params: RouteParams }
-  ) => Promise<NextResponse>
+    ctx: { db: Database; params: RouteParams },
+  ) => Promise<NextResponse>,
 ) {
   return async (
     req: NextRequest,
-    route?: NextRouteContext
+    route?: NextRouteContext,
   ): Promise<NextResponse> => {
     try {
       const params = route?.params ? await route.params : {};
@@ -313,7 +375,7 @@ export function withPublic(
 export async function parseBody<T extends z.ZodTypeAny>(
   req: NextRequest,
   schema: T,
-  maxBytes = 2 * 1024 * 1024
+  maxBytes = 2 * 1024 * 1024,
 ): Promise<z.infer<T>> {
   let raw: unknown;
   try {
@@ -335,12 +397,16 @@ export async function parseBody<T extends z.ZodTypeAny>(
  */
 export function parseQuery<T extends z.ZodTypeAny>(
   req: NextRequest,
-  schema: T
+  schema: T,
 ): z.infer<T> {
   const raw = Object.fromEntries(new URL(req.url).searchParams.entries());
   const result = schema.safeParse(raw);
   if (!result.success) {
-    throw new ApiError(400, "Invalid query parameters", z.flattenError(result.error));
+    throw new ApiError(
+      400,
+      "Invalid query parameters",
+      z.flattenError(result.error),
+    );
   }
   return result.data;
 }

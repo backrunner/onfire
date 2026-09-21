@@ -6,6 +6,7 @@ import { ok } from "@/lib/api/response";
 import { withAuth, parseBody, parseQuery } from "@/lib/api/handler";
 import { assertProductAccess, productScopeCondition } from "@/lib/api/scope";
 import { generateProductKeySecret } from "@/lib/auth/api-key";
+import { validateKeyExpiry } from "@/lib/api-keys/auth";
 
 const listQuerySchema = z.object({
   productId: z.string().optional(),
@@ -14,6 +15,7 @@ const listQuerySchema = z.object({
 const createKeySchema = z.object({
   productId: z.string().min(1),
   name: z.string().max(100).optional(),
+  expiresAt: z.iso.datetime({ offset: true }).optional(),
 });
 
 /** Public projection of a key row — the hash never leaves the server. */
@@ -24,6 +26,7 @@ function toKeyView(row: typeof productKeys.$inferSelect) {
     name: row.name,
     createdAt: row.createdAt,
     lastUsedAt: row.lastUsedAt,
+    expiresAt: row.expiresAt,
     revoked: row.revoked,
   };
 }
@@ -60,6 +63,7 @@ export const POST = withAuth({ permission: "product.settings" }, async (req: Nex
 
   const generated = await generateProductKeySecret();
   const now = new Date().toISOString();
+  const expiresAt = validateKeyExpiry(body.expiresAt ?? new Date(Date.now() + 90 * 86400000).toISOString());
 
   await ctx.db.insert(productKeys).values({
     id: generated.id,
@@ -67,6 +71,7 @@ export const POST = withAuth({ permission: "product.settings" }, async (req: Nex
     name: body.name,
     secretHash: generated.secretHash,
     createdAt: now,
+    expiresAt,
   });
 
   // The plaintext credential is returned exactly once.
@@ -77,6 +82,7 @@ export const POST = withAuth({ permission: "product.settings" }, async (req: Nex
       name: body.name,
       apiKey: generated.plaintext,
       createdAt: now,
+      expiresAt,
     },
     201
   );

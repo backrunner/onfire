@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
-import { Ban, Copy, Pencil, Plus, RefreshCw, Trash2, Undo2 } from "lucide-react";
+import { Ban, Copy, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { defaultKeyExpiry, localKeyExpiry } from "@/lib/api-keys/dates";
 import { useI18n } from "@/lib/i18n";
 import { api, qs, swrFetcher } from "@/lib/api/client";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +66,7 @@ interface ProductKeyView {
   createdAt: string | null;
   lastUsedAt: string | null;
   revoked: boolean | null;
+  expiresAt: string | null;
 }
 
 interface CreatedKeyResponse {
@@ -112,7 +114,7 @@ export function ProductKeyManagement({ productId }: { productId?: string }) {
   );
 
   const [createOpen, setCreateOpen] = useState(false);
-  const [form, setForm] = useState({ productId: "", name: "" });
+  const [form, setForm] = useState({ productId: "", name: "", expiresAt: defaultKeyExpiry() });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
   const [secret, setSecret] = useState<SecretReveal | null>(null);
@@ -120,6 +122,7 @@ export function ProductKeyManagement({ productId }: { productId?: string }) {
   const [rotatePending, setRotatePending] = useState(false);
   const [editing, setEditing] = useState<ProductKeyView | null>(null);
   const [editName, setEditName] = useState("");
+  const [editExpiry, setEditExpiry] = useState("");
   const [editPending, setEditPending] = useState(false);
   const [deleting, setDeleting] = useState<ProductKeyView | null>(null);
 
@@ -134,6 +137,7 @@ export function ProductKeyManagement({ productId }: { productId?: string }) {
     setForm({
       productId: productId ?? (productFilter === ALL ? "" : productFilter),
       name: "",
+      expiresAt: defaultKeyExpiry(),
     });
     setFormErrors({});
     setCreateOpen(true);
@@ -142,6 +146,8 @@ export function ProductKeyManagement({ productId }: { productId?: string }) {
   const handleCreate = async () => {
     const errors: Record<string, string> = {};
     if (!form.productId) errors.productId = m.apiKeys.selectProduct;
+    const expiry = new Date(form.expiresAt).getTime();
+    if (!Number.isFinite(expiry) || expiry <= Date.now() || expiry > Date.now() + 365 * 86400000) errors.expiresAt = t.accountApiKeys.validation;
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
@@ -151,6 +157,7 @@ export function ProductKeyManagement({ productId }: { productId?: string }) {
         "/api/tob/admin/product-keys",
         {
           productId: form.productId,
+          expiresAt: new Date(expiry).toISOString(),
           ...(form.name.trim() ? { name: form.name.trim() } : {}),
         }
       );
@@ -195,14 +202,26 @@ export function ProductKeyManagement({ productId }: { productId?: string }) {
   const openEdit = (key: ProductKeyView) => {
     setEditing(key);
     setEditName(key.name ?? "");
+    setEditExpiry(key.expiresAt ? localKeyExpiry(key.expiresAt) : "");
   };
 
   const handleEdit = async () => {
     if (!editing) return;
+    const expiryChanged = editExpiry !== (editing.expiresAt ? localKeyExpiry(editing.expiresAt) : "");
+    const expiry = expiryChanged && editExpiry ? new Date(editExpiry).getTime() : null;
+    if (expiryChanged && (!expiry || !Number.isFinite(expiry) || expiry <= Date.now() || expiry > Date.now() + 365 * 86400000)) {
+      toast.warning(t.accountApiKeys.validation);
+      return;
+    }
+    if (expiry && editing.expiresAt && expiry > Date.parse(editing.expiresAt)) {
+      toast.warning(t.accountApiKeys.noExtension);
+      return;
+    }
     setEditPending(true);
     try {
       await api.patch(`/api/tob/admin/product-keys/${editing.id}`, {
         name: editName.trim(),
+        ...(expiry !== null ? { expiresAt: new Date(expiry).toISOString() } : {}),
       });
       toast.success(m.toastUpdated);
       setEditing(null);
@@ -290,6 +309,7 @@ export function ProductKeyManagement({ productId }: { productId?: string }) {
             <TableBody>
               {keys.map((key) => {
                 const revoked = key.revoked === true;
+                const expired = key.expiresAt !== null && Date.parse(key.expiresAt) <= Date.now();
                 return (
                   <TableRow key={key.id}>
                     <TableCell>
@@ -303,6 +323,7 @@ export function ProductKeyManagement({ productId }: { productId?: string }) {
                     </TableCell>}
                     <TableCell className="text-sm tabular-nums text-muted-foreground">
                       {formatDateTime(key.createdAt)}
+                      <div className="text-xs">{key.expiresAt ? `${t.accountApiKeys.expiresAt}: ${formatDateTime(key.expiresAt)}` : t.accountApiKeys.legacyExpiry}</div>
                     </TableCell>
                     <TableCell className="text-sm tabular-nums text-muted-foreground">
                       {key.lastUsedAt
@@ -310,7 +331,7 @@ export function ProductKeyManagement({ productId }: { productId?: string }) {
                         : m.apiKeys.neverUsed}
                     </TableCell>
                     <TableCell>
-                      {revoked ? (
+                      {expired && !revoked ? <Badge variant="secondary">{t.accountApiKeys.expired}</Badge> : revoked ? (
                         <Badge variant="destructive">{m.apiKeys.revoked}</Badge>
                       ) : (
                         <Badge
@@ -332,21 +353,16 @@ export function ProductKeyManagement({ productId }: { productId?: string }) {
                           {
                             label: m.apiKeys.rotate,
                             icon: RefreshCw,
-                            disabled: revoked,
+                            disabled: revoked || expired,
                             onSelect: () => setRotating(key),
                           },
-                          revoked
-                            ? {
-                                label: m.apiKeys.unrevoke,
-                                icon: Undo2,
-                                onSelect: () => void handleSetRevoked(key, false),
-                              }
-                            : {
-                                label: m.apiKeys.revoke,
-                                icon: Ban,
-                                destructive: true,
-                                onSelect: () => void handleSetRevoked(key, true),
-                              },
+                          {
+                            label: m.apiKeys.revoke,
+                            icon: Ban,
+                            disabled: revoked,
+                            destructive: true,
+                            onSelect: () => void handleSetRevoked(key, true),
+                          },
                           {
                             label: t.common.delete,
                             icon: Trash2,
@@ -403,6 +419,9 @@ export function ProductKeyManagement({ productId }: { productId?: string }) {
                 className="h-8"
               />
             </FormField>
+            <FormField label={t.accountApiKeys.expiresAt} htmlFor="product-key-expiry" error={formErrors.expiresAt}>
+              <Input id="product-key-expiry" type="datetime-local" value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} />
+            </FormField>
           </div>
           <DialogFooter>
             <Button
@@ -438,6 +457,9 @@ export function ProductKeyManagement({ productId }: { productId?: string }) {
               maxLength={100}
               className="h-8"
             />
+          </FormField>
+          <FormField label={t.accountApiKeys.expiresAt} htmlFor="edit-product-key-expiry">
+            <Input id="edit-product-key-expiry" type="datetime-local" value={editExpiry} onChange={(e) => setEditExpiry(e.target.value)} />
           </FormField>
           <DialogFooter>
             <Button

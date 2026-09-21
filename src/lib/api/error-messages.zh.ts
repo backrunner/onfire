@@ -4,6 +4,16 @@
  * source literals — a mismatch silently falls back to English.
  */
 export const zhErrorMessages: Record<string, string> = {
+  "API key does not permit this operation": "此 API 密钥未获准执行该操作",
+  "Key expiry must be in the future and within 365 days": "密钥到期时间必须在未来 365 天内",
+  "API keys can only be managed in your own browser session": "只能在自己的浏览器登录会话中管理 API 密钥",
+  "Invalid API key permissions": "API 密钥操作权限无效",
+  "Invalid API key resource scope": "API 密钥资源范围无效",
+  "Expired or revoked keys cannot be changed": "已到期或撤销的密钥无法修改",
+  "Create a new key to extend its lifetime": "如需延长有效期，请创建新密钥",
+  "Key changed; reload before editing": "密钥已变更，请刷新后重新编辑",
+  "No changes provided": "未提供任何修改",
+  "An account API key is required": "需要账户 API 密钥",
   "A required agent is required": "必须指定要求的坐席",
   "A required team is required": "必须指定要求的团队",
   "A target agent is required": "必须指定目标坐席",
@@ -207,6 +217,7 @@ export const zhErrorMessages: Record<string, string> = {
   "This ticket is closed and no longer accepts replies": "该工单已关闭，不再接受回复",
   "Ticket belongs to another product": "工单属于其他产品",
   "Ticket belongs to another team": "工单属于其他团队",
+  "Ticket changed; reload before retrying": "工单已变更，请刷新后重试",
   "Ticket is already assigned to this agent": "工单已分配给该坐席",
   "Ticket is already assigned; use reassign_ticket": "工单已分配，请使用 reassign_ticket",
   "Ticket is already closed": "工单已关闭",

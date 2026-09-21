@@ -1,10 +1,12 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { tickets, history, products } from "@/drizzle/schema";
+import { tickets, products } from "@/drizzle/schema";
+import { guardedTicketChange } from "@/lib/tickets/guarded-change";
 import { TicketStatus } from "@/lib/types";
-import { ok, notFound } from "@/lib/api/response";
+import { conflict, ok, notFound } from "@/lib/api/response";
 import { withAuth, parseBody } from "@/lib/api/handler";
+import { assertApiKeyPermission } from "@/lib/api-keys/auth";
 import { assertTicketVisible } from "@/lib/api/scope";
 import { serializeTicket } from "@/lib/tickets/serialize";
 import {
@@ -26,6 +28,7 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
   assertTicketVisible(ctx, ticket);
 
   const body = await parseBody(req, statusSchema);
+  if (ticket.status === TicketStatus.Closed) assertApiKeyPermission(ctx, "reopen_ticket");
   assertManualStatusTarget(body.status);
   assertTransition(ticket.status, body.status);
   if (body.status === TicketStatus.Replied) {
@@ -51,14 +54,13 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
     new Date(now),
   );
 
-  await ctx.db.batch([
-    ctx.db
-      .update(tickets)
-      .set({ status: body.status, updatedAt: now, ...slaUpdate })
-      .where(eq(tickets.id, ticket.id)),
-    ctx.db.insert(history).values({
-      id: crypto.randomUUID(),
-      ticketId: ticket.id,
+  const changed = await guardedTicketChange(
+    ctx.db,
+    ticket,
+    {
+      status: body.status, updatedAt: now, ...slaUpdate
+    },
+    {
       actorId: ctx.user.id,
       action: "status_changed",
       snapshot: JSON.stringify({
@@ -66,8 +68,9 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
         newStatus: body.status,
       }),
       createdAt: now,
-    }),
-  ]);
+    },
+  );
+  if (!changed) throw conflict("Ticket changed; reload before retrying");
 
   const updated = await ctx.db.query.tickets.findFirst({
     where: eq(tickets.id, ticket.id),

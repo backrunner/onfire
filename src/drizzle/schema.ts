@@ -429,12 +429,32 @@ export const productKeys = sqliteTable(
     secretHash: text("secret").notNull(),
     createdAt: text("created_at").notNull(),
     lastUsedAt: text("last_used_at"),
+    expiresAt: text("expires_at"),
     revoked: integer("revoked", { mode: "boolean" }).default(false),
   },
   (t) => [index("product_keys_product_idx").on(t.productId)],
 );
 
 export type TeamScope = "system" | "tenant" | "product";
+
+/** Account automation credentials. Only the hash is stored. */
+export const accountApiKeys = sqliteTable(
+  "account_api_keys",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    secretHash: text("secret_hash").notNull(),
+    permissions: text("permissions", { mode: "json" }).$type<string[]>().notNull(),
+    resourceMode: text("resource_mode").$type<"all" | "products">().notNull(),
+    productIds: text("product_ids", { mode: "json" }).$type<string[]>().notNull(),
+    createdAt: text("created_at").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    lastUsedAt: text("last_used_at"),
+    revokedAt: text("revoked_at"),
+  },
+  (t) => [index("account_api_keys_user_idx").on(t.userId)],
+);
 
 export const teams = sqliteTable(
   "teams",

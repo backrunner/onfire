@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq, and, inArray } from "drizzle-orm";
-import { tickets, history, products } from "@/drizzle/schema";
+import { tickets, products } from "@/drizzle/schema";
+import { guardedTicketChange } from "@/lib/tickets/guarded-change";
 import { TicketStatus } from "@/lib/types";
 import { ok } from "@/lib/api/response";
 import { withAuth, parseBody } from "@/lib/api/handler";
@@ -55,6 +56,10 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
       : null;
 
   for (const ticket of rows) {
+    if (ticket.status === TicketStatus.Closed && ctx.apiKey && !ctx.apiKey.permissions.includes("reopen_ticket")) {
+      results.push({ id: ticket.id, success: false, error: "API key does not permit reopening tickets" });
+      continue;
+    }
     if (ticket.status === body.status) {
       results.push({ id: ticket.id, success: false, error: "Status unchanged" });
       continue;
@@ -83,14 +88,13 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
       new Date(now),
     );
 
-    await ctx.db.batch([
-      ctx.db
-        .update(tickets)
-        .set({ status: body.status, updatedAt: now, ...slaUpdate })
-        .where(eq(tickets.id, ticket.id)),
-      ctx.db.insert(history).values({
-        id: crypto.randomUUID(),
-        ticketId: ticket.id,
+    const changed = await guardedTicketChange(
+      ctx.db,
+      ticket,
+      {
+        status: body.status, updatedAt: now, ...slaUpdate
+      },
+      {
         actorId: ctx.user.id,
         action: "status_changed",
         snapshot: JSON.stringify({
@@ -99,8 +103,12 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
           bulk: true,
         }),
         createdAt: now,
-      }),
-    ]);
+      },
+    );
+    if (!changed) {
+      results.push({ id: ticket.id, success: false, error: "Ticket changed; reload before retrying" });
+      continue;
+    }
 
     results.push({ id: ticket.id, success: true });
   }

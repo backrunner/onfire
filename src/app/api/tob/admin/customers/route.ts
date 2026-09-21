@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { and, desc, eq, exists, inArray, or, count, sql } from "drizzle-orm";
-import { customers, tickets } from "@/drizzle/schema";
+import { and, desc, eq, exists, inArray, or, count, sql, type SQL } from "drizzle-orm";
+import { customers, tickets, products } from "@/drizzle/schema";
 import { ok } from "@/lib/api/response";
 import { withAuth, parseQuery } from "@/lib/api/handler";
-import { isTeamScoped, tenantCondition } from "@/lib/api/scope";
+import { isTeamScoped, productScopeCondition } from "@/lib/api/scope";
 import { Role } from "@/lib/types";
 
 const querySchema = z.object({
@@ -21,7 +21,7 @@ const querySchema = z.object({
 export const GET = withAuth({ permission: "customer.read" }, async (req: NextRequest, ctx) => {
   const query = parseQuery(req, querySchema);
 
-  const conditions = [tenantCondition(ctx, customers.tenantId)];
+  const conditions: (SQL | undefined)[] = [inArray(customers.productId, ctx.db.select({ id: products.id }).from(products).where(productScopeCondition(ctx)))];
   if (ctx.role === Role.ProductAdmin) {
     conditions.push(
       inArray(

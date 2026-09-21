@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
-import { tickets, history, agents, agentTeams, products, users } from "@/drizzle/schema";
+import { tickets, agents, agentTeams, products, users } from "@/drizzle/schema";
+import { guardedTicketChange } from "@/lib/tickets/guarded-change";
 import { TicketStatus, hasPermission } from "@/lib/types";
-import { ok, notFound, badRequest, forbidden } from "@/lib/api/response";
+import { conflict, ok, notFound, badRequest, forbidden } from "@/lib/api/response";
 import { withAuth, parseBody } from "@/lib/api/handler";
 import {
   assertAgentMayReassign,
@@ -13,6 +14,7 @@ import { serializeTicket } from "@/lib/tickets/serialize";
 import { isOpen } from "@/lib/tickets/state-machine";
 import { computeSlaDeadlines, restartReplySla } from "@/lib/tickets/sla";
 import { emitTicketEvent } from "@/services/ticket-events";
+import { assertApiKeyPermission } from "@/lib/api-keys/auth";
 
 const assignSchema = z.object({
   assigneeId: z.string().min(1),
@@ -41,6 +43,7 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
 
   const body = await parseBody(req, assignSchema);
   const isReassign = Boolean(ticket.assigneeId);
+  assertApiKeyPermission(ctx, isReassign ? "reassign_ticket" : "assign_ticket");
 
   if (!isReassign) {
     // First assignment
@@ -103,22 +106,19 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
     slaReset = { slaReplyDeadline: null };
   }
 
-  await ctx.db.batch([
-    ctx.db
-      .update(tickets)
-      .set({
-        assigneeId: body.assigneeId,
-        status:
-          ticket.status === TicketStatus.New
-            ? TicketStatus.Processing
-            : ticket.status,
-        updatedAt: now,
-        ...slaReset,
-      })
-      .where(eq(tickets.id, ticket.id)),
-    ctx.db.insert(history).values({
-      id: crypto.randomUUID(),
-      ticketId: ticket.id,
+  const changed = await guardedTicketChange(
+    ctx.db,
+    ticket,
+    {
+      assigneeId: body.assigneeId,
+      status:
+        ticket.status === TicketStatus.New
+          ? TicketStatus.Processing
+          : ticket.status,
+      updatedAt: now,
+      ...slaReset,
+    },
+    {
       actorId: ctx.user.id,
       action: isReassign ? "reassigned" : "assigned",
       snapshot: JSON.stringify({
@@ -126,8 +126,9 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
         newAssignee: body.assigneeId,
       }),
       createdAt: now,
-    }),
-  ]);
+    },
+  );
+  if (!changed) throw conflict("Ticket changed; reload before retrying");
 
   emitTicketEvent(ctx.db, {
     type: isReassign ? "ticket_reassigned" : "ticket_assigned",

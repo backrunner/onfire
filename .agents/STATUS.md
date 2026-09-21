@@ -1,6 +1,98 @@
 # OnFire Project Status
 
-Updated: 2026-09-19
+Updated: 2026-09-21
+
+## Account API keys production release — 2026-09-21
+
+- With explicit deployment authorization, applied migration
+  `0030_account_api_keys.sql` to production D1 and deployed Worker
+  `246484d1-fb74-45da-b2f8-f1aeb58687e9` at 100% traffic on
+  `onfire.alkinum.com` and `support.alkinum.io`. Version tag:
+  `api-keys-20260921`; source snapshot SHA-256 starts `db42e161210d`.
+  The previous version is `2032a255-d84e-48f9-9a94-3a2190d0f008`.
+- Built with the ignored production configuration, matching real domains,
+  production Turnstile site key, and disabled debug/port routing. Existing
+  application secrets, cron, queues and mail bindings are preserved. The email
+  agent has no change and was not redeployed. This release was not committed.
+- Production D1 export was saved privately before migration; its Time Travel
+  bookmark is `00004f7f-00000000-000050ed-53b723cdb8edf6016f050abe9a0cd4b8`.
+  The account-key table and product-key expiry column are present, no migrations
+  remain pending, and `PRAGMA foreign_key_check` returns no violations.
+- Release checks pass: frozen install, generated bindings, TypeScript, 95 test
+  files / 784 tests, seven Python client tests, Drizzle metadata, production
+  dependency audit, production Worker build, deploy dry-run and startup profile.
+  Deployment startup is 33 ms. Earlier isolated local migration, actual Worker
+  API/skill and desktop/mobile UI validation remains recorded below.
+- Post-deployment portal and direct/proxied health return 200; cross-surface ToB
+  and proxied admin return 404; unauthenticated customer ticket reads return 401.
+  All four account-key feature JavaScript chunks match the verified build by
+  SHA-256. Admin requests retain the expected Cloudflare Access 302 challenge.
+  Authenticated production API mutations were not exercised, and no production
+  account key was created. Machine clients still need an authorized Access
+  service-token policy when accessing the protected ToB hostname.
+
+## Account API keys and portable automation skill — 2026-09-20
+
+- Audit confirmed that existing product keys only issue ToC customer JWTs and
+  previously had no expiry. They are not account-management credentials.
+- Added owner-session-managed `ofk_` account keys with 128 individually grantable
+  REST operations. Grants intersect current RBAC, live tenant/product/team scope
+  and optional selected products on every request; unknown operations and
+  static/dynamic route aliases fail closed. Existing APIs retain their lifecycle,
+  translation, assignment, SLA and notification behavior.
+- Public replies/internal notes and initial assignment/reassignment have separate
+  branch checks. Both single and bulk status-based reopening require the reopen
+  grant; bulk assignment requires reassignment authority for assigned rows.
+  Product-restricted customer/team lookups now filter through visible
+  product associations. Session-only key management rejects preview and bearer
+  credentials and validates canonical Origin on writes.
+- Keys have required expiry within 365 days, hashed 256-bit secrets, one-time
+  plaintext reveal, last-used metadata and irreversible revocation. Expiry cannot
+  be extended by editing the same credential. Explicit Authorization never falls
+  back to cookies. Authenticated discovery returns current capabilities and JSON
+  input schemas. Atomic D1 rate limits fail closed and return Retry-After; key
+  responses are non-cacheable. Account deletion removes owned keys.
+- Security follow-up adds compare-and-set protection for concurrent account-key
+  grant edits and product-key expiry/rotation/revocation changes. Authorization
+  rechecks the verified key configuration before entering a handler. Assignment,
+  status and public-reply writes claim current ticket state in a D1 transaction;
+  stale requests cannot bypass reassignment/reopen grants or reopen closed tickets
+  through replies, and leave no partial history, replies or mail intents.
+  Revocation blocks new authorization decisions, not already-running operations.
+- Migration `0030_account_api_keys.sql` adds the account-key table and nullable
+  product-key expiry. New product keys default to 90 days (maximum 365); rotation
+  preserves expiry and revoked keys cannot be restored. Legacy null-expiry keys
+  remain valid until an administrator constrains or revokes them; existing customer
+  JWTs retain their own 24-hour expiry.
+- Added bilingual account key creation/edit/revocation controls and product-key
+  expiry controls. The portable `.agents/skills/onfire-api` skill includes live
+  operation discovery, workflow references and a dependency-free Python client
+  with redirect rejection, stdout secret redaction, multipart uploads and private
+  output files. Also installed it in the local Codex skills directory. See
+  `docs/API_KEYS.md` for coverage, edge Access setup and rollout requirements.
+- Validation: frozen install, Worker binding check, TypeScript, 95 Vitest files /
+  784 tests, seven Python HTTP-fixture client tests, skill validation, both Worker
+  builds, Drizzle metadata, all 31 migrations in isolated local D1, deploy dry-run,
+  startup profiling (~21 ms active local CPU), and production dependency audit
+  pass. Initial local migration transport interrupted at `0018`; retry applied
+  the remaining migrations successfully. No production dependency advisories.
+- Actual local Worker/Playwright smoke verifies account-key creation, validation,
+  editing and revocation, permitted read/write 200, unauthorized operation 403,
+  out-of-scope record 404 and revoked-key 401. The Python skill client also passes
+  live local discovery, product-limited reads, denied operations and revocation.
+  Account UI screenshots were inspected at 1440x900 and 390x844 in English/Chinese
+  and light/dark (eight combinations), with no page exceptions or horizontal
+  overflow. Product-key expiry/create dialogs pass at both viewport widths.
+- Final security follow-up re-applied all 31 migrations to a fresh isolated local
+  D1 and exercised real workerd HTTP discovery, assignment, public reply, close,
+  rejected closed-ticket reply, reopening, bulk assignment/status, product scope,
+  separate bulk reassignment grants, product-key creation/rotation/expiry/revocation,
+  and account-key revocation. The installed Python skill also completed a live
+  product-limited read; its dry-run/error output now redacts Bark device keys and
+  echoed input credentials. Fixtures have no outbound provider; no email was sent.
+- Initial implementation validation created no production API key, applied no
+  remote migration, deployed nothing and committed nothing. The subsequently
+  authorized production release is recorded above.
 
 ## TypeSafe Jev screening — 2026-09-19
 

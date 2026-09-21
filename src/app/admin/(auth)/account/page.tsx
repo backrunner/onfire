@@ -26,6 +26,7 @@ import {
 import { EndpointDialog } from "@/components/admin/notifications/endpoint-dialog";
 import { EndpointTestDialog } from "@/components/admin/notifications/endpoint-test-dialog";
 import { ConnectedApplicationsCard } from "@/components/admin/oauth/connected-applications-card";
+import { ApiKeysCard } from "@/components/admin/account/api-keys-card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -211,6 +212,7 @@ export default function AdminAccountPage() {
         </Card>
 
         <ConnectedApplicationsCard />
+        <ApiKeysCard />
 
         <Card className="gap-0 rounded-lg py-0">
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 px-4 py-4">

@@ -1,0 +1,3 @@
+interface:
+  display_name: "OnFire API"
+  short_description: "Manage OnFire through scoped account API keys"

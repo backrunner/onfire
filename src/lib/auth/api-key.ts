@@ -58,7 +58,7 @@ export async function verifyProductApiKey(
   const key = await db.query.productKeys.findFirst({
     where: eq(productKeys.id, keyId),
   });
-  if (!key || key.revoked) return null;
+  if (!key || key.revoked || (key.expiresAt != null && !(Date.parse(key.expiresAt) > Date.now()))) return null;
 
   const candidateHash = await sha256Hex(secret);
   if (!(await timingSafeEqual(candidateHash, key.secretHash))) return null;

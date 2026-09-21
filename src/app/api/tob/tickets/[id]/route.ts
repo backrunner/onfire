@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   tickets,
   replies,
@@ -9,10 +9,12 @@ import {
   ticketTemplateVersions,
   ticketTypeInternalStates,
   ticketInternalStateValues,
+  emailReplyIntents,
 } from "@/drizzle/schema";
 import { TicketStatus } from "@/lib/types";
-import { ok, notFound, badRequest, ApiError } from "@/lib/api/response";
+import { ok, notFound, badRequest, conflict, ApiError } from "@/lib/api/response";
 import { withAuth, parseBody } from "@/lib/api/handler";
+import { assertApiKeyPermission } from "@/lib/api-keys/auth";
 import { assertTicketVisible } from "@/lib/api/scope";
 import {
   serializeTicket,
@@ -27,6 +29,7 @@ import { parseFormSchema } from "@/lib/form-schema";
 import { serializeState } from "@/services/ticket-internal-states";
 import { sanitizeRichHtml, richHtmlToText, richTextIsEmpty } from "@/lib/rich-text";
 import { prepareReplyTranslation } from "@/services/ticket-translation";
+import { guardedTicketChange } from "@/lib/tickets/guarded-change";
 
 const replySchema = z.object({
   content: z.string().max(20_000).default(""),
@@ -155,6 +158,7 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
   assertTicketVisible(ctx, ticket);
 
   const body = await parseBody(req, replySchema);
+  assertApiKeyPermission(ctx, body.internal ? "add_ticket_note" : "reply_ticket");
 
   if (!isOpen(ticket.status) && !body.internal) {
     throw badRequest("Cannot reply to a closed ticket");
@@ -221,20 +225,39 @@ export const POST = withAuth({ permission: "ticket.write" }, async (req: NextReq
   if (body.internal) {
     await ctx.db.batch([...statements]);
   } else {
-    await ctx.db.batch([
-      ...statements,
-      ...(mailIntent ? [mailIntent.statement] : []),
-      ctx.db
-        .update(tickets)
-        .set({
+    const changed = await guardedTicketChange(ctx.db, ticket, {
           status: TicketStatus.Replied,
           // The public reply completes the first-reply SLA. Keep breach flags
           // as history, but stop the deadline from becoming active again.
           slaReplyDeadline: null,
           updatedAt: now,
-        })
-        .where(eq(tickets.id, ticket.id)),
-    ]);
+        }, {
+          actorId: ctx.user.id,
+          action: "agent_replied",
+          createdAt: now,
+        }, (applied) => [
+          ctx.db.insert(replies).select(ctx.db.select({
+            id: sql<string>`${replyId}`.as("id"),
+            ticketId: tickets.id,
+            senderId: sql<string>`${ctx.user.id}`.as("sender_id"),
+            senderEmail: sql<null>`NULL`.as("sender_email"),
+            content: sql<string>`${content}`.as("content"),
+            contentHtml: sql<string | null>`${contentHtml}`.as("content_html"),
+            detectedLanguage: sql<string | null>`${translation.detectedLanguage}`.as("detected_language"),
+            translations: sql<string | null>`${translation.translations}`.as("translations"),
+            internal: sql<boolean>`0`.as("internal"),
+            source: sql<"web">`'web'`.as("source"),
+            sourceEmailId: sql<null>`NULL`.as("source_email_id"),
+            emailSent: sql<boolean>`0`.as("email_sent"),
+            createdAt: sql<string>`${now}`.as("created_at"),
+          }).from(tickets).where(and(eq(tickets.id, ticket.id), applied))),
+          ...(mailIntent ? [ctx.db.insert(emailReplyIntents).select(ctx.db.select({
+            replyId: replies.id,
+            ticketId: replies.ticketId,
+            createdAt: sql<string>`${now}`.as("created_at"),
+          }).from(replies).where(eq(replies.id, replyId)))] : []),
+        ]);
+    if (!changed) throw conflict("Ticket changed; reload before retrying");
     emitTicketEvent(ctx.db, {
       type: "agent_replied",
       ticketId: ticket.id,

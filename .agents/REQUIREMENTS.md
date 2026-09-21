@@ -43,6 +43,35 @@
 - Passkeys use the exact `BETTER_AUTH_URL` hostname as the WebAuthn RP ID and its origin as the allowed origin. Registration requires an authenticated session, and users may list, rename, and delete only their own credentials.
 - TOTP enrollment requires the current password and a verified first code. Recovery codes are shown only when generated, trusted-device state lasts 30 days, and disabling or regenerating TOTP credentials requires the current password.
 
+## Account API Keys
+
+- Account API keys must grant explicit operation IDs, enforced on the exact HTTP
+  method and resolved route, with default-deny coverage for new/unknown endpoints.
+- Effective access intersects the key grant, live account RBAC and resource scope,
+  and optional selected products. System/tenant/staff/personal administration
+  requires account mode; a product-restricted key cannot widen its resource mode.
+- Check public reply versus internal note, initial assignment versus reassignment,
+  and status-based reopening at their actual operation branches. Bulk assignment
+  requires the separate reassignment grant for already assigned tickets. Compare
+  ticket state inside assignment/status/public-reply transactions so concurrent
+  changes cannot bypass those branches or leave partial history/replies/mail intents.
+- Keys require a future expiry within 365 days; only hashes are persisted. Return
+  plaintext once, support immediate irreversible revocation, and prohibit renewal
+  of the same credential. Owners can shorten expiry or replace grants in-session.
+- Reject stale concurrent grant/expiry edits, and recheck the verified key snapshot
+  before entering a handler. Revocation prevents subsequent authorization decisions;
+  it cannot cancel an operation already authorized and in progress.
+- Key management is owner-session-only with canonical Origin on writes. Preview,
+  account keys and other bearer types cannot mint keys or operate account security.
+- Explicit Authorization never falls back to cookies. Rate limits fail closed,
+  429 includes Retry-After, and all credential responses are non-cacheable.
+- Publish authenticated capability discovery for AI clients; preserve host routing,
+  normal API lifecycle behavior and safe secret projections. Provide a portable
+  onfire-api skill using that discovery contract.
+- New product keys default to a 90-day lifetime (maximum 365 days); legacy null
+  expiry remains supported. Rotation preserves expiry; revocation is irreversible.
+  Expiring a product key prevents issuance but does not revoke existing customer JWTs.
+
 ## MCP OAuth Delegation
 
 - Serve MCP only on the ToB surface at the canonical `BETTER_AUTH_URL` `/mcp`

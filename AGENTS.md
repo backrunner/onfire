@@ -7,7 +7,7 @@ OnFire is a minimalist modern ticket system designed to enable users to quickly 
 - **Runtime**: Node.js 22+ + Cloudflare Workers
 - **Framework**: Next.js 16 (App Router) + OpenNext/Cloudflare
 - **Database**: Cloudflare D1 (SQLite) + Drizzle ORM
-- **Authentication**: Better Auth + OAuth 2.1 (ToB/MCP) / JWT + API Key (ToC)
+- **Authentication**: Better Auth + scoped account API keys (ToB REST) + OAuth 2.1 (MCP) / JWT + product API keys (ToC)
 - **ToB Account Security**: Password + Passkey login, with optional authenticator TOTP, trusted devices, and recovery codes
 - **ToB Login Protection**: D1-backed atomic limits before authentication: 30 requests/IP/minute, 100 requests/IP/15 minutes, and 10 password attempts/normalized email/15 minutes (including successful attempts). Account keys use HMAC; unknown accounts follow the same policy. TOTP and recovery codes share Better Auth's 10-failure/15-minute account lockout. Limiter failures reject authentication, 429 responses include `Retry-After`, and scheduled maintenance purges expired login counters.
 - **Frontend**: React 19 + TypeScript
@@ -100,7 +100,25 @@ Ticket submission and query system for end users, including:
 
 Both systems are served by a single Cloudflare Worker via OpenNext, with multi-domain routing handled by Next.js middleware.
 
-### MCP - Delegated Automation
+### Account API Keys - REST Automation
+
+The account page issues `ofk_` bearer keys for explicit management API operations.
+Grants intersect live RBAC, tenant/product/team membership and optional selected
+products on every request. Expiry is mandatory (maximum 365 days), editing cannot
+extend it, and revocation is irreversible. Key management and account security
+remain browser-session-only; preview cannot manage keys. Public replies/internal
+notes and assignment/reassignment have separate grants. Status-based reopening
+requires the reopen grant too, and bulk reassignment requires `reassign_ticket`.
+Concurrent grant/expiry edits use compare-and-set checks. Assignment, status and
+public-reply transactions reject stale ticket state without recording side effects.
+Unknown methods/routes and static/dynamic aliases
+fail closed. `GET /api/tob/api-key` discovers effective operations and input schemas.
+Use `.agents/skills/onfire-api/SKILL.md` for account automation and `docs/API_KEYS.md`
+for credentials, limits, compatibility and deployment. Product keys remain ToC-only;
+new ones expire (90-day default), rotation preserves expiry, and legacy null-expiry
+keys are preserved until explicitly constrained or revoked.
+
+### MCP - OAuth Delegation
 
 OnFire exposes a stateless Streamable HTTP MCP server at `/mcp` on the ToB
 hostname. MCP clients authenticate through OAuth 2.1 authorization code flow
@@ -671,7 +689,9 @@ Custom product templates use the same escaped variable renderer for preview and 
 
 ### ToB API (`/api/tob`)
 
-Authentication: Better Auth (Bearer Token)
+Authentication: Better Auth browser session, or an `ofk_` account Bearer key for
+explicitly granted operations. Account/security and key-management APIs remain
+session-only. See `docs/API_KEYS.md` and `GET /api/tob/api-key` for the live contract.
 
 ```
 # System
@@ -778,7 +798,8 @@ GET  /meta/agents         - Agents of a team (assignment pickers; ticket.assign)
 
 ### ToC API (`/api/toc`)
 
-Authentication: JWT (Bearer Token) or API Key
+Authentication: customer JWT (Bearer Token). Product API keys are accepted only
+by `POST /tokens` to issue a customer JWT, not as direct ticket credentials.
 
 ```
 # System
