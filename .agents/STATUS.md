@@ -2,6 +2,49 @@
 
 Updated: 2026-10-11
 
+## Tenant, current-team, and product notification inheritance — 2026-10-11
+
+- Notification rules and mandatory-channel requirements now have tenant, team,
+  or product owners. Delivery resolves tenant defaults → the ticket’s current
+  team → product overrides. Unrelated associated teams never merge. Each scope
+  can add, replace, disable, or reset an inherited policy. Disabled overrides
+  mask ancestors; deleting an override restores inheritance.
+- Added tenant notification tabs, team notification pages and a product team
+  context selector. Rows identify inherited/local/overridden policies. TeamAdmin
+  has an own-team notification entry and cannot configure tenant/product rules;
+  ProductAdmin can configure assigned products and product-owned teams.
+  Preview controls and API writes remain read-only.
+- Personal endpoints and event-product email transport stay unchanged. Live
+  audiences enforce tenant/product membership. Team-wide policies target only
+  their team. Compliance and delivery share requirement targeting and inheritance.
+  Atomic inserts/deletes and unique indexes reject duplicate overrides and
+  concurrent parent deletion. Parent policies and owning teams/tenants cannot
+  be deleted while dependent policies remain. Disabled copies may retain a
+  known inherited or inactive target so lower scopes can mask a policy; enabling
+  or changing a target revalidates its live audience.
+  Product editor copies of team-wide policies retain the original team audience
+  unless the user explicitly selects all product agents.
+- Added separate tenant/team account-key and WebMCP operations. Existing product
+  grants remain product-only; tenant/team keys require account resource mode.
+  Migration `0032_notification_policy_inheritance.sql` preserves existing product
+  policy IDs, settings and timestamps, with new nullable owner/lineage fields.
+- Frozen install, generated bindings, TypeScript, all 98 files / 827 tests,
+  OpenNext build and both Worker dry-runs pass. Drizzle metadata validates and
+  all 33 migrations apply to a fresh local D1 directory. Non-empty legacy-policy
+  migration, actual delivery through mocked providers, missing-channel logs,
+  scope isolation and concurrent deletion are covered by integration tests.
+- Chromium checks cover all three scopes at 1440x900 and 390x844, en/zh and
+  light/dark, plus override/disable/reset, current-team switching, compliance,
+  empty/error states and preview. Team-wide toggle/edit copies retain their
+  team targets. WebKit mobile checks also pass: 34 browser
+  cases total, using actual components with API fixtures. Screenshots and harness
+  are in `.cache/onfire-notification-qa`. Startup profiling passes locally and
+  its generated profile was removed. No live notification or remote mutation
+  was performed; this change is not deployed and remote D1 still needs 0032.
+- Production dependency audit is blocked by 37 pre-existing vulnerabilities
+  (2 critical, 13 high, 16 moderate, 6 low). Package manifest and lockfile are
+  unchanged by this task. This is not a clean CI security-audit result.
+
 ## Management selection-list overflow — 2026-10-11
 
 - Reproduced the team editor's associated-product list overflowing its 176px

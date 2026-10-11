@@ -89,6 +89,15 @@ describe("WebMCP catalogue and browser compatibility", () => {
     expect(buildOperationRequest(operation("list_tickets"), { query: { q: "a&productId=foreign", overdue: false, pageSize: 10 } }).path).toContain("q=a%26productId%3Dforeign");
   });
 
+  it("limits team administrators to team notification tools and keeps owner schemas separate", () => {
+    const visible = webMcpOperations.filter(op => op.name.includes("notification") && operationAllowed(op, identity(Role.TeamAdmin)));
+    expect(visible).toHaveLength(9);
+    expect(visible.every(op => op.name.startsWith("onfire_team_"))).toBe(true);
+    expect(buildOperationRequest(operation("team_list_notification_rules"), { query: { scope: "team", teamId: "team-1" } }).path).toBe("/api/tob/admin/notification-rules?scope=team&teamId=team-1");
+    expect(() => buildOperationRequest(operation("list_notification_rules"), { query: { scope: "tenant", tenantId: "tenant-1" } })).toThrow();
+    expect(() => buildOperationRequest(operation("team_list_notification_rules"), { query: { scope: "team", teamId: "team-1", productId: "product-1" } })).toThrow();
+  });
+
   it("exposes a complete form schema and preserves translated fields in version saves", () => {
     const formSchema = { version: "1.0", fields: [{ id: "field-1", key: "environment", label: "Environment", labelI18n: { zh: "环境" }, type: "select", options: [{ value: "prod", label: "Production", labelI18n: { zh: "生产" } }] }] };
     const request = buildOperationRequest(operation("save_template_version"), { id: "type-1", body: { formSchema, changeNote: "Add environment" } });

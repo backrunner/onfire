@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, ApiClientError } from "@/lib/api/client";
+import type { NotificationPolicyScope } from "@/lib/notifications/policy-scope";
+import { ruleTargetForScope } from "@/lib/notifications/policy-recipients";
 import { useI18n } from "@/lib/i18n";
 import {
   CHANNEL_TYPES,
@@ -51,7 +53,8 @@ type FormErrors = {
 };
 
 export function RuleDialog({
-  productId,
+  owner,
+  contextTeamId,
   rule,
   teams,
   agents,
@@ -59,7 +62,8 @@ export function RuleDialog({
   onOpenChange,
   onSaved,
 }: {
-  productId: string;
+  owner: NotificationPolicyScope;
+  contextTeamId?: string;
   rule: NotificationRuleView | null;
   teams: NotificationTeamView[];
   agents: NotificationAgentView[];
@@ -83,9 +87,10 @@ export function RuleDialog({
     if (!open) return;
     const nextName = rule?.name ?? "";
     const nextEnabled = rule?.enabled ?? true;
-    const nextRecipientType = rule?.recipientType ?? "assignee";
-    const nextTeamId = rule?.recipientTeamId ?? "";
-    const nextUserId = rule?.recipientUserId ?? "";
+    const target = rule ? ruleTargetForScope(rule, owner.scope) : null;
+    const nextRecipientType = target?.recipientType ?? "assignee";
+    const nextTeamId = target?.recipientTeamId ?? "";
+    const nextUserId = target?.recipientUserId ?? "";
     const nextEvents = new Set(rule?.triggerEvents ?? []);
     const nextChannels = new Set(rule?.channelTypes ?? []);
     setName(nextName);
@@ -105,7 +110,7 @@ export function RuleDialog({
       events: nextEvents,
       channels: nextChannels,
     });
-  }, [open, rule]);
+  }, [open, rule, owner.scope]);
 
   const isDirty =
     open &&
@@ -168,11 +173,13 @@ export function RuleDialog({
     };
     setPending(true);
     try {
-      if (rule) {
+      if (rule && !rule.inherited) {
         await api.patch(`/api/tob/admin/notification-rules/${rule.id}`, payload);
       } else {
         await api.post("/api/tob/admin/notification-rules", {
-          productId,
+          ...owner,
+          contextTeamId,
+          overridesId: rule?.inherited ? (rule?.overridesId ?? rule?.id) : undefined,
           ...payload,
         });
       }
@@ -235,7 +242,7 @@ export function RuleDialog({
               <SelectContent>
                 {RECIPIENT_TYPES.map((type) => (
                   <SelectItem key={type} value={type}>
-                    {t.notifChannels.recipients[type]}
+                    {type === "product_agents" ? t.notifChannels.allScopeAgents[owner.scope] : t.notifChannels.recipients[type]}
                   </SelectItem>
                 ))}
               </SelectContent>

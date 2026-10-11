@@ -29,6 +29,7 @@ const name = z.string().trim().min(1).max(100);
 const empty = z.strictObject({});
 const record = z.strictObject({ id });
 const product = z.strictObject({ productId: id });
+const notificationProduct = product.extend({ scope: z.literal("product").optional(), contextTeamId: id.optional() });
 const page = { page: z.number().int().min(1).optional(), pageSize: z.number().int().min(1).max(100).optional() };
 const reason = z.strictObject({ reason: z.string().max(2000).optional() });
 const workflow = z.enum(["processing", "replied"]).describe("replied requires an existing public agent reply. Use the dedicated close, reopen and escalate tools for those transitions.");
@@ -155,13 +156,30 @@ export const webMcpOperations: WebMcpOperation[] = [
     const schema = kind === "rule" ? ruleFields : requirementFields;
     const path = `/admin/notification-${kind}s`;
     return [
-      op(`list_notification_${kind}s`, `Read product notification ${kind}s.`, "notification.manage", "GET", path, { query: product }),
-      op(`create_notification_${kind}`, `Create a notification ${kind} selecting events, channels and scoped recipients.`, "notification.manage", "POST", path, { body: schema.extend({ productId: id }).strict() }),
-      op(`update_notification_${kind}`, `Update a product notification ${kind}; recipient endpoints remain user-owned.`, "notification.manage", "PATCH", `${path}/:id`, { params: record, body: schema.partial().strict() }),
-      op(`delete_notification_${kind}`, `Delete a product notification ${kind}.`, "notification.manage", "DELETE", `${path}/:id`, { params: record }),
+      op(`list_notification_${kind}s`, `Read effective product notification ${kind}s for the optional ticket team context.`, "notification.manage", "GET", path, { query: notificationProduct, roles: adminRoles }),
+      op(`create_notification_${kind}`, `Create a notification ${kind} selecting events, channels and scoped recipients.`, "notification.manage", "POST", path, { roles: adminRoles, body: schema.extend({ productId: id, scope: z.literal("product").optional(), contextTeamId: id.optional(), overridesId: id.optional() }).strict() }),
+      op(`update_notification_${kind}`, `Update a product notification ${kind}; recipient endpoints remain user-owned.`, "notification.manage", "PATCH", `${path}/:id`, { roles: adminRoles, params: record, body: schema.partial().strict() }),
+      op(`delete_notification_${kind}`, `Delete a product notification ${kind}, or reset its override to restore inheritance.`, "notification.manage", "DELETE", `${path}/:id`, { roles: adminRoles, params: record }),
     ];
   }),
-  op("get_notification_compliance", "Read required-channel compliance and missing endpoints for product agents.", "notification.manage", "GET", "/admin/notification-compliance", { query: product }),
+  op("get_notification_compliance", "Read effective required-channel compliance for a product and optional ticket team context.", "notification.manage", "GET", "/admin/notification-compliance", { roles: adminRoles, query: notificationProduct }),
+  ...(["tenant", "team"] as const).flatMap(scope => {
+    const owner = scope === "tenant" ? z.object({ scope: z.literal("tenant"), tenantId: id }) : z.object({ scope: z.literal("team"), teamId: id });
+    const roles = scope === "tenant" ? [Role.SuperAdmin, Role.TenantAdmin] : [Role.SuperAdmin, Role.TenantAdmin, Role.ProductAdmin, Role.TeamAdmin];
+    return [
+      ...(["rule", "requirement"] as const).flatMap(kind => {
+        const fields = kind === "rule" ? ruleFields : requirementFields;
+        const path = `/admin/notification-${kind}s`;
+        return [
+          op(`${scope}_list_notification_${kind}s`, `Read effective ${scope} notification ${kind}s and inherited policies.`, "notification.manage", "GET", path, { roles, query: owner.strict() }),
+          op(`${scope}_create_notification_${kind}`, `Create or override a notification ${kind} in ${scope} scope.`, "notification.manage", "POST", path, { roles, body: fields.extend({ ...owner.shape, overridesId: id.optional() }).strict() }),
+          op(`${scope}_update_notification_${kind}`, `Update a notification ${kind} owned by this ${scope} scope.`, "notification.manage", "PATCH", `${path}/:id`, { roles, params: record, body: fields.partial().strict() }),
+          op(`${scope}_delete_notification_${kind}`, `Delete a local ${scope} policy or reset an override to restore inheritance.`, "notification.manage", "DELETE", `${path}/:id`, { roles, params: record }),
+        ];
+      }),
+      op(`${scope}_get_notification_compliance`, `Read effective required-channel compliance in ${scope} scope.`, "notification.manage", "GET", "/admin/notification-compliance", { roles, query: owner.strict() }),
+    ];
+  }),
   op("list_knowledge", "Read a product's knowledge entries used by AI retrieval.", "ai.knowledge", "GET", "/admin/ai/knowledge", { query: product }),
   op("get_knowledge", "Read one scoped knowledge entry.", "ai.knowledge", "GET", "/admin/ai/knowledge/:id", { params: record }),
   op("create_knowledge", "Create product knowledge and synchronize embeddings; requires a configured embedding route.", "ai.knowledge", "POST", "/admin/ai/knowledge", { body: knowledgeFields.extend({ productId: id }).strict() }),

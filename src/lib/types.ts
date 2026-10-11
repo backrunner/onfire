@@ -267,6 +267,7 @@ export const rolePermissions: Record<Role, Permission[]> = {
     "ticket_type.read",
     "ticket_type.route",
     "agent.profile",
+    "notification.manage",
   ],
   [Role.Agent]: [
     "ticket.read",

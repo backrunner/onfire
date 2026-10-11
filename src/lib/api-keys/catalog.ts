@@ -20,6 +20,7 @@ export interface ApiKeyOperation extends AutomationOperation {
 // Tenant, staff and system configuration deliberately require account scope.
 function supportsProducts(operation: WebMcpOperation): boolean {
   const path = operation.path.slice("/api/tob".length);
+  if (/^onfire_(tenant|team)_.*notification/.test(operation.name)) return false;
   return (
     path === "/dashboard" ||
     path.startsWith("/tickets") ||

@@ -42,7 +42,7 @@ staff, and workflows evolve.
 | Customer portal | Integrate with server-issued JWTs or an identity resolver; mount the portal under your product's `/support` path. |
 | Languages | English and Chinese UI, product-specific form translations, and AI-assisted ticket/reply translation with preserved originals. |
 | Email | Create and reply to tickets through email, preserve threading, edit HTML templates, and review/release quarantined messages. |
-| Notifications | Route product events to personal endpoints across 11 channels, with mandatory-channel requirements and delivery logs. |
+| Notifications | Inherit tenant → current team → product policies across 11 personal channels, with mandatory-channel requirements and delivery logs. |
 | AI and knowledge | Use scoped credential pools, ordered provider fallback, ticket prescreening, reply suggestions, an assistant, translation, and semantic knowledge retrieval. |
 | Automation | Connect MCP clients through OAuth 2.1/PKCE with granular grants, or use permission-filtered WebMCP tools in supported browsers. |
 

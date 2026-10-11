@@ -14,6 +14,8 @@ import {
   Smartphone,
   type LucideIcon,
 } from "lucide-react";
+import type { PolicyOwnership, NotificationPolicyScope } from "@/lib/notifications/policy-scope";
+
 import {
   CHANNEL_DEFINITIONS,
   CHANNEL_TYPES,
@@ -51,9 +53,9 @@ export interface EndpointView {
   updatedAt: string;
 }
 
-export interface NotificationRuleView {
+export interface NotificationRuleView extends PolicyOwnership {
   id: string;
-  productId: string;
+  inherited?: boolean;
   name: string;
   enabled: boolean | null;
   triggerEvents: TriggerEvent[];
@@ -65,9 +67,9 @@ export interface NotificationRuleView {
   updatedAt: string;
 }
 
-export interface NotificationRequirementView {
+export interface NotificationRequirementView extends PolicyOwnership {
   id: string;
-  productId: string;
+  inherited?: boolean;
   name: string;
   enabled: boolean | null;
   scopeType: RequirementScope;
@@ -93,6 +95,9 @@ export interface NotificationAgentView {
 }
 
 export interface NotificationComplianceView {
+  scope: NotificationPolicyScope;
+  name: string;
+  chain: NotificationPolicyScope[];
   teams: NotificationTeamView[];
   agents: NotificationAgentView[];
   requirements: Array<

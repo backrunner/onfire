@@ -16,7 +16,12 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
+import type { NotificationPolicyScope } from "@/lib/notifications/policy-scope";
+import { ruleTargetForScope, requirementTargetForScope } from "@/lib/notifications/policy-recipients";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { useI18n } from "@/lib/i18n";
+import { useMe } from "@/lib/hooks/use-me";
 import { api, ApiClientError, qs, swrFetcher } from "@/lib/api/client";
 
 import {
@@ -64,10 +69,17 @@ type DeleteTarget = {
   kind: "rule" | "requirement";
   id: string;
   name: string;
+  reset?: boolean;
 };
 
 export function NotificationProductPanel({ productId }: { productId: string }) {
+  return <NotificationScopePanel key={productId} owner={{ scope: "product", productId }} />;
+}
+
+export function NotificationScopePanel({ owner }: { owner: NotificationPolicyScope }) {
   const { t } = useI18n();
+  const { me } = useMe();
+  const readOnly = Boolean(me?.preview);
   const [tab, setTab] = useState<TabValue>("rules");
   const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
   const [requirementDialogOpen, setRequirementDialogOpen] = useState(false);
@@ -77,15 +89,12 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
   const [deleting, setDeleting] = useState<DeleteTarget | null>(null);
   const [busyPolicyIds, setBusyPolicyIds] = useState<Set<string>>(new Set());
 
-  const rulesKey = productId
-    ? `/api/tob/admin/notification-rules${qs({ productId })}`
-    : null;
-  const requirementsKey = productId
-    ? `/api/tob/admin/notification-requirements${qs({ productId })}`
-    : null;
-  const complianceKey = productId
-    ? `/api/tob/admin/notification-compliance${qs({ productId })}`
-    : null;
+  const [contextTeamId, setContextTeamId] = useState<string>();
+  const scopeId = owner.scope === "product" ? owner.productId : owner.scope === "tenant" ? owner.tenantId : owner.teamId;
+  const query = qs({ ...owner, contextTeamId });
+  const rulesKey = `/api/tob/admin/notification-rules${query}`;
+  const requirementsKey = `/api/tob/admin/notification-requirements${query}`;
+  const complianceKey = `/api/tob/admin/notification-compliance${query}`;
   const rulesState = useSWR<NotificationRuleView[]>(rulesKey, swrFetcher);
   const requirementsState = useSWR<NotificationRequirementView[]>(
     requirementsKey,
@@ -114,7 +123,11 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
   const toggleRule = async (rule: NotificationRuleView, enabled: boolean) => {
     setBusyPolicyIds((current) => new Set(current).add(rule.id));
     try {
-      await api.patch(`/api/tob/admin/notification-rules/${rule.id}`, { enabled });
+      if (rule.inherited) {
+        await api.post("/api/tob/admin/notification-rules", { ...owner, contextTeamId, overridesId: rule.overridesId ?? rule.id,
+          name: rule.name, enabled, triggerEvents: rule.triggerEvents, channelTypes: rule.channelTypes,
+          ...ruleTargetForScope(rule, owner.scope) });
+      } else await api.patch(`/api/tob/admin/notification-rules/${rule.id}`, { enabled });
       mutateAll();
     } catch (error) {
       showError(error, t.notifChannels.actionFailed);
@@ -129,10 +142,11 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
   ) => {
     setBusyPolicyIds((current) => new Set(current).add(requirement.id));
     try {
-      await api.patch(
-        `/api/tob/admin/notification-requirements/${requirement.id}`,
-        { enabled }
-      );
+      if (requirement.inherited) {
+        await api.post("/api/tob/admin/notification-requirements", { ...owner, contextTeamId, overridesId: requirement.overridesId ?? requirement.id,
+          name: requirement.name, enabled, triggerEvents: requirement.triggerEvents, channelTypes: requirement.channelTypes,
+          ...requirementTargetForScope(requirement, owner.scope) });
+      } else await api.patch(`/api/tob/admin/notification-requirements/${requirement.id}`, { enabled });
       mutateAll();
     } catch (error) {
       showError(error, t.notifChannels.actionFailed);
@@ -149,7 +163,7 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
           ? "notification-rules"
           : "notification-requirements";
       await api.delete(`/api/tob/admin/${resource}/${deleting.id}`);
-      toast.success(
+      toast.success(deleting.reset ? t.notifChannels.restoreInheritance :
         deleting.kind === "rule"
           ? t.notifChannels.ruleDeleted
           : t.notifChannels.requirementDeleted
@@ -165,6 +179,22 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
   return (
     <TooltipProvider>
       <div className="space-y-4">
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <Badge variant="outline">{t.notifChannels.policyScopes[owner.scope]}</Badge>
+          <span className="text-muted-foreground">{t.notifChannels.inheritanceChain}</span>
+          {owner.scope === "product" && (
+            <div className="flex min-w-0 items-center gap-2">
+              <Label htmlFor="notification-team-context" className="shrink-0">{t.notifChannels.teamContext}</Label>
+              <Select value={contextTeamId ?? "__none__"} onValueChange={value => setContextTeamId(value === "__none__" ? undefined : value)}>
+                <SelectTrigger id="notification-team-context" className="h-8 w-44"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">{t.notifChannels.noTeamContext}</SelectItem>
+                  {teams.map(team => <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
         <Tabs value={tab} onValueChange={(value) => setTab(value as TabValue)}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <TabsList>
@@ -179,7 +209,7 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
             {tab === "rules" ? (
               <Button
                 size="sm"
-                disabled={!productId || !metadataReady}
+                disabled={!scopeId || !metadataReady || readOnly}
                 onClick={() => {
                   setEditingRule(null);
                   setRuleDialogOpen(true);
@@ -195,7 +225,7 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
             ) : tab === "requirements" ? (
               <Button
                 size="sm"
-                disabled={!productId || !metadataReady}
+                disabled={!scopeId || !metadataReady || readOnly}
                 onClick={() => {
                   setEditingRequirement(null);
                   setRequirementDialogOpen(true);
@@ -211,7 +241,7 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
             ) : null}
           </div>
 
-          {tab !== "compliance" && productId && complianceState.error ? (
+          {tab !== "compliance" && scopeId && complianceState.error ? (
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/35 bg-amber-500/5 px-3 py-2.5">
               <div className="flex min-w-0 items-center gap-2 text-sm text-amber-800 dark:text-amber-300">
                 <CircleAlert className="size-4 shrink-0" />
@@ -231,7 +261,7 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
 
           <TabsContent value="rules" className="mt-3">
             <StateBoundary
-              ready={Boolean(productId)}
+              ready={Boolean(scopeId)}
               loading={rulesState.isLoading}
               error={rulesState.error}
               onRetry={() => void rulesState.mutate()}
@@ -246,16 +276,22 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
               ) : (
                 <div className="space-y-2">
                   {rulesState.data!.map((rule) => {
+                    const recipient = ruleTargetForScope(rule, owner.scope);
                     const target =
-                      rule.recipientType === "team"
-                        ? teamName(rule.recipientTeamId)
-                        : rule.recipientType === "user"
-                          ? agentName(rule.recipientUserId)
-                          : t.notifChannels.recipients[rule.recipientType];
+                      recipient.recipientType === "team"
+                        ? teamName(recipient.recipientTeamId)
+                        : recipient.recipientType === "user"
+                          ? agentName(recipient.recipientUserId)
+                          : recipient.recipientType === "product_agents"
+                            ? t.notifChannels.allScopeAgents[owner.scope]
+                            : t.notifChannels.recipients[recipient.recipientType];
                     return (
                       <PolicyRow
                         key={rule.id}
                         name={rule.name}
+                        source={t.notifChannels.policyScopes[rule.scope]}
+                        inherited={rule.inherited ?? false}
+                        reset={Boolean(rule.overridesId)}
                         target={target}
                         events={rule.triggerEvents.map(
                           (event) => t.notifChannels.events[event]
@@ -264,14 +300,14 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
                           (channel) => t.notifChannels.types[channel]
                         )}
                         enabled={rule.enabled ?? false}
-                        disabled={busyPolicyIds.has(rule.id)}
+                        disabled={busyPolicyIds.has(rule.id) || !metadataReady || readOnly}
                         onToggle={(checked) => void toggleRule(rule, checked)}
                         onEdit={() => {
                           setEditingRule(rule);
                           setRuleDialogOpen(true);
                         }}
                         onDelete={() =>
-                          setDeleting({ kind: "rule", id: rule.id, name: rule.name })
+                          setDeleting({ kind: "rule", id: rule.id, name: rule.name, reset: Boolean(rule.overridesId) })
                         }
                       />
                     );
@@ -283,7 +319,7 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
 
           <TabsContent value="requirements" className="mt-3">
             <StateBoundary
-              ready={Boolean(productId)}
+              ready={Boolean(scopeId)}
               loading={requirementsState.isLoading}
               error={requirementsState.error}
               onRetry={() => void requirementsState.mutate()}
@@ -298,16 +334,20 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
               ) : (
                 <div className="space-y-2">
                   {requirementsState.data!.map((requirement) => {
+                    const recipient = requirementTargetForScope(requirement, owner.scope);
                     const target =
-                      requirement.scopeType === "team"
-                        ? teamName(requirement.scopeTeamId)
-                        : requirement.scopeType === "user"
-                          ? agentName(requirement.scopeUserId)
-                          : t.notifChannels.scopes.product;
+                      recipient.scopeType === "team"
+                        ? teamName(recipient.scopeTeamId)
+                        : recipient.scopeType === "user"
+                          ? agentName(recipient.scopeUserId)
+                          : t.notifChannels.allScopeAgents[owner.scope];
                     return (
                       <PolicyRow
                         key={requirement.id}
                         name={requirement.name}
+                        source={t.notifChannels.policyScopes[requirement.scope]}
+                        inherited={requirement.inherited ?? false}
+                        reset={Boolean(requirement.overridesId)}
                         target={target}
                         events={requirement.triggerEvents.map(
                           (event) => t.notifChannels.events[event]
@@ -316,7 +356,7 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
                           (channel) => t.notifChannels.types[channel]
                         )}
                         enabled={requirement.enabled ?? false}
-                        disabled={busyPolicyIds.has(requirement.id)}
+                        disabled={busyPolicyIds.has(requirement.id) || !metadataReady || readOnly}
                         onToggle={(checked) =>
                           void toggleRequirement(requirement, checked)
                         }
@@ -329,6 +369,7 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
                             kind: "requirement",
                             id: requirement.id,
                             name: requirement.name,
+                            reset: Boolean(requirement.overridesId),
                           })
                         }
                       />
@@ -341,7 +382,7 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
 
           <TabsContent value="compliance" className="mt-3">
             <StateBoundary
-              ready={Boolean(productId)}
+              ready={Boolean(scopeId)}
               loading={complianceState.isLoading}
               error={complianceState.error}
               onRetry={() => void complianceState.mutate()}
@@ -363,7 +404,8 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
         </Tabs>
 
       <RuleDialog
-        productId={productId}
+        owner={owner}
+        contextTeamId={contextTeamId}
         rule={editingRule}
         teams={teams}
         agents={agents}
@@ -372,7 +414,8 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
         onSaved={mutateAll}
       />
       <RequirementDialog
-        productId={productId}
+        owner={owner}
+        contextTeamId={contextTeamId}
         requirement={editingRequirement}
         teams={teams}
         agents={agents}
@@ -384,9 +427,9 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
       <AlertDialog open={Boolean(deleting)} onOpenChange={(open) => !open && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t.notifChannels.deletePolicyTitle}</AlertDialogTitle>
+            <AlertDialogTitle>{deleting?.reset ? t.notifChannels.restoreInheritance : t.notifChannels.deletePolicyTitle}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t.notifChannels.deletePolicyMessage.replace(
+              {(deleting?.reset ? t.notifChannels.restoreInheritanceMessage : t.notifChannels.deletePolicyMessage).replace(
                 "{{name}}",
                 deleting?.name ?? ""
               )}
@@ -398,7 +441,7 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
               className="bg-destructive text-white hover:bg-destructive/90"
               onClick={confirmDelete}
             >
-              {t.common.delete}
+              {deleting?.reset ? t.notifChannels.restoreInheritance : t.common.delete}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -410,6 +453,9 @@ export function NotificationProductPanel({ productId }: { productId: string }) {
 
 function PolicyRow({
   name,
+  source,
+  inherited,
+  reset,
   target,
   events,
   channels,
@@ -420,6 +466,9 @@ function PolicyRow({
   onDelete,
 }: {
   name: string;
+  source: string;
+  inherited: boolean;
+  reset: boolean;
   target: string;
   events: string[];
   channels: string[];
@@ -437,6 +486,7 @@ function PolicyRow({
           <div className="flex flex-wrap items-center gap-2">
             <p className="truncate text-sm font-medium">{name}</p>
             <Badge variant="secondary">{target}</Badge>
+            <Badge variant="outline">{inherited ? t.notifChannels.inheritedFrom.replace("{{scope}}", source) : reset ? t.notifChannels.overridden : t.notifChannels.localPolicy}</Badge>
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1">
             <BadgeSummary items={events} variant="event" />
@@ -457,14 +507,15 @@ function PolicyRow({
               size="icon"
               className="size-8"
               onClick={onEdit}
-              aria-label={t.common.edit}
+              disabled={disabled}
+              aria-label={inherited ? t.notifChannels.overridePolicy : t.common.edit}
             >
               <Pencil className="size-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>{t.common.edit}</TooltipContent>
+          <TooltipContent>{inherited ? t.notifChannels.overridePolicy : t.common.edit}</TooltipContent>
         </Tooltip>
-        <DropdownMenu>
+        {!inherited && <DropdownMenu>
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
@@ -482,12 +533,12 @@ function PolicyRow({
             <TooltipContent>{t.notifChannels.moreActions}</TooltipContent>
           </Tooltip>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+            <DropdownMenuItem variant={reset ? "default" : "destructive"} disabled={disabled} onSelect={onDelete}>
               <Trash2 className="size-4" />
-              {t.common.delete}
+              {reset ? t.notifChannels.restoreInheritance : t.common.delete}
             </DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu>
+        </DropdownMenu>}
       </CardContent>
     </Card>
   );

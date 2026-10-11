@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { customers, products, teams, tenants, tickets, users } from "@/drizzle/schema";
+import { customers, products, teams, tenants, tickets, users, notificationRules, notificationRequirements } from "@/drizzle/schema";
 import { badRequest, conflict, forbidden, ok, notFound } from "@/lib/api/response";
 import { withAuth, parseBody, type AuthedContext } from "@/lib/api/handler";
 import { Role } from "@/lib/types";
@@ -61,6 +61,8 @@ export const DELETE = withAuth({ permission: "tenant.manage" }, async (_req: Nex
     ctx.db.query.users.findFirst({ where: eq(users.tenantId, tenant.id) }),
     ctx.db.query.tickets.findFirst({ where: eq(tickets.tenantId, tenant.id) }),
     ctx.db.query.customers.findFirst({ where: eq(customers.tenantId, tenant.id) }),
+    ctx.db.query.notificationRules.findFirst({ where: eq(notificationRules.tenantId, tenant.id) }),
+    ctx.db.query.notificationRequirements.findFirst({ where: eq(notificationRequirements.tenantId, tenant.id) }),
   ]);
   if (dependencies.some(Boolean)) {
     throw conflict("Tenant must be empty before it can be deleted");

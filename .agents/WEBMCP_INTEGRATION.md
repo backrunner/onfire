@@ -175,3 +175,13 @@ Results use a WebMCP text content block containing JSON:
 No database migration, new Cloudflare binding, OAuth scope, public route or
 Access exception is required. Deployment still requires the normal explicit
 operator action.
+
+## Notification inheritance
+
+Notification tools support tenant defaults, team overrides, and product overrides.
+Product tools keep their existing names and use optional `contextTeamId` to preview
+the current-team chain. Separate `onfire_tenant_*notification*` and
+`onfire_team_*notification*` tools advertise only when live RBAC permits their
+scope; handlers recheck ownership and targets. TeamAdmin receives only team tools.
+Preview exposes reads and blocks writes. `overridesId` identifies the inherited
+policy’s root; deleting an override restores the upper-level policy.

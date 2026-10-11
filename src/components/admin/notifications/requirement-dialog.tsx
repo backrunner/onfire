@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, ApiClientError } from "@/lib/api/client";
+import type { NotificationPolicyScope } from "@/lib/notifications/policy-scope";
+import { requirementTargetForScope } from "@/lib/notifications/policy-recipients";
 import { useI18n } from "@/lib/i18n";
 import {
   CHANNEL_TYPES,
@@ -51,7 +53,8 @@ type FormErrors = {
 };
 
 export function RequirementDialog({
-  productId,
+  owner,
+  contextTeamId,
   requirement,
   teams,
   agents,
@@ -59,7 +62,8 @@ export function RequirementDialog({
   onOpenChange,
   onSaved,
 }: {
-  productId: string;
+  owner: NotificationPolicyScope;
+  contextTeamId?: string;
   requirement: NotificationRequirementView | null;
   teams: NotificationTeamView[];
   agents: NotificationAgentView[];
@@ -83,9 +87,10 @@ export function RequirementDialog({
     if (!open) return;
     const nextName = requirement?.name ?? "";
     const nextEnabled = requirement?.enabled ?? true;
-    const nextScopeType = requirement?.scopeType ?? "product";
-    const nextTeamId = requirement?.scopeTeamId ?? "";
-    const nextUserId = requirement?.scopeUserId ?? "";
+    const target = requirement ? requirementTargetForScope(requirement, owner.scope) : null;
+    const nextScopeType = target?.scopeType ?? "product";
+    const nextTeamId = target?.scopeTeamId ?? "";
+    const nextUserId = target?.scopeUserId ?? "";
     const nextEvents = new Set(requirement?.triggerEvents ?? []);
     const nextChannels = new Set(requirement?.channelTypes ?? []);
     setName(nextName);
@@ -105,7 +110,7 @@ export function RequirementDialog({
       events: nextEvents,
       channels: nextChannels,
     });
-  }, [open, requirement]);
+  }, [open, requirement, owner.scope]);
 
   const isDirty =
     open &&
@@ -168,14 +173,16 @@ export function RequirementDialog({
     };
     setPending(true);
     try {
-      if (requirement) {
+      if (requirement && !requirement.inherited) {
         await api.patch(
           `/api/tob/admin/notification-requirements/${requirement.id}`,
           payload
         );
       } else {
         await api.post("/api/tob/admin/notification-requirements", {
-          productId,
+          ...owner,
+          contextTeamId,
+          overridesId: requirement?.inherited ? (requirement?.overridesId ?? requirement?.id) : undefined,
           ...payload,
         });
       }
@@ -244,7 +251,7 @@ export function RequirementDialog({
               <SelectContent>
                 {REQUIREMENT_SCOPE_TYPES.map((type) => (
                   <SelectItem key={type} value={type}>
-                    {t.notifChannels.scopes[type]}
+                    {type === "product" ? t.notifChannels.allScopeAgents[owner.scope] : t.notifChannels.scopes[type]}
                   </SelectItem>
                 ))}
               </SelectContent>

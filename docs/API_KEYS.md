@@ -39,6 +39,14 @@ Reopening through either status endpoint additionally requires `reopen_ticket`.
 Existing state transitions, agent checks, SLA, translation, history and notifications
 remain in the normal API handlers.
 
+Notification APIs accept `scope=tenant&tenantId=…`, `scope=team&teamId=…`, or
+`scope=product&productId=…`; omitted scope keeps the existing product contract.
+Product reads accept `contextTeamId` to preview tenant → team → product inheritance.
+An override uses `overridesId` with the inherited policy’s original ancestor ID.
+Deleting an override restores inheritance; disabling it masks the parent.
+Existing product grants remain product-only. Tenant/team operations use separate
+`tenant_` / `team_` grant prefixes and require account resource mode.
+
 Assignment, status changes and public replies compare the loaded ticket state
 inside their write transaction; stale requests cannot bypass branch permissions
 or resurrect a concurrently closed ticket. A conflict writes no reply, history or

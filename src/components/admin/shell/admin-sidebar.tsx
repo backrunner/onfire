@@ -8,13 +8,14 @@ import {
   Ticket,
   Users,
   Settings,
+  Bell,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { useMe } from "@/lib/hooks/use-me";
-import type { Permission } from "@/lib/types";
+import { Role, type Permission } from "@/lib/types";
 import { canAccessManagement, managementEntryHref } from "@/lib/staff-access";
 import { isAdminNavItemActive } from "./admin-navigation";
 import { Button } from "@/components/ui/button";
@@ -35,7 +36,7 @@ import {
 interface NavItem {
   href: string;
   icon: typeof LayoutDashboard;
-  labelKey: "dashboard" | "tickets" | "customers" | "admin";
+  labelKey: "dashboard" | "tickets" | "customers" | "admin" | "notifications";
   permission?: Permission;
   exact?: boolean;
   matchHref?: string;
@@ -58,6 +59,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     labelKey: "configuration",
     items: [
+      { href: "/admin/notifications", icon: Bell, labelKey: "notifications", permission: "notification.manage" },
       {
         href: "/admin/management",
         icon: Settings,
@@ -87,12 +89,14 @@ export function AdminSidebar({
   const { me, can, isLoading } = useMe();
 
   const isActive = (item: NavItem) =>
-    isAdminNavItemActive(pathname, item.matchHref ?? item.href, item.exact);
+    isAdminNavItemActive(pathname, item.matchHref ?? item.href, item.exact) ||
+    (item.href === "/admin/notifications" && isAdminNavItemActive(pathname, "/admin/management/teams"));
 
   const managementHref = me ? managementEntryHref(me) : null;
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
     items: group.items.flatMap((item) => {
+      if (item.href === "/admin/notifications" && (isLoading || me?.role !== Role.TeamAdmin)) return [];
       if (item.href === "/admin/management") {
         if (isLoading || !me || !canAccessManagement(me.role) || !managementHref) {
           return [];

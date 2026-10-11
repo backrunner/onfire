@@ -32,7 +32,7 @@ function parseStringArray(value: string): string[] {
   }
 }
 
-export function toNotificationRuleView(row: NotificationRuleRow) {
+export function toNotificationRuleView<T extends NotificationRuleRow>(row: T) {
   return {
     ...row,
     triggerEvents: parseStringArray(row.triggerEvents),
@@ -40,8 +40,8 @@ export function toNotificationRuleView(row: NotificationRuleRow) {
   };
 }
 
-export function toNotificationRequirementView(
-  row: NotificationRequirementRow
+export function toNotificationRequirementView<T extends NotificationRequirementRow>(
+  row: T
 ) {
   return {
     ...row,

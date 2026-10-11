@@ -7,7 +7,7 @@
 - SuperAdmin is global, TenantAdmin tenant-scoped, ProductAdmin limited by `user_products`, TeamAdmin and Agent team-scoped.
 - SuperAdmin and TenantAdmin may start a read-only preview of a strictly lower-role user in their scope. The browser session stays the actor; APIs overlay the target's live role and tenant/product/team scope. Mutations stay blocked except starting or leaving preview. MCP tokens never inherit preview. The sidebar shows a persistent preview indicator.
 - Teams exist at system, tenant, and product scope. SuperAdmin manages system staff; TenantAdmin manages tenant-scope teams and agents; ProductAdmin manages only product-scope teams and memberships. The configuration landing is role-specific: SuperAdmin sees system administration, TenantAdmin is sent to their tenant page, and ProductAdmin sees only assigned products with no tenant tabs. TeamAdmin and Agent have no management entry.
-- Product notification policies live on the product configuration page. There is no first-level Notifications menu.
+- Notification policies live on tenant/product configuration tabs and scoped team pages. Only TeamAdmin has a first-level Notifications entry for their own teams.
 - Split product lifecycle from product configuration: `product.manage` creates/deletes products, while `product.settings` reads and updates SLA, auto-close, and team associations. ProductAdmin receives only `product.settings` within `user_products` scope.
 - Agents may escalate because escalation is required by the lifecycle. They may reassign only within their team when `allowReassign` is enabled.
 - AI credentials are SuperAdmin-only. TenantAdmin and ProductAdmin may maintain knowledge within product scope.
@@ -300,15 +300,18 @@
 
 - Users own their notification endpoints and secrets. Products never store recipient email addresses, device keys, bot tokens, chat IDs, or webhook URLs.
 - Every system user starts with an enabled email endpoint configured from their account email. Existing users without an email endpoint are backfilled, while later endpoint changes remain user-controlled.
-- Product delivery rules select events, channel types, and recipients from current assignee, current ticket team, all product agents, a specific team, or a specific agent.
-- Product requirements select events and mandatory channel types for all product agents, a team, or a specific agent. A matching requirement is a mandatory delivery overlay, not only a compliance warning.
+- Resolve policies in order: tenant defaults, the ticket’s current team, then product overrides. The event product executes the result. Never merge every team associated with a product.
+- Every scope can add policies, override an inherited policy as a whole, or disable it locally. Removing an override restores inheritance. Retain disabled policies through resolution so a lower-level disable masks its parent. Block deleting roots that still have overrides.
+- Delivery rules select events, channels, and current assignee, current ticket team, all agents in scope, a specific team, or a specific agent. Delivery restricts recipients to the event product’s live active agents.
+- Requirements select events and mandatory channels for all agents in scope, a team, or a specific agent. They directly participate in delivery. Compliance shares the delivery inheritance resolver; product compliance can select a team context.
 - Resolve policies to active support agents and then to their enabled personal endpoints. Deduplicate overlapping rules and requirements by recipient plus endpoint.
 - Persist a failed delivery log when a selected or mandatory endpoint type is missing; never silently discard a required notification.
 - Endpoint credentials are sealed with `AUTH_SECRET`, omitted from API responses, and editable with blank-secret preservation.
 - A user may send a test through only their own saved endpoint. Email endpoint tests require a product visible to that user so delivery uses that product's outbound provider; test sends do not create ticket notification logs.
 - Supported endpoint types are email, PushDeer, Bark, ntfy, Telegram, Discord, Slack, Microsoft Teams, Feishu, DingTalk, and WeCom. Keep provider definitions and factories centralized so new channels do not change product policy storage.
 - Email endpoints send through the event product's outbound provider. Slack, Teams, Discord, Feishu, DingTalk, and WeCom endpoints use bounded HTTPS webhook requests; Feishu and DingTalk support optional signed-robot secrets.
-- Notification administration requires `notification.manage` plus product scope and is edited from the product configuration page. Every authenticated user may maintain only their own endpoints. `/admin/notifications` redirects to that product tab.
+- Notification administration requires `notification.manage` and live owner scope. TenantAdmin manages their tenant; ProductAdmin manages assigned products and product-owned teams; TeamAdmin manages their own teams. System teams are outside the inheritance chain. Every authenticated user maintains only their own endpoints. Preview remains read-only.
+- Product API-key operations keep their existing authority. Tenant/team notification operations need separate explicit grants and account resource mode. Reject mixed owner IDs and foreign targets.
 
 ## Customer Session Expiry
 

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Bell, Pencil, Plus, Trash2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { api, qs, swrFetcher } from "@/lib/api/client";
 import { useMe } from "@/lib/hooks/use-me";
@@ -61,7 +61,7 @@ export function TeamManagement({
 }) {
   const { t } = useI18n();
   const m = t.management;
-  const { can } = useMe();
+  const { me, can } = useMe();
   const canSeeMembers = can("user.manage") || scope === "product";
   const scopeQuery = qs({ scope, tenantId, productId });
 
@@ -240,6 +240,11 @@ export function TeamManagement({
                   <TableCell className="text-right">
                     <RowActions
                       actions={[
+                        ...(scope !== "system" && can("notification.manage") && (me?.role !== "product_admin" || scope === "product") ? [{
+                          label: t.management.tabs.notifications,
+                          icon: Bell,
+                          onSelect: () => window.location.assign(`/admin/management/teams/${encodeURIComponent(team.id)}`),
+                        }] : []),
                         {
                           label: t.common.edit,
                           icon: Pencil,

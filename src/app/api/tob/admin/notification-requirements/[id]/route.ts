@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq, notExists } from "drizzle-orm";
 import { notificationRequirements } from "@/drizzle/schema";
-import { ok } from "@/lib/api/response";
+import { conflict, ok } from "@/lib/api/response";
 import { parseBody, withAuth } from "@/lib/api/handler";
 import { toNotificationRequirementView } from "@/lib/notifications/policy-schema";
 import {
@@ -9,8 +9,10 @@ import {
   requirementFieldsSchema,
   validateRequirementTarget,
 } from "../shared";
+import { assertNotificationOperation } from "@/lib/notifications/policy-access";
+import { policyOwner } from "@/lib/notifications/policy-scope";
 
-const updateSchema = requirementFieldsSchema.partial();
+const updateSchema = requirementFieldsSchema.partial().strict();
 
 export const GET = withAuth(
   { permission: "notification.manage" },
@@ -27,6 +29,7 @@ export const PATCH = withAuth(
   { permission: "notification.manage" },
   async (req: NextRequest, ctx) => {
     const requirement = await loadRequirement(ctx, ctx.params.id);
+    assertNotificationOperation(ctx, policyOwner(requirement), "update_notification_requirement");
     const body = await parseBody(req, updateSchema);
     const merged = requirementFieldsSchema.parse({
       name: body.name ?? requirement.name,
@@ -47,8 +50,9 @@ export const PATCH = withAuth(
     });
     const target = await validateRequirementTarget(
       ctx,
-      requirement.productId,
-      merged
+      policyOwner(requirement),
+      merged,
+      requirement
     );
     await ctx.db
       .update(notificationRequirements)
@@ -74,9 +78,15 @@ export const DELETE = withAuth(
   { permission: "notification.manage" },
   async (_req: NextRequest, ctx) => {
     const requirement = await loadRequirement(ctx, ctx.params.id);
-    await ctx.db
-      .delete(notificationRequirements)
-      .where(eq(notificationRequirements.id, requirement.id));
+    assertNotificationOperation(ctx, policyOwner(requirement), "delete_notification_requirement");
+    if (await ctx.db.query.notificationRequirements.findFirst({ where: eq(notificationRequirements.overridesId, requirement.id) })) {
+      throw conflict("Reset descendant overrides before deleting their original policy");
+    }
+    const deleted = await ctx.db.delete(notificationRequirements).where(and(
+      eq(notificationRequirements.id, requirement.id),
+      notExists(ctx.db.select({ id: notificationRequirements.id }).from(notificationRequirements).where(eq(notificationRequirements.overridesId, requirement.id))),
+    )).returning({ id: notificationRequirements.id });
+    if (!deleted.length) throw conflict("Policy changed; reload before deleting");
     return ok({ deleted: true });
   }
 );

@@ -213,7 +213,7 @@ System-scope teams exist outside any tenant and are SuperAdmin-only.
 | agent.profile | ✓ | ✓ | ✓ | ✓ | ✓ |
 | email.config | ✓ | ✓ | ✓ | - | - |
 | spam.config | ✓ | ✓ | - | - | - |
-| notification.manage | ✓ | ✓ | ✓ | - | - |
+| notification.manage | ✓ | ✓ | ✓ | ✓ | - |
 | ai.config | ✓ | - | - | - | - |
 | ai.knowledge | ✓ | ✓ | ✓ | - | - |
 
@@ -444,7 +444,7 @@ OnFire supports multi-channel notifications to keep agents informed about ticket
 
 ### Notification Events
 
-Product notification rules and requirements can match these events:
+Tenant, team, and product notification rules and requirements can match these events:
 
 | Event | Description |
 |-------|-------------|
@@ -460,12 +460,14 @@ Product notification rules and requirements can match these events:
 
 - Every system user owns their receiving endpoints. Endpoint credentials and destinations are configured from the user's account and are not stored on products.
 - Every system user starts with an enabled email endpoint configured from their account email. Backfill only users who have no email endpoint, and preserve later user changes to endpoint state.
-- A product delivery rule selects trigger events, channel types, and recipients: current assignee, current ticket team, all product agents, a specific team, or a specific agent.
-- A product requirement declares mandatory channel types for all product agents, a team, or a specific agent on selected events. Requirements participate directly in delivery and also expose compliance gaps.
+- Tenant defaults are inherited by the ticket’s current team, then overridden by the product. Delivery resolves this complete chain for the event product; unrelated associated teams are never merged.
+- Each scope can add a policy, override an inherited policy as a whole, or disable it locally. Removing an override restores inheritance. Parents with remaining overrides cannot be deleted.
+- A delivery rule selects trigger events, channel types, and recipients: current assignee, current ticket team, all agents in scope, a specific team, or a specific agent. Delivery restricts recipients to the event product’s live active agents.
+- A requirement declares mandatory channel types for all agents in scope, a team, or a specific agent on selected events. Requirements participate directly in delivery and expose compliance gaps using the same inheritance resolver.
 - Rules and requirements resolve to active support agents, then send through each matching enabled personal endpoint. Overlapping policies deduplicate the same endpoint.
 - Missing required or selected endpoints are recorded as failed notification logs instead of being silently skipped.
 - Email endpoints use the event product's configured outbound email provider. Other endpoint types use their provider-specific APIs or webhooks.
-- Product notification rules, requirements, and compliance live on the product configuration page. `/admin/notifications` redirects there and is not a first-level sidebar destination.
+- Policies and compliance live on tenant/product configuration tabs and scoped team notification pages. Product settings can preview the chain for a selected team. TeamAdmin configures only their own teams; ProductAdmin configures assigned products and their product-owned teams. System teams are outside the chain. `/admin/notifications` routes administrators to configuration and provides TeamAdmin’s own-team entry.
 
 ---
 

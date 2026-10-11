@@ -61,6 +61,10 @@ const AgentManagement = dynamic(
   () => import("../../_components/agent-management").then((m) => m.AgentManagement),
   { loading: () => <ManagementPanelSkeleton columns={5} /> }
 );
+const NotificationScopePanel = dynamic(
+  () => import("@/components/admin/notifications/notification-product-panel").then(m => m.NotificationScopePanel),
+  { loading: () => <ManagementPanelSkeleton columns={3} /> }
+);
 const AiScopePanel = dynamic(
   () => import("@/components/admin/ai/ai-scope-panel").then((m) => m.AiScopePanel),
   { loading: () => <AiScopePanelSkeleton /> }
@@ -78,7 +82,8 @@ type TenantTab =
   | "agents"
   | "presets"
   | "spam"
-  | "ai";
+  | "ai"
+  | "notifications";
 
 const TENANT_TABS: Array<{
   value: TenantTab;
@@ -94,6 +99,7 @@ const TENANT_TABS: Array<{
     visible: (can) => can("ticket_type.preset.read"),
     label: (t) => t.management.tabs.ticketTypePresets,
   },
+  { value: "notifications", visible: can => can("notification.manage"), label: t => t.management.tabs.notifications },
   { value: "spam", visible: (can) => can("spam.config"), label: (t) => t.management.tabs.spamFilter },
   {
     value: "ai",
@@ -162,6 +168,9 @@ function TenantConfigurationTabs({ tenantId }: { tenantId: string }) {
       <TabsContent value="spam" className="mt-4">
         <SpamFilterManagement tenantId={tenantId} />
       </TabsContent>
+      <TabsContent value="notifications" className="mt-4">
+        <NotificationScopePanel key={tenantId} owner={{ scope: "tenant", tenantId }} />
+      </TabsContent>
       <TabsContent value="ai" className="mt-4">
         <AiScopePanel scope="tenant" tenantId={tenantId} />
       </TabsContent>
@@ -180,7 +189,7 @@ export default function TenantConfigurationPage() {
   const tenant = tenants?.find((item) => item.id === id);
   const allowed = me ? canViewTenantConfiguration(me, id) : false;
 
-  if (isLoading || meLoading) return <ConfigurationPageSkeleton tabs={7} />;
+  if (isLoading || meLoading) return <ConfigurationPageSkeleton tabs={8} />;
   if (!tenant || !allowed) {
     return (
       <p className="py-12 text-center text-sm text-muted-foreground">
@@ -208,7 +217,7 @@ export default function TenantConfigurationPage() {
           </p>
         </div>
       </div>
-      <Suspense fallback={<TabsPanelSkeleton tabs={7} />}>
+      <Suspense fallback={<TabsPanelSkeleton tabs={8} />}>
         <TenantConfigurationTabs tenantId={id} />
       </Suspense>
     </div>

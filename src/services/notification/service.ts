@@ -2,14 +2,9 @@ import { and, eq, inArray } from "drizzle-orm";
 import type { Database } from "@/lib/db";
 import { getEnv } from "@/lib/db";
 import {
-  agents,
   agentProfiles,
-  agentTeams,
   notificationEndpoints,
   notificationLogs,
-  notificationRequirements,
-  notificationRules,
-  productTeams,
   products,
   tickets,
   users,
@@ -18,6 +13,9 @@ import {
   type NotificationRequirementRow,
   type NotificationTriggerEvent,
 } from "@/drizzle/schema";
+import { loadEffectiveNotificationPolicies } from "./policies";
+import { loadNotificationAudience } from "@/lib/notifications/policy-access";
+import { requirementTargetsAgent } from "@/lib/notifications/policy-recipients";
 import { createChannel, type ChannelConfig } from "./channels";
 import {
   openEndpointConfig,
@@ -54,45 +52,28 @@ export async function sendRecipientNotifications(
     return;
   }
 
-  const [rules, requirements] = await Promise.all([
-    db
-      .select()
-      .from(notificationRules)
-      .where(
-        and(
-          eq(notificationRules.productId, ticket.productId),
-          eq(notificationRules.enabled, true)
-        )
-      ),
-    db
-      .select()
-      .from(notificationRequirements)
-      .where(
-        and(
-          eq(notificationRequirements.productId, ticket.productId),
-          eq(notificationRequirements.enabled, true)
-        )
-      ),
-  ]);
+  const { rules, requirements } = await loadEffectiveNotificationPolicies(
+    db, { scope: "product", productId: ticket.productId }, ticket.teamId ?? undefined
+  );
+  const audience = await loadNotificationAudience(db, { scope: "product", productId: ticket.productId });
 
   const matches: RecipientMatch[] = [];
   for (const rule of rules) {
+    if (!rule.enabled) continue;
     const events = parsePolicyEvents(rule);
     const channelTypes = parsePolicyChannelTypes(rule);
     if (!events.includes(triggerEvent) || channelTypes.length === 0) continue;
-    const recipientIds = await resolveRuleRecipients(db, rule, ticket);
+    const recipientIds = resolveRuleRecipients(audience.agents, rule, ticket);
     for (const userId of recipientIds) {
       matches.push({ ruleId: rule.id, userId, channelTypes });
     }
   }
   for (const requirement of requirements) {
+    if (!requirement.enabled) continue;
     const events = parsePolicyEvents(requirement);
     const channelTypes = parsePolicyChannelTypes(requirement);
     if (!events.includes(triggerEvent) || channelTypes.length === 0) continue;
-    const recipientIds = await resolveRequirementRecipients(
-      db,
-      requirement
-    );
+    const recipientIds = resolveRequirementRecipients(audience.agents, requirement);
     for (const userId of recipientIds) {
       matches.push({
         requirementId: requirement.id,
@@ -258,124 +239,22 @@ function parsePolicyChannelTypes(
   }
 }
 
-async function resolveRuleRecipients(
-  db: Database,
-  rule: NotificationRuleRow,
-  ticket: typeof tickets.$inferSelect
-): Promise<string[]> {
-  if (rule.recipientType === "assignee") {
-    return ticket.assigneeId
-      ? activeProductUser(db, ticket.productId, ticket.assigneeId)
-      : [];
-  }
-  if (rule.recipientType === "user") {
-    if (!rule.recipientUserId) return [];
-    return activeProductUser(db, ticket.productId, rule.recipientUserId);
-  }
-  if (rule.recipientType === "product_agents") {
-    return activeProductMembers(db, ticket.productId);
-  }
-  if (rule.recipientType === "ticket_team") {
-    return ticket.teamId ? activeTeamMembers(db, ticket.teamId) : [];
-  }
-  return rule.recipientTeamId
-    ? activeProductTeamMembers(db, ticket.productId, rule.recipientTeamId)
-    : [];
-}
+type AudienceAgent = Awaited<ReturnType<typeof loadNotificationAudience>>["agents"][number];
 
-async function resolveRequirementRecipients(
-  db: Database,
-  requirement: NotificationRequirementRow
-): Promise<string[]> {
-  if (requirement.scopeType === "user") {
-    if (!requirement.scopeUserId) return [];
-    return activeProductUser(
-      db,
-      requirement.productId,
-      requirement.scopeUserId
+function resolveRuleRecipients(members: AudienceAgent[], rule: NotificationRuleRow, ticket: typeof tickets.$inferSelect): string[] {
+  return members.filter(member => {
+    if (rule.recipientType === "assignee") return member.userId === ticket.assigneeId;
+    if (rule.recipientType === "user") return member.userId === rule.recipientUserId;
+    if (rule.recipientType === "ticket_team") return Boolean(ticket.teamId && member.teamIds.includes(ticket.teamId));
+    if (rule.recipientType === "team") return Boolean(rule.recipientTeamId && member.teamIds.includes(rule.recipientTeamId));
+    return rule.recipientType === "product_agents" && (
+      rule.scope !== "team" || Boolean(rule.teamId && member.teamIds.includes(rule.teamId))
     );
-  }
-  if (requirement.scopeType === "team") {
-    return requirement.scopeTeamId
-      ? activeProductTeamMembers(
-          db,
-          requirement.productId,
-          requirement.scopeTeamId
-        )
-      : [];
-  }
-  return activeProductMembers(db, requirement.productId);
+  }).map(member => member.userId);
 }
 
-async function activeProductMembers(
-  db: Database,
-  productId: string
-): Promise<string[]> {
-  const associations = await db
-    .select({ teamId: productTeams.teamId })
-    .from(productTeams)
-    .where(eq(productTeams.productId, productId));
-  const teamIds = associations.map((association) => association.teamId);
-  if (teamIds.length === 0) return [];
-  const rows = await db
-    .select({ userId: agentTeams.userId })
-    .from(agentTeams)
-    .innerJoin(
-      agents,
-      and(eq(agents.userId, agentTeams.userId), eq(agents.active, true))
-    )
-    .where(inArray(agentTeams.teamId, teamIds));
-  return [...new Set(rows.map((row) => row.userId))];
-}
-
-async function activeTeamMembers(
-  db: Database,
-  teamId: string
-): Promise<string[]> {
-  const rows = await db
-    .select({ userId: agentTeams.userId })
-    .from(agentTeams)
-    .innerJoin(
-      agents,
-      and(eq(agents.userId, agentTeams.userId), eq(agents.active, true))
-    )
-    .where(eq(agentTeams.teamId, teamId));
-  return [...new Set(rows.map((row) => row.userId))];
-}
-
-async function activeProductTeamMembers(
-  db: Database,
-  productId: string,
-  teamId: string
-): Promise<string[]> {
-  const association = await db.query.productTeams.findFirst({
-    where: and(
-      eq(productTeams.productId, productId),
-      eq(productTeams.teamId, teamId)
-    ),
-  });
-  return association ? activeTeamMembers(db, teamId) : [];
-}
-
-async function activeProductUser(
-  db: Database,
-  productId: string,
-  userId: string
-): Promise<string[]> {
-  const row = await db
-    .select({ userId: agents.userId })
-    .from(agents)
-    .innerJoin(agentTeams, eq(agentTeams.userId, agents.userId))
-    .innerJoin(
-      productTeams,
-      and(
-        eq(productTeams.teamId, agentTeams.teamId),
-        eq(productTeams.productId, productId)
-      )
-    )
-    .where(and(eq(agents.userId, userId), eq(agents.active, true)))
-    .get();
-  return row ? [row.userId] : [];
+function resolveRequirementRecipients(members: AudienceAgent[], requirement: NotificationRequirementRow): string[] {
+  return members.filter(member => requirementTargetsAgent(requirement, member)).map(member => member.userId);
 }
 
 function buildNotificationMessage(params: {

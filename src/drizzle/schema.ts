@@ -1396,12 +1396,17 @@ export const notificationEndpoints = sqliteTable(
   ],
 );
 
-/** Product-owned routing rules: event -> recipients -> allowed endpoint types. */
+/** Scoped policies inherit tenant -> current ticket team -> product. */
 export const notificationRules = sqliteTable(
   "notification_rules",
   {
     id: text("id").primaryKey(),
-    productId: text("product_id").notNull(),
+    scope: text("scope").$type<"tenant" | "team" | "product">().notNull().default("product"),
+    tenantId: text("tenant_id"),
+    teamId: text("team_id"),
+    productId: text("product_id"),
+    /** The original ancestor policy ID; disabled overrides mask inheritance. */
+    overridesId: text("overrides_id"),
     name: text("name").notNull(),
     enabled: integer("enabled", { mode: "boolean" }).default(true),
     triggerEvents: text("trigger_events").notNull(),
@@ -1414,7 +1419,14 @@ export const notificationRules = sqliteTable(
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
-  (t) => [index("notification_rules_product_idx").on(t.productId)],
+  (t) => [
+    index("notification_rules_product_idx").on(t.productId),
+    index("notification_rules_tenant_idx").on(t.tenantId),
+    index("notification_rules_team_idx").on(t.teamId),
+    index("notification_rules_overrides_idx").on(t.overridesId),
+    uniqueIndex("notification_rules_product_override_uq").on(t.productId, t.overridesId),
+    uniqueIndex("notification_rules_team_override_uq").on(t.teamId, t.overridesId),
+  ],
 );
 
 /** Compliance requirements for endpoint types at product, team, or user scope. */
@@ -1422,7 +1434,11 @@ export const notificationRequirements = sqliteTable(
   "notification_requirements",
   {
     id: text("id").primaryKey(),
-    productId: text("product_id").notNull(),
+    scope: text("scope").$type<"tenant" | "team" | "product">().notNull().default("product"),
+    tenantId: text("tenant_id"),
+    teamId: text("team_id"),
+    productId: text("product_id"),
+    overridesId: text("overrides_id"),
     name: text("name").notNull(),
     enabled: integer("enabled", { mode: "boolean" }).default(true),
     scopeType: text("scope_type")
@@ -1435,7 +1451,14 @@ export const notificationRequirements = sqliteTable(
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
-  (t) => [index("notification_requirements_product_idx").on(t.productId)],
+  (t) => [
+    index("notification_requirements_product_idx").on(t.productId),
+    index("notification_requirements_tenant_idx").on(t.tenantId),
+    index("notification_requirements_team_idx").on(t.teamId),
+    index("notification_requirements_overrides_idx").on(t.overridesId),
+    uniqueIndex("notification_requirements_product_override_uq").on(t.productId, t.overridesId),
+    uniqueIndex("notification_requirements_team_override_uq").on(t.teamId, t.overridesId),
+  ],
 );
 
 export const notificationLogs = sqliteTable(

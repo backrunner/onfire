@@ -1,13 +1,14 @@
 import { NextRequest } from "next/server";
-import { eq } from "drizzle-orm";
-import { z } from "zod";
+import { and, eq, notExists } from "drizzle-orm";
 import { notificationRules } from "@/drizzle/schema";
-import { ok } from "@/lib/api/response";
+import { conflict, ok } from "@/lib/api/response";
 import { parseBody, withAuth } from "@/lib/api/handler";
 import { toNotificationRuleView } from "@/lib/notifications/policy-schema";
 import { loadRule, ruleFieldsSchema, validateRuleTarget } from "../shared";
+import { assertNotificationOperation } from "@/lib/notifications/policy-access";
+import { policyOwner } from "@/lib/notifications/policy-scope";
 
-const updateSchema = ruleFieldsSchema.partial();
+const updateSchema = ruleFieldsSchema.partial().strict();
 
 export const GET = withAuth(
   { permission: "notification.manage" },
@@ -20,6 +21,7 @@ export const PATCH = withAuth(
   { permission: "notification.manage" },
   async (req: NextRequest, ctx) => {
     const rule = await loadRule(ctx, ctx.params.id);
+    assertNotificationOperation(ctx, policyOwner(rule), "update_notification_rule");
     const body = await parseBody(req, updateSchema);
     const currentEvents = JSON.parse(rule.triggerEvents) as string[];
     const currentChannels = JSON.parse(rule.channelTypes) as string[];
@@ -38,7 +40,7 @@ export const PATCH = withAuth(
           ? body.recipientUserId
           : rule.recipientUserId,
     });
-    const target = await validateRuleTarget(ctx, rule.productId, merged);
+    const target = await validateRuleTarget(ctx, policyOwner(rule), merged, rule);
     await ctx.db
       .update(notificationRules)
       .set({
@@ -61,7 +63,15 @@ export const DELETE = withAuth(
   { permission: "notification.manage" },
   async (_req: NextRequest, ctx) => {
     const rule = await loadRule(ctx, ctx.params.id);
-    await ctx.db.delete(notificationRules).where(eq(notificationRules.id, rule.id));
+    assertNotificationOperation(ctx, policyOwner(rule), "delete_notification_rule");
+    if (await ctx.db.query.notificationRules.findFirst({ where: eq(notificationRules.overridesId, rule.id) })) {
+      throw conflict("Reset descendant overrides before deleting their original policy");
+    }
+    const deleted = await ctx.db.delete(notificationRules).where(and(
+      eq(notificationRules.id, rule.id),
+      notExists(ctx.db.select({ id: notificationRules.id }).from(notificationRules).where(eq(notificationRules.overridesId, rule.id))),
+    )).returning({ id: notificationRules.id });
+    if (!deleted.length) throw conflict("Policy changed; reload before deleting");
     return ok({ deleted: true });
   }
 );

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { and, eq, inArray } from "drizzle-orm";
+import { or, and, eq, inArray } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import {
   categoryRoutes,
@@ -228,10 +228,10 @@ export const DELETE = withAuth({ permission: "team.manage" }, async (_req: NextR
     ctx.db.query.categoryRoutes.findFirst({ where: eq(categoryRoutes.teamId, team.id) }),
     ctx.db.query.ticketTypeRoutes.findFirst({ where: eq(ticketTypeRoutes.teamId, team.id) }),
     ctx.db.query.notificationRules.findFirst({
-      where: eq(notificationRules.recipientTeamId, team.id),
+      where: or(eq(notificationRules.recipientTeamId, team.id), eq(notificationRules.teamId, team.id)),
     }),
     ctx.db.query.notificationRequirements.findFirst({
-      where: eq(notificationRequirements.scopeTeamId, team.id),
+      where: or(eq(notificationRequirements.scopeTeamId, team.id), eq(notificationRequirements.teamId, team.id)),
     }),
   ]);
   if (dependencies.some(Boolean)) {
