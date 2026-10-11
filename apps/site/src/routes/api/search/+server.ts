@@ -1,5 +1,5 @@
 import { createConfiguredSearchResponse } from 'svedocs/search';
-import { getRuntimeEnv } from '$lib/server/env';
+import { getRuntimeEnv } from '#lib/server/env.ts';
 import config from 'virtual:svedocs/config';
 import records from 'virtual:svedocs/search';
 import type { RequestHandler } from './$types';

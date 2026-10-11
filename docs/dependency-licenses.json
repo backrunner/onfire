@@ -7,16 +7,16 @@
     {
       "name": "@alloc/quick-lru",
       "versions": [
-        "5.2.0"
+        "5.3.0"
       ],
       "license": "MIT",
       "author": "Sindre Sorhus",
-      "homepage": "https://github.com/sindresorhus/quick-lru#readme"
+      "homepage": "https://github.com/aleclarson/quick-lru#readme"
     },
     {
       "name": "@assistant-ui/core",
       "versions": [
-        "0.3.15"
+        "0.3.25"
       ],
       "license": "MIT",
       "author": "AgentbaseAI Inc.",
@@ -25,7 +25,7 @@
     {
       "name": "@assistant-ui/react",
       "versions": [
-        "0.15.16"
+        "0.15.26"
       ],
       "license": "MIT",
       "author": "AgentbaseAI Inc.",
@@ -34,7 +34,7 @@
     {
       "name": "@assistant-ui/react-markdown",
       "versions": [
-        "0.14.12"
+        "0.14.20"
       ],
       "license": "MIT",
       "author": "AgentbaseAI Inc.",
@@ -43,7 +43,7 @@
     {
       "name": "@assistant-ui/store",
       "versions": [
-        "0.3.10"
+        "0.3.18"
       ],
       "license": "MIT",
       "author": "AgentbaseAI Inc.",
@@ -52,7 +52,7 @@
     {
       "name": "@assistant-ui/tap",
       "versions": [
-        "0.9.14"
+        "0.9.22"
       ],
       "license": "MIT",
       "author": "AgentbaseAI Inc.",
@@ -61,7 +61,7 @@
     {
       "name": "@ast-grep/napi",
       "versions": [
-        "0.40.5"
+        "0.45.3"
       ],
       "license": "MIT",
       "homepage": "https://ast-grep.github.io"
@@ -69,7 +69,7 @@
     {
       "name": "@ast-grep/napi-darwin-arm64",
       "versions": [
-        "0.40.5"
+        "0.45.3"
       ],
       "license": "MIT",
       "homepage": "https://github.com/ast-grep/ast-grep#readme"
@@ -122,7 +122,7 @@
     {
       "name": "@aws-sdk/checksums",
       "versions": [
-        "3.1000.24"
+        "3.1001.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -176,7 +176,7 @@
     {
       "name": "@aws-sdk/core",
       "versions": [
-        "3.977.4"
+        "3.978.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -185,7 +185,7 @@
     {
       "name": "@aws-sdk/credential-provider-env",
       "versions": [
-        "3.972.65"
+        "3.972.73"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -194,7 +194,7 @@
     {
       "name": "@aws-sdk/credential-provider-http",
       "versions": [
-        "3.972.67"
+        "3.972.75"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -203,7 +203,7 @@
     {
       "name": "@aws-sdk/credential-provider-ini",
       "versions": [
-        "3.973.10"
+        "3.973.18"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -212,7 +212,7 @@
     {
       "name": "@aws-sdk/credential-provider-login",
       "versions": [
-        "3.972.72"
+        "3.972.80"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -221,7 +221,7 @@
     {
       "name": "@aws-sdk/credential-provider-node",
       "versions": [
-        "3.972.76"
+        "3.972.85"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -230,7 +230,7 @@
     {
       "name": "@aws-sdk/credential-provider-process",
       "versions": [
-        "3.972.65"
+        "3.972.73"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -239,7 +239,7 @@
     {
       "name": "@aws-sdk/credential-provider-sso",
       "versions": [
-        "3.973.9"
+        "3.973.17"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -248,7 +248,7 @@
     {
       "name": "@aws-sdk/credential-provider-web-identity",
       "versions": [
-        "3.972.71"
+        "3.972.79"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -257,7 +257,7 @@
     {
       "name": "@aws-sdk/dynamodb-codec",
       "versions": [
-        "3.973.39"
+        "3.973.47"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -266,7 +266,7 @@
     {
       "name": "@aws-sdk/endpoint-cache",
       "versions": [
-        "3.972.9"
+        "3.972.11"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -275,7 +275,7 @@
     {
       "name": "@aws-sdk/middleware-bucket-endpoint",
       "versions": [
-        "3.972.43"
+        "3.972.51"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -284,7 +284,7 @@
     {
       "name": "@aws-sdk/middleware-endpoint-discovery",
       "versions": [
-        "3.972.27"
+        "3.972.32"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -293,7 +293,7 @@
     {
       "name": "@aws-sdk/middleware-expect-continue",
       "versions": [
-        "3.972.39"
+        "3.972.47"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -302,7 +302,7 @@
     {
       "name": "@aws-sdk/middleware-flexible-checksums",
       "versions": [
-        "3.974.49"
+        "3.974.57"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -311,7 +311,7 @@
     {
       "name": "@aws-sdk/middleware-host-header",
       "versions": [
-        "3.972.40"
+        "3.972.48"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -320,7 +320,7 @@
     {
       "name": "@aws-sdk/middleware-location-constraint",
       "versions": [
-        "3.972.36"
+        "3.972.44"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -329,7 +329,7 @@
     {
       "name": "@aws-sdk/middleware-logger",
       "versions": [
-        "3.972.39"
+        "3.972.47"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -338,7 +338,7 @@
     {
       "name": "@aws-sdk/middleware-recursion-detection",
       "versions": [
-        "3.972.41"
+        "3.972.49"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -347,7 +347,7 @@
     {
       "name": "@aws-sdk/middleware-sdk-s3",
       "versions": [
-        "3.972.70"
+        "3.972.78"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -356,7 +356,7 @@
     {
       "name": "@aws-sdk/middleware-sdk-sqs",
       "versions": [
-        "3.972.39"
+        "3.972.44"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -365,7 +365,7 @@
     {
       "name": "@aws-sdk/middleware-ssec",
       "versions": [
-        "3.972.36"
+        "3.972.44"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -374,7 +374,7 @@
     {
       "name": "@aws-sdk/middleware-user-agent",
       "versions": [
-        "3.972.69"
+        "3.972.77"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -383,7 +383,7 @@
     {
       "name": "@aws-sdk/nested-clients",
       "versions": [
-        "3.997.39"
+        "3.997.47"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -392,7 +392,7 @@
     {
       "name": "@aws-sdk/region-config-resolver",
       "versions": [
-        "3.972.43"
+        "3.972.51"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -402,7 +402,7 @@
       "name": "@aws-sdk/signature-v4-multi-region",
       "versions": [
         "3.984.0",
-        "3.996.43"
+        "3.996.48"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -411,7 +411,7 @@
     {
       "name": "@aws-sdk/token-providers",
       "versions": [
-        "3.1100.0"
+        "3.1149.0"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -420,7 +420,7 @@
     {
       "name": "@aws-sdk/types",
       "versions": [
-        "3.974.2"
+        "3.974.6"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -438,7 +438,7 @@
     {
       "name": "@aws-sdk/util-locate-window",
       "versions": [
-        "3.965.8"
+        "3.965.10"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -447,7 +447,7 @@
     {
       "name": "@aws-sdk/util-user-agent-browser",
       "versions": [
-        "3.972.40"
+        "3.972.48"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -456,7 +456,7 @@
     {
       "name": "@aws-sdk/util-user-agent-node",
       "versions": [
-        "3.973.55"
+        "3.973.63"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -465,7 +465,7 @@
     {
       "name": "@aws-sdk/xml-builder",
       "versions": [
-        "3.972.37"
+        "3.972.41"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -645,7 +645,7 @@
     {
       "name": "@babel/helpers",
       "versions": [
-        "7.29.7"
+        "7.29.10"
       ],
       "license": "MIT",
       "author": "The Babel Team",
@@ -654,7 +654,7 @@
     {
       "name": "@babel/parser",
       "versions": [
-        "7.29.8"
+        "7.29.9"
       ],
       "license": "MIT",
       "author": "The Babel Team",
@@ -690,7 +690,7 @@
     {
       "name": "@babel/plugin-transform-typescript",
       "versions": [
-        "7.29.7"
+        "7.29.9"
       ],
       "license": "MIT",
       "author": "The Babel Team",
@@ -708,7 +708,7 @@
     {
       "name": "@babel/runtime",
       "versions": [
-        "7.29.7"
+        "7.29.10"
       ],
       "license": "MIT",
       "author": "The Babel Team",
@@ -726,7 +726,7 @@
     {
       "name": "@babel/traverse",
       "versions": [
-        "7.29.8"
+        "7.29.10"
       ],
       "license": "MIT",
       "author": "The Babel Team",
@@ -744,7 +744,7 @@
     {
       "name": "@better-auth/core",
       "versions": [
-        "1.7.0-rc.5"
+        "1.7.7"
       ],
       "license": "MIT",
       "homepage": "https://www.better-auth.com"
@@ -752,7 +752,7 @@
     {
       "name": "@better-auth/drizzle-adapter",
       "versions": [
-        "1.7.0-rc.5"
+        "1.7.7"
       ],
       "license": "MIT",
       "homepage": "https://www.better-auth.com/docs/adapters/drizzle"
@@ -760,7 +760,7 @@
     {
       "name": "@better-auth/kysely-adapter",
       "versions": [
-        "1.7.0-rc.5"
+        "1.7.7"
       ],
       "license": "MIT",
       "homepage": "https://www.better-auth.com/docs/adapters/kysely"
@@ -768,7 +768,7 @@
     {
       "name": "@better-auth/memory-adapter",
       "versions": [
-        "1.7.0-rc.5"
+        "1.7.7"
       ],
       "license": "MIT",
       "homepage": "https://www.better-auth.com"
@@ -776,7 +776,7 @@
     {
       "name": "@better-auth/mongo-adapter",
       "versions": [
-        "1.7.0-rc.5"
+        "1.7.7"
       ],
       "license": "MIT",
       "homepage": "https://www.better-auth.com/docs/adapters/mongodb"
@@ -784,7 +784,7 @@
     {
       "name": "@better-auth/oauth-provider",
       "versions": [
-        "1.7.0-rc.5"
+        "1.7.7"
       ],
       "license": "MIT",
       "homepage": "https://www.better-auth.com/docs/plugins/oauth-provider"
@@ -792,7 +792,7 @@
     {
       "name": "@better-auth/passkey",
       "versions": [
-        "1.7.0-rc.5"
+        "1.7.7"
       ],
       "license": "MIT",
       "homepage": "https://www.better-auth.com/docs/plugins/passkey"
@@ -800,7 +800,7 @@
     {
       "name": "@better-auth/prisma-adapter",
       "versions": [
-        "1.7.0-rc.5"
+        "1.7.7"
       ],
       "license": "MIT",
       "homepage": "https://www.better-auth.com/docs/adapters/prisma"
@@ -808,7 +808,7 @@
     {
       "name": "@better-auth/telemetry",
       "versions": [
-        "1.7.0-rc.5"
+        "1.7.7"
       ],
       "license": "MIT",
       "homepage": "https://www.better-auth.com"
@@ -826,7 +826,7 @@
     {
       "name": "@better-fetch/fetch",
       "versions": [
-        "1.3.1"
+        "1.3.2"
       ],
       "license": "MIT",
       "homepage": "https://github.com/better-auth/better-fetch#readme"
@@ -843,7 +843,7 @@
     {
       "name": "@cloudflare/unenv-preset",
       "versions": [
-        "2.16.1"
+        "2.16.2"
       ],
       "license": "MIT OR Apache-2.0",
       "homepage": "https://github.com/cloudflare/workers-sdk#readme"
@@ -851,7 +851,7 @@
     {
       "name": "@cloudflare/workerd-darwin-arm64",
       "versions": [
-        "1.20260820.1"
+        "1.20261006.1"
       ],
       "license": "Apache-2.0",
       "homepage": "https://github.com/cloudflare/workerd#readme"
@@ -867,8 +867,8 @@
     {
       "name": "@dotenvx/dotenvx",
       "versions": [
-        "1.31.0",
-        "1.75.1"
+        "1.75.1",
+        "2.34.2"
       ],
       "license": "BSD-3-Clause",
       "author": "@motdotla",
@@ -877,7 +877,24 @@
     {
       "name": "@dotenvx/primitives",
       "versions": [
-        "0.8.0"
+        "0.8.0",
+        "3.3.0"
+      ],
+      "license": "BSD-3-Clause",
+      "author": "@motdotla",
+      "homepage": "https://github.com/dotenvx/dotenvx"
+    },
+    {
+      "name": "@dotenvx/providers",
+      "versions": [
+        "0.3.5"
+      ],
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "@dotenvx/tooling",
+      "versions": [
+        "1.0.5"
       ],
       "license": "BSD-3-Clause",
       "author": "@motdotla",
@@ -891,42 +908,6 @@
       "license": "Apache-2.0",
       "author": "Drizzle Team",
       "homepage": "https://github.com/drizzle-team/brocli"
-    },
-    {
-      "name": "@ecies/ciphers",
-      "versions": [
-        "0.2.6"
-      ],
-      "license": "MIT",
-      "author": "Weiliang Li",
-      "homepage": "https://github.com/ecies/js-ciphers#readme"
-    },
-    {
-      "name": "@emnapi/core",
-      "versions": [
-        "2.0.0-alpha.3"
-      ],
-      "license": "MIT",
-      "author": "toyobayashi",
-      "homepage": "https://github.com/toyobayashi/emnapi#readme"
-    },
-    {
-      "name": "@emnapi/runtime",
-      "versions": [
-        "2.0.0-alpha.3"
-      ],
-      "license": "MIT",
-      "author": "toyobayashi",
-      "homepage": "https://github.com/toyobayashi/emnapi#readme"
-    },
-    {
-      "name": "@emnapi/wasi-threads",
-      "versions": [
-        "2.0.1"
-      ],
-      "license": "MIT",
-      "author": "toyobayashi",
-      "homepage": "https://github.com/toyobayashi/emnapi#readme"
     },
     {
       "name": "@esbuild-kit/core-utils",
@@ -950,8 +931,7 @@
       "name": "@esbuild/darwin-arm64",
       "versions": [
         "0.25.12",
-        "0.25.4",
-        "0.28.1"
+        "0.28.2"
       ],
       "license": "MIT",
       "homepage": "https://github.com/evanw/esbuild#readme"
@@ -1004,7 +984,7 @@
     {
       "name": "@hono/node-server",
       "versions": [
-        "2.0.12"
+        "2.1.4"
       ],
       "license": "MIT",
       "author": "Yusuke Wada",
@@ -1021,7 +1001,7 @@
     {
       "name": "@img/sharp-darwin-arm64",
       "versions": [
-        "0.35.4"
+        "0.35.5"
       ],
       "license": "Apache-2.0",
       "author": "Lovell Fuller",
@@ -1030,7 +1010,7 @@
     {
       "name": "@img/sharp-libvips-darwin-arm64",
       "versions": [
-        "1.3.3"
+        "1.3.4"
       ],
       "license": "LGPL-3.0-or-later",
       "author": "Lovell Fuller",
@@ -1039,10 +1019,11 @@
     {
       "name": "@isaacs/cliui",
       "versions": [
-        "9.0.0"
+        "8.0.2"
       ],
-      "license": "BlueOak-1.0.0",
-      "homepage": "https://github.com/isaacs/cliui#readme"
+      "license": "ISC",
+      "author": "Ben Coe",
+      "homepage": "https://github.com/yargs/cliui#readme"
     },
     {
       "name": "@jridgewell/gen-mapping",
@@ -1083,7 +1064,7 @@
     {
       "name": "@jridgewell/sourcemap-codec",
       "versions": [
-        "1.5.5"
+        "1.6.0"
       ],
       "license": "MIT",
       "author": "Justin Ridgewell",
@@ -1110,7 +1091,7 @@
     {
       "name": "@libsql/client",
       "versions": [
-        "0.17.4"
+        "0.18.0"
       ],
       "license": "MIT",
       "homepage": "https://github.com/tursodatabase/libsql-client-ts#readme"
@@ -1118,7 +1099,7 @@
     {
       "name": "@libsql/core",
       "versions": [
-        "0.17.4"
+        "0.18.0"
       ],
       "license": "MIT",
       "homepage": "https://github.com/tursodatabase/libsql-client-ts#readme"
@@ -1151,7 +1132,7 @@
     {
       "name": "@marsidev/react-turnstile",
       "versions": [
-        "1.5.4"
+        "1.6.1"
       ],
       "license": "MIT",
       "author": "Luis Marsiglia",
@@ -1160,7 +1141,7 @@
     {
       "name": "@modelcontextprotocol/sdk",
       "versions": [
-        "1.30.0"
+        "1.32.1"
       ],
       "license": "MIT",
       "author": "Anthropic, PBC",
@@ -1185,15 +1166,6 @@
       "homepage": "https://github.com/suren-atoyan/monaco-react#readme"
     },
     {
-      "name": "@napi-rs/wasm-runtime",
-      "versions": [
-        "1.2.2"
-      ],
-      "license": "MIT",
-      "author": "LongYinan",
-      "homepage": "https://napi.rs/"
-    },
-    {
       "name": "@neon-rs/load",
       "versions": [
         "0.0.4"
@@ -1205,7 +1177,7 @@
     {
       "name": "@next/env",
       "versions": [
-        "16.3.4"
+        "16.4.0"
       ],
       "license": "MIT",
       "author": "Next.js Team",
@@ -1214,7 +1186,7 @@
     {
       "name": "@next/swc-darwin-arm64",
       "versions": [
-        "16.3.4"
+        "16.4.0"
       ],
       "license": "MIT",
       "homepage": "https://github.com/vercel/next.js#readme"
@@ -1222,17 +1194,7 @@
     {
       "name": "@noble/ciphers",
       "versions": [
-        "1.3.0",
-        "2.2.0"
-      ],
-      "license": "MIT",
-      "author": "Paul Miller",
-      "homepage": "https://paulmillr.com/noble/"
-    },
-    {
-      "name": "@noble/curves",
-      "versions": [
-        "1.9.7"
+        "2.4.0"
       ],
       "license": "MIT",
       "author": "Paul Miller",
@@ -1241,8 +1203,7 @@
     {
       "name": "@noble/hashes",
       "versions": [
-        "1.8.0",
-        "2.2.0"
+        "2.4.0"
       ],
       "license": "MIT",
       "author": "Paul Miller",
@@ -1251,7 +1212,7 @@
     {
       "name": "@node-minify/core",
       "versions": [
-        "8.0.6"
+        "9.0.2"
       ],
       "license": "MIT",
       "author": "Rodolphe Stoclin",
@@ -1260,7 +1221,7 @@
     {
       "name": "@node-minify/terser",
       "versions": [
-        "8.0.6"
+        "9.0.1"
       ],
       "license": "MIT",
       "author": "Rodolphe Stoclin",
@@ -1269,7 +1230,7 @@
     {
       "name": "@node-minify/utils",
       "versions": [
-        "8.0.6"
+        "9.0.1"
       ],
       "license": "MIT",
       "author": "Rodolphe Stoclin",
@@ -1302,7 +1263,7 @@
     {
       "name": "@opennextjs/aws",
       "versions": [
-        "4.1.4"
+        "4.1.9"
       ],
       "license": "MIT",
       "homepage": "https://opennext.js.org/aws"
@@ -1310,19 +1271,10 @@
     {
       "name": "@opennextjs/cloudflare",
       "versions": [
-        "1.20.6"
+        "1.20.10"
       ],
       "license": "MIT",
       "homepage": "https://github.com/opennextjs/opennextjs-cloudflare"
-    },
-    {
-      "name": "@opentelemetry/api",
-      "versions": [
-        "1.9.0"
-      ],
-      "license": "Apache-2.0",
-      "author": "OpenTelemetry Authors",
-      "homepage": "https://github.com/open-telemetry/opentelemetry-js/tree/main/api"
     },
     {
       "name": "@opentelemetry/semantic-conventions",
@@ -1336,7 +1288,7 @@
     {
       "name": "@oxc-project/types",
       "versions": [
-        "0.142.0"
+        "0.153.0"
       ],
       "license": "MIT",
       "author": "Boshen and oxc contributors",
@@ -1345,7 +1297,7 @@
     {
       "name": "@peculiar/asn1-android",
       "versions": [
-        "2.8.0"
+        "2.10.0"
       ],
       "license": "MIT",
       "author": "PeculiarVentures, LLC",
@@ -1354,7 +1306,7 @@
     {
       "name": "@peculiar/asn1-cms",
       "versions": [
-        "2.8.0"
+        "2.10.0"
       ],
       "license": "MIT",
       "author": "PeculiarVentures, LLC",
@@ -1363,7 +1315,7 @@
     {
       "name": "@peculiar/asn1-csr",
       "versions": [
-        "2.8.0"
+        "2.10.0"
       ],
       "license": "MIT",
       "author": "PeculiarVentures, LLC",
@@ -1372,7 +1324,7 @@
     {
       "name": "@peculiar/asn1-ecc",
       "versions": [
-        "2.8.0"
+        "2.10.0"
       ],
       "license": "MIT",
       "author": "PeculiarVentures, LLC",
@@ -1381,7 +1333,7 @@
     {
       "name": "@peculiar/asn1-pfx",
       "versions": [
-        "2.8.0"
+        "2.10.0"
       ],
       "license": "MIT",
       "author": "PeculiarVentures, LLC",
@@ -1390,7 +1342,7 @@
     {
       "name": "@peculiar/asn1-pkcs8",
       "versions": [
-        "2.8.0"
+        "2.10.0"
       ],
       "license": "MIT",
       "author": "PeculiarVentures, LLC",
@@ -1399,7 +1351,7 @@
     {
       "name": "@peculiar/asn1-pkcs9",
       "versions": [
-        "2.8.0"
+        "2.10.0"
       ],
       "license": "MIT",
       "author": "PeculiarVentures, LLC",
@@ -1408,7 +1360,7 @@
     {
       "name": "@peculiar/asn1-rsa",
       "versions": [
-        "2.8.0"
+        "2.10.0"
       ],
       "license": "MIT",
       "author": "PeculiarVentures, LLC",
@@ -1417,7 +1369,7 @@
     {
       "name": "@peculiar/asn1-schema",
       "versions": [
-        "2.8.0"
+        "2.10.0"
       ],
       "license": "MIT",
       "author": "PeculiarVentures, LLC",
@@ -1426,7 +1378,7 @@
     {
       "name": "@peculiar/asn1-x509",
       "versions": [
-        "2.8.0"
+        "2.10.0"
       ],
       "license": "MIT",
       "author": "PeculiarVentures, LLC",
@@ -1435,7 +1387,7 @@
     {
       "name": "@peculiar/asn1-x509-attr",
       "versions": [
-        "2.8.0"
+        "2.10.0"
       ],
       "license": "MIT",
       "author": "PeculiarVentures, LLC",
@@ -1458,6 +1410,14 @@
       "license": "MIT",
       "author": "Peculiar Ventures LLC",
       "homepage": "https://github.com/PeculiarVentures/x509#readme"
+    },
+    {
+      "name": "@pkgjs/parseargs",
+      "versions": [
+        "0.11.0"
+      ],
+      "license": "MIT",
+      "homepage": "https://github.com/pkgjs/parseargs#readme"
     },
     {
       "name": "@poppinss/colors",
@@ -1505,7 +1465,7 @@
     {
       "name": "@radix-ui/react-accessible-icon",
       "versions": [
-        "1.1.15"
+        "1.1.16"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1513,7 +1473,7 @@
     {
       "name": "@radix-ui/react-accordion",
       "versions": [
-        "1.2.20"
+        "1.2.21"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1521,7 +1481,7 @@
     {
       "name": "@radix-ui/react-alert-dialog",
       "versions": [
-        "1.1.23"
+        "1.1.24"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1529,7 +1489,7 @@
     {
       "name": "@radix-ui/react-arrow",
       "versions": [
-        "1.1.15"
+        "1.1.16"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1537,7 +1497,7 @@
     {
       "name": "@radix-ui/react-aspect-ratio",
       "versions": [
-        "1.1.15"
+        "1.1.16"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1545,7 +1505,7 @@
     {
       "name": "@radix-ui/react-avatar",
       "versions": [
-        "1.2.6"
+        "1.2.7"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1553,7 +1513,7 @@
     {
       "name": "@radix-ui/react-checkbox",
       "versions": [
-        "1.3.11"
+        "1.3.12"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1561,7 +1521,7 @@
     {
       "name": "@radix-ui/react-collapsible",
       "versions": [
-        "1.1.20"
+        "1.1.21"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1569,7 +1529,7 @@
     {
       "name": "@radix-ui/react-collection",
       "versions": [
-        "1.1.15"
+        "1.1.16"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1593,7 +1553,7 @@
     {
       "name": "@radix-ui/react-context-menu",
       "versions": [
-        "2.3.7"
+        "2.3.8"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1601,7 +1561,7 @@
     {
       "name": "@radix-ui/react-dialog",
       "versions": [
-        "1.1.23"
+        "1.2.0"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1609,7 +1569,7 @@
     {
       "name": "@radix-ui/react-direction",
       "versions": [
-        "1.1.4"
+        "1.1.5"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1617,7 +1577,7 @@
     {
       "name": "@radix-ui/react-dismissable-layer",
       "versions": [
-        "1.1.19"
+        "1.1.20"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1625,7 +1585,7 @@
     {
       "name": "@radix-ui/react-dropdown-menu",
       "versions": [
-        "2.1.24"
+        "2.1.25"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1641,7 +1601,7 @@
     {
       "name": "@radix-ui/react-focus-scope",
       "versions": [
-        "1.1.16"
+        "1.2.0"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1649,7 +1609,7 @@
     {
       "name": "@radix-ui/react-form",
       "versions": [
-        "0.1.16"
+        "0.2.0"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1657,7 +1617,7 @@
     {
       "name": "@radix-ui/react-hover-card",
       "versions": [
-        "1.1.23"
+        "1.1.24"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1673,7 +1633,7 @@
     {
       "name": "@radix-ui/react-label",
       "versions": [
-        "2.1.15"
+        "2.1.16"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1681,7 +1641,7 @@
     {
       "name": "@radix-ui/react-menu",
       "versions": [
-        "2.1.24"
+        "2.1.25"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1689,7 +1649,7 @@
     {
       "name": "@radix-ui/react-menubar",
       "versions": [
-        "1.1.24"
+        "1.1.25"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1697,7 +1657,7 @@
     {
       "name": "@radix-ui/react-navigation-menu",
       "versions": [
-        "1.2.22"
+        "1.3.0"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1705,7 +1665,7 @@
     {
       "name": "@radix-ui/react-one-time-password-field",
       "versions": [
-        "0.1.16"
+        "0.1.17"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1713,7 +1673,7 @@
     {
       "name": "@radix-ui/react-password-toggle-field",
       "versions": [
-        "0.1.11"
+        "0.1.12"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1721,7 +1681,7 @@
     {
       "name": "@radix-ui/react-popover",
       "versions": [
-        "1.1.23"
+        "1.2.0"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1729,7 +1689,7 @@
     {
       "name": "@radix-ui/react-popper",
       "versions": [
-        "1.3.7"
+        "1.3.8"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1737,7 +1697,7 @@
     {
       "name": "@radix-ui/react-portal",
       "versions": [
-        "1.1.17"
+        "1.1.18"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1745,7 +1705,7 @@
     {
       "name": "@radix-ui/react-presence",
       "versions": [
-        "1.1.10"
+        "1.1.11"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1753,7 +1713,7 @@
     {
       "name": "@radix-ui/react-primitive",
       "versions": [
-        "2.1.10"
+        "2.1.11"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1761,7 +1721,7 @@
     {
       "name": "@radix-ui/react-progress",
       "versions": [
-        "1.1.16"
+        "1.1.17"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1769,7 +1729,7 @@
     {
       "name": "@radix-ui/react-radio-group",
       "versions": [
-        "1.4.7"
+        "1.4.8"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1777,7 +1737,7 @@
     {
       "name": "@radix-ui/react-roving-focus",
       "versions": [
-        "1.1.19"
+        "1.1.20"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1785,7 +1745,7 @@
     {
       "name": "@radix-ui/react-scroll-area",
       "versions": [
-        "1.2.18"
+        "1.3.0"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1793,7 +1753,7 @@
     {
       "name": "@radix-ui/react-select",
       "versions": [
-        "2.3.7"
+        "2.3.8"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1801,7 +1761,7 @@
     {
       "name": "@radix-ui/react-separator",
       "versions": [
-        "1.1.15"
+        "1.1.16"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1809,7 +1769,7 @@
     {
       "name": "@radix-ui/react-slider",
       "versions": [
-        "1.4.7"
+        "1.5.0"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1817,7 +1777,7 @@
     {
       "name": "@radix-ui/react-slot",
       "versions": [
-        "1.3.3"
+        "1.4.0"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1825,7 +1785,7 @@
     {
       "name": "@radix-ui/react-switch",
       "versions": [
-        "1.3.7"
+        "1.3.8"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1833,7 +1793,7 @@
     {
       "name": "@radix-ui/react-tabs",
       "versions": [
-        "1.1.21"
+        "1.1.22"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1841,7 +1801,7 @@
     {
       "name": "@radix-ui/react-toast",
       "versions": [
-        "1.2.23"
+        "1.2.24"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1849,7 +1809,7 @@
     {
       "name": "@radix-ui/react-toggle",
       "versions": [
-        "1.1.18"
+        "1.1.19"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1857,7 +1817,7 @@
     {
       "name": "@radix-ui/react-toggle-group",
       "versions": [
-        "1.1.19"
+        "1.1.20"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1865,7 +1825,7 @@
     {
       "name": "@radix-ui/react-toolbar",
       "versions": [
-        "1.1.19"
+        "1.1.20"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1873,7 +1833,7 @@
     {
       "name": "@radix-ui/react-tooltip",
       "versions": [
-        "1.2.16"
+        "1.3.0"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1945,7 +1905,7 @@
     {
       "name": "@radix-ui/react-use-size",
       "versions": [
-        "1.1.4"
+        "1.1.5"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1953,7 +1913,7 @@
     {
       "name": "@radix-ui/react-visually-hidden",
       "versions": [
-        "1.2.11"
+        "1.2.12"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -1969,15 +1929,7 @@
     {
       "name": "@rolldown/binding-darwin-arm64",
       "versions": [
-        "1.2.1"
-      ],
-      "license": "MIT",
-      "homepage": "https://rolldown.rs/"
-    },
-    {
-      "name": "@rolldown/binding-wasm32-wasi",
-      "versions": [
-        "1.2.1"
+        "1.2.13"
       ],
       "license": "MIT",
       "homepage": "https://rolldown.rs/"
@@ -2000,6 +1952,15 @@
       "homepage": "https://github.com/Sec-ant/readable-stream"
     },
     {
+      "name": "@shadcn/registry",
+      "versions": [
+        "0.1.3"
+      ],
+      "license": "MIT",
+      "author": "shadcn",
+      "homepage": "https://ui.shadcn.com/docs/registry"
+    },
+    {
       "name": "@simplewebauthn/browser",
       "versions": [
         "13.3.0"
@@ -2011,7 +1972,7 @@
     {
       "name": "@simplewebauthn/server",
       "versions": [
-        "13.3.2"
+        "13.3.3"
       ],
       "license": "MIT",
       "author": "Matthew Miller",
@@ -2038,7 +1999,7 @@
     {
       "name": "@smithy/config-resolver",
       "versions": [
-        "4.6.16"
+        "4.7.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2047,7 +2008,7 @@
     {
       "name": "@smithy/core",
       "versions": [
-        "3.31.1"
+        "3.35.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS Smithy Team",
@@ -2056,7 +2017,7 @@
     {
       "name": "@smithy/credential-provider-imds",
       "versions": [
-        "4.4.16"
+        "4.5.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2065,7 +2026,7 @@
     {
       "name": "@smithy/eventstream-serde-browser",
       "versions": [
-        "4.4.16"
+        "4.5.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2074,7 +2035,7 @@
     {
       "name": "@smithy/eventstream-serde-config-resolver",
       "versions": [
-        "4.5.16"
+        "4.6.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2083,7 +2044,7 @@
     {
       "name": "@smithy/eventstream-serde-node",
       "versions": [
-        "4.4.16"
+        "4.5.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2092,7 +2053,7 @@
     {
       "name": "@smithy/fetch-http-handler",
       "versions": [
-        "5.6.13"
+        "5.8.0"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2101,7 +2062,7 @@
     {
       "name": "@smithy/hash-blob-browser",
       "versions": [
-        "4.4.16"
+        "4.5.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2110,7 +2071,7 @@
     {
       "name": "@smithy/hash-node",
       "versions": [
-        "4.4.16"
+        "4.5.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2119,7 +2080,7 @@
     {
       "name": "@smithy/hash-stream-node",
       "versions": [
-        "4.4.16"
+        "4.5.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2128,7 +2089,7 @@
     {
       "name": "@smithy/invalid-dependency",
       "versions": [
-        "4.4.16"
+        "4.5.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2146,7 +2107,7 @@
     {
       "name": "@smithy/md5-js",
       "versions": [
-        "4.4.16"
+        "4.5.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2155,7 +2116,7 @@
     {
       "name": "@smithy/middleware-content-length",
       "versions": [
-        "4.4.16"
+        "4.5.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2164,7 +2125,7 @@
     {
       "name": "@smithy/middleware-endpoint",
       "versions": [
-        "4.6.16"
+        "4.7.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2173,7 +2134,7 @@
     {
       "name": "@smithy/middleware-retry",
       "versions": [
-        "4.7.16"
+        "4.8.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2182,7 +2143,7 @@
     {
       "name": "@smithy/middleware-serde",
       "versions": [
-        "4.4.16"
+        "4.5.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2191,7 +2152,7 @@
     {
       "name": "@smithy/middleware-stack",
       "versions": [
-        "4.4.16"
+        "4.5.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2200,7 +2161,7 @@
     {
       "name": "@smithy/node-config-provider",
       "versions": [
-        "4.5.16"
+        "4.6.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2209,7 +2170,7 @@
     {
       "name": "@smithy/node-http-handler",
       "versions": [
-        "4.9.13"
+        "4.12.1"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2218,7 +2179,7 @@
     {
       "name": "@smithy/protocol-http",
       "versions": [
-        "5.5.16"
+        "5.6.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS Smithy Team",
@@ -2227,7 +2188,7 @@
     {
       "name": "@smithy/signature-v4",
       "versions": [
-        "5.6.12"
+        "5.7.4"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2236,7 +2197,7 @@
     {
       "name": "@smithy/smithy-client",
       "versions": [
-        "4.14.16"
+        "4.15.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2245,7 +2206,7 @@
     {
       "name": "@smithy/types",
       "versions": [
-        "4.16.1"
+        "4.19.0"
       ],
       "license": "Apache-2.0",
       "author": "AWS Smithy Team",
@@ -2254,7 +2215,7 @@
     {
       "name": "@smithy/url-parser",
       "versions": [
-        "4.4.16"
+        "4.5.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2263,7 +2224,7 @@
     {
       "name": "@smithy/util-base64",
       "versions": [
-        "4.5.16"
+        "4.6.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2272,7 +2233,7 @@
     {
       "name": "@smithy/util-body-length-browser",
       "versions": [
-        "4.4.16"
+        "4.5.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2281,7 +2242,7 @@
     {
       "name": "@smithy/util-body-length-node",
       "versions": [
-        "4.4.16"
+        "4.5.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2299,7 +2260,7 @@
     {
       "name": "@smithy/util-defaults-mode-browser",
       "versions": [
-        "4.5.16"
+        "4.6.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2308,7 +2269,7 @@
     {
       "name": "@smithy/util-defaults-mode-node",
       "versions": [
-        "4.4.16"
+        "4.5.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2317,7 +2278,7 @@
     {
       "name": "@smithy/util-endpoints",
       "versions": [
-        "3.6.16"
+        "3.7.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2326,7 +2287,7 @@
     {
       "name": "@smithy/util-middleware",
       "versions": [
-        "4.4.16"
+        "4.5.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2335,7 +2296,7 @@
     {
       "name": "@smithy/util-retry",
       "versions": [
-        "4.5.16"
+        "4.6.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2344,7 +2305,7 @@
     {
       "name": "@smithy/util-stream",
       "versions": [
-        "4.7.16"
+        "4.8.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2354,7 +2315,7 @@
       "name": "@smithy/util-utf8",
       "versions": [
         "2.3.0",
-        "4.4.16"
+        "4.5.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2363,7 +2324,7 @@
     {
       "name": "@smithy/util-waiter",
       "versions": [
-        "4.5.16"
+        "4.6.2"
       ],
       "license": "Apache-2.0",
       "author": "AWS SDK for JavaScript Team",
@@ -2372,7 +2333,7 @@
     {
       "name": "@speed-highlight/core",
       "versions": [
-        "1.2.23"
+        "1.2.24"
       ],
       "license": "CC0-1.0",
       "author": "matubu",
@@ -2431,7 +2392,7 @@
     {
       "name": "@tiptap/core",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2439,7 +2400,7 @@
     {
       "name": "@tiptap/extension-blockquote",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2447,7 +2408,7 @@
     {
       "name": "@tiptap/extension-bold",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2455,7 +2416,7 @@
     {
       "name": "@tiptap/extension-bubble-menu",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2463,7 +2424,7 @@
     {
       "name": "@tiptap/extension-bullet-list",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2471,7 +2432,7 @@
     {
       "name": "@tiptap/extension-code",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2479,7 +2440,7 @@
     {
       "name": "@tiptap/extension-code-block",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2487,7 +2448,7 @@
     {
       "name": "@tiptap/extension-document",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2495,7 +2456,7 @@
     {
       "name": "@tiptap/extension-dropcursor",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2503,7 +2464,7 @@
     {
       "name": "@tiptap/extension-floating-menu",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2511,7 +2472,7 @@
     {
       "name": "@tiptap/extension-gapcursor",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2519,7 +2480,7 @@
     {
       "name": "@tiptap/extension-hard-break",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2527,7 +2488,7 @@
     {
       "name": "@tiptap/extension-heading",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2535,7 +2496,7 @@
     {
       "name": "@tiptap/extension-horizontal-rule",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2543,7 +2504,7 @@
     {
       "name": "@tiptap/extension-image",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2551,7 +2512,7 @@
     {
       "name": "@tiptap/extension-italic",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2559,7 +2520,7 @@
     {
       "name": "@tiptap/extension-link",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2567,7 +2528,7 @@
     {
       "name": "@tiptap/extension-list",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2575,7 +2536,7 @@
     {
       "name": "@tiptap/extension-list-item",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2583,7 +2544,7 @@
     {
       "name": "@tiptap/extension-list-keymap",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2591,7 +2552,7 @@
     {
       "name": "@tiptap/extension-ordered-list",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2599,7 +2560,7 @@
     {
       "name": "@tiptap/extension-paragraph",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2607,7 +2568,7 @@
     {
       "name": "@tiptap/extension-strike",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2615,7 +2576,7 @@
     {
       "name": "@tiptap/extension-text",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2623,7 +2584,7 @@
     {
       "name": "@tiptap/extension-underline",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2631,7 +2592,7 @@
     {
       "name": "@tiptap/extensions",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2639,7 +2600,7 @@
     {
       "name": "@tiptap/pm",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2647,7 +2608,7 @@
     {
       "name": "@tiptap/react",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2655,7 +2616,7 @@
     {
       "name": "@tiptap/starter-kit",
       "versions": [
-        "3.30.5"
+        "3.31.4"
       ],
       "license": "MIT",
       "homepage": "https://tiptap.dev"
@@ -2672,19 +2633,10 @@
     {
       "name": "@tsconfig/node18",
       "versions": [
-        "1.0.3"
+        "18.2.7"
       ],
       "license": "MIT",
       "homepage": "https://github.com/tsconfig/bases#readme"
-    },
-    {
-      "name": "@tybys/wasm-util",
-      "versions": [
-        "0.10.3"
-      ],
-      "license": "MIT",
-      "author": "toyobayashi",
-      "homepage": "https://github.com/toyobayashi/wasm-util#readme"
     },
     {
       "name": "@types/chai",
@@ -2735,6 +2687,14 @@
       "homepage": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/hast"
     },
     {
+      "name": "@types/json-schema",
+      "versions": [
+        "7.0.15"
+      ],
+      "license": "MIT",
+      "homepage": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/json-schema"
+    },
+    {
       "name": "@types/mdast",
       "versions": [
         "4.0.4"
@@ -2754,7 +2714,7 @@
       "name": "@types/node",
       "versions": [
         "18.19.130",
-        "26.1.2"
+        "26.6.5"
       ],
       "license": "MIT",
       "homepage": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node"
@@ -2778,7 +2738,7 @@
     {
       "name": "@types/react",
       "versions": [
-        "19.2.18"
+        "19.3.0"
       ],
       "license": "MIT",
       "homepage": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/react"
@@ -2786,7 +2746,7 @@
     {
       "name": "@types/react-dom",
       "versions": [
-        "19.2.4"
+        "19.3.0"
       ],
       "license": "MIT",
       "homepage": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/react-dom"
@@ -2827,7 +2787,7 @@
     {
       "name": "@types/ws",
       "versions": [
-        "8.18.1"
+        "8.18.2"
       ],
       "license": "MIT",
       "homepage": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/ws"
@@ -2835,67 +2795,27 @@
     {
       "name": "@ungap/structured-clone",
       "versions": [
-        "1.3.3"
+        "1.4.0"
       ],
       "license": "ISC",
       "author": "Andrea Giammarchi",
       "homepage": "https://github.com/ungap/structured-clone#readme"
     },
     {
-      "name": "@vitest/expect",
-      "versions": [
-        "4.1.11"
-      ],
-      "license": "MIT",
-      "homepage": "https://vitest.dev/api/expect"
-    },
-    {
       "name": "@vitest/mocker",
       "versions": [
-        "4.1.11"
+        "5.0.3"
       ],
       "license": "MIT",
       "homepage": "https://github.com/vitest-dev/vitest/tree/main/packages/mocker"
     },
     {
-      "name": "@vitest/pretty-format",
-      "versions": [
-        "4.1.11"
-      ],
-      "license": "MIT",
-      "homepage": "https://github.com/vitest-dev/vitest/tree/main/packages/pretty-format"
-    },
-    {
-      "name": "@vitest/runner",
-      "versions": [
-        "4.1.11"
-      ],
-      "license": "MIT",
-      "homepage": "https://vitest.dev/api/advanced/runner"
-    },
-    {
-      "name": "@vitest/snapshot",
-      "versions": [
-        "4.1.11"
-      ],
-      "license": "MIT",
-      "homepage": "https://vitest.dev/guide/snapshot"
-    },
-    {
       "name": "@vitest/spy",
       "versions": [
-        "4.1.11"
+        "5.0.3"
       ],
       "license": "MIT",
       "homepage": "https://vitest.dev/api/mock"
-    },
-    {
-      "name": "@vitest/utils",
-      "versions": [
-        "4.1.11"
-      ],
-      "license": "MIT",
-      "homepage": "https://github.com/vitest-dev/vitest/tree/main/packages/utils"
     },
     {
       "name": "abort-controller",
@@ -2917,7 +2837,7 @@
     {
       "name": "acorn",
       "versions": [
-        "8.17.0"
+        "8.19.0"
       ],
       "license": "MIT",
       "homepage": "https://github.com/acornjs/acorn"
@@ -2963,7 +2883,7 @@
       "name": "ansi-regex",
       "versions": [
         "5.0.1",
-        "6.2.2"
+        "6.4.0"
       ],
       "license": "MIT",
       "author": "Sindre Sorhus",
@@ -2978,14 +2898,6 @@
       "license": "MIT",
       "author": "Sindre Sorhus",
       "homepage": "https://github.com/chalk/ansi-styles#readme"
-    },
-    {
-      "name": "argparse",
-      "versions": [
-        "2.0.1"
-      ],
-      "license": "Python-2.0",
-      "homepage": "https://github.com/nodeca/argparse#readme"
     },
     {
       "name": "aria-hidden",
@@ -3025,7 +2937,7 @@
     {
       "name": "assistant-cloud",
       "versions": [
-        "0.1.41"
+        "0.2.6"
       ],
       "license": "MIT",
       "author": "AgentbaseAI Inc.",
@@ -3034,7 +2946,7 @@
     {
       "name": "assistant-stream",
       "versions": [
-        "0.3.39"
+        "0.3.49"
       ],
       "license": "MIT",
       "author": "AgentbaseAI Inc.",
@@ -3043,11 +2955,11 @@
     {
       "name": "ast-types",
       "versions": [
-        "0.16.1"
+        "0.16.3"
       ],
       "license": "MIT",
       "author": "Ben Newman",
-      "homepage": "http://github.com/benjamn/ast-types"
+      "homepage": "https://github.com/benjamn/ast-types"
     },
     {
       "name": "asynckit",
@@ -3097,7 +3009,7 @@
     {
       "name": "baseline-browser-mapping",
       "versions": [
-        "2.11.10"
+        "2.11.28"
       ],
       "license": "Apache-2.0",
       "homepage": "https://github.com/web-platform-dx/baseline-browser-mapping#readme"
@@ -3105,7 +3017,7 @@
     {
       "name": "better-auth",
       "versions": [
-        "1.7.0-rc.5"
+        "1.7.7"
       ],
       "license": "MIT",
       "homepage": "https://better-auth.com"
@@ -3147,8 +3059,8 @@
     {
       "name": "brace-expansion",
       "versions": [
-        "2.1.4",
-        "5.0.9"
+        "2.1.7",
+        "5.0.12"
       ],
       "license": "MIT",
       "homepage": "https://github.com/juliangruber/brace-expansion#readme"
@@ -3165,7 +3077,7 @@
     {
       "name": "browserslist",
       "versions": [
-        "4.28.7"
+        "4.29.3"
       ],
       "license": "MIT",
       "author": "Andrey Sitnik",
@@ -3182,7 +3094,7 @@
     {
       "name": "bundle-name",
       "versions": [
-        "4.1.0"
+        "4.1.1"
       ],
       "license": "MIT",
       "author": "Sindre Sorhus",
@@ -3216,15 +3128,6 @@
       "homepage": "https://github.com/ljharb/call-bound#readme"
     },
     {
-      "name": "callsites",
-      "versions": [
-        "3.1.0"
-      ],
-      "license": "MIT",
-      "author": "Sindre Sorhus",
-      "homepage": "https://github.com/sindresorhus/callsites#readme"
-    },
-    {
       "name": "camelcase",
       "versions": [
         "5.3.1"
@@ -3236,7 +3139,7 @@
     {
       "name": "caniuse-lite",
       "versions": [
-        "1.0.30001806"
+        "1.0.30001815"
       ],
       "license": "CC-BY-4.0",
       "author": "Ben Briggs",
@@ -3254,7 +3157,7 @@
     {
       "name": "chai",
       "versions": [
-        "6.2.2"
+        "6.3.0"
       ],
       "license": "MIT",
       "author": "Jake Luer",
@@ -3386,6 +3289,14 @@
       "homepage": "https://github.com/lukeed/clsx#readme"
     },
     {
+      "name": "cn",
+      "versions": [
+        "0.2.6"
+      ],
+      "license": "MIT",
+      "homepage": "https://github.com/shadcn-ui/cn#readme"
+    },
+    {
       "name": "code-block-writer",
       "versions": [
         "13.0.3"
@@ -3453,7 +3364,7 @@
     {
       "name": "concurrently",
       "versions": [
-        "10.0.4"
+        "10.0.6"
       ],
       "license": "MIT",
       "author": "Kimmo Brunfeldt",
@@ -3471,7 +3382,7 @@
     {
       "name": "content-disposition",
       "versions": [
-        "1.1.0"
+        "2.0.1"
       ],
       "license": "MIT",
       "author": "Douglas Christopher Wilson",
@@ -3481,7 +3392,7 @@
       "name": "content-type",
       "versions": [
         "1.0.5",
-        "2.0.0"
+        "2.1.0"
       ],
       "license": "MIT",
       "author": "Douglas Christopher Wilson",
@@ -3523,15 +3434,6 @@
       "license": "MIT",
       "author": "Troy Goode",
       "homepage": "https://github.com/expressjs/cors#readme"
-    },
-    {
-      "name": "cosmiconfig",
-      "versions": [
-        "9.0.2"
-      ],
-      "license": "MIT",
-      "author": "Daniel Fischer",
-      "homepage": "https://github.com/cosmiconfig/cosmiconfig#readme"
     },
     {
       "name": "cross-spawn",
@@ -3616,7 +3518,7 @@
     {
       "name": "default-browser",
       "versions": [
-        "5.5.0"
+        "5.5.1"
       ],
       "license": "MIT",
       "author": "Sindre Sorhus",
@@ -3723,7 +3625,7 @@
     {
       "name": "dompurify",
       "versions": [
-        "3.4.13"
+        "3.4.16"
       ],
       "license": "(MPL-2.0 OR Apache-2.0)",
       "author": "Dr.-Ing. Mario Heiderich, Cure53",
@@ -3741,7 +3643,6 @@
     {
       "name": "dotenv",
       "versions": [
-        "16.6.1",
         "17.4.2"
       ],
       "license": "BSD-2-Clause",
@@ -3750,7 +3651,7 @@
     {
       "name": "drizzle-kit",
       "versions": [
-        "0.31.10"
+        "0.31.11"
       ],
       "license": "MIT",
       "author": "Drizzle Team",
@@ -3759,7 +3660,7 @@
     {
       "name": "drizzle-orm",
       "versions": [
-        "0.45.2"
+        "0.45.4"
       ],
       "license": "Apache-2.0",
       "author": "Drizzle Team",
@@ -3784,13 +3685,13 @@
       "homepage": "https://github.com/Raynos/duplexer"
     },
     {
-      "name": "eciesjs",
+      "name": "eastasianwidth",
       "versions": [
-        "0.4.18"
+        "0.2.0"
       ],
       "license": "MIT",
-      "author": "Weiliang Li",
-      "homepage": "https://github.com/ecies/js#readme"
+      "author": "Masaki Komagata",
+      "homepage": "https://github.com/komagata/eastasianwidth#readme"
     },
     {
       "name": "ee-first",
@@ -3804,7 +3705,7 @@
     {
       "name": "electron-to-chromium",
       "versions": [
-        "1.5.399"
+        "1.5.452"
       ],
       "license": "ISC",
       "author": "Kilian Valkhof",
@@ -3814,7 +3715,8 @@
       "name": "emoji-regex",
       "versions": [
         "10.6.0",
-        "8.0.0"
+        "8.0.0",
+        "9.2.2"
       ],
       "license": "MIT",
       "author": "Mathias Bynens",
@@ -3831,7 +3733,7 @@
     {
       "name": "enhanced-resolve",
       "versions": [
-        "5.24.5"
+        "5.26.0"
       ],
       "license": "MIT",
       "author": "Tobias Koppers @sokra",
@@ -3854,14 +3756,6 @@
       "license": "MIT",
       "author": "Sindre Sorhus",
       "homepage": "https://github.com/sindresorhus/env-paths#readme"
-    },
-    {
-      "name": "error-ex",
-      "versions": [
-        "1.3.4"
-      ],
-      "license": "MIT",
-      "homepage": "https://github.com/qix-/node-error-ex#readme"
     },
     {
       "name": "error-stack-parser-es",
@@ -3892,7 +3786,7 @@
     {
       "name": "es-module-lexer",
       "versions": [
-        "2.3.1"
+        "2.3.2"
       ],
       "license": "MIT",
       "author": "Guy Bedford",
@@ -3920,8 +3814,7 @@
       "name": "esbuild",
       "versions": [
         "0.25.12",
-        "0.25.4",
-        "0.28.1"
+        "0.28.2"
       ],
       "license": "MIT",
       "homepage": "https://github.com/evanw/esbuild#readme"
@@ -3999,7 +3892,7 @@
     {
       "name": "eventsource-parser",
       "versions": [
-        "3.1.0"
+        "3.1.1"
       ],
       "license": "MIT",
       "author": "Espen Hovlandsdal",
@@ -4026,7 +3919,7 @@
     {
       "name": "express",
       "versions": [
-        "5.2.1"
+        "5.3.0"
       ],
       "license": "MIT",
       "author": "TJ Holowaychuk",
@@ -4035,7 +3928,7 @@
     {
       "name": "express-rate-limit",
       "versions": [
-        "8.6.1"
+        "8.7.1"
       ],
       "license": "MIT",
       "author": "Nathan Friedly",
@@ -4062,7 +3955,7 @@
     {
       "name": "fast-equals",
       "versions": [
-        "5.4.1"
+        "5.4.4"
       ],
       "license": "MIT",
       "author": "Tony Quetano",
@@ -4080,7 +3973,7 @@
     {
       "name": "fast-uri",
       "versions": [
-        "3.1.6"
+        "3.1.8"
       ],
       "license": "BSD-3-Clause",
       "author": "Vincent Le Goff",
@@ -4089,7 +3982,7 @@
     {
       "name": "fastq",
       "versions": [
-        "1.20.1"
+        "1.20.3"
       ],
       "license": "ISC",
       "author": "Matteo Collina",
@@ -4197,20 +4090,11 @@
     {
       "name": "fs-extra",
       "versions": [
-        "11.4.0"
+        "11.4.1"
       ],
       "license": "MIT",
       "author": "JP Richardson",
       "homepage": "https://github.com/jprichardson/node-fs-extra"
-    },
-    {
-      "name": "fs.realpath",
-      "versions": [
-        "1.0.0"
-      ],
-      "license": "ISC",
-      "author": "Isaac Z. Schlueter",
-      "homepage": "https://github.com/isaacs/fs.realpath#readme"
     },
     {
       "name": "fsevents",
@@ -4259,7 +4143,7 @@
     {
       "name": "get-east-asian-width",
       "versions": [
-        "1.6.0"
+        "1.7.0"
       ],
       "license": "MIT",
       "author": "Sindre Sorhus",
@@ -4314,7 +4198,7 @@
     {
       "name": "get-tsconfig",
       "versions": [
-        "4.14.1"
+        "4.14.3"
       ],
       "license": "MIT",
       "author": "Hiroki Osame",
@@ -4323,18 +4207,18 @@
     {
       "name": "glob",
       "versions": [
-        "12.0.0"
+        "10.5.0"
       ],
-      "license": "BlueOak-1.0.0",
+      "license": "ISC",
       "author": "Isaac Z. Schlueter",
       "homepage": "https://github.com/isaacs/node-glob#readme"
     },
     {
       "name": "glob",
       "versions": [
-        "9.3.5"
+        "13.0.6"
       ],
-      "license": "ISC",
+      "license": "BlueOak-1.0.0",
       "author": "Isaac Z. Schlueter",
       "homepage": "https://github.com/isaacs/node-glob#readme"
     },
@@ -4421,7 +4305,7 @@
     {
       "name": "hono",
       "versions": [
-        "4.13.7"
+        "4.13.13"
       ],
       "license": "MIT",
       "author": "Yusuke Wada",
@@ -4483,13 +4367,13 @@
       "homepage": "https://github.com/kaelzhang/node-ignore#readme"
     },
     {
-      "name": "import-fresh",
+      "name": "imurmurhash",
       "versions": [
-        "3.3.1"
+        "0.1.4"
       ],
       "license": "MIT",
-      "author": "Sindre Sorhus",
-      "homepage": "https://github.com/sindresorhus/import-fresh#readme"
+      "author": "Jens Taylor",
+      "homepage": "https://github.com/jensyt/imurmurhash-js"
     },
     {
       "name": "inherits",
@@ -4510,7 +4394,7 @@
     {
       "name": "ip-address",
       "versions": [
-        "10.4.0"
+        "10.7.3"
       ],
       "license": "MIT",
       "author": "Beau Gunderson",
@@ -4542,15 +4426,6 @@
       "license": "MIT",
       "author": "Titus Wormer",
       "homepage": "https://github.com/wooorm/is-alphanumerical#readme"
-    },
-    {
-      "name": "is-arrayish",
-      "versions": [
-        "0.2.1"
-      ],
-      "license": "MIT",
-      "author": "Qix",
-      "homepage": "https://github.com/qix-/node-is-arrayish#readme"
     },
     {
       "name": "is-decimal",
@@ -4713,15 +4588,6 @@
     {
       "name": "isexe",
       "versions": [
-        "3.1.5"
-      ],
-      "license": "BlueOak-1.0.0",
-      "author": "Isaac Z. Schlueter",
-      "homepage": "https://github.com/isaacs/isexe#readme"
-    },
-    {
-      "name": "isexe",
-      "versions": [
         "2.0.0"
       ],
       "license": "ISC",
@@ -4729,9 +4595,18 @@
       "homepage": "https://github.com/isaacs/isexe#readme"
     },
     {
+      "name": "isexe",
+      "versions": [
+        "3.1.5"
+      ],
+      "license": "BlueOak-1.0.0",
+      "author": "Isaac Z. Schlueter",
+      "homepage": "https://github.com/isaacs/isexe#readme"
+    },
+    {
       "name": "jackspeak",
       "versions": [
-        "4.2.3"
+        "3.4.3"
       ],
       "license": "BlueOak-1.0.0",
       "author": "Isaac Z. Schlueter",
@@ -4748,7 +4623,7 @@
     {
       "name": "jose",
       "versions": [
-        "6.2.7"
+        "6.2.12"
       ],
       "license": "MIT",
       "author": "Filip Skokan",
@@ -4757,7 +4632,7 @@
     {
       "name": "js-base64",
       "versions": [
-        "3.9.2"
+        "3.9.4"
       ],
       "license": "BSD-3-Clause",
       "author": "Dan Kogai",
@@ -4773,15 +4648,6 @@
       "homepage": "https://github.com/lydell/js-tokens#readme"
     },
     {
-      "name": "js-yaml",
-      "versions": [
-        "4.3.2"
-      ],
-      "license": "MIT",
-      "author": "Vladimir Zapparov",
-      "homepage": "https://github.com/nodeca/js-yaml#readme"
-    },
-    {
       "name": "jsesc",
       "versions": [
         "3.1.0"
@@ -4789,15 +4655,6 @@
       "license": "MIT",
       "author": "Mathias Bynens",
       "homepage": "https://mths.be/jsesc"
-    },
-    {
-      "name": "json-parse-even-better-errors",
-      "versions": [
-        "2.3.1"
-      ],
-      "license": "MIT",
-      "author": "Kat Marchán",
-      "homepage": "https://github.com/npm/json-parse-even-better-errors#readme"
     },
     {
       "name": "json-schema-traverse",
@@ -4849,7 +4706,7 @@
     {
       "name": "kysely",
       "versions": [
-        "0.29.4"
+        "0.29.6"
       ],
       "license": "MIT",
       "author": "Sami Koskimäki",
@@ -4881,15 +4738,6 @@
       ],
       "license": "MPL-2.0",
       "homepage": "https://github.com/parcel-bundler/lightningcss#readme"
-    },
-    {
-      "name": "lines-and-columns",
-      "versions": [
-        "1.2.4"
-      ],
-      "license": "MIT",
-      "author": "Brian Donovan",
-      "homepage": "https://github.com/eventualbuddha/lines-and-columns#readme"
     },
     {
       "name": "linkifyjs",
@@ -4931,15 +4779,6 @@
     {
       "name": "lru-cache",
       "versions": [
-        "11.5.2"
-      ],
-      "license": "BlueOak-1.0.0",
-      "author": "Isaac Z. Schlueter",
-      "homepage": "https://github.com/isaacs/node-lru-cache#readme"
-    },
-    {
-      "name": "lru-cache",
-      "versions": [
         "10.4.3",
         "5.1.1"
       ],
@@ -4948,9 +4787,18 @@
       "homepage": "https://github.com/isaacs/node-lru-cache#readme"
     },
     {
+      "name": "lru-cache",
+      "versions": [
+        "11.5.3"
+      ],
+      "license": "BlueOak-1.0.0",
+      "author": "Isaac Z. Schlueter",
+      "homepage": "https://github.com/isaacs/node-lru-cache#readme"
+    },
+    {
       "name": "lucide-react",
       "versions": [
-        "1.28.0"
+        "1.55.0"
       ],
       "license": "ISC",
       "author": "Eric Fennis",
@@ -4959,7 +4807,8 @@
     {
       "name": "magic-string",
       "versions": [
-        "0.30.21"
+        "0.30.21",
+        "1.4.3"
       ],
       "license": "MIT",
       "author": "Rich Harris",
@@ -4986,7 +4835,7 @@
     {
       "name": "mdast-util-from-markdown",
       "versions": [
-        "2.0.3"
+        "2.1.0"
       ],
       "license": "MIT",
       "author": "Titus Wormer",
@@ -5040,7 +4889,7 @@
     {
       "name": "mdast-util-to-markdown",
       "versions": [
-        "2.1.2"
+        "2.2.0"
       ],
       "license": "MIT",
       "author": "Titus Wormer",
@@ -5092,7 +4941,7 @@
     {
       "name": "micromark",
       "versions": [
-        "4.0.2"
+        "4.0.3"
       ],
       "license": "MIT",
       "author": "Titus Wormer",
@@ -5101,7 +4950,7 @@
     {
       "name": "micromark-core-commonmark",
       "versions": [
-        "2.0.3"
+        "2.0.4"
       ],
       "license": "MIT",
       "author": "Titus Wormer",
@@ -5128,7 +4977,7 @@
     {
       "name": "micromark-factory-space",
       "versions": [
-        "2.0.1"
+        "2.1.0"
       ],
       "license": "MIT",
       "author": "Titus Wormer",
@@ -5207,6 +5056,15 @@
       "homepage": "https://github.com/micromark/micromark/tree/main#readme"
     },
     {
+      "name": "micromark-util-edit-map",
+      "versions": [
+        "1.0.0"
+      ],
+      "license": "MIT",
+      "author": "Titus Wormer",
+      "homepage": "https://github.com/micromark/micromark/tree/main#readme"
+    },
+    {
       "name": "micromark-util-encode",
       "versions": [
         "2.0.1"
@@ -5272,7 +5130,7 @@
     {
       "name": "micromark-util-types",
       "versions": [
-        "2.0.2"
+        "2.0.3"
       ],
       "license": "MIT",
       "author": "Titus Wormer",
@@ -5327,7 +5185,7 @@
     {
       "name": "miniflare",
       "versions": [
-        "5.20260820.0-alpha"
+        "5.20261006.1-alpha"
       ],
       "license": "MIT",
       "author": "MrBBot",
@@ -5336,18 +5194,18 @@
     {
       "name": "minimatch",
       "versions": [
-        "10.2.6"
+        "9.0.9"
       ],
-      "license": "BlueOak-1.0.0",
+      "license": "ISC",
       "author": "Isaac Z. Schlueter",
       "homepage": "https://github.com/isaacs/minimatch#readme"
     },
     {
       "name": "minimatch",
       "versions": [
-        "8.0.7"
+        "10.2.6"
       ],
-      "license": "ISC",
+      "license": "BlueOak-1.0.0",
       "author": "Isaac Z. Schlueter",
       "homepage": "https://github.com/isaacs/minimatch#readme"
     },
@@ -5370,18 +5228,9 @@
       "homepage": "https://github.com/isaacs/minipass#readme"
     },
     {
-      "name": "minipass",
-      "versions": [
-        "4.2.8"
-      ],
-      "license": "ISC",
-      "author": "Isaac Z. Schlueter",
-      "homepage": "https://github.com/isaacs/minipass#readme"
-    },
-    {
       "name": "mkdirp",
       "versions": [
-        "1.0.4"
+        "3.0.1"
       ],
       "license": "MIT",
       "homepage": "https://github.com/isaacs/node-mkdirp#readme"
@@ -5398,7 +5247,7 @@
     {
       "name": "monaco-editor",
       "versions": [
-        "0.56.0"
+        "0.57.0"
       ],
       "license": "MIT",
       "author": "Microsoft Corporation",
@@ -5415,7 +5264,8 @@
     {
       "name": "nanoid",
       "versions": [
-        "3.3.18"
+        "3.3.20",
+        "6.0.2"
       ],
       "license": "MIT",
       "author": "Andrey Sitnik",
@@ -5424,7 +5274,7 @@
     {
       "name": "nanostores",
       "versions": [
-        "1.4.2"
+        "1.5.5"
       ],
       "license": "MIT",
       "author": "Andrey Sitnik",
@@ -5433,7 +5283,7 @@
     {
       "name": "negotiator",
       "versions": [
-        "1.0.0"
+        "1.1.0"
       ],
       "license": "MIT",
       "homepage": "https://github.com/jshttp/negotiator#readme"
@@ -5441,7 +5291,7 @@
     {
       "name": "next",
       "versions": [
-        "16.3.4"
+        "16.4.0"
       ],
       "license": "MIT",
       "homepage": "https://nextjs.org"
@@ -5467,7 +5317,7 @@
     {
       "name": "node-releases",
       "versions": [
-        "2.0.51"
+        "2.0.58"
       ],
       "license": "MIT",
       "author": "Sergey Rubanov",
@@ -5522,7 +5372,7 @@
     {
       "name": "obug",
       "versions": [
-        "2.1.4"
+        "2.2.1"
       ],
       "license": "MIT",
       "author": "Kevin Deng",
@@ -5558,7 +5408,7 @@
     {
       "name": "open",
       "versions": [
-        "11.0.0",
+        "11.0.4",
         "8.4.2"
       ],
       "license": "MIT",
@@ -5621,15 +5471,6 @@
       "homepage": "https://github.com/isaacs/package-json-from-dist#readme"
     },
     {
-      "name": "parent-module",
-      "versions": [
-        "1.0.1"
-      ],
-      "license": "MIT",
-      "author": "Sindre Sorhus",
-      "homepage": "https://github.com/sindresorhus/parent-module#readme"
-    },
-    {
       "name": "parse-entities",
       "versions": [
         "4.0.2"
@@ -5637,15 +5478,6 @@
       "license": "MIT",
       "author": "Titus Wormer",
       "homepage": "https://github.com/wooorm/parse-entities#readme"
-    },
-    {
-      "name": "parse-json",
-      "versions": [
-        "5.2.0"
-      ],
-      "license": "MIT",
-      "author": "Sindre Sorhus",
-      "homepage": "https://github.com/sindresorhus/parse-json#readme"
     },
     {
       "name": "parse-ms",
@@ -5733,7 +5565,7 @@
       "name": "picomatch",
       "versions": [
         "2.3.2",
-        "4.0.5"
+        "4.0.7"
       ],
       "license": "MIT",
       "author": "Jon Schlinkert",
@@ -5768,7 +5600,7 @@
     {
       "name": "postal-mime",
       "versions": [
-        "2.7.5"
+        "4.0.5"
       ],
       "license": "MIT-0",
       "author": "Andris Reinman",
@@ -5777,8 +5609,7 @@
     {
       "name": "postcss",
       "versions": [
-        "8.5.23",
-        "8.5.25"
+        "8.5.29"
       ],
       "license": "MIT",
       "author": "Andrey Sitnik",
@@ -5787,7 +5618,7 @@
     {
       "name": "postcss-selector-parser",
       "versions": [
-        "7.1.4"
+        "7.1.6"
       ],
       "license": "MIT",
       "homepage": "https://github.com/postcss/postcss-selector-parser"
@@ -5795,7 +5626,7 @@
     {
       "name": "powershell-utils",
       "versions": [
-        "0.1.0"
+        "0.2.1"
       ],
       "license": "MIT",
       "author": "Sindre Sorhus",
@@ -5804,7 +5635,7 @@
     {
       "name": "pretty-ms",
       "versions": [
-        "9.3.0"
+        "9.3.1"
       ],
       "license": "MIT",
       "author": "Sindre Sorhus",
@@ -5840,7 +5671,7 @@
     {
       "name": "prosemirror-changeset",
       "versions": [
-        "2.4.1"
+        "2.4.4"
       ],
       "license": "MIT"
     },
@@ -5854,7 +5685,7 @@
     {
       "name": "prosemirror-dropcursor",
       "versions": [
-        "1.8.3"
+        "1.8.4"
       ],
       "license": "MIT"
     },
@@ -5869,10 +5700,9 @@
     {
       "name": "prosemirror-history",
       "versions": [
-        "1.5.0"
+        "1.5.1"
       ],
-      "license": "MIT",
-      "homepage": "https://github.com/prosemirror/prosemirror-history#readme"
+      "license": "MIT"
     },
     {
       "name": "prosemirror-inputrules",
@@ -5893,7 +5723,7 @@
     {
       "name": "prosemirror-model",
       "versions": [
-        "1.25.11"
+        "1.25.12"
       ],
       "license": "MIT"
     },
@@ -5924,22 +5754,21 @@
     {
       "name": "prosemirror-transform",
       "versions": [
-        "1.12.0"
+        "1.12.2"
       ],
-      "license": "MIT",
-      "homepage": "https://github.com/prosemirror/prosemirror-transform#readme"
+      "license": "MIT"
     },
     {
       "name": "prosemirror-view",
       "versions": [
-        "1.42.2"
+        "1.42.6"
       ],
       "license": "MIT"
     },
     {
       "name": "proxy-addr",
       "versions": [
-        "2.0.7"
+        "2.0.8"
       ],
       "license": "MIT",
       "author": "Douglas Christopher Wilson",
@@ -5992,7 +5821,7 @@
     {
       "name": "radix-ui",
       "versions": [
-        "1.6.7"
+        "1.7.0"
       ],
       "license": "MIT",
       "homepage": "https://radix-ui.com/primitives"
@@ -6018,7 +5847,7 @@
     {
       "name": "react",
       "versions": [
-        "19.2.8"
+        "19.3.0"
       ],
       "license": "MIT",
       "homepage": "https://react.dev/"
@@ -6026,7 +5855,7 @@
     {
       "name": "react-dom",
       "versions": [
-        "19.2.8"
+        "19.3.0"
       ],
       "license": "MIT",
       "homepage": "https://react.dev/"
@@ -6079,7 +5908,7 @@
     {
       "name": "recast",
       "versions": [
-        "0.23.19"
+        "0.23.21"
       ],
       "license": "MIT",
       "author": "Ben Newman",
@@ -6140,15 +5969,6 @@
       "homepage": "https://github.com/yargs/require-main-filename#readme"
     },
     {
-      "name": "resolve-from",
-      "versions": [
-        "4.0.0"
-      ],
-      "license": "MIT",
-      "author": "Sindre Sorhus",
-      "homepage": "https://github.com/sindresorhus/resolve-from#readme"
-    },
-    {
       "name": "resolve-pkg-maps",
       "versions": [
         "1.0.0"
@@ -6178,7 +5998,7 @@
     {
       "name": "rolldown",
       "versions": [
-        "1.2.1"
+        "1.2.13"
       ],
       "license": "MIT",
       "homepage": "https://rolldown.rs/"
@@ -6239,7 +6059,7 @@
     {
       "name": "safe-content-frame",
       "versions": [
-        "0.0.27"
+        "0.0.33"
       ],
       "license": "MIT",
       "author": "AgentbaseAI Inc.",
@@ -6257,7 +6077,7 @@
     {
       "name": "scheduler",
       "versions": [
-        "0.27.0"
+        "0.28.0"
       ],
       "license": "MIT",
       "homepage": "https://react.dev/"
@@ -6265,7 +6085,7 @@
     {
       "name": "secure-json-parse",
       "versions": [
-        "4.1.0"
+        "4.1.1"
       ],
       "license": "BSD-3-Clause",
       "author": "Eran Hammer",
@@ -6311,7 +6131,7 @@
     {
       "name": "set-cookie-parser",
       "versions": [
-        "3.1.2"
+        "3.1.3"
       ],
       "license": "MIT",
       "author": "Nathan Friedly",
@@ -6329,16 +6149,16 @@
     {
       "name": "shadcn",
       "versions": [
-        "4.16.1"
+        "4.21.4"
       ],
       "license": "MIT",
       "author": "shadcn",
-      "homepage": "https://github.com/shadcn-ui/ui#readme"
+      "homepage": "https://ui.shadcn.com"
     },
     {
       "name": "sharp",
       "versions": [
-        "0.35.4"
+        "0.35.5"
       ],
       "license": "Apache-2.0",
       "author": "Lovell Fuller",
@@ -6365,7 +6185,7 @@
     {
       "name": "shell-quote",
       "versions": [
-        "1.9.0"
+        "1.12.0"
       ],
       "license": "MIT",
       "author": "James Halliday",
@@ -6408,15 +6228,6 @@
       "homepage": "https://github.com/ljharb/side-channel-weakmap#readme"
     },
     {
-      "name": "siginfo",
-      "versions": [
-        "2.0.0"
-      ],
-      "license": "ISC",
-      "author": "Emil Bay",
-      "homepage": "https://github.com/emilbayes/siginfo#readme"
-    },
-    {
       "name": "signal-exit",
       "versions": [
         "3.0.7",
@@ -6436,9 +6247,27 @@
       "homepage": "https://github.com/terkelg/sisteransi#readme"
     },
     {
+      "name": "smart-buffer",
+      "versions": [
+        "4.2.0"
+      ],
+      "license": "MIT",
+      "author": "Josh Glazebrook",
+      "homepage": "https://github.com/JoshGlazebrook/smart-buffer/"
+    },
+    {
+      "name": "socks",
+      "versions": [
+        "2.8.10"
+      ],
+      "license": "MIT",
+      "author": "Josh Glazebrook",
+      "homepage": "https://github.com/JoshGlazebrook/socks/"
+    },
+    {
       "name": "sonner",
       "versions": [
-        "2.0.7"
+        "2.0.8"
       ],
       "license": "MIT",
       "author": "Emil Kowalski",
@@ -6456,7 +6285,7 @@
     {
       "name": "source-map-js",
       "versions": [
-        "1.2.1"
+        "1.2.2"
       ],
       "license": "BSD-3-Clause",
       "author": "Valentin 7rulnik Semirulnik",
@@ -6480,15 +6309,6 @@
       "homepage": "https://github.com/wooorm/space-separated-tokens#readme"
     },
     {
-      "name": "stackback",
-      "versions": [
-        "0.0.2"
-      ],
-      "license": "MIT",
-      "author": "Roman Shtylman",
-      "homepage": "https://github.com/shtylman/node-stackback#readme"
-    },
-    {
       "name": "state-local",
       "versions": [
         "1.0.7"
@@ -6508,7 +6328,7 @@
     {
       "name": "std-env",
       "versions": [
-        "4.2.0"
+        "4.3.0"
       ],
       "license": "MIT",
       "homepage": "https://github.com/unjs/std-env#readme"
@@ -6526,8 +6346,9 @@
       "name": "string-width",
       "versions": [
         "4.2.3",
+        "5.1.2",
         "7.2.0",
-        "8.2.2"
+        "8.3.0"
       ],
       "license": "MIT",
       "author": "Sindre Sorhus",
@@ -6618,7 +6439,7 @@
     {
       "name": "swr",
       "versions": [
-        "2.4.2"
+        "2.5.1"
       ],
       "license": "MIT",
       "homepage": "https://swr.vercel.app"
@@ -6626,7 +6447,7 @@
     {
       "name": "systeminformation",
       "versions": [
-        "5.33.1"
+        "5.33.15"
       ],
       "license": "MIT",
       "author": "Sebastian Hildebrandt",
@@ -6635,7 +6456,7 @@
     {
       "name": "tailwind-merge",
       "versions": [
-        "3.6.0"
+        "3.7.0"
       ],
       "license": "MIT",
       "author": "Dany Castillo",
@@ -6661,7 +6482,7 @@
     {
       "name": "terser",
       "versions": [
-        "5.16.9"
+        "5.36.0"
       ],
       "license": "BSD-2-Clause",
       "author": "Mihai Bazon",
@@ -6679,7 +6500,7 @@
     {
       "name": "tinybench",
       "versions": [
-        "2.9.0"
+        "6.2.1"
       ],
       "license": "MIT",
       "homepage": "https://github.com/tinylibs/tinybench#readme"
@@ -6687,7 +6508,7 @@
     {
       "name": "tinyexec",
       "versions": [
-        "1.3.0"
+        "1.3.1"
       ],
       "license": "MIT",
       "author": "James Garbutt",
@@ -6701,14 +6522,6 @@
       "license": "MIT",
       "author": "Superchupu",
       "homepage": "https://superchupu.dev/tinyglobby"
-    },
-    {
-      "name": "tinyrainbow",
-      "versions": [
-        "3.1.1"
-      ],
-      "license": "MIT",
-      "homepage": "https://github.com/tinylibs/tinyrainbow#readme"
     },
     {
       "name": "to-regex-range",
@@ -6804,7 +6617,7 @@
     {
       "name": "tsx",
       "versions": [
-        "4.23.1"
+        "4.23.15"
       ],
       "license": "MIT",
       "author": "Hiroki Osame",
@@ -6829,6 +6642,15 @@
       "homepage": "https://github.com/Wombosvideo/tw-animate-css#readme"
     },
     {
+      "name": "type-fest",
+      "versions": [
+        "4.41.0"
+      ],
+      "license": "(MIT OR CC0-1.0)",
+      "author": "Sindre Sorhus",
+      "homepage": "https://github.com/sindresorhus/type-fest#readme"
+    },
+    {
       "name": "type-is",
       "versions": [
         "2.1.0"
@@ -6848,7 +6670,9 @@
     {
       "name": "undici",
       "versions": [
-        "7.29.0"
+        "6.29.0",
+        "7.29.1",
+        "7.30.0"
       ],
       "license": "MIT",
       "homepage": "https://undici.nodejs.org"
@@ -6857,7 +6681,7 @@
       "name": "undici-types",
       "versions": [
         "5.26.5",
-        "8.3.0"
+        "8.9.0"
       ],
       "license": "MIT",
       "homepage": "https://undici.nodejs.org"
@@ -6954,7 +6778,7 @@
     {
       "name": "update-browserslist-db",
       "versions": [
-        "1.2.3"
+        "1.3.4"
       ],
       "license": "MIT",
       "author": "Andrey Sitnik",
@@ -7012,10 +6836,10 @@
     {
       "name": "use-sync-external-store",
       "versions": [
-        "1.6.0"
+        "1.7.0"
       ],
       "license": "MIT",
-      "homepage": "https://github.com/facebook/react#readme"
+      "homepage": "https://github.com/react/react#readme"
     },
     {
       "name": "util-deprecate",
@@ -7065,7 +6889,7 @@
     {
       "name": "vite",
       "versions": [
-        "8.2.0"
+        "8.3.4"
       ],
       "license": "MIT",
       "author": "Evan You",
@@ -7074,7 +6898,7 @@
     {
       "name": "vitest",
       "versions": [
-        "4.1.11"
+        "5.0.3"
       ],
       "license": "MIT",
       "author": "Anthony Fu",
@@ -7138,7 +6962,7 @@
     {
       "name": "why-is-node-running",
       "versions": [
-        "2.3.0"
+        "3.2.1"
       ],
       "license": "MIT",
       "author": "Mathias Buus",
@@ -7147,7 +6971,7 @@
     {
       "name": "workerd",
       "versions": [
-        "1.20260820.1"
+        "1.20261006.1"
       ],
       "license": "Apache-2.0",
       "homepage": "https://github.com/cloudflare/workerd#readme"
@@ -7155,7 +6979,7 @@
     {
       "name": "wrangler",
       "versions": [
-        "4.125.0"
+        "4.149.0"
       ],
       "license": "MIT OR Apache-2.0",
       "author": "wrangler@cloudflare.com",
@@ -7165,6 +6989,8 @@
       "name": "wrap-ansi",
       "versions": [
         "6.2.0",
+        "7.0.0",
+        "8.1.0",
         "9.0.2"
       ],
       "license": "MIT",
@@ -7181,10 +7007,19 @@
       "homepage": "https://github.com/npm/wrappy"
     },
     {
+      "name": "write-file-atomic",
+      "versions": [
+        "5.0.1"
+      ],
+      "license": "ISC",
+      "author": "GitHub Inc.",
+      "homepage": "https://github.com/npm/write-file-atomic"
+    },
+    {
       "name": "ws",
       "versions": [
         "8.21.0",
-        "8.21.1"
+        "8.22.0"
       ],
       "license": "MIT",
       "author": "Einar Otto Stangvik",
@@ -7193,7 +7028,7 @@
     {
       "name": "wsl-utils",
       "versions": [
-        "0.3.1"
+        "1.0.1"
       ],
       "license": "MIT",
       "author": "Sindre Sorhus",
@@ -7221,7 +7056,7 @@
     {
       "name": "yaml",
       "versions": [
-        "2.9.0"
+        "2.9.1"
       ],
       "license": "ISC",
       "author": "Eemeli Aro",
@@ -7232,7 +7067,7 @@
       "versions": [
         "15.4.1",
         "18.0.0",
-        "18.1.0"
+        "18.2.0"
       ],
       "license": "MIT",
       "homepage": "https://yargs.js.org/"
@@ -7287,7 +7122,7 @@
       "name": "zod",
       "versions": [
         "3.25.76",
-        "4.4.3"
+        "4.6.5"
       ],
       "license": "MIT",
       "author": "Colin McDonnell",

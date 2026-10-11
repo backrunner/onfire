@@ -11,7 +11,7 @@ demo database or its accounts.
 
 ## 1. Prepare Cloudflare resources
 
-Use Node.js 22+ and the pnpm version pinned in `package.json`. Sign in to your own
+Use Node.js 22.17+, 24, or 26+ and the pnpm version pinned in `package.json`. Sign in to your own
 Cloudflare account, then create the resources referenced by the Wrangler files:
 
 ```sh

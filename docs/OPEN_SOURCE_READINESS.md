@@ -4,6 +4,30 @@ Review date: **2026-09-09**
 
 Revision reviewed: `f1523a3` plus the follow-up site cleanup commit.
 
+### Dependency update follow-up — 2026-10-11
+
+All application and independent site direct dependencies are on their latest
+stable releases as of this update, except TypeScript, which stays on 6.0.3.
+The application uses Next.js 16.4.0, OpenNext 1.20.10, Better Auth 1.7.7,
+React 19.3.0, Wrangler 4.149.0, and Vitest 5.0.3. The site uses svedocs 0.2.3
+and SvelteKit 3.0.1, including the required config, import, and state migration.
+The installed dependency-license inventory has been regenerated.
+
+The application production audit reports zero advisories. Its full audit still
+reports the development CLI's `braces` advisory. The independent site audit
+reports `braces` (high) and `sprintf-js` (moderate) in svedocs build dependencies.
+Neither has a published patched version in the audit database. See the
+[braces advisory](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) and
+[sprintf-js advisory](https://github.com/advisories/GHSA-hp3w-g68c-fv3c).
+This static site ships generated assets without these Node build tools.
+The site KaTeX advisory is resolved by the tested 0.18.2 override.
+
+Frozen installs, binding/type checks, 98 test files / 827 tests, both Worker
+bundles, Drizzle metadata, fresh local migrations `0000`–`0032`, and the main
+Worker dry-run/startup profile pass. Site type/content checks and static build
+also pass. These audit results supersede the older clean-audit statements below.
+No deployment or remote database migration was performed.
+
 ### CI recovery follow-up — 2026-09-09
 
 The application dependency update resolves the nine production audit findings

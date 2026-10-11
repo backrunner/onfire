@@ -78,7 +78,7 @@ Better Auth · Drizzle · Cloudflare Workers, D1, R2, Queues, and Vectorize.
 
 ## Local development
 
-Use **Node.js 22+** and **pnpm 12.3.4** (the version pinned in `package.json`).
+Use **Node.js 22.17+, 24, or 26+** and **pnpm 12.3.4** (the version pinned in `package.json`).
 The default local workflow uses Wrangler's local D1/R2 storage.
 
 ```sh

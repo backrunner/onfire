@@ -2,40 +2,14 @@ allowBuilds:
   esbuild: true
   sharp: true
   workerd: true
-minimumReleaseAgeExclude:
-  - '@ai-sdk/anthropic@4.0.7'
-  - '@ai-sdk/gateway@4.0.11'
-  - '@ai-sdk/google@4.0.8'
-  - '@ai-sdk/openai@4.0.7'
-  - '@ai-sdk/provider-utils@5.0.5'
-  - '@ai-sdk/provider@4.0.2'
-  - ai@7.0.14
-  - miniflare@4.20260701.0 || 5.20260804.0-alpha
-  - wrangler@4.110.0 || 4.120.1
-  - shadcn@4.13.0
-  - '@cloudflare/workers-types@5.20260712.1'
-  - postcss@8.5.17
-  - '@better-auth/core@1.7.0-rc.5'
-  - '@better-auth/drizzle-adapter@1.7.0-rc.5'
-  - '@better-auth/kysely-adapter@1.7.0-rc.5'
-  - '@better-auth/memory-adapter@1.7.0-rc.5'
-  - '@better-auth/mongo-adapter@1.7.0-rc.5'
-  - '@better-auth/oauth-provider@1.7.0-rc.5'
-  - '@better-auth/passkey@1.7.0-rc.5'
-  - '@better-auth/prisma-adapter@1.7.0-rc.5'
-  - '@better-auth/telemetry@1.7.0-rc.5'
-  - better-auth@1.7.0-rc.5
-
 overrides:
-  '@tiptap/react>@tiptap/extension-bubble-menu': 3.30.5
-  '@tiptap/react>@tiptap/extension-floating-menu': 3.30.5
-  'ajv>fast-uri': 3.1.6
+  '@node-minify/core>glob': 10.5.0
+  'ajv>fast-uri': 3.1.8
   'express>qs': 6.16.0
   'body-parser>qs': 6.16.0
-  hono: 4.13.7
-  '@esbuild-kit/core-utils>esbuild': 0.25.12
-  dompurify: 3.4.13
-  nanoid: 3.3.18
-  'next>postcss': 8.5.23
-  sharp: 0.35.4
+  hono: 4.13.13
+  '@esbuild-kit/core-utils>esbuild': 0.28.2
+  dompurify: 3.4.16
+  'next>postcss': 8.5.29
+  sharp: 0.35.5
   'cosmiconfig>js-yaml': 4.3.2

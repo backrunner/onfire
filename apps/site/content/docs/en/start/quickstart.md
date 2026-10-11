@@ -6,7 +6,7 @@ order: 1
 
 ## Requirements
 
-- Node.js 22 or later
+- Node.js 22.17+, 24, or 26+
 - pnpm 12.3.4
 - A local Cloudflare Wrangler environment
 

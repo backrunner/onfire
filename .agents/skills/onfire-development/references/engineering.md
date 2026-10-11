@@ -1,7 +1,7 @@
 # Engineering Reference
 
-- Runtime: Node.js 22+, Next.js 16 App Router, OpenNext Cloudflare, React 19, TypeScript strict.
-- The verified OpenNext 1.20.6 / Next 16.3.4 build uses Web API-only `src/middleware.ts`. Keep its routing tests in `src/middleware.test.ts` and verify adapter support before migrating to Node `proxy.ts`.
+- Runtime: Node.js 22.17+ (22/24/26+), Next.js 16 App Router, OpenNext Cloudflare, React 19, TypeScript strict.
+- The verified OpenNext 1.20.10 / Next 16.4.0 build uses Web API-only `src/middleware.ts`. Keep its routing tests in `src/middleware.test.ts` and verify adapter support before migrating to Node `proxy.ts`.
 - Storage: D1/Drizzle, R2 documents, Vectorize 1024-dimension cosine index.
 - Authentication: Better Auth for ToB; minimal-claim JWT/API key and Product Identity Resolver v1 for ToC.
 - RBAC: combine `withAuth` permission gates with `src/lib/api/scope.ts`.

@@ -1,9 +1,14 @@
 # OnFire site
 
 The public OnFire landing page and documentation site is a standalone SvelteKit
-app powered by svedocs 0.2.1. It is intentionally separate from the Next.js
-application so the marketing/docs surface can be deployed as a static Cloudflare
-site without changing the ticket system runtime.
+app powered by svedocs 0.2.3 and SvelteKit 3. It is intentionally separate from
+the Next.js application so the marketing/docs surface can be deployed as a
+static Cloudflare site without changing the ticket system runtime.
+
+Use Node.js 22.17 or later and TypeScript 6.x. SvelteKit configuration now lives
+in `vite.config.ts`, and local imports use the package's `#lib/*` mapping. The
+Vite alias from `$app/environment` to `$app/env` keeps svedocs 0.2.3 compatible
+with the renamed SvelteKit API; remove it once upstream adopts the new name.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -55,9 +60,12 @@ Geist and Geist Mono are bundled locally. Their SIL OFL notices and the Lucide
 notice ship in `/licenses/`. Vite emits bundled dependency notices at
 `/third-party-licenses.txt`.
 
-Scoped pnpm overrides keep svedocs on Sharp 0.35.4 and SvelteKit on cookie 0.7.2
+pnpm overrides keep svedocs on Sharp 0.35.5 and its math renderer on KaTeX 0.18.2
 for published security fixes. Recheck `pnpm audit --prod` when upgrading upstream
-and remove the overrides once its minimum versions include the fixes.
+and remove the overrides once its minimum versions include the fixes. The
+2026-10-11 audit still reports upstream build dependencies `braces` (high) and
+`sprintf-js` (moderate), for which no patched releases are available. This
+static site does not run those build dependencies in a deployed server.
 
 Deploy a verified build from the repository root with the existing Wrangler login:
 

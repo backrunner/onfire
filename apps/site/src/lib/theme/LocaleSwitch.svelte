@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { page as currentPage } from "$app/stores";
+  import { page as currentPage } from "$app/state";
   import { onMount } from "svelte";
   import { Languages } from "@lucide/svelte";
   import { resolveSvedocsHref } from "svedocs/routes";
@@ -7,33 +7,41 @@
   import type { SvedocsThemeContext } from "svedocs/theme/types";
   import pageLoaders from "virtual:svedocs/page-loaders";
 
-  export let context: SvedocsThemeContext;
-  let mounted = false;
-  let alternate: SvedocsPage | undefined;
+  let { context }: { context: SvedocsThemeContext } = $props();
+  let mounted = $state(false);
+  let alternate = $state<SvedocsPage>();
   let generation = 0;
   onMount(() => {
     mounted = true;
   });
-  $: target = context.config.i18n.locales.find(
-    (locale) => locale.code !== context.localeCode,
+  const target = $derived(
+    context.config.i18n.locales.find(
+      (locale) => locale.code !== context.localeCode,
+    ),
   );
-  $: translation = target
-    ? resolveSvedocsHref({
-        href: context.page?.scopePath ?? "/",
-        pages: context.pages,
-        config: context.config,
-        localeCode: target.code,
-      })
-    : undefined;
-  $: available = Boolean(
-    translation?.page &&
-    !translation.fallback &&
-    translation.page.locale === target?.code,
+  const translation = $derived(
+    target
+      ? resolveSvedocsHref({
+          href: context.page?.scopePath ?? "/",
+          pages: context.pages,
+          config: context.config,
+          localeCode: target.code,
+        })
+      : undefined,
   );
-  $: loadHeadings(
-    available ? translation?.page?.id : undefined,
-    mounted ? $currentPage.url.hash : "",
+  const available = $derived(
+    Boolean(
+      translation?.page &&
+        !translation.fallback &&
+        translation.page.locale === target?.code,
+    ),
   );
+  $effect(() => {
+    void loadHeadings(
+      available ? translation?.page?.id : undefined,
+      mounted ? currentPage.url.hash : "",
+    );
+  });
   async function loadHeadings(id: string | undefined, hash: string) {
     const request = ++generation;
     alternate = undefined;
@@ -71,10 +79,14 @@
       ? `#${encodeURIComponent(translated.headings[index].id)}`
       : "";
   }
-  $: hash = mounted
-    ? translatedHash($currentPage.url.hash, context.page, alternate)
-    : "";
-  $: href = `${translation?.href ?? "/"}${mounted ? $currentPage.url.search : ""}${hash}`;
+  const hash = $derived(
+    mounted
+      ? translatedHash(currentPage.url.hash, context.page, alternate)
+      : "",
+  );
+  const href = $derived(
+    `${translation?.href ?? "/"}${mounted ? currentPage.url.search : ""}${hash}`,
+  );
 </script>
 
 {#if target}

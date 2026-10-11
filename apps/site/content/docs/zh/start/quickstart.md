@@ -6,7 +6,7 @@ order: 1
 
 ## 环境要求
 
-- Node.js 22 或更高版本
+- Node.js 22.17+、24 或 26+
 - pnpm 12.3.4
 - Wrangler 本地 Cloudflare 环境
 

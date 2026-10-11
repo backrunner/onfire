@@ -6,7 +6,7 @@ behavior before implementing it. Use [SECURITY.md](SECURITY.md) for security iss
 
 ## Local setup
 
-Follow the [README](README.md#local-development). Use Node.js 22 or later and the
+Follow the [README](README.md#local-development). Use Node.js 22.17+, 24, or 26+ and the
 pnpm version pinned in `package.json`. Local seed/reset commands operate on local
 D1; `pnpm db:reset` deletes existing local data.
 

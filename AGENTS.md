@@ -4,7 +4,7 @@ OnFire is a minimalist modern ticket system designed to enable users to quickly 
 
 ## Tech Stack
 
-- **Runtime**: Node.js 22+ + Cloudflare Workers
+- **Runtime**: Node.js 22.17+ (22/24/26+) + Cloudflare Workers
 - **Framework**: Next.js 16 (App Router) + OpenNext/Cloudflare
 - **Database**: Cloudflare D1 (SQLite) + Drizzle ORM
 - **Authentication**: Better Auth + scoped account API keys (ToB REST) + OAuth 2.1 (MCP) / JWT + product API keys (ToC)
@@ -1107,5 +1107,5 @@ for the separately recorded production deployment.
 
 - Use `xxx(comp): desc`, for example `feat(ai): add qwen embeddings` or `fix(rbac): scope assistant tickets`.
 - Do not commit, deploy, apply remote migrations, or create remote Cloudflare resources unless explicitly requested.
-- The verified OpenNext Cloudflare 1.20.6 / Next 16.3.4 build uses Web API-only `src/middleware.ts`. Verify adapter support before migrating to Node `proxy.ts`; domain routing is covered by `src/middleware.test.ts`.
+- The verified OpenNext Cloudflare 1.20.10 / Next 16.4.0 build uses Web API-only `src/middleware.ts`. Verify adapter support before migrating to Node `proxy.ts`; domain routing is covered by `src/middleware.test.ts`.
 - Track `pnpm-lock.yaml`, `wrangler.types.env`, and generated `worker-configuration.d.ts`; regenerate types after Wrangler config changes. pnpm 11 overrides belong in `pnpm-workspace.yaml`.

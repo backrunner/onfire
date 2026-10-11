@@ -1,5 +1,5 @@
 import { createConfiguredAskResponse, createMemoryRateLimiter, resolveCloudflareRateLimiter } from 'svedocs/ai';
-import { getRuntimeEnv } from '$lib/server/env';
+import { getRuntimeEnv } from '#lib/server/env.ts';
 import config from 'virtual:svedocs/config';
 import records from 'virtual:svedocs/search';
 import type { RequestHandler } from './$types';

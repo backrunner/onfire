@@ -7,5 +7,5 @@ allowBuilds:
 
 # Remove when upstream minimum versions include these security fixes.
 overrides:
-  'svedocs>sharp': 0.35.4
-  '@sveltejs/kit>cookie': 0.7.2
+  'svedocs>sharp': 0.35.5
+  katex: 0.18.2

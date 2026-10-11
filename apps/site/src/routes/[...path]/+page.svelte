@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Site from '$lib/Site.svelte';
+  import Site from '#lib/Site.svelte';
   export let data;
 </script>
 

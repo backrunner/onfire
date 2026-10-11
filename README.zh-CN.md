@@ -57,7 +57,7 @@ TypeScript、Tailwind CSS 4、shadcn/ui、Better Auth、Drizzle 和 Cloudflare �
 
 ## 本地开发
 
-需要 **Node.js 22+** 与 **pnpm 12.3.4**（版本固定在 `package.json` 中）。
+需要 **Node.js 22.17+、24 或 26+** 与 **pnpm 12.3.4**（版本固定在 `package.json` 中）。
 默认开发流程使用 Wrangler 提供的本地 D1/R2 存储。
 
 ```sh

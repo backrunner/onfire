@@ -2,6 +2,37 @@
 
 Updated: 2026-10-11
 
+## Dependency refresh with TypeScript 6 — 2026-10-11
+
+- Updated all direct application and independent site dependencies to the latest
+  stable releases available today, preserving TypeScript 6.0.3 and its 6.x range
+  in both projects. `pnpm outdated` lists only the intentionally retained
+  TypeScript version. Next.js is 16.4.0, OpenNext 1.20.10, Better Auth and plugins
+  1.7.7, React 19.3.0, Tiptap 3.31.4, Wrangler 4.149.0 and Vitest 5.0.3.
+  Development uses Node 22.17+, 24, or 26+; pnpm remains 12.3.4.
+- Migrated the site to svedocs 0.2.3 / SvelteKit 3.0.1: configuration moves into
+  Vite, local imports use `#lib`, and language/error state uses `$app/state`.
+  A documented `$app/environment` → `$app/env` compatibility alias supports the
+  current svedocs release. Language switching preserves translated anchors and
+  queries after client navigation. Refreshed security overrides and removed
+  obsolete release-age exclusions and Tiptap/nanoid pins.
+- Main production audit: zero advisories. Full main audit: one development
+  `braces` high advisory. Site audit: `braces` high and `sprintf-js` moderate in
+  Node build dependencies, with no published patched releases. Updated KaTeX to
+  0.18.2 and verified inline/display math rendering. This supersedes the earlier
+  37-advisory dependency blocker. No audit findings were suppressed.
+- Frozen installs, generated bindings, TypeScript, 98 files / 827 tests, both
+  Worker builds, dry-run/startup profiling, Drizzle metadata and all 33 fresh
+  local D1 migrations pass. Site type/content checks and static build pass.
+  Browser fixtures pass 34 notification cases, 23 site cases, and 4 rich-text
+  cases (61 total), covering desktop/mobile, en/zh, light/dark, Chromium/WebKit,
+  language anchors/queries/navigation, search, 404, rich text and inline images.
+- Regenerated the complete installed dependency-license inventory: 813 package
+  entries on darwin-arm64, with no missing license metadata. Reviewed and tested
+  the dependency commit independently of unrelated customer/email work in the
+  shared worktree. Startup profiles were removed. No deployment, remote D1
+  migration, live email, notification or paid AI request was performed.
+
 ## Tenant, current-team, and product notification inheritance — 2026-10-11
 
 - Notification rules and mandatory-channel requirements now have tenant, team,
