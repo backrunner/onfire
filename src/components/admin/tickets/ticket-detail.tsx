@@ -216,9 +216,10 @@ export function TicketDetail({
       {/* Scrollable conversation */}
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <div className="rounded-lg bg-muted px-3 py-2">
-          <p className="mb-1 text-[11px] font-medium text-muted-foreground">
-            {t.tickets.detail.content} · {customerLabel}
-          </p>
+          <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+            <span className="font-medium">{t.tickets.detail.content}</span>
+            <span className="min-w-0 wrap-anywhere">{customerLabel}</span>
+          </div>
           <p className="whitespace-pre-wrap break-words text-sm">
             {ticket.content}
           </p>
@@ -362,10 +363,10 @@ function HistoricalFields({
   };
   return (
     <div className="mt-3 rounded-md border border-border px-3 py-2">
-      <p className="mb-2 text-[11px] font-medium text-muted-foreground">
-        {t.tickets.detail.submittedFields}
-        {version ? ` · v${version}` : ""}
-      </p>
+      <div className="mb-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+        <span className="font-medium">{t.tickets.detail.submittedFields}</span>
+        {version ? <span className="rounded bg-muted px-1.5 py-0.5 font-mono">v{version}</span> : null}
+      </div>
       <dl className="grid gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
         {fields.map((field) => (
           <div key={field.key} className="min-w-0">
@@ -422,13 +423,12 @@ function AiInsights({
   return (
     <div className="flex items-start gap-2 rounded-md bg-muted/60 px-3 py-2 text-xs">
       <Sparkles className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-      <p className="min-w-0 flex-1 text-muted-foreground">
-        <span className="font-medium text-foreground/80">
+      <div className="min-w-0 flex-1 text-muted-foreground">
+        <p className="font-medium text-foreground/80">
           {t.tickets.detail.aiSummary}
-        </span>
-        {" · "}
-        {r.summary}
-      </p>
+        </p>
+        <p className="mt-1 wrap-anywhere">{r.summary}</p>
+      </div>
       <span className="flex shrink-0 items-center gap-1">
         {r.sentiment && r.sentiment !== "neutral" && (
           <span

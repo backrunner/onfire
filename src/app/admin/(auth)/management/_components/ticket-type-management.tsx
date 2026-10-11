@@ -350,7 +350,7 @@ export function TicketTypeManagement({ productId }: { productId?: string }) {
                       {dialogLangs.map((lang) => (
                         <TabsTrigger key={lang} value={lang}>
                           {t.languages[lang as keyof typeof t.languages] ?? lang}
-                          {lang === dialogDefaultLang ? ` · ${t.formBuilder.defaultTag}` : ""}
+                          {lang === dialogDefaultLang && <Badge variant="secondary" className="px-1 py-0 text-[10px] font-normal">{t.formBuilder.defaultTag}</Badge>}
                         </TabsTrigger>
                       ))}
                     </TabsList>

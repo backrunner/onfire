@@ -219,12 +219,10 @@ export function ApiKeysCard() {
                               : m.active}
                         </Badge>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {key.resourceMode === "all"
-                          ? m.allResources
-                          : m.selectedProducts}{" "}
-                        · {key.permissions.length} {m.permissions}
-                      </p>
+                      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        <span>{key.resourceMode === "all" ? m.allResources : m.selectedProducts}</span>
+                        <span>{key.permissions.length} {m.permissions}</span>
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         {m.expiresAt}:{" "}
                         {new Date(key.expiresAt).toLocaleString()}

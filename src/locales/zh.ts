@@ -1064,7 +1064,7 @@ export const zh = {
       showOriginal: '查看原文',
       customerTranslation: '客户所见译文',
       internalStates: '内部状态',
-      internalStateArchived: '已归档 · 保留历史值',
+      internalStateArchived: '已归档，保留历史值',
       internalStateUnset: '未设置',
       internalStateSaved: '内部状态已保存',
       internalStateFailed: '内部状态保存失败'
@@ -1344,7 +1344,7 @@ export const zh = {
     useBackupCode: '使用恢复码',
     useAuthenticator: '使用认证器验证码',
     turnstileError: '验证码加载失败，请刷新页面重试',
-    footer: 'OnFire · 现代化客服工单系统'
+    footer: '现代化客服工单系统'
   },
 
   // Install
@@ -1785,7 +1785,7 @@ export const zh = {
 
   // Footer
   footer: {
-    tech: 'Cloudflare Worker · Next.js · D1 · Better Auth'
+    tech: 'Cloudflare Worker, Next.js, D1, Better Auth'
   },
 
   // Errors

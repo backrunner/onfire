@@ -1,5 +1,6 @@
 "use client";
 
+import { MetadataList, MetadataItem } from "@/components/ui/metadata";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -283,14 +284,14 @@ export function TicketDetail({ ticket, replies, onBack, onRefresh }: TicketDetai
             </h1>
             <TocStatusBadge status={ticket.status} className="mt-0.5 shrink-0" />
           </div>
-          <p className="text-xs text-muted-foreground">
-            <span className="font-mono">#{ticket.number}</span>
-            <span className="mx-1.5">·</span>
-            {t.toc.detail.created}{" "}
-            <time dateTime={ticket.createdAt}>
-              {formatDateTime(ticket.createdAt)}
-            </time>
-          </p>
+          <MetadataList className="justify-between gap-x-3">
+            <MetadataItem label={t.toc.submit.ticketIdLabel} hideLabel>
+              <span className="font-mono">#{ticket.number}</span>
+            </MetadataItem>
+            <MetadataItem label={t.toc.detail.created}>
+              <time dateTime={ticket.createdAt} className="tabular-nums">{formatDateTime(ticket.createdAt)}</time>
+            </MetadataItem>
+          </MetadataList>
         </CardContent>
       </Card>
 

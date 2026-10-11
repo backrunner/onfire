@@ -1066,7 +1066,7 @@ export const en: Translations = {
       showOriginal: 'Show original',
       customerTranslation: 'Customer translation',
       internalStates: 'Internal States',
-      internalStateArchived: 'Archived · historical value',
+      internalStateArchived: 'Archived; historical value retained',
       internalStateUnset: 'Not set',
       internalStateSaved: 'Internal state saved',
       internalStateFailed: 'Failed to save internal state'
@@ -1346,7 +1346,7 @@ export const en: Translations = {
     useBackupCode: 'Use a recovery code',
     useAuthenticator: 'Use authenticator code',
     turnstileError: 'Verification failed to load, please refresh the page',
-    footer: 'OnFire · Modern Ticket System'
+    footer: 'Modern Ticket System'
   },
 
   // Install
@@ -1787,7 +1787,7 @@ export const en: Translations = {
 
   // Footer
   footer: {
-    tech: 'Cloudflare Worker · Next.js · D1 · Better Auth'
+    tech: 'Cloudflare Worker, Next.js, D1, Better Auth'
   },
 
   // Errors

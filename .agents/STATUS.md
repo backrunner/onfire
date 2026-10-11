@@ -2,6 +2,27 @@
 
 Updated: 2026-10-12
 
+## Metadata information hierarchy — 2026-10-12
+
+- Ticket lists/details, search results, activity history and management summaries
+  use aligned label/value groups and responsive spacing instead of middot text
+  chains. The shared `MetadataList`/`MetadataItem` renders semantic definition
+  lists; numeric references stay prominent and timestamps remain secondary.
+- Activity entries separate the action, actor, details and timestamp without
+  truncating the entire audit record. Long reply sender names wrap independently
+  of the timestamp. Language, default-language, level and version are small
+  semantic badges; search filters keep an explicit field label while changing
+  the selection. AI summaries, login branding and team headings use hierarchy.
+- The durable design rule lives in `.agents/DESIGN.md` and `AGENTS.md`.
+  This presentation change requires no database migration or binding change.
+- Frozen install, generated binding check, TypeScript, all 99 files / 847 tests,
+  main Worker build and email-agent dry-run pass. Local browser checks use actual
+  React components with synthetic read-only API data: search, history, customer
+  list and detail pass 32 combinations of en/zh, light/dark and 1440/390px.
+  Long identity/product/team values wrap without page overflow; eight mobile
+  empty/error cases preserve retry controls and layout. Fixtures, screenshots
+  and results live in `.cache/onfire-design-qa`.
+
 
 ## Numeric ticket numbers — 2026-10-12
 

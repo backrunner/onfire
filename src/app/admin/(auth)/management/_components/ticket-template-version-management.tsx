@@ -20,6 +20,7 @@ import {
   Dialog,
   DialogContent,
   DialogFooter,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -179,12 +180,7 @@ export function TicketTemplateVersionManagement({ ticketTypeId, productId }: { t
     }
   };
 
-  const editorTitle = current
-    ? `${m.newVersion} · v${current.version + 1}` +
-      (editorBase && editorBase.id !== current.id
-        ? ` (${m.basedOn.replace("{{version}}", String(editorBase.version))})`
-        : "")
-    : m.createTemplate;
+  const editorTitle = current ? m.newVersion : m.createTemplate;
 
   return (
     <>
@@ -235,7 +231,15 @@ export function TicketTemplateVersionManagement({ ticketTypeId, productId }: { t
       {/* Form editor */}
       <Dialog open={editorOpen} onOpenChange={(open) => !pending && setEditorOpen(open)}>
         <DialogContent className="h-[85vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden sm:max-w-6xl">
-          <DialogHeader><DialogTitle>{editorTitle}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="flex flex-wrap items-center gap-2">
+              {editorTitle}
+              {current && <Badge variant="secondary" className="font-mono font-normal">v{current.version + 1}</Badge>}
+            </DialogTitle>
+            {current && editorBase && editorBase.id !== current.id && (
+              <DialogDescription>{m.basedOn.replace("{{version}}", String(editorBase.version))}</DialogDescription>
+            )}
+          </DialogHeader>
           <div className="-mx-6 -mb-6 min-h-0 overflow-hidden">
             <FormBuilder
               key={`${ticketTypeId}:${editorBase?.id ?? current?.id ?? "new"}`}

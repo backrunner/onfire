@@ -19,6 +19,15 @@ Avoid generic AI-dashboard composition: no oversized headings inside operational
 ## Components
 
 - Start from existing shadcn/ui and zinc tokens.
+- Avoid middot/bullet-delimited UI metadata. Use explicit label/value groups,
+  alignment and spacing; keep each field together when it wraps on mobile.
+- Use a definition list for compact resource metadata. Put the identifier in a
+  stable leading position and timestamps in a secondary, aligned position.
+- Activity entries separate the action, actor/details and timestamp by hierarchy;
+  do not truncate an entire audit event into one concatenated sentence.
+- Put state, level, language and version in small semantic badges. Filter controls
+  retain an explicit field label independently of the selected value. Do not
+  replace dot chains with pipes, slashes, arbitrary icons or extra cards.
 - Use lucide icons for tools; unfamiliar icon-only actions need labels and tooltips/titles.
 - Use segmented icon controls for preview modes, switches for binary state, Select for finite options, and text buttons for commands.
 - Empty Select never appears blank; render a disabled labeled boundary state.

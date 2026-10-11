@@ -93,9 +93,10 @@ function TranslationPanel({
 
   return (
     <div className="space-y-4 p-4">
-      <h3 className="text-sm font-medium">
-        {fb.fieldProperties} · {t.languages[lang as keyof typeof t.languages] ?? lang}
-      </h3>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-medium">{fb.fieldProperties}</h3>
+        <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">{t.languages[lang as keyof typeof t.languages] ?? lang}</span>
+      </div>
       <Separator />
 
       <div className="space-y-3">

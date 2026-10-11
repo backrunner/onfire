@@ -1,5 +1,6 @@
 "use client";
 
+import { MetadataList, MetadataItem } from "@/components/ui/metadata";
 import { useCallback, useEffect, useState } from "react";
 import { ChevronRight, Inbox, Loader2, RefreshCw } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
@@ -207,12 +208,14 @@ export function TicketList({ onSelect }: TicketListProps) {
                         </h3>
                         <TocStatusBadge status={ticket.status} />
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        <span className="font-mono">#{ticket.number}</span>
-                        <span className="mx-1.5">·</span>
-                        {t.toc.list.updated}{" "}
-                        {formatDateTime(ticket.updatedAt)}
-                      </p>
+                      <MetadataList className="justify-between gap-x-3">
+                        <MetadataItem label={t.toc.submit.ticketIdLabel} hideLabel>
+                          <span className="font-mono">#{ticket.number}</span>
+                        </MetadataItem>
+                        <MetadataItem label={t.toc.list.updated}>
+                          <time dateTime={ticket.updatedAt} className="tabular-nums">{formatDateTime(ticket.updatedAt)}</time>
+                        </MetadataItem>
+                      </MetadataList>
                     </div>
                     <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
                   </CardContent>

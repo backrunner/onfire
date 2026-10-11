@@ -57,7 +57,8 @@ function ReplyBubble({ reply }: { reply: ReplyView }) {
       }
     : customerTranslation
       ? {
-          label: `${t.tickets.detail.customerTranslation} · ${customerTranslation[0]}`,
+          label: t.tickets.detail.customerTranslation,
+          language: customerTranslation[0],
           content: customerTranslation[1].content,
           contentHtml: customerTranslation[1].contentHtml,
         }
@@ -67,7 +68,7 @@ function ReplyBubble({ reply }: { reply: ReplyView }) {
     <div className={cn("flex", fromAgent ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          "max-w-[85%] rounded-lg px-3 py-2 text-sm",
+          "min-w-0 max-w-[85%] rounded-lg px-3 py-2 text-sm",
           internal
             ? "bg-amber-500/10 ring-1 ring-inset ring-amber-500/25"
             : fromAgent
@@ -77,7 +78,7 @@ function ReplyBubble({ reply }: { reply: ReplyView }) {
       >
         <div
           className={cn(
-            "mb-1 flex items-center gap-2 text-[11px]",
+            "mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px]",
             internal
               ? "text-amber-700 dark:text-amber-400"
               : fromAgent
@@ -85,7 +86,7 @@ function ReplyBubble({ reply }: { reply: ReplyView }) {
                 : "text-muted-foreground"
           )}
         >
-          <span className="font-medium">
+          <span className="min-w-0 wrap-anywhere font-medium">
             {fromAgent
               ? reply.senderName || t.tickets.detail.agentReply
               : reply.senderEmail || t.tickets.detail.customerReply}
@@ -95,7 +96,7 @@ function ReplyBubble({ reply }: { reply: ReplyView }) {
               {t.tickets.detail.internalNote}
             </span>
           )}
-          <span>{formatDateTime(reply.createdAt)}</span>
+          <time dateTime={reply.createdAt} className="shrink-0 tabular-nums">{formatDateTime(reply.createdAt)}</time>
         </div>
         {reply.contentHtml ? (
           <RichTextView html={reply.contentHtml} />
@@ -120,6 +121,7 @@ function ReplyBubble({ reply }: { reply: ReplyView }) {
           >
             <summary className="cursor-pointer opacity-75">
               {alternate.label}
+              {"language" in alternate && <span className="ml-2 rounded border px-1 py-px text-[10px] uppercase">{alternate.language}</span>}
             </summary>
             <div className="mt-2 opacity-90">
               {alternate.contentHtml ? (
@@ -148,17 +150,17 @@ function HistoryLine({
   const detail = snapshotDetail(event.snapshot, t, actors);
 
   return (
-    <div className="flex items-center justify-center gap-2 py-0.5">
-      <span className="h-px w-6 bg-border" aria-hidden />
-      <p className="max-w-[80%] truncate text-center text-[11px] text-muted-foreground">
-        <span className="font-medium text-foreground/70">
-          {historyLabel(t, event.action)}
-        </span>
-        {event.actorName && <span> · {event.actorName}</span>}
-        {detail && <span> · {detail}</span>}
-        <span> · {formatDateTime(event.createdAt)}</span>
-      </p>
-      <span className="h-px w-6 bg-border" aria-hidden />
+    <div className="border-l-2 border-border py-1 pl-3 text-[11px] text-muted-foreground">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+        <span className="font-medium text-foreground/80">{historyLabel(t, event.action)}</span>
+        <time dateTime={event.createdAt} className="shrink-0 tabular-nums">{formatDateTime(event.createdAt)}</time>
+      </div>
+      {event.actorName && <p className="mt-0.5 wrap-anywhere">{event.actorName}</p>}
+      {detail.length > 0 && (
+        <ul className="mt-0.5 space-y-0.5">
+          {detail.map((part, index) => <li key={index} className="wrap-anywhere">{part}</li>)}
+        </ul>
+      )}
     </div>
   );
 }
@@ -181,8 +183,8 @@ function snapshotDetail(
   snapshot: unknown,
   t: ReturnType<typeof useI18n>["t"],
   actors?: Record<string, string>
-): string | null {
-  if (!snapshot || typeof snapshot !== "object") return null;
+): string[] {
+  if (!snapshot || typeof snapshot !== "object") return [];
   const s = snapshot as Snapshot;
   const parts: string[] = [];
 
@@ -221,7 +223,7 @@ function snapshotDetail(
     };
     parts.push(`${s.stateName}: ${display(s.previousValue)} → ${display(s.value)}`);
   }
-  return parts.length > 0 ? parts.join(" · ") : null;
+  return parts;
 }
 
 function shortId(id: string): string {

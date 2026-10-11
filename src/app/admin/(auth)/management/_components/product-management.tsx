@@ -230,16 +230,16 @@ export function ProductManagement({ tenantId }: { tenantId?: string } = {}) {
     }
   };
 
-  const slaSummary = (product: ProductView): string | null => {
-    const parts: string[] = [];
+  const slaSummary = (product: ProductView) => {
+    const parts: { label: string; accept: number | null; reply: number | null }[] = [];
     const row = (label: string, accept: number | null, reply: number | null) => {
       if (accept == null && reply == null) return;
-      parts.push(`${label} ${accept ?? "-"}/${reply ?? "-"}`);
+      parts.push({ label, accept, reply });
     };
     row(t.tickets.priority.high, product.slaHighAccept, product.slaHighReply);
     row(t.tickets.priority.medium, product.slaMediumAccept, product.slaMediumReply);
     row(t.tickets.priority.low, product.slaLowAccept, product.slaLowReply);
-    return parts.length > 0 ? parts.join(" · ") : null;
+    return parts;
   };
 
   const slaRow = (
@@ -330,10 +330,18 @@ export function ProductManagement({ tenantId }: { tenantId?: string } = {}) {
                       </TableCell>
                     )}
                     <TableCell>
-                      {summary ? (
-                        <span className="text-sm tabular-nums text-muted-foreground">
-                          {summary}
-                        </span>
+                      {summary.length > 0 ? (
+                        <dl className="space-y-1 text-xs">
+                          {summary.map(({ label, accept, reply }) => (
+                            <div key={label} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                              <dt className="w-14 shrink-0 font-medium">{label}</dt>
+                              <dd className="flex flex-wrap gap-x-3 gap-y-0.5 text-muted-foreground">
+                                <span>{m.products.accept} <span className="tabular-nums text-foreground/80">{accept ?? "—"}</span></span>
+                                <span>{m.products.reply} <span className="tabular-nums text-foreground/80">{reply ?? "—"}</span></span>
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
                       ) : (
                         <Badge variant="secondary">{m.products.slaNone}</Badge>
                       )}

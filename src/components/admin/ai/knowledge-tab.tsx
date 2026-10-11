@@ -1,5 +1,6 @@
 "use client";
 
+import { MetadataList, MetadataItem } from "@/components/ui/metadata";
 import { useRef, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
@@ -303,13 +304,17 @@ export function KnowledgeTab({ productId: fixedProductId }: { productId?: string
             </CardHeader>
             <CardContent>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
-                <p className="min-w-0 text-xs text-muted-foreground" role="status">
+                <div className="min-w-0 text-xs text-muted-foreground" role="status">
                   {indexingError ? k.loadFailed : indexing ? (
-                    indexing.profile
-                      ? `${k.indexing}: ${indexing.total - indexing.pending}/${indexing.total} · ${k.indexPending}: ${indexing.pending} · ${k.indexFailed}: ${indexing.failed}`
-                      : k.indexDisabled
+                    indexing.profile ? (
+                      <MetadataList>
+                        <MetadataItem label={k.indexing}><span className="tabular-nums">{indexing.total - indexing.pending}/{indexing.total}</span></MetadataItem>
+                        <MetadataItem label={k.indexPending}><span className="tabular-nums">{indexing.pending}</span></MetadataItem>
+                        <MetadataItem label={k.indexFailed}><span className="tabular-nums">{indexing.failed}</span></MetadataItem>
+                      </MetadataList>
+                    ) : k.indexDisabled
                   ) : k.indexLoading}
-                </p>
+                </div>
                 <Button variant="outline" size="sm" disabled={reindexing || !indexing?.profile || indexing.total === 0} onClick={reindex}>
                   <RefreshCw className={cn("size-3.5", reindexing && "animate-spin")} />
                   {k.reindex}

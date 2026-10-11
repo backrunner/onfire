@@ -156,8 +156,8 @@ export function AssignDialog({
                   {candidates.map((agent) => (
                     <SelectItem key={agent.userId} value={agent.userId}>
                       {agent.displayName || agent.email || agent.userId}
-                      <span className="ml-1 text-muted-foreground">
-                        · Lv{agent.level}
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                        {t.management.agents.level} {agent.level}
                       </span>
                     </SelectItem>
                   ))}

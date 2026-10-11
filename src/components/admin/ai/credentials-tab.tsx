@@ -485,8 +485,9 @@ function CredentialRow({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{credential.name}</span>
-        <span className="block truncate text-xs text-muted-foreground">
-          {t.aiConfig.providers[credential.provider]} · {c.usage.replace("{{count}}", String(credential.usageCount))}
+        <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+          <span>{t.aiConfig.providers[credential.provider]}</span>
+          <span className="tabular-nums">{c.usage.replace("{{count}}", String(credential.usageCount))}</span>
         </span>
       </span>
       <span className={cn(

@@ -202,7 +202,7 @@ export function SpamFilterManagement({ tenantId }: { tenantId?: string }) {
               />
             </FormField>
             {provider.docsUrl && (
-              <p className="col-span-full text-xs text-muted-foreground">
+              <div className="col-span-full space-y-1 text-xs text-muted-foreground">
                 <a
                   href={provider.docsUrl}
                   target="_blank"
@@ -211,8 +211,8 @@ export function SpamFilterManagement({ tenantId }: { tenantId?: string }) {
                 >
                   {m.docs}
                 </a>
-                {labels[form.provider].mapping ? ` · ${labels[form.provider].mapping}` : ""}
-              </p>
+                {labels[form.provider].mapping && <p>{labels[form.provider].mapping}</p>}
+              </div>
             )}
             {form.provider === "custom" && (
               <div className="col-span-full space-y-3 rounded-md border p-3">

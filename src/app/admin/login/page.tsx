@@ -301,9 +301,10 @@ export default function AdminLoginPage() {
           </CardContent>
         </Card>
 
-        <p className="text-center text-xs text-muted-foreground">
-          {t.login.footer}
-        </p>
+        <div className="space-y-1 text-center text-xs text-muted-foreground">
+          <p className="font-medium text-foreground/70">OnFire</p>
+          <p>{t.login.footer}</p>
+        </div>
       </div>
     </AuthShell>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { MetadataList, MetadataItem } from "@/components/ui/metadata";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -261,12 +262,13 @@ function SearchContent() {
             value={status || ALL}
             onValueChange={(v) => setParams({ status: v === ALL ? null : v, page: null })}
           >
-            <SelectTrigger className="h-8 w-[140px] text-xs">
+            <SelectTrigger className="h-8 w-auto min-w-[140px] text-xs" aria-label={t.common.status}>
+              <span className="text-muted-foreground">{t.common.status}</span>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>
-                {t.common.all} · {t.common.status}
+                {t.common.all}
               </SelectItem>
               {Object.values(TicketStatus).map((s) => (
                 <SelectItem key={s} value={s}>
@@ -280,12 +282,13 @@ function SearchContent() {
             value={priority || ALL}
             onValueChange={(v) => setParams({ priority: v === ALL ? null : v, page: null })}
           >
-            <SelectTrigger className="h-8 w-[140px] text-xs">
+            <SelectTrigger className="h-8 w-auto min-w-[140px] text-xs" aria-label={t.common.priority}>
+              <span className="text-muted-foreground">{t.common.priority}</span>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>
-                {t.common.all} · {t.common.priority}
+                {t.common.all}
               </SelectItem>
               {Object.values(TicketPriority).map((p) => (
                 <SelectItem key={p} value={p}>
@@ -297,11 +300,13 @@ function SearchContent() {
 
           <ProductSelect
             value={productId}
+            label={t.tickets.detail.product}
             onChange={(v) =>
               setParams({ product: v === ALL_PRODUCTS ? null : v, page: null })
             }
             placeholder={t.common.all}
             allLabel={t.common.all}
+            emptyLabel={t.emailConfig.noProducts}
             className="h-8 w-[160px] text-xs"
           />
 
@@ -407,21 +412,11 @@ function SearchContent() {
                 <div className="mt-1.5 truncate text-sm font-medium">
                   <span className="font-mono text-muted-foreground">#{ticket.number}</span>{" "}{ticket.subject}
                 </div>
-                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                  <span className="truncate">{ticket.customerLabel ?? "—"}</span>
-                  {ticket.productName && (
-                    <>
-                      <span aria-hidden>·</span>
-                      <span>{ticket.productName}</span>
-                    </>
-                  )}
-                  {ticket.teamName && (
-                    <>
-                      <span aria-hidden>·</span>
-                      <span>{ticket.teamName}</span>
-                    </>
-                  )}
-                </div>
+                <MetadataList className="mt-1.5">
+                  <MetadataItem label={t.tickets.detail.customer}>{ticket.customerLabel ?? "—"}</MetadataItem>
+                  {ticket.productName && <MetadataItem label={t.tickets.detail.product}>{ticket.productName}</MetadataItem>}
+                  {ticket.teamName && <MetadataItem label={t.tickets.detail.team}>{ticket.teamName}</MetadataItem>}
+                </MetadataList>
               </Link>
             ))}
           </div>

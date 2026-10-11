@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { useMemo, useState, useCallback } from "react";
 import {
   FormSchema,
@@ -345,7 +346,7 @@ export function FormBuilder({
                   {languages.map((lang) => (
                     <TabsTrigger key={lang} value={lang} className="px-2.5 text-xs">
                       {t.languages[lang as keyof typeof t.languages] ?? lang}
-                      {lang === languages[0] ? ` · ${fb.defaultTag}` : ""}
+                      {lang === languages[0] && <Badge variant="secondary" className="px-1 py-0 text-[10px] font-normal">{fb.defaultTag}</Badge>}
                     </TabsTrigger>
                   ))}
                 </TabsList>

@@ -84,9 +84,10 @@ export function AdminHeader({ onMobileMenu }: { onMobileMenu: () => void }) {
       {preview && (
         <div className="flex h-8 items-center justify-center gap-2 bg-amber-400 px-4 text-amber-950 shadow-sm dark:bg-amber-500">
           <Glasses className="size-3.5 shrink-0" />
-          <span className="truncate text-xs font-semibold">
-            {t.preview.active} · {preview.target.displayName} ·{" "}
-            {t.roles[preview.target.role] ?? preview.target.role}
+          <span className="flex min-w-0 items-center gap-2 text-xs">
+            <span className="shrink-0 font-semibold">{t.preview.active}</span>
+            <span className="truncate font-medium">{preview.target.displayName}</span>
+            <span className="shrink-0 rounded bg-amber-950/10 px-1.5 py-0.5">{t.roles[preview.target.role] ?? preview.target.role}</span>
           </span>
           <button
             type="button"
@@ -171,8 +172,9 @@ export function AdminHeader({ onMobileMenu }: { onMobileMenu: () => void }) {
                     <span className="block truncate text-sm font-medium">
                       {ticket.subject}
                     </span>
-                    <span className="block truncate text-[11px] text-muted-foreground">
-                      #{ticket.number} · {ticket.customerLabel ?? "—"}
+                    <span className="mt-0.5 flex items-baseline gap-3 text-[11px] text-muted-foreground">
+                      <span className="shrink-0 font-mono">#{ticket.number}</span>
+                      <span className="min-w-0 truncate">{ticket.customerLabel ?? "—"}</span>
                     </span>
                   </span>
                   <StatusBadge status={ticket.status} className="shrink-0" />

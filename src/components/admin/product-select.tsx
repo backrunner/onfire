@@ -29,6 +29,8 @@ interface ProductSelectProps {
   value: string;
   onChange: (productId: string) => void;
   placeholder: string;
+  /** Persistent field label, independent of the selected product. */
+  label?: string;
   /** Adds an "all products" option using the ALL_PRODUCTS sentinel. */
   allLabel?: string;
   /** Auto-select the first product once loaded when no value is set. */
@@ -42,6 +44,7 @@ export function ProductSelect({
   value,
   onChange,
   placeholder,
+  label,
   allLabel,
   autoSelectFirst,
   emptyLabel,
@@ -70,12 +73,14 @@ export function ProductSelect({
     return (
       <div
         aria-disabled="true"
+        aria-label={label}
         className={cn(
           "flex h-8 w-56 items-center gap-2 rounded-md border border-dashed border-border bg-muted/35 px-3 text-sm text-muted-foreground",
           className
         )}
       >
         <PackageOpen className="size-3.5 shrink-0" />
+        {label && <span className="shrink-0">{label}</span>}
         <span className="truncate">{emptyLabel ?? placeholder}</span>
       </div>
     );
@@ -86,7 +91,8 @@ export function ProductSelect({
       value={value || NO_PRODUCT}
       onValueChange={(next) => next !== NO_PRODUCT && onChange(next)}
     >
-      <SelectTrigger className={cn("h-8 w-56 text-sm", className)}>
+      <SelectTrigger className={cn("h-8 w-56 text-sm", className)} aria-label={label}>
+        {label && <span className="shrink-0 text-muted-foreground">{label}</span>}
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>

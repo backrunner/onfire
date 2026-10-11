@@ -33,7 +33,10 @@ export default function TeamNotificationPage() {
   return <div className="space-y-4">
     <div className="flex items-center gap-3">
       <Button variant="ghost" size="icon" asChild aria-label={t.common.back}><Link href={backHref}><ArrowLeft className="size-4" /></Link></Button>
-      <h1 className="text-xl font-semibold">{state.data.name} · {t.nav.notifications}</h1>
+      <div className="min-w-0">
+        <h1 className="text-xl font-semibold">{t.nav.notifications}</h1>
+        <p className="mt-1 truncate text-sm text-muted-foreground">{state.data.name}</p>
+      </div>
     </div>
     <NotificationScopePanel key={id} owner={{ scope: "team", teamId: id }} />
   </div>;

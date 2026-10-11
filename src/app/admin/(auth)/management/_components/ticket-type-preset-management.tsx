@@ -208,7 +208,7 @@ export function TicketTypePresetManagement({ tenantId }: { tenantId?: string }) 
           <TabsList>
             {PRODUCT_LANGUAGES.map((lang) => (
               <TabsTrigger key={lang} value={lang}>
-                {t.languages[lang]}{lang === PRODUCT_LANGUAGES[0] ? ` · ${t.formBuilder.defaultTag}` : ""}
+                {t.languages[lang]}{lang === PRODUCT_LANGUAGES[0] && <Badge variant="secondary" className="px-1 py-0 text-[10px] font-normal">{t.formBuilder.defaultTag}</Badge>}
               </TabsTrigger>
             ))}
           </TabsList>

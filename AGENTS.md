@@ -17,6 +17,11 @@ OnFire is a minimalist modern ticket system designed to enable users to quickly 
 
 Current status and task requirements live in `.agents/STATUS.md` and `.agents/REQUIREMENTS.md`. Development and visual rules live in `.agents/DEVELOPMENT.md` and `.agents/DESIGN.md`.
 
+UI metadata uses label/value groups, alignment and responsive spacing rather
+than middot/bullet-delimited text. Activity records separate action, actor/details
+and time; state, language and version use small semantic badges. See
+`.agents/DESIGN.md` for the shared information hierarchy patterns.
+
 ## Project Structure
 
 ```
