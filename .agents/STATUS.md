@@ -44,7 +44,13 @@ Updated: 2026-10-12
   D1 export and Time Travel bookmark were saved. Applying pending 0032 and 0033
   to the export preserves every original column in tickets, replies, customers
   and notification policies; four existing tickets receive unique numbers 1–4.
-  Remote migration and deployment verification are recorded after release.
+  Remote migrations 0032 and 0033 now pass: four positive unique numbers,
+  high-water mark 4, three allocation/guard triggers, no orphan replies and
+  no foreign-key violations. Remote D1 rejects multiline trigger parsing;
+  single-line trigger definitions and a conditional RAISE avoid that parser
+  path while preserving the allocation semantics. Exhausted/missing counters
+  reject and roll back inserts. Deployment verification is saved privately in
+  `.cache/onfire-release-20261012`; no live mail is sent by this release check.
 
 
 ## Iconwiz support identity and Maileroo delivery — 2026-10-12

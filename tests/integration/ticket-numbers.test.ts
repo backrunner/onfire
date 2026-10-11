@@ -46,6 +46,12 @@ describe("database ticket numbers", () => {
       await client.execute(insert("after-rollback"));
       expect((await client.execute("SELECT number FROM tickets WHERE id = 'after-rollback'")).rows[0]?.number).toBe(25);
       expect((await client.execute("SELECT id FROM tickets WHERE number = 0")).rows).toEqual([]);
+      await client.execute("UPDATE ticket_number_sequence SET value = 9007199254740991 WHERE id = 1");
+      await expect(client.execute(insert("exhausted"))).rejects.toThrow("allocation failed");
+      expect((await client.execute("SELECT id FROM tickets WHERE id = 'exhausted'")).rows).toEqual([]);
+      await client.execute("DELETE FROM ticket_number_sequence WHERE id = 1");
+      await expect(client.execute(insert("missing-counter"))).rejects.toThrow("allocation failed");
+      expect((await client.execute("SELECT id FROM tickets WHERE number = 0")).rows).toEqual([]);
     } finally {
       client.close();
     }
