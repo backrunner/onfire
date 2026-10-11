@@ -10,6 +10,24 @@
 6. Run generated-type, TypeScript, test, Worker-build, and proportional Playwright checks.
 7. Update `.agents/STATUS.md` when behavior, prerequisites, or gaps change.
 
+## UI Implementation And Review
+
+- Read `.agents/DESIGN.md` for presentation patterns and `.agents/GUARD.md`
+  before accepting UI changes.
+- Avoid joining UI metadata with middots or bullets. Choose a layout from the
+  meaning of the information: label/value groups for fields, separate action,
+  actor/details and time for activity, and small semantic badges for state,
+  language, level and version. Use natural sentences for prose.
+- Reuse `MetadataList`/`MetadataItem` for compact definition lists. Keep ticket
+  numbers prominent, timestamps secondary and filter labels visible independently
+  of their selected values. Let field groups wrap on narrow screens and keep
+  long audit details readable.
+- Do not mechanically replace dots with pipes, slashes, arbitrary icons or
+  extra cards. Legitimate list markers, password masks, semantic status indicators
+  and user-authored content are outside the metadata-separator rule.
+- Review changed flows against the guard with proportional browser checks;
+  record any unresolved presentation issue before delivery.
+
 ## Engineering Rules
 
 - TypeScript strict; avoid `any`, ignored errors, and unchecked production casts.

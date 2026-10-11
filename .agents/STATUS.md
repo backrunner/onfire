@@ -14,6 +14,9 @@ Updated: 2026-10-12
   semantic badges; search filters keep an explicit field label while changing
   the selection. AI summaries, login branding and team headings use hierarchy.
 - The durable design rule lives in `.agents/DESIGN.md` and `AGENTS.md`.
+  `.agents/DEVELOPMENT.md` now includes the implementation rules, and
+  `.agents/GUARD.md` defines the review acceptance checks. The OnFire development
+  skill and its design reference link this guard for future UI work.
   This presentation change requires no database migration or binding change.
 - Frozen install, generated binding check, TypeScript, all 99 files / 847 tests,
   main Worker build and email-agent dry-run pass. Local browser checks use actual

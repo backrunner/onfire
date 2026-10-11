@@ -31,6 +31,14 @@ Use the repository's current architecture and written requirements to make produ
 - Configure Turnstile site key and secret as a pair; protected ToC mutations fail closed when the widget cannot issue a token.
 - Update `.agents/STATUS.md` and `AGENTS.md` when a durable requirement or prerequisite changes.
 
+## UI Review Guard
+
+For UI implementation or review, read [OnFire UI Review Guard](../../GUARD.md)
+and apply its information-hierarchy checks before delivery. Use label/value
+groups, layered activity records and semantic badges instead of dot-delimited
+metadata. Inspect the rendered narrow-screen behavior and preserve legitimate
+list markers, password masks and user-authored content.
+
 ## Verify
 
 Run the CI gates in order:

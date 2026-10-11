@@ -1,5 +1,8 @@
 # Design Reference
 
+- Apply [OnFire UI Review Guard](../../../GUARD.md) to changed UI metadata.
+  Choose label/value groups, layered activity records and semantic badges;
+  preserve field labels and wrap groups on mobile instead of dot-delimited text.
 - Use existing shadcn/ui primitives and zinc tokens.
 - Favor a dense operational console over marketing composition.
 - Avoid AI-dashboard slop: no oversized operational headings, decorative card grids, gradient blobs, glass-heavy shells, or explanatory UI copy.

@@ -21,6 +21,8 @@ UI metadata uses label/value groups, alignment and responsive spacing rather
 than middot/bullet-delimited text. Activity records separate action, actor/details
 and time; state, language and version use small semantic badges. See
 `.agents/DESIGN.md` for the shared information hierarchy patterns.
+Read `.agents/GUARD.md` before accepting UI changes; the OnFire development skill
+links the same review checks.
 
 ## Project Structure
 
