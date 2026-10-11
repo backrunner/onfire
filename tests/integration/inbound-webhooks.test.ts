@@ -164,7 +164,13 @@ describe("maileroo inbound webhook", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const res = await mailerooPOST(postJson(URL, mailerooPayload(address)));
+    const res = await mailerooPOST(postJson(URL, mailerooPayload(address, {
+      headers: {
+        From: ["=?utf-8?B?5rWL6K+V?= <sender@gmail.com>"],
+        To: [address],
+        Subject: ["=?utf-8?B?SWNvbndpeiDpm4bmiJDmtYvor5UgMjAyNjEwMTItMDIwMw==?="],
+      },
+    })));
     expect(res.status).toBe(200);
     const json = await resultOf(res);
     expect(json.data.action).toBe("ticket_created");
@@ -180,6 +186,7 @@ describe("maileroo inbound webhook", () => {
       where: eq(tickets.id, json.data.ticketId),
     });
     expect(ticket?.productId).toBe(productId);
+    expect(ticket?.subject).toBe("Iconwiz 集成测试 20261012-0203");
     // The stripped reply part wins over the full body.
     expect(ticket?.content).toBe("Stripped reply text");
     expect(ticket?.customerEmail).toBe("sender@gmail.com");

@@ -77,7 +77,7 @@ describe("email content and threading", () => {
       Response.json({
         success: true,
         message: "queued",
-        data: { reference_id: "maileroo-ref" },
+        data: { reference_id: "c843204e3af03193bd14f339" },
       })
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -90,10 +90,15 @@ describe("email content and threading", () => {
       subject: "Update",
       html: "<p>Done</p>",
       text: "Done",
-      headers: { "In-Reply-To": "<previous@example.com>" },
+      headers: {
+        "In-Reply-To": "<previous@example.com>",
+        References: "<previous@example.com>",
+        "Message-ID": "<generated@example.com>",
+        "message-id": "<lowercase@example.com>",
+      },
     });
 
-    expect(result).toEqual({ success: true, messageId: "maileroo-ref" });
+    expect(result).toEqual({ success: true, messageId: "c843204e3af03193bd14f339" });
     expect(fetchMock).toHaveBeenCalledWith(
       "https://smtp.maileroo.com/api/v2/emails",
       expect.objectContaining({ method: "POST" })
@@ -105,5 +110,19 @@ describe("email content and threading", () => {
       reply_to: { address: "reply@example.com" },
       headers: { "In-Reply-To": "<previous@example.com>" },
     });
+    expect(JSON.parse(String(request.body)).headers).toEqual({
+      "In-Reply-To": "<previous@example.com>",
+      References: "<previous@example.com> <generated@example.com>",
+    });
+  });
+
+  it("does not mark an incomplete Maileroo acceptance as a successful tracked send", async () => {
+    for (const data of [undefined, {}, { reference_id: "" }, { reference_id: 42 }, { reference_id: "invalid" }]) {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ success: true, data })));
+      const result = await new MailerooProvider("secret").send({
+        to: "customer@example.com", from: "support@example.com", subject: "Update", html: "<p>Done</p>",
+      });
+      expect(result).toEqual({ success: false, error: "Maileroo returned an invalid reference ID" });
+    }
   });
 });

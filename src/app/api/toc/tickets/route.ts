@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { eq, and, or, desc, count, sql } from "drizzle-orm";
+import { eq, and, or, isNull, desc, count, sql } from "drizzle-orm";
 import {
   tickets,
   history,
@@ -78,7 +78,7 @@ export const GET = withCustomerAuth(async (req: NextRequest, { db, customer }) =
   const identity = customer.email
     ? or(
         eq(tickets.customerId, customer.sub),
-        sql`lower(${tickets.customerEmail}) = ${customer.email.toLowerCase()}`
+        and(isNull(tickets.customerId), sql`lower(${tickets.customerEmail}) = ${customer.email.toLowerCase()}`)
       )
     : eq(tickets.customerId, customer.sub);
 

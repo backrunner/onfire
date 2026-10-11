@@ -1,3 +1,5 @@
+import { decodeWords } from "postal-mime";
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
@@ -19,7 +21,7 @@ export function parseMailboxHeader(
       .trim()
       .replace(/^"|"$/g, "")
       .trim();
-    return { email, name: name || undefined };
+    return { email, name: name ? decodeWords(name) : undefined };
   }
 
   const bare = trimmed.toLowerCase();

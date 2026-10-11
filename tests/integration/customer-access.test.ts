@@ -123,6 +123,14 @@ describe("customer ticket ownership", () => {
     ).rejects.toThrow();
   });
 
+  it("never grants another linked customer access through a reused email", async () => {
+    const productId = uid("prod");
+    const ownerId = uid("cust");
+    const ticketId = await seedTicket({ productId, customerId: ownerId, customerEmail: "reused@example.com" });
+    await expect(loadCustomerTicket(ctxFor({ sub: uid("cust"), productId, email: "reused@example.com" }), ticketId)).rejects.toThrow();
+    expect((await loadCustomerTicket(ctxFor({ sub: ownerId, productId, email: "new@example.com" }), ticketId)).id).toBe(ticketId);
+  });
+
   it("allows multiple email-less customers per product (unique index sanity)", async () => {
     const productId = uid("prod");
     const tenantId = uid("tenant");

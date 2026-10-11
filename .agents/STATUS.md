@@ -1,6 +1,41 @@
 # OnFire Project Status
 
-Updated: 2026-10-11
+Updated: 2026-10-12
+
+
+## Iconwiz support identity and Maileroo delivery — 2026-10-12
+
+- Stable product-scoped external IDs own customer history across verified email
+  changes. An email-only inbound customer can acquire an external ID once;
+  conflicts fail closed. Email-only and external-ID-only updates preserve fields
+  changed by concurrent requests; deterministic stale-read regressions cover
+  identity, email and level preservation. Linked ticket access and notification/reply recipients
+  use the current customer record rather than stale ticket contact fields.
+- Maileroo v2 rejects the reserved custom Message-ID header and rewrites the
+  SMTP identifier. Its provider filters that header, retains OnFire's thread
+  ancestor in bounded References, and requires a valid 24-hex acceptance ID.
+  This preserves reply correlation for first portal notifications even when
+  a mail client changes the subject or removes the ticket marker.
+- Maileroo webhook subjects and mailbox display names decode RFC 2047 words
+  with postal-mime. One-shot validation, product/customer ownership checks and
+  mail authentication settings remain enforced.
+- Authorized production Worker: `a15bbe52-a9b0-4d8b-af9a-478c153dbcd8`, built
+  with the existing ignored production configuration. No remote migration or
+  historical mailbox import. Iconwiz Maileroo inbound/outbound are enabled;
+  support routing uses the ToC callback and stops catch-all forwarding.
+- Real owned Outlook mailbox checks confirmed delivered test/confirmation
+  mail, inbound ticket creation, staff reply delivery and a changed-subject
+  email reply in the same ticket. Real macOS Desktop handoff claims that same
+  email customer with `iconwiz:<account ID>`; its technical v1 form reaches the
+  admin ticket with platform/version/reproduction fields and delivered mail.
+- A portal-first ticket passed the final
+  live References regression: Maileroo Delivered at 02:22:39, actual Outlook
+  Inbox receipt, and a changed-subject reply without the ticket marker or quoted
+  body in the same admin/customer ticket at 02:29:29.
+- Generated types, TypeScript, Worker build and all 98 files / 840 tests pass,
+  including a Maileroo payload → persisted outbound identifier → changed-subject
+  inbound reply regression. Account email-change/conflict checks use isolated
+  fixtures; the production account email was not changed.
 
 ## Dashboard alignment and page loading — 2026-10-11
 
@@ -117,6 +152,45 @@ Updated: 2026-10-11
   no footer overlap, horizontal overflow or page exceptions. API reads/writes
   use local fixtures; no production mutation, migration or deployment.
   Screenshots and the reproducible local harness are in `.cache/onfire-scroll-qa`.
+
+## Emberday support and Cloudflare email configuration — 2026-09-23
+
+- Added the independent Emberday product, four published website support forms
+  (problem, feature, question, privacy), and Emberday Support product team. The
+  signed-in administrator is the team's active support agent. All four public
+  types and the system Unclassified email fallback route to this team.
+- Product default language remains English; the custom Emberday website provides
+  English/Chinese intake and submits required `preferred_language` (`en`/`zh`).
+  Optional metadata limits are app_version 40, os_version 80 and device_model 120.
+  Email intake does not require website form metadata and retains Unclassified.
+- Disabled all six AI routes at product scope without inheritance. Email AI
+  filtering is disabled; the existing global external spam filter is disabled.
+  Added email alerts for new tickets, customer replies and escalation to product
+  agents using their existing personal email endpoint. No messages were sent.
+- Created an independent expiring website product key (expires 2027-09-22), stored
+  only in the Emberday website's ignored `.dev.vars` with mode 0600. No account or
+  other-product key is embedded in the website.
+- Enabled Cloudflare Email Sending and subdomain Email Routing for
+  `emberday.alkinum.com`. The exact `support@emberday.alkinum.com` recipient rule
+  targets `onfire-email-agent`. OnFire inbound/outbound provider, sender and
+  Reply-To use that address. Authoritative MX/SPF/DKIM/DMARC and routing settings
+  were verified; apex `alkinum.com` still uses `mail.alkinum.com`.
+- Extended both ignored production email address lists, the main product map,
+  and the email agent sender allowlist while retaining WiFiBuddy. Persisted
+  matching build-time production domains and disabled debug/port routing in
+  `.env.production.local`. Main Worker `b6aaa754-dec4-4a7f-ae82-d77952a98c09` and
+  agent `5d08d909-6819-4533-b38f-41b348e0ca4e` are deployed. Source HEAD is
+  `80b656c` (application code identical to `a0157f0`). No application source or
+  database migration changed. Existing secrets and queue consumers are retained.
+- Frozen install, generated types, TypeScript, 97 files / 808 tests, production
+  OpenNext build and both Worker dry-runs pass. Remote migration listing has no
+  pending migration. Post-deploy APIs confirm exact address/product mapping,
+  allowlists, MailAgentGateway binding and one correct consumer per mail queue.
+  Portal/direct/proxied health, denied cross-surface routes and authenticated
+  product settings were checked separately. Real inbound/outbound mailbox
+  delivery and customer ticket creation were intentionally not exercised, since
+  those actions can send external notifications. DNS/configuration readiness
+  does not establish inbox delivery or real reply threading.
 
 ## AI routing and usage production release — 2026-09-21
 

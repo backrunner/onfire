@@ -18,7 +18,7 @@ export async function loadCustomerTicket(ctx: CustomerContext, id: string) {
     ticket &&
     ticket.productId === ctx.customer.productId &&
     (ticket.customerId === ctx.customer.sub ||
-      (Boolean(ticket.customerEmail) &&
+      (!ticket.customerId && Boolean(ticket.customerEmail) &&
         Boolean(ctx.customer.email) &&
         ticket.customerEmail!.toLowerCase() ===
           ctx.customer.email!.toLowerCase()));

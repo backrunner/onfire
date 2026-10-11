@@ -1,15 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
-import { emailConfigs, emailDispatches, emailReplyIntents, notificationLogs, outboundEmails, products, replies, teams, tenants, tickets } from "@/drizzle/schema";
+import { customers, emailConfigs, emailDispatches, emailReplyIntents, notificationLogs, outboundEmails, products, replies, teams, tenants, tickets } from "@/drizzle/schema";
 import type { Database } from "@/lib/db";
 import { TicketPriority, TicketStatus } from "@/lib/types";
 import { enqueueInboundEmail, repairInboundEnqueue } from "@/lib/email-queue";
 import type { InboundQueueMessage, OutboundQueueMessage } from "@/lib/email-queue";
 import { claimOutbound, completeOutbound, prepareReplyEmailIntent, repairEmailOutbox } from "@/services/email/agent-outbox";
-import { sendConfiguredEmail } from "@/services/email/outbound";
+import { sendConfiguredEmail, sendTicketNotification } from "@/services/email/outbound";
 import { consumeAgentOutbound } from "@/services/email/agent-consumer";
 import { processQueuedInbound } from "@/services/email/queued-inbound";
+import { processInboundEmail } from "@/services/email/inbound";
 import { createTestDb, NOW, uid } from "./test-db";
 
 const mocks = vi.hoisted(() => ({ env: {} as Record<string, unknown>, db: undefined as Database | undefined }));
@@ -68,6 +69,41 @@ async function queueEmail(replyId?: string) {
 }
 
 describe("durable mail agent outbox", () => {
+  it("threads a Maileroo notification reply after SMTP ID rewriting and a changed subject", async () => {
+    await db.update(emailConfigs).set({ outboundProvider: "maileroo", outboundApiKey: "fixture-key", inboundProvider: "generic" }).where(eq(emailConfigs.productId, productId));
+    let sentHeaders: Record<string, string> = {};
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+      sentHeaders = JSON.parse(String(init?.body)).headers;
+      return Response.json({ success: true, data: { reference_id: "c843204e3af03193bd14f339" } });
+    });
+    try {
+      expect((await sendTicketNotification(db, { ticketId, templateType: "ticket_created" })).success).toBe(true);
+      const sent = (await db.query.outboundEmails.findFirst())!;
+      expect(sentHeaders["Message-ID"]).toBeUndefined();
+      expect(sentHeaders.References).toContain(sent.providerMessageId);
+      const inbound = await processInboundEmail(db, {
+        fromEmail: "customer@example.com", toEmail: address,
+        subject: "Entirely changed subject", bodyPlain: "Reply from the mail client",
+        messageId: "<customer-reply@example.com>",
+        inReplyTo: "<rewritten-id@maileroo.test>",
+        references: `${sentHeaders.References} <rewritten-id@maileroo.test>`,
+      });
+      expect(inbound).toMatchObject({ success: true, action: "reply_added", ticketId });
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+  it("sends linked ticket notifications to the current email after an account email change", async () => {
+    const ticket = (await db.query.tickets.findFirst({ where: eq(tickets.id, ticketId) }))!;
+    const id = uid("customer");
+    await db.insert(customers).values({ id, productId, tenantId: ticket.tenantId, email: "new@example.com", externalId: "iconwiz:stable", createdAt: NOW(), updatedAt: NOW() });
+    await db.update(tickets).set({ customerId: id }).where(eq(tickets.id, ticketId));
+    const sent = await sendTicketNotification(db, { ticketId, templateType: "ticket_created" });
+    expect(sent.success).toBe(true);
+    expect((await db.query.outboundEmails.findFirst())?.toEmail).toBe("new@example.com");
+    await db.update(customers).set({ email: null }).where(eq(customers.id, id));
+    expect((await sendTicketNotification(db, { ticketId, templateType: "ticket_created" })).success).toBe(false);
+  });
   it("commits one outbox per reply and repairs an unavailable queue", async () => {
     queueSend.mockRejectedValue(new Error("queue unavailable"));
     const first = await queueEmail("reply-1"), second = await queueEmail("reply-1");

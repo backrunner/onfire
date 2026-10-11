@@ -12,6 +12,22 @@ export class MailerooProvider implements EmailProvider {
 
   async send(message: EmailMessage): Promise<SendResult> {
     try {
+      // Maileroo generates its own Message-ID and rejects this reserved header.
+      // Keep the reply headers so replies can still reference the incoming mail.
+      const headers = message.headers
+        ? Object.fromEntries(Object.entries(message.headers).filter(([name]) => name.toLowerCase() !== "message-id"))
+        : undefined;
+      // Maileroo also rewrites the SMTP Message-ID. Retain OnFire's identifier
+      // as a thread ancestor: mail clients carry References into their replies,
+      // including replies to a portal-created ticket with a changed subject.
+      const threadId = Object.entries(message.headers ?? {}).find(([name]) => name.toLowerCase() === "message-id")?.[1];
+      if (headers && threadId && /^<[^<>\s]+@[^<>\s]+>$/.test(threadId) && threadId.length <= 256) {
+        const referenceKey = Object.keys(headers).find((name) => name.toLowerCase() === "references");
+        const references = [...new Set([...(referenceKey ? headers[referenceKey].match(/<[^<>\s]+@[^<>\s]+>/g) ?? [] : []), threadId])];
+        if (referenceKey) delete headers[referenceKey];
+        while (references.join(" ").length > 768) references.shift();
+        headers.References = references.join(" ");
+      }
       const response = await fetchWithTimeout("https://smtp.maileroo.com/api/v2/emails", {
         method: "POST",
         headers: {
@@ -30,7 +46,7 @@ export class MailerooProvider implements EmailProvider {
           reply_to: message.replyTo
             ? { address: message.replyTo }
             : undefined,
-          headers: message.headers,
+          headers,
         }),
       }, 15_000);
 
@@ -53,9 +69,14 @@ export class MailerooProvider implements EmailProvider {
         };
       }
 
+      const referenceId = data.data?.reference_id;
+      if (typeof referenceId !== "string" || !/^[a-f0-9]{24}$/i.test(referenceId)) {
+        return { success: false, error: "Maileroo returned an invalid reference ID" };
+      }
+
       return {
         success: true,
-        messageId: data.data?.reference_id,
+        messageId: referenceId,
       };
     } catch (error) {
       return {

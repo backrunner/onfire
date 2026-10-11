@@ -1,4 +1,5 @@
 import type { Database } from "@/lib/db";
+import { ticketCustomerEmail } from "@/lib/tickets/customer-contact";
 import {
   emailConfigs,
   emailTemplates,
@@ -219,10 +220,10 @@ export async function sendTicketNotification(
   }
 
   // Anonymous customers (externalId-only identity) have no email channel.
-  if (!ticket.customerEmail) {
+  const customerEmail = await ticketCustomerEmail(db, ticket);
+  if (!customerEmail) {
     return { success: false, error: "Customer has no email address" };
   }
-  const customerEmail = ticket.customerEmail;
 
   // Get template for this event type (fall back to built-in defaults)
   const template = await db.query.emailTemplates.findFirst({

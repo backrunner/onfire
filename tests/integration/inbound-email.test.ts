@@ -153,6 +153,20 @@ describe("inbound email processing", () => {
     expect(thread[0].source).toBe("email");
   });
 
+  it("threads linked tickets only from the current customer email after a change", async () => {
+    const { address } = await seedInbound();
+    const created = await processInboundEmail(db, email(address));
+    const ticket = (await db.query.tickets.findFirst({ where: eq(tickets.id, created.ticketId!) }))!;
+    await db.update(customers).set({ email: "changed@example.com", externalId: "iconwiz:stable" }).where(eq(customers.id, ticket.customerId!));
+    const oldMailbox = await processInboundEmail(db, email(address, { subject: `Re: [Ticket #${ticket.id}] Help needed` }));
+    expect(oldMailbox.action).toBe("ticket_created");
+    expect(oldMailbox.ticketId).not.toBe(ticket.id);
+    const currentMailbox = await processInboundEmail(db, email(address, { fromEmail: "changed@example.com", subject: `Re: [Ticket #${ticket.id}] Help needed` }));
+    expect(currentMailbox.action).toBe("reply_added");
+    expect(currentMailbox.ticketId).toBe(ticket.id);
+    expect(await db.select().from(replies).where(eq(replies.ticketId, ticket.id))).toHaveLength(1);
+  });
+
   it("threads replies through a sent outbound Message-ID", async () => {
     const { address, productId } = await seedInbound();
     const created = await processInboundEmail(db, email(address));

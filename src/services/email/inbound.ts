@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { Database } from "@/lib/db";
+import { ticketCustomerEmail } from "@/lib/tickets/customer-contact";
 import { sanitizeRichHtml } from "@/lib/rich-text";
 import {
   emailConfigs,
@@ -186,16 +187,16 @@ async function resolveReplyTicketId(
   if (uniqueIds.length === 0) return null;
 
   const matchingTickets = await db
-    .select({ id: tickets.id })
+    .select({ id: tickets.id, customerId: tickets.customerId, customerEmail: tickets.customerEmail, productId: tickets.productId, tenantId: tickets.tenantId })
     .from(tickets)
     .where(
       and(
         eq(tickets.productId, productId),
-        inArray(tickets.id, uniqueIds),
-        sql`lower(${tickets.customerEmail}) = ${fromEmail.toLowerCase()}`
+        inArray(tickets.id, uniqueIds)
       )
     );
-  const validIds = new Set(matchingTickets.map((ticket) => ticket.id));
+  const checked = await Promise.all(matchingTickets.map(async (ticket) => ({ id: ticket.id, email: await ticketCustomerEmail(db, ticket) })));
+  const validIds = new Set(checked.filter((ticket) => ticket.email?.toLowerCase() === fromEmail.toLowerCase()).map((ticket) => ticket.id));
   return uniqueIds.find((id) => validIds.has(id)) ?? null;
 }
 
@@ -209,7 +210,7 @@ async function addEmailReply(
   if (
     !ticket ||
     ticket.productId !== context.product.id ||
-    ticket.customerEmail?.toLowerCase() !== context.row.fromEmail.toLowerCase()
+    (await ticketCustomerEmail(db, ticket))?.toLowerCase() !== context.row.fromEmail.toLowerCase()
   ) {
     return null;
   }

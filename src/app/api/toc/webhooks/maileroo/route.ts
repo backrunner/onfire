@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { decodeWords } from "postal-mime";
 import { z } from "zod";
 import { inArray, sql } from "drizzle-orm";
 import { emailConfigs } from "@/drizzle/schema";
@@ -167,7 +168,7 @@ export const POST = withPublic(async (req: NextRequest, { db }) => {
     return err("Missing sender", 400);
   }
   const subject =
-    headerValue(payload.headers, "subject")?.trim() || "(no subject)";
+    decodeWords(headerValue(payload.headers, "subject") ?? "").trim() || "(no subject)";
 
   const result = await processInboundEmail(db, {
     provider: "maileroo",
