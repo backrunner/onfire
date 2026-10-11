@@ -272,7 +272,7 @@ export async function sendTicketNotification(
 
   // Build email content
   const variables: EmailTemplateVariables = {
-    ticket_id: ticket.id,
+    ticket_id: String(ticket.number),
     subject: translatedTicketText(
       ticket,
       ticket.customerLanguage ?? product?.defaultLanguage ?? "en",

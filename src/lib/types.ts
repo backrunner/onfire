@@ -84,6 +84,7 @@ export interface Customer {
 }
 
 export interface Ticket {
+  number: number;
   id: TicketID;
   tenantId: TenantID;
   productId: ProductID;

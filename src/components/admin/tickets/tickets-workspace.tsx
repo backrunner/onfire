@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { MousePointerClick } from "lucide-react";
@@ -25,6 +25,7 @@ const BulkBar = dynamic(() => import("./bulk-bar").then((m) => m.BulkBar));
  * shareable; on mobile the panes stack and the detail takes over full width.
  */
 export function TicketsWorkspace({ initialKey, initialData }: { initialKey: string; initialData?: Paginated<TicketSummary> }) {
+  const selectedNumbers = useRef<Record<string, number>>({});
   const { t } = useI18n();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -84,16 +85,19 @@ export function TicketsWorkspace({ initialKey, initialData }: { initialKey: stri
   );
 
   const toggleOne = useCallback((id: string, checked: boolean) => {
+    const ticket = data?.items.find(ticket => ticket.id === id);
+    if (ticket) selectedNumbers.current[id] = ticket.number;
     setSelection((prev) => {
       const next = new Set(prev);
       if (checked) next.add(id);
       else next.delete(id);
       return next;
     });
-  }, []);
+  }, [data?.items]);
 
   const toggleAll = useCallback(
     (checked: boolean) => {
+      for (const ticket of data?.items ?? []) selectedNumbers.current[ticket.id] = ticket.number;
       const ids = data?.items.map((i) => i.id) ?? [];
       setSelection((prev) => {
         const next = new Set(prev);
@@ -114,6 +118,7 @@ export function TicketsWorkspace({ initialKey, initialData }: { initialKey: stri
       {selection.size > 0 && (
         <BulkBar
           selectedIds={[...selection]}
+          ticketNumbers={selectedNumbers.current}
           onClear={() => setSelection(new Set())}
           onDone={() => void mutate()}
         />

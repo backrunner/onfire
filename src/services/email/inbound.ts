@@ -1,4 +1,5 @@
-import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { parseTicketNumber } from "@/lib/tickets/number";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { Database } from "@/lib/db";
 import { ticketCustomerEmail } from "@/lib/tickets/customer-contact";
@@ -182,22 +183,24 @@ async function resolveReplyTicketId(
     .map((match) => match.ticketId)
     .filter((id): id is string => Boolean(id));
   const marker = subject.match(/\[Ticket\s+#([a-zA-Z0-9-]+)\]/i)?.[1];
+  const markerNumber = marker ? parseTicketNumber(marker) : null;
   if (marker) candidateIds.push(marker);
   const uniqueIds = [...new Set(candidateIds)];
   if (uniqueIds.length === 0) return null;
 
   const matchingTickets = await db
-    .select({ id: tickets.id, customerId: tickets.customerId, customerEmail: tickets.customerEmail, productId: tickets.productId, tenantId: tickets.tenantId })
+    .select({ id: tickets.id, number: tickets.number, customerId: tickets.customerId, customerEmail: tickets.customerEmail, productId: tickets.productId, tenantId: tickets.tenantId })
     .from(tickets)
     .where(
       and(
         eq(tickets.productId, productId),
-        inArray(tickets.id, uniqueIds)
+        or(inArray(tickets.id, uniqueIds), markerNumber === null ? undefined : eq(tickets.number, markerNumber))
       )
     );
   const checked = await Promise.all(matchingTickets.map(async (ticket) => ({ id: ticket.id, email: await ticketCustomerEmail(db, ticket) })));
   const validIds = new Set(checked.filter((ticket) => ticket.email?.toLowerCase() === fromEmail.toLowerCase()).map((ticket) => ticket.id));
-  return uniqueIds.find((id) => validIds.has(id)) ?? null;
+  return uniqueIds.find((id) => validIds.has(id)) ??
+    matchingTickets.find((ticket) => ticket.number === markerNumber && validIds.has(ticket.id))?.id ?? null;
 }
 
 async function addEmailReply(

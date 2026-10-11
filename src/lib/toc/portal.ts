@@ -39,6 +39,7 @@ export interface TocTicketTypeForm {
 }
 
 export interface TocTicket {
+  number: number;
   id: string;
   productId: string;
   status: TicketStatus;
@@ -73,6 +74,7 @@ export interface TocTicketDetail {
 }
 
 export interface TocCreateTicketResult {
+  ticketNumber: number;
   ticketId: string;
   status: TicketStatus;
   assigned: boolean;

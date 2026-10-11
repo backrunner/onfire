@@ -51,7 +51,7 @@ const createTicketSchema = z.object({
   metadata: z
     .record(z.string(), z.unknown())
     .optional()
-    .refine((value) => JSON.stringify(value).length <= 20_000, {
+    .refine((value) => value === undefined || JSON.stringify(value).length <= 20_000, {
       message: "Metadata exceeds the 20 KB limit",
     }),
   turnstileToken: z.string().optional(),
@@ -267,9 +267,13 @@ export const POST = withCustomerAuth(async (req: NextRequest, { db, customer }) 
     });
   }
 
+  const createdTicket = await db.query.tickets.findFirst({ where: eq(tickets.id, ticketId), columns: { number: true } });
+  if (!createdTicket) throw new ApiError(500, "Created ticket not found");
+
   return ok(
     {
       ticketId,
+      ticketNumber: createdTicket.number,
       status: assignee ? TicketStatus.Processing : TicketStatus.New,
       assigned: Boolean(assignee),
     },

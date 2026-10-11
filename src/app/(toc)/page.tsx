@@ -37,7 +37,7 @@ function SubmitSuccess({
           </p>
         </div>
         <p className="rounded-md bg-muted px-3 py-1.5 font-mono text-sm">
-          {t.toc.submit.ticketIdLabel}: #{result.ticketId.slice(-8)}
+          {t.toc.submit.ticketIdLabel}: #{result.ticketNumber}
         </p>
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button onClick={onViewTicket}>{t.toc.submit.viewTicket}</Button>

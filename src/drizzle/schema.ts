@@ -8,6 +8,7 @@ import {
   primaryKey,
 } from "drizzle-orm/sqlite-core";
 import { Role, TicketPriority, TicketStatus } from "@/lib/types";
+import { sql } from "drizzle-orm";
 
 // ============================================
 // Better Auth Tables (required for authentication)
@@ -742,10 +743,18 @@ export const categoryRoutes = sqliteTable(
   ],
 );
 
+/** Singleton high-water mark. Ticket insert triggers allocate numbers atomically. */
+export const ticketNumberSequence = sqliteTable("ticket_number_sequence", {
+  id: integer("id").primaryKey(),
+  value: integer("value").notNull(),
+});
+
 export const tickets = sqliteTable(
   "tickets",
   {
     id: text("id").primaryKey(),
+    // Zero exists only inside INSERT, before the allocation trigger finishes.
+    number: integer("number").notNull().default(0),
     tenantId: text("tenant_id").notNull(),
     productId: text("product_id").notNull(),
     teamId: text("team_id").notNull(),
@@ -801,6 +810,7 @@ export const tickets = sqliteTable(
     updatedAt: text("updated_at").notNull(),
   },
   (t) => [
+    uniqueIndex("tickets_number_idx").on(t.number).where(sql`${t.number} > 0`),
     index("tickets_tenant_status_idx").on(t.tenantId, t.status),
     index("tickets_team_status_idx").on(t.teamId, t.status),
     index("tickets_product_status_idx").on(t.productId, t.status),

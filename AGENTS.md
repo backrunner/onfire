@@ -291,6 +291,18 @@ System-scope teams exist outside any tenant and are SuperAdmin-only.
 
 ## Ticket Lifecycle
 
+### Ticket Numbers
+
+User-facing ticket references use immutable, positive decimal numbers (`#123`).
+D1 assigns them atomically across the instance on every ticket insert and never
+reuses a deleted ticket's number. Migration `0033_ticket_numbers.sql` backfills
+existing tickets by creation time, then UUID. UUIDs remain internal relationship
+and API route identifiers. Ticket reads include `number`; creation returns
+`ticketNumber` alongside `ticketId`. UI, search, notifications and the
+`{{ticket_id}}` email variable use the numeric number. Inbound subjects accept
+numeric and legacy UUID markers, always checking the product and current customer
+email; validated RFC thread headers take precedence.
+
 ### Status Flow
 
 ```

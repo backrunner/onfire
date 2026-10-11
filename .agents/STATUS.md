@@ -3,6 +3,50 @@
 Updated: 2026-10-12
 
 
+## Numeric ticket numbers — 2026-10-12
+
+- User-facing tickets now use immutable positive numeric numbers (`#123`) in
+  ToB/ToC lists and details, Dashboard, search suggestions, submission success,
+  bulk failure feedback, notifications, AI ticket context and email templates.
+  Search and MCP lists accept both `123` and `#123` within the existing scope.
+  Internal UUIDs, routes and relationship keys remain compatible.
+- Migration `0033_ticket_numbers.sql` backfills existing tickets by creation
+  time and UUID, then allocates numbers atomically on every D1 ticket insert.
+  A persistent high-water mark prevents reuse after deletion; allocation and
+  ticket insertion roll back together. Insert/update guards prevent authored
+  numbers and renumbering. Drizzle metadata includes the new column, index and
+  sequence table; preserve the migration's allocation triggers in future ticket
+  table rebuilds. Creation rereads the row after the trigger and returns
+  `ticketNumber` alongside `ticketId`; ticket reads include `number`.
+- Email `{{ticket_id}}` now renders the number. Inbound subjects support numeric
+  and legacy UUID markers while enforcing product/current customer email checks.
+  RFC thread headers retain precedence. Four customer mail template types are
+  verified through the local durable outbox. No external message was sent.
+- Real local HTTP creation exposed an existing undefined optional-metadata
+  validation error. Omitted metadata now validates normally, with a regression
+  test verifying the positive allocated response number.
+- Frozen install, generated bindings, TypeScript, 99 files / 847 tests, main
+  Worker build, email-agent dry-run, Drizzle metadata, all 34 migrations in a
+  fresh isolated local D1, main deploy dry-run, startup profiling (~31.5 ms
+  active local CPU), and production dependency audit (zero advisories) pass.
+  The generated startup profile was removed. Tests cover historical backfill,
+  links, concurrency, deletion/non-reuse, immutability, transaction rollback,
+  numeric/legacy mail and scoped search.
+- Real local workerd HTTP requests verify allocated creation responses and
+  concurrent distinct numbers. Chromium covers ToB and ToC in eight combinations
+  of en/zh, light/dark and 1440/390px: numeric references, real scoped suggestions,
+  hydrated editors, no visible UUID, no page exceptions and no horizontal
+  overflow. Harness/results/screenshots are in `.cache/onfire-ticket-number-qa`.
+  Customer multilingual read fixtures use synthetic local data only.
+- Release review corrected stale-read customer identity updates and added two
+  deterministic regressions. All 99 files / 847 tests, TypeScript, production
+  build, both production dry-runs and production audit pass. A private remote
+  D1 export and Time Travel bookmark were saved. Applying pending 0032 and 0033
+  to the export preserves every original column in tickets, replies, customers
+  and notification policies; four existing tickets receive unique numbers 1–4.
+  Remote migration and deployment verification are recorded after release.
+
+
 ## Iconwiz support identity and Maileroo delivery — 2026-10-12
 
 - Stable product-scoped external IDs own customer history across verified email

@@ -15,6 +15,14 @@ Use `Authorization: Bearer <account-key>` against the canonical ToB origin. An
 explicit Authorization header never falls back to a browser cookie. Product keys,
 customer JWTs and MCP tokens are not accepted as account REST credentials.
 
+Ticket responses include a positive numeric `number` for display (`#123`). The
+existing UUID `id` remains the API path identifier and relationship key. Ticket
+lists, search and MCP list queries accept numeric references such as `123` or
+`#123`, subject to the same live scope checks. Customer ticket creation returns
+`ticketNumber` alongside the existing UUID `ticketId`. Email `{{ticket_id}}`
+renders the numeric number; old UUID-based email threads remain supported.
+Apply migration `0033_ticket_numbers.sql` before deploying this version.
+
 ## Permissions and resources
 
 Each operation has an explicit stable grant ID and an exact HTTP method/route.

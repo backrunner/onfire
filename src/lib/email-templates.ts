@@ -16,7 +16,7 @@ export type EmailTemplateVariables = Record<
 >;
 
 export const EMAIL_TEMPLATE_SAMPLE_VARIABLES: EmailTemplateVariables = {
-  ticket_id: "TKT-2026-0712",
+  ticket_id: "12345",
   subject: "Unable to access the analytics dashboard",
   customer_name: "Alex",
   customer_email: "alex@example.com",

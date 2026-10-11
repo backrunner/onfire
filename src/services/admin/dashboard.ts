@@ -27,7 +27,7 @@ export async function getDashboard(ctx: AuthedContext): Promise<DashboardRespons
       .where(productScopeCondition(ctx)),
     ctx.db
       .select({
-        id: tickets.id, tenantId: tickets.tenantId, productId: tickets.productId, teamId: tickets.teamId,
+        id: tickets.id, number: tickets.number, tenantId: tickets.tenantId, productId: tickets.productId, teamId: tickets.teamId,
         subject: tickets.subject, status: tickets.status, priority: tickets.priority, createdAt: tickets.createdAt,
       })
       .from(tickets)

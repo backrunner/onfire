@@ -284,7 +284,7 @@ export function TicketDetail({ ticket, replies, onBack, onRefresh }: TicketDetai
             <TocStatusBadge status={ticket.status} className="mt-0.5 shrink-0" />
           </div>
           <p className="text-xs text-muted-foreground">
-            <span className="font-mono">#{ticket.id.slice(-8)}</span>
+            <span className="font-mono">#{ticket.number}</span>
             <span className="mx-1.5">·</span>
             {t.toc.detail.created}{" "}
             <time dateTime={ticket.createdAt}>

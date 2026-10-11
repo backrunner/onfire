@@ -30,13 +30,14 @@ import { ALL_STATUSES, interp, type BulkResponse } from "./utils";
 
 interface BulkBarProps {
   selectedIds: string[];
+  ticketNumbers: Record<string, number>;
   onClear: () => void;
   /** Called after any bulk mutation so the list revalidates. */
   onDone: () => void;
 }
 
 /** Floating action bar shown while tickets are multi-selected. */
-export function BulkBar({ selectedIds, onClear, onDone }: BulkBarProps) {
+export function BulkBar({ selectedIds, ticketNumbers, onClear, onDone }: BulkBarProps) {
   const { t } = useI18n();
   const { can } = useMe();
   const [assignOpen, setAssignOpen] = useState(false);
@@ -60,7 +61,7 @@ export function BulkBar({ selectedIds, onClear, onDone }: BulkBarProps) {
         .slice(0, 3)
         .map((r) =>
           interp(t.tickets.bulk.failedItem, {
-            id: r.id.length > 8 ? `${r.id.slice(0, 8)}…` : r.id,
+            id: ticketNumbers[r.id] ? `#${ticketNumbers[r.id]}` : "—",
             error: r.error ?? "",
           })
         )

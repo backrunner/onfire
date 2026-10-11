@@ -108,7 +108,7 @@ export function TicketDetail({
           )}
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-base font-semibold leading-tight">
-              {ticket.subject}
+              <span className="font-mono text-muted-foreground">#{ticket.number}</span>{" "}{ticket.subject}
             </h2>
             {ticket.originalSubject && ticket.originalSubject !== ticket.subject && (
               <p className="mt-0.5 truncate text-xs text-muted-foreground" title={ticket.originalSubject}>

@@ -96,7 +96,7 @@ export async function chatWithAgent(
   // Add ticket context if provided
   if (ticket) {
       contextInfo += `\n\nCurrent Ticket Context:
-- ID: ${ticket.id}
+- Ticket number: #${ticket.number}
 - Subject: ${ticket.subject}
 - Status: ${ticket.status}
 - Priority: ${ticket.priority}

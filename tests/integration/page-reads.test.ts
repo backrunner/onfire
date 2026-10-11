@@ -3,13 +3,17 @@ import { z } from "zod";
 import { NextRequest } from "next/server";
 import { and, eq } from "drizzle-orm";
 import type { Database } from "@/lib/db";
-import { agentTeams, products, productTeams, teams, tenants, tickets, ticketTypes, userProducts, users } from "@/drizzle/schema";
+import { agentTeams, customers, products, productTeams, teams, tenants, tickets, ticketTemplates, ticketTemplateVersions, ticketTypes, userProducts, users } from "@/drizzle/schema";
 import { Role, TicketPriority, TicketStatus } from "@/lib/types";
 import { resolveAuthedContext, withAuth } from "@/lib/api/handler";
 import { ok } from "@/lib/api/response";
 import { sealPreviewCookie, PREVIEW_COOKIE_NAME } from "@/lib/preview-identity";
 import { GET as dashboard } from "@/app/api/tob/dashboard/route";
 import { GET as listTickets } from "@/app/api/tob/tickets/route";
+import { POST as createCustomerTicket } from "@/app/api/toc/tickets/route";
+import { signCustomerToken } from "@/lib/auth/customer";
+import { GET as searchTickets } from "@/app/api/tob/search/route";
+import { GET as suggestTickets } from "@/app/api/tob/search/suggest/route";
 import { GET as listTypes } from "@/app/api/tob/admin/ticket-types/route";
 import { ensureUnclassifiedType } from "@/services/ticket-types";
 import { createTestDb } from "./test-db";
@@ -81,6 +85,41 @@ const ticketsSchema = z.object({ ok: z.literal(true), data: z.object({
 const typesSchema = z.object({ ok: z.literal(true), data: z.array(z.object({ id: z.string(), productId: z.string() })) });
 
 describe("live, batched page reads", () => {
+  it("returns the allocated numeric number when a customer creates a ticket without optional metadata", async () => {
+    await db.update(tenants).set({ defaultTeamId: "team1" }).where(eq(tenants.id, "t1"));
+    await db.insert(customers).values({ id: "customer", tenantId: "t1", productId: "p1", email: "customer@example.com", createdAt: "2026-10-12", updatedAt: "2026-10-12" });
+    await db.insert(ticketTypes).values({ id: "intake", productId: "p1", level: 1, name: "Support", createdAt: "2026-10-12", updatedAt: "2026-10-12" });
+    await db.insert(ticketTemplates).values({ id: "form", ticketTypeId: "intake", currentVersionId: "form-v1", createdAt: "2026-10-12", updatedAt: "2026-10-12" });
+    await db.insert(ticketTemplateVersions).values({ id: "form-v1", templateId: "form", version: 1, formSchema: '{"version":"1.0","fields":[]}', createdAt: "2026-10-12" });
+    const { token } = await signCustomerToken({ sub: "customer", tenantId: "t1", productId: "p1" });
+    const response = await createCustomerTicket(new NextRequest("https://support.example.com/api/toc/tickets", {
+      method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ ticketTypeId: "intake", templateVersionId: "form-v1", subject: "Help", content: "Please help" }),
+    }));
+    expect(response.status).toBe(201);
+    const result = z.object({ data: z.object({ ticketId: z.string(), ticketNumber: z.number().positive() }) }).parse(await response.json());
+    const row = await db.query.tickets.findFirst({ where: eq(tickets.id, result.data.ticketId) });
+    expect(result.data.ticketNumber).toBe(row?.number);
+    expect(result.data.ticketNumber).toBe(5);
+  });
+
+  it("finds numeric ticket numbers in lists, search and suggestions without expanding live scope", async () => {
+    sessionUserId = "product";
+    const visible = (await db.query.tickets.findFirst({ where: eq(tickets.id, "new") }))!;
+    const foreign = (await db.query.tickets.findFirst({ where: eq(tickets.id, "foreign") }))!;
+    for (const number of [visible.number, foreign.number]) {
+      const q = encodeURIComponent(`#${number}`);
+      const rowsSchema = z.array(z.object({ id: z.string(), number: z.number() }));
+      const list = z.object({ data: z.object({ items: rowsSchema }) }).parse(await (await listTickets(request(`tickets?q=${q}&summary=true`))).json());
+      const search = z.object({ data: z.object({ tickets: rowsSchema }) }).parse(await (await searchTickets(request(`search?q=${q}`))).json());
+      const suggestions = z.object({ data: z.object({ tickets: rowsSchema }) }).parse(await (await suggestTickets(request(`search/suggest?q=${q}`))).json());
+      for (const rows of [list.data.items, search.data.tickets, suggestions.data.tickets]) {
+        expect(rows.map((row: { id: string }) => row.id)).toEqual(number === visible.number ? [visible.id] : []);
+        if (rows.length) expect(rows[0].number).toBe(number);
+      }
+    }
+  });
+
   it.each([
     ["admin", 4, 3], ["tenant", 3, 2], ["product", 2, 1], ["lead", 2, 1], ["agent", 2, 1],
   ])("preserves %s scope for dashboard and pagination", async (userId, total, productCount) => {

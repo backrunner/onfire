@@ -30,6 +30,7 @@ import { ThemeToggle } from "./theme-toggle";
 import { LanguageToggle } from "./language-toggle";
 
 interface TicketSuggestion {
+  number: number;
   id: string;
   subject: string;
   customerEmail: string | null;
@@ -171,7 +172,7 @@ export function AdminHeader({ onMobileMenu }: { onMobileMenu: () => void }) {
                       {ticket.subject}
                     </span>
                     <span className="block truncate text-[11px] text-muted-foreground">
-                      {ticket.id} · {ticket.customerLabel ?? "—"}
+                      #{ticket.number} · {ticket.customerLabel ?? "—"}
                     </span>
                   </span>
                   <StatusBadge status={ticket.status} className="shrink-0" />

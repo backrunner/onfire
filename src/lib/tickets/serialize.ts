@@ -70,6 +70,7 @@ export function serializeHistory(rows: HistoryRow[]) {
 export function serializeTicketForCustomer(row: TicketRow, language: string) {
   return {
     id: row.id,
+    number: row.number,
     productId: row.productId,
     status: row.status,
     priority: row.priority,

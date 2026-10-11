@@ -221,7 +221,7 @@ export function Dashboard({ initialData }: { initialData: DashboardResponse }) {
             <div className="divide-y sm:hidden">
               {data.recentTickets.map((ticket) => (
                 <Link key={ticket.id} href={`/admin/tickets?ticket=${ticket.id}`} className="block space-y-2 py-3 first:pt-0 last:pb-0">
-                  <p className="truncate text-sm font-medium">{ticket.subject}</p>
+                  <p className="truncate text-sm font-medium"><span className="font-mono text-muted-foreground">#{ticket.number}</span>{" "}{ticket.subject}</p>
                   <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                     <span className="flex items-center gap-2"><StatusBadge status={ticket.status} /><PriorityBadge priority={ticket.priority} /></span>
                     <span className="shrink-0"><LocalDateTime value={ticket.createdAt} /></span>
@@ -253,7 +253,7 @@ export function Dashboard({ initialData }: { initialData: DashboardResponse }) {
                         href={`/admin/tickets?ticket=${ticket.id}`}
                         className="hover:underline"
                       >
-                        {ticket.subject}
+                        <span className="font-mono text-muted-foreground">#{ticket.number}</span>{" "}{ticket.subject}
                       </Link>
                     </TableCell>
                     <TableCell>

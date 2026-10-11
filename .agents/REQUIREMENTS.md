@@ -1,5 +1,17 @@
 # Current Requirements
 
+## Ticket Numbers
+
+- Allocate immutable, positive numeric ticket numbers atomically in D1 across
+  the instance. Numbers start at 1 and are never reused after deletion.
+- Backfill old tickets chronologically without changing UUIDs or reply links.
+  UUIDs remain internal/API identifiers; reads add `number`, and creation adds
+  `ticketNumber` beside the existing `ticketId`.
+- Display numbers in ToB/ToC, search suggestions, notifications and email
+  templates (`{{ticket_id}}`). Search accepts `123` and `#123` within live scope.
+- Keep old UUID email markers and RFC headers working. Numeric markers must
+  enforce the same product and current customer email checks as old threads.
+
 ## RBAC And Scope
 
 - Keep SuperAdmin > TenantAdmin > ProductAdmin > TeamAdmin > Agent.

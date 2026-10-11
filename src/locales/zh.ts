@@ -271,7 +271,7 @@ export const zh = {
   // Topbar
   topbar: {
     title: 'OnFire 客服工作台',
-    searchPlaceholder: '搜索工单主题/ID',
+    searchPlaceholder: '搜索工单主题/编号',
     viewAllResults: '查看全部搜索结果',
     pending: '待处理',
     overdue: '超时',

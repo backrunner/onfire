@@ -69,6 +69,19 @@ async function queueEmail(replyId?: string) {
 }
 
 describe("durable mail agent outbox", () => {
+  it("renders the numeric ticket number in queued customer mail instead of the UUID", async () => {
+    const ticket = (await db.query.tickets.findFirst({ where: eq(tickets.id, ticketId) }))!;
+    for (const templateType of ["ticket_created", "ticket_replied", "ticket_closed", "ticket_escalated"] as const) {
+      const previousIds = new Set((await db.query.outboundEmails.findMany()).map(row => row.id));
+      expect((await sendTicketNotification(db, { ticketId, templateType })).success).toBe(true);
+      const sent = (await db.query.outboundEmails.findMany()).find(row => !previousIds.has(row.id))!;
+      expect(sent.subject).toContain(`#${ticket.number}`);
+      expect(sent.subject).not.toContain(ticketId);
+      expect(sent.bodyHtml).toContain(String(ticket.number));
+      expect(sent.bodyHtml).not.toContain(ticketId);
+    }
+  });
+
   it("threads a Maileroo notification reply after SMTP ID rewriting and a changed subject", async () => {
     await db.update(emailConfigs).set({ outboundProvider: "maileroo", outboundApiKey: "fixture-key", inboundProvider: "generic" }).where(eq(emailConfigs.productId, productId));
     let sentHeaders: Record<string, string> = {};

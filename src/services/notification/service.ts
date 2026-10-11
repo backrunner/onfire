@@ -130,7 +130,7 @@ export async function sendRecipientNotifications(
   });
   const message = buildNotificationMessage({
     triggerEvent,
-    ticketId: ticket.id,
+    ticketNumber: ticket.number,
     ticketSubject: ticket.subject,
     agentName,
     productName: product?.name || "",
@@ -259,7 +259,7 @@ function resolveRequirementRecipients(members: AudienceAgent[], requirement: Not
 
 function buildNotificationMessage(params: {
   triggerEvent: NotificationTriggerEvent;
-  ticketId: string;
+  ticketNumber: number;
   ticketSubject: string;
   agentName: string;
   productName: string;
@@ -268,50 +268,49 @@ function buildNotificationMessage(params: {
 }): { title: string; body: string; url?: string } {
   const {
     triggerEvent,
-    ticketId,
+    ticketNumber,
     ticketSubject,
     agentName,
     productName,
     previousAgentName,
     customerEmail,
   } = params;
-  const shortId = ticketId.slice(-8);
 
   switch (triggerEvent) {
     case "ticket_created":
       return {
         title: "New Ticket Created",
-        body: `[#${shortId}] ${ticketSubject}\n\nFrom: ${customerEmail || "Unknown"}\nProduct: ${productName}`,
+        body: `[#${ticketNumber}] ${ticketSubject}\n\nFrom: ${customerEmail || "Unknown"}\nProduct: ${productName}`,
       };
     case "ticket_assigned":
       return {
         title: "New Ticket Assigned",
-        body: `[#${shortId}] ${ticketSubject}\n\nAssigned to: ${agentName}\nProduct: ${productName}`,
+        body: `[#${ticketNumber}] ${ticketSubject}\n\nAssigned to: ${agentName}\nProduct: ${productName}`,
       };
     case "ticket_reassigned":
       return {
         title: "Ticket Reassigned",
-        body: `[#${shortId}] ${ticketSubject}\n\nReassigned from ${previousAgentName || "another agent"} to ${agentName}`,
+        body: `[#${ticketNumber}] ${ticketSubject}\n\nReassigned from ${previousAgentName || "another agent"} to ${agentName}`,
       };
     case "ticket_escalated":
       return {
         title: "Ticket Escalated",
-        body: `[#${shortId}] ${ticketSubject}\n\nEscalated to: ${agentName}\nFrom: ${previousAgentName || "another agent"}`,
+        body: `[#${ticketNumber}] ${ticketSubject}\n\nEscalated to: ${agentName}\nFrom: ${previousAgentName || "another agent"}`,
       };
     case "ticket_expiring":
       return {
         title: "Ticket SLA Expiring Soon",
-        body: `[#${shortId}] ${ticketSubject}\n\nAssigned to: ${agentName}\nProduct: ${productName}\n\nPlease respond before SLA breach.`,
+        body: `[#${ticketNumber}] ${ticketSubject}\n\nAssigned to: ${agentName}\nProduct: ${productName}\n\nPlease respond before SLA breach.`,
       };
     case "customer_replied":
       return {
         title: "Customer Replied",
-        body: `[#${shortId}] ${ticketSubject}\n\nCustomer: ${customerEmail || "Unknown"}\nAssigned to: ${agentName}`,
+        body: `[#${ticketNumber}] ${ticketSubject}\n\nCustomer: ${customerEmail || "Unknown"}\nAssigned to: ${agentName}`,
       };
     case "ticket_closed":
       return {
         title: "Ticket Closed",
-        body: `[#${shortId}] ${ticketSubject}\n\nProduct: ${productName}\nHandled by: ${agentName}`,
+        body: `[#${ticketNumber}] ${ticketSubject}\n\nProduct: ${productName}\nHandled by: ${agentName}`,
       };
   }
 }

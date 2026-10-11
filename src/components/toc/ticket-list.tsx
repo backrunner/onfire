@@ -208,7 +208,7 @@ export function TicketList({ onSelect }: TicketListProps) {
                         <TocStatusBadge status={ticket.status} />
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        <span className="font-mono">#{ticket.id.slice(-8)}</span>
+                        <span className="font-mono">#{ticket.number}</span>
                         <span className="mx-1.5">·</span>
                         {t.toc.list.updated}{" "}
                         {formatDateTime(ticket.updatedAt)}

@@ -70,6 +70,23 @@ const email = (to: string, overrides = {}) => ({
 });
 
 describe("inbound email processing", () => {
+  it("threads numeric ticket subjects only for the current customer and product", async () => {
+    const { address } = await seedInbound();
+    const created = await processInboundEmail(db, email(address));
+    const ticket = (await db.query.tickets.findFirst({ where: eq(tickets.id, created.ticketId!) }))!;
+    expect(ticket.number).toBeGreaterThan(0);
+    const subject = `Re: [Ticket #${ticket.number}] Help needed`;
+    const reply = await processInboundEmail(db, email(address, { subject }));
+    expect(reply).toMatchObject({ action: "reply_added", ticketId: ticket.id });
+    const attacker = await processInboundEmail(db, email(address, { subject, fromEmail: "attacker@example.com" }));
+    expect(attacker.action).toBe("ticket_created");
+    expect(attacker.ticketId).not.toBe(ticket.id);
+    const other = await seedInbound();
+    const crossProduct = await processInboundEmail(db, email(other.address, { subject }));
+    expect(crossProduct.action).toBe("ticket_created");
+    expect(crossProduct.ticketId).not.toBe(ticket.id);
+  });
+
   it("creates a ticket with SLA deadlines and a customer record", async () => {
     const { address, productId } = await seedInbound();
 

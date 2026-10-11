@@ -24,6 +24,7 @@ export interface SlaView {
 }
 
 export interface TicketView {
+  number: number;
   id: string;
   tenantId: string;
   productId: string;
@@ -62,7 +63,7 @@ export interface TicketView {
 }
 
 /** Lightweight workspace rows; bodies, translations and AI content stay in detail reads. */
-export type TicketSummary = Pick<TicketView, "id" | "subject" | "status" | "priority" | "customerEmail" | "customerLabel" | "updatedAt" | "sla">;
+export type TicketSummary = Pick<TicketView, "number" | "id" | "subject" | "status" | "priority" | "customerEmail" | "customerLabel" | "updatedAt" | "sla">;
 
 export interface ReplyView {
   id: string;
@@ -215,6 +216,7 @@ export interface DashboardResponse {
     products: number;
   };
   recentTickets: Array<{
+    number: number;
     id: string;
     subject: string;
     status: TicketStatus;

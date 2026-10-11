@@ -1,4 +1,11 @@
 import { sql, type SQL, type SQLWrapper } from "drizzle-orm";
+import { tickets } from "@/drizzle/schema";
+import { parseTicketNumber } from "./number";
+
+export function ticketNumberSearchCondition(query: string): SQL {
+  const number = parseTicketNumber(query);
+  return number === null ? sql`0` : sql`${tickets.number} = ${number}`;
+}
 
 /** Search JSON translation values without matching the language keys. */
 export function translationSearchCondition(

@@ -148,7 +148,7 @@ export function TicketList({
                     onToggle(ticket.id, checked === true)
                   }
                   onClick={(e) => e.stopPropagation()}
-                  aria-label={ticket.subject}
+                  aria-label={`#${ticket.number} ${ticket.subject}`}
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -164,7 +164,7 @@ export function TicketList({
                     </span>
                   </div>
                   <p className="mt-1 truncate text-sm font-medium">
-                    {ticket.subject}
+                    <span className="font-mono text-muted-foreground">#{ticket.number}</span>{" "}{ticket.subject}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
                     {ticket.customerLabel ||

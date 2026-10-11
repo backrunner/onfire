@@ -7,7 +7,7 @@ import { ticketScopeCondition } from "@/lib/api/scope";
 import { serializeTicket } from "@/lib/tickets/serialize";
 import { resolveUserNames, resolveCustomerExternalIds } from "@/lib/tickets/names";
 import { activeSlaOverdueCondition } from "@/lib/tickets/sla";
-import { translationSearchCondition } from "@/lib/tickets/search";
+import { ticketNumberSearchCondition, translationSearchCondition } from "@/lib/tickets/search";
 import { translatedTicketText } from "@/lib/tickets/translation";
 import { slaViewOf } from "@/lib/tickets/sla";
 
@@ -53,6 +53,7 @@ export async function listTickets(ctx: AuthedContext, query: z.infer<typeof list
         translationSearchCondition(tickets.contentTranslations, query.q),
         sql`instr(lower(${tickets.customerEmail}), lower(${query.q})) > 0`,
         sql`instr(lower(${tickets.id}), lower(${query.q})) > 0`,
+        ticketNumberSearchCondition(query.q),
         exists(
           ctx.db
             .select({ value: sql<number>`1` })
@@ -118,7 +119,7 @@ export async function listTickets(ctx: AuthedContext, query: z.infer<typeof list
   return {
     items: rows.map((row) => ({
       ...(query.summary ? {
-        id: row.id, subject: translatedTicketText(row, productLanguages.get(row.productId) ?? "en", "subject"),
+        id: row.id, number: row.number, subject: translatedTicketText(row, productLanguages.get(row.productId) ?? "en", "subject"),
         status: row.status, priority: row.priority, customerEmail: row.customerEmail,
         updatedAt: row.updatedAt, sla: slaViewOf(row),
       } : serializeTicket(row, productLanguages.get(row.productId))),

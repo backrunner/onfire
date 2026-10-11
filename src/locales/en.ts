@@ -273,7 +273,7 @@ export const en: Translations = {
   // Topbar
   topbar: {
     title: 'OnFire Support',
-    searchPlaceholder: 'Search ticket subject/ID',
+    searchPlaceholder: 'Search ticket subject/number',
     viewAllResults: 'View all search results',
     pending: 'Pending',
     overdue: 'Overdue',
@@ -1017,7 +1017,7 @@ export const en: Translations = {
       noTickets: 'No tickets',
       noTicketsHint: 'No tickets match the current filters',
       pageOf: 'Page {{page}} of {{total}}',
-      searchPlaceholder: 'Search subject, email, or ticket ID...',
+      searchPlaceholder: 'Search subject, email, or ticket number...',
       loadError: 'Failed to load tickets',
       retry: 'Retry',
       clearSelection: 'Clear selection',
@@ -1026,7 +1026,7 @@ export const en: Translations = {
     },
     detail: {
       title: 'Ticket Details',
-      ticketId: 'Ticket ID',
+      ticketId: 'Ticket number',
       customer: 'Customer',
       product: 'Product',
       team: 'Team',
@@ -1864,7 +1864,7 @@ export const en: Translations = {
       submitting: 'Submitting...',
       successTitle: 'Ticket submitted!',
       successMessage: 'We have received your ticket and our team will get back to you as soon as possible.',
-      ticketIdLabel: 'Ticket ID',
+      ticketIdLabel: 'Ticket number',
       viewTicket: 'View ticket',
       submitAnother: 'Submit another ticket',
       requiredField: 'This field is required',

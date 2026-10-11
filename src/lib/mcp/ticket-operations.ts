@@ -48,7 +48,7 @@ import { emitTicketEvent } from "@/services/ticket-events";
 import { prepareReplyEmailIntent } from "@/services/email/agent-outbox";
 import { serializeState } from "@/services/ticket-internal-states";
 import { prepareReplyTranslation } from "@/services/ticket-translation";
-import { translationSearchCondition } from "@/lib/tickets/search";
+import { ticketNumberSearchCondition, translationSearchCondition } from "@/lib/tickets/search";
 
 export interface McpTicketListInput {
   productId?: string;
@@ -99,6 +99,7 @@ export async function listMcpTickets(
         translationSearchCondition(tickets.contentTranslations, input.query),
         sql`instr(lower(${tickets.customerEmail}), lower(${input.query})) > 0`,
         sql`instr(lower(${tickets.id}), lower(${input.query})) > 0`,
+        ticketNumberSearchCondition(input.query),
         exists(
           ctx.db
             .select({ value: sql<number>`1` })

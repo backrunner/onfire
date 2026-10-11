@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select";
 
 interface SearchTicket {
+  number: number;
   id: string;
   subject: string;
   status: TicketStatus;
@@ -404,7 +405,7 @@ function SearchContent() {
                   </span>
                 </div>
                 <div className="mt-1.5 truncate text-sm font-medium">
-                  {ticket.subject}
+                  <span className="font-mono text-muted-foreground">#{ticket.number}</span>{" "}{ticket.subject}
                 </div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                   <span className="truncate">{ticket.customerLabel ?? "—"}</span>
