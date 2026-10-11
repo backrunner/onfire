@@ -1,6 +1,22 @@
 # OnFire Project Status
 
-Updated: 2026-09-21
+Updated: 2026-10-11
+
+## Management selection-list overflow — 2026-10-11
+
+- Reproduced the team editor's associated-product list overflowing its 176px
+  container: six products expanded the viewport to 228px and covered the footer.
+  The shared ScrollArea now uses a bounded flex column with a shrinkable viewport
+  and clips overflow, fixing the same max-height usage in user-product and
+  agent-team selectors. Short lists still fit their content; fixed-height lists
+  retain their dimensions.
+- Frozen install, generated bindings, TypeScript, all 97 files / 808 tests,
+  OpenNext build and email-agent dry-run pass. Playwright checks in Chromium and
+  WebKit cover the actual team editor at 1440x900 and 390x844, English/Chinese,
+  light/dark, 30-product scrolling, last-item selection and save payloads, with
+  no footer overlap, horizontal overflow or page exceptions. API reads/writes
+  use local fixtures; no production mutation, migration or deployment.
+  Screenshots and the reproducible local harness are in `.cache/onfire-scroll-qa`.
 
 ## AI routing and usage production release — 2026-09-21
 
