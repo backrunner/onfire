@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { AlertTriangle, Search } from "lucide-react";
 import { swrFetcher } from "@/lib/api/client";
 import type { ProductView, TeamView } from "@/lib/api/types";
+import { metadataCacheOptions } from "@/lib/admin-cache";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -49,9 +50,10 @@ export function TicketFiltersBar({ value, onChange }: TicketFiltersBarProps) {
   const { t } = useI18n();
   const { data: products } = useSWR<ProductView[]>(
     "/api/tob/meta/products",
-    swrFetcher
+    swrFetcher,
+    metadataCacheOptions
   );
-  const { data: teams } = useSWR<TeamView[]>("/api/tob/meta/teams", swrFetcher);
+  const { data: teams } = useSWR<TeamView[]>("/api/tob/meta/teams", swrFetcher, metadataCacheOptions);
 
   // Debounced server-side search
   const [search, setSearch] = useState(value.q);

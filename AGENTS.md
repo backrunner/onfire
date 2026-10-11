@@ -924,6 +924,16 @@ Customers may be email-backed or `externalId`-only. Ticket lists, search, labels
 - **Supported Modes**: Light mode + Dark mode
 - **SSR Theme Contract**: `onfire-theme=light|dark` is read by the server and emitted on `<html>` before hydration. First visits use a pre-paint system-preference fallback; client toggles persist cookie and localStorage together to prevent theme flashing.
 
+### Rendering and Loading
+
+- Authenticated layouts resolve live identity and preview scope once per SSR request and seed an identity-scoped SWR cache. Never cache private identity or page data across requests.
+- Dashboard, ticket workspace and customer directory pre-render their initial data through the same scoped services as their APIs. SWR continues mount, focus and reconnect revalidation for business data.
+- The ticket workspace requests `summary=true` rows; default REST list responses retain full ticket fields. Keep heavy bodies, metadata, translation maps and AI output in detail reads. Synthetic D1 batch columns require unique SQL aliases.
+- Prefetch navigation on pointer or keyboard intent. Avoid eagerly downloading every sidebar destination. Product/team metadata is preloaded with relevant pages and deduplicated for one minute.
+- Load ticket detail, closed preview/assistant dialogs, authentication actions and unsupported-browser WebMCP code on demand. Pass only the selected UI dictionary from SSR; load another language when selected.
+- Import language cookie constants from the shared server-safe module. SSR timestamps hydrate in UTC before switching to browser-local time.
+- OpenNext 1.20.10 requires the checked-in pnpm patch to inline Next 16.4's `preview-props.json`. A successful build alone is insufficient: smoke-test the production Worker over HTTP after framework/adapter changes.
+
 ### Color Specifications
 
 **Light Mode**:

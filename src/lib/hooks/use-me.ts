@@ -13,11 +13,11 @@ export function useMe() {
   const { data, error, isLoading, mutate } = useSWR<MeResponse>(
     "/api/tob/me",
     swrFetcher,
-    { revalidateOnFocus: false, dedupingInterval: 60_000 }
+    { revalidateIfStale: false, dedupingInterval: 60_000 }
   );
 
   const can = (permission: Permission): boolean =>
     data?.permissions?.includes(permission) ?? false;
 
-  return { me: data, can, error, isLoading, mutate };
+  return { me: data, can, error, isLoading: isLoading && !data, mutate };
 }

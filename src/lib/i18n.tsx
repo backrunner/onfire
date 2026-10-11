@@ -6,14 +6,13 @@ import {
   useState,
   useCallback,
   useEffect,
+  useRef,
   ReactNode,
 } from "react";
-import { en } from "@/locales/en";
-import { zh, type Translations } from "@/locales/zh";
+import type { Translations } from "@/locales/zh";
+import { LANGUAGE_COOKIE, type Language } from "./i18n-shared";
 
-export type Language = "en" | "zh";
-
-export const LANGUAGE_COOKIE = "onfire-lang";
+export { LANGUAGE_COOKIE, type Language } from "./i18n-shared";
 
 interface I18nContextType {
   language: Language;
@@ -22,8 +21,6 @@ interface I18nContextType {
 }
 
 const I18nContext = createContext<I18nContextType | null>(null);
-
-const translations: Record<Language, Translations> = { en, zh };
 
 /**
  * The language is resolved SERVER-SIDE (cookie, falling back to the
@@ -34,19 +31,32 @@ const translations: Record<Language, Translations> = { en, zh };
 export function I18nProvider({
   children,
   initialLanguage,
+  initialTranslations,
 }: {
   children: ReactNode;
-  initialLanguage?: Language;
+  initialLanguage: Language;
+  initialTranslations: Translations;
 }) {
-  const [language, setLanguageState] = useState<Language>(
-    initialLanguage ?? "en"
-  );
+  const [{ language, t }, setLocale] = useState({ language: initialLanguage, t: initialTranslations });
+  const dictionaries = useRef<Partial<Record<Language, Translations>>>({ [initialLanguage]: initialTranslations });
+  const revision = useRef(0);
 
   const setLanguage = useCallback((lang: Language) => {
-    setLanguageState(lang);
-    document.cookie = `${LANGUAGE_COOKIE}=${lang}; path=/; max-age=31536000; samesite=lax`;
-    localStorage.setItem(LANGUAGE_COOKIE, lang);
-    document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+    const request = ++revision.current;
+    const commit = (dictionary: Translations) => {
+      dictionaries.current[lang] = dictionary;
+      if (request !== revision.current) return;
+      setLocale({ language: lang, t: dictionary });
+      document.cookie = `${LANGUAGE_COOKIE}=${lang}; path=/; max-age=31536000; samesite=lax`;
+      localStorage.setItem(LANGUAGE_COOKIE, lang);
+      document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+    };
+    const cached = dictionaries.current[lang];
+    if (cached) { commit(cached); return; }
+    // Only the current dictionary crosses SSR; load the other one on demand.
+    void (lang === "zh" ? import("@/locales/zh").then((m) => m.zh) : import("@/locales/en").then((m) => m.en))
+      .then(commit)
+      .catch(() => { console.warn("OnFire could not load the selected language."); });
   }, []);
 
   // One-time migration for users who picked a language before the cookie
@@ -59,8 +69,6 @@ export function I18nProvider({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const t = translations[language];
 
   return (
     <I18nContext.Provider value={{ language, setLanguage, t }}>

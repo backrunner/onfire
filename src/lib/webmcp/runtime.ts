@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { MeResponse } from "@/lib/api/types";
 import type { WebMcpOperation } from "./catalog";
+import { adminIdentityKey } from "@/lib/admin-cache";
 
 export interface WebMcpTool {
   name: string;
@@ -24,7 +25,7 @@ export function getWebMcpContext(document: object, navigator: object): WebMcpCon
 }
 
 export function identityKey(me: MeResponse | null | undefined): string {
-  return me ? JSON.stringify([me.user.id, me.role, [...me.permissions].sort(), [...me.tenantIds].sort(), [...me.productIds].sort(), [...me.teamIds].sort(), me.preview?.actor.id ?? null, me.preview?.target.id ?? null]) : "";
+  return adminIdentityKey(me);
 }
 
 class ToolError extends Error {

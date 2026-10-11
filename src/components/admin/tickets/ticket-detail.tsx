@@ -24,7 +24,8 @@ import {
 import { TicketActions } from "./ticket-actions";
 import { Timeline } from "./timeline";
 import { ReplyComposer } from "./reply-composer";
-import { AssistantPanel } from "./assistant-panel";
+import dynamic from "next/dynamic";
+const AssistantPanel = dynamic(() => import("./assistant-panel").then((m) => m.AssistantPanel), { ssr: false });
 import { formatDuration, interp } from "./utils";
 
 interface TicketDetailProps {
@@ -251,11 +252,11 @@ export function TicketDetail({
         />
       </div>
 
-      <AssistantPanel
+      {assistantOpen && <AssistantPanel
         ticketId={ticket.id}
         open={assistantOpen}
         onOpenChange={setAssistantOpen}
-      />
+      />}
     </div>
   );
 }

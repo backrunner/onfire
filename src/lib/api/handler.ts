@@ -132,11 +132,10 @@ export async function resolveAuthedContext(
   };
 }
 
-async function applyPreviewOverlay(
-  req: NextRequest,
+export async function resolvePreviewContext(
   actor: AuthedContext,
+  raw: string | undefined,
 ): Promise<{ ctx: AuthedContext; clearCookie: boolean }> {
-  const raw = req.cookies.get(PREVIEW_COOKIE_NAME)?.value;
   if (!raw) return { ctx: actor, clearCookie: false };
   const secret = getEnv().AUTH_SECRET;
   const payload = await verifyPreviewCookie(raw, secret);
@@ -169,6 +168,10 @@ async function applyPreviewOverlay(
     },
     clearCookie: false,
   };
+}
+
+async function applyPreviewOverlay(req: NextRequest, actor: AuthedContext) {
+  return resolvePreviewContext(actor, req.cookies.get(PREVIEW_COOKIE_NAME)?.value);
 }
 
 function attachClearedPreviewCookie(response: NextResponse, req: NextRequest) {

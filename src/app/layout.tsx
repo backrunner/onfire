@@ -3,9 +3,12 @@ import { cookies, headers } from "next/headers";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { I18nProvider, LANGUAGE_COOKIE, type Language } from "@/lib/i18n";
+import { I18nProvider } from "@/lib/i18n";
+import { LANGUAGE_COOKIE, type Language } from "@/lib/i18n-shared";
 import { Toaster } from "@/components/ui/sonner";
 import { isTheme, THEME_COOKIE, type Theme } from "@/lib/theme";
+import { en } from "@/locales/en";
+import { zh } from "@/locales/zh";
 
 export async function generateMetadata(): Promise<Metadata> {
   const proxied =
@@ -57,7 +60,7 @@ export default async function RootLayout({
       <body className="antialiased">
         <ThemeProvider>
           <TooltipProvider>
-            <I18nProvider initialLanguage={language}>{children}</I18nProvider>
+            <I18nProvider initialLanguage={language} initialTranslations={language === "zh" ? zh : en}>{children}</I18nProvider>
           </TooltipProvider>
           <Toaster />
         </ThemeProvider>

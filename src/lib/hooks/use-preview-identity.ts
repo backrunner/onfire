@@ -20,6 +20,7 @@ export function usePreviewIdentity() {
     await mutate();
     await mutateAll(() => true, undefined, { revalidate: true });
     router.replace("/admin");
+    router.refresh();
   };
 
   const start = async (userId: string) => {

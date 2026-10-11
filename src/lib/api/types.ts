@@ -61,6 +61,9 @@ export interface TicketView {
   aiSuggestedReply?: string | null;
 }
 
+/** Lightweight workspace rows; bodies, translations and AI content stay in detail reads. */
+export type TicketSummary = Pick<TicketView, "id" | "subject" | "status" | "priority" | "customerEmail" | "customerLabel" | "updatedAt" | "sla">;
+
 export interface ReplyView {
   id: string;
   ticketId: string;
@@ -143,7 +146,7 @@ export interface MeResponse {
   tenantIds: string[];
   productIds: string[];
   teamIds: string[];
-  agent?: { level: number; active: boolean } | null;
+  agent?: { userId?: string; level: number; active: boolean; teamIds?: string[] } | null;
   preview?: {
     actor: PreviewIdentityView;
     target: PreviewIdentityView;

@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { PackageOpen } from "lucide-react";
 import { swrFetcher } from "@/lib/api/client";
 import type { ProductView } from "@/lib/api/types";
+import { metadataCacheOptions } from "@/lib/admin-cache";
 import { cn } from "@/lib/utils";
 import {
   Select,
@@ -21,9 +22,7 @@ const NO_PRODUCT = "__none__";
 
 /** Products visible to the current user, shared via SWR. */
 export function useProducts() {
-  return useSWR<ProductView[]>("/api/tob/meta/products", swrFetcher, {
-    revalidateOnFocus: false,
-  });
+  return useSWR<ProductView[]>("/api/tob/meta/products", swrFetcher, metadataCacheOptions);
 }
 
 interface ProductSelectProps {
@@ -63,7 +62,7 @@ export function ProductSelect({
     }
   }, [autoSelectFirst, value, products, onChange]);
 
-  if (isLoading) {
+  if (isLoading && !products) {
     return <Skeleton className={cn("h-8 w-56", className)} />;
   }
 

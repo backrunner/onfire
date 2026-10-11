@@ -110,6 +110,30 @@ describe("live, batched page reads", () => {
     expect(await resolveAuthedContext(db, "missing", {})).toBeNull();
   });
 
+  it.each(["admin", "tenant", "product", "lead", "agent"])("keeps summary rows in the same %s scope without loading detail content", async (userId) => {
+    sessionUserId = userId;
+    await db.update(tickets).set({
+      content: "Large private body ".repeat(1_000),
+      metadata: JSON.stringify({ private: "Form data" }),
+      aiScreeningResult: JSON.stringify({ internal: "AI analysis" }),
+    });
+    const responseSchema = z.object({ data: z.object({ total: z.number(), items: z.array(z.object({ id: z.string(), content: z.string().optional() }).passthrough()) }) });
+    const full = responseSchema.parse(await (await listTickets(request("tickets"))).json());
+    const summary = responseSchema.parse(await (await listTickets(request("tickets?summary=true"))).json());
+    expect(summary.data.total).toBe(full.data.total);
+    expect(summary.data.items.map((row: { id: string }) => row.id)).toEqual(full.data.items.map((row: { id: string }) => row.id));
+    const fresh = summary.data.items.find((row: { id: string }) => row.id === "new");
+    expect(fresh).toMatchObject({ subject: "New", status: "new", priority: "high", updatedAt: "2026-01-01", sla: { acceptBreached: true } });
+    for (const row of summary.data.items) {
+      expect(row).not.toHaveProperty("content");
+      expect(row).not.toHaveProperty("metadata");
+      expect(row).not.toHaveProperty("aiScreeningResult");
+      expect(row).not.toHaveProperty("subjectTranslations");
+    }
+    expect(JSON.stringify(summary).length).toBeLessThan(JSON.stringify(full).length / 10);
+    expect(full.data.items[0].content).toContain("Large private body");
+  });
+
   it("keeps preview reads scoped and rejects preview writes", async () => {
     const cookie = `${PREVIEW_COOKIE_NAME}=${await sealPreviewCookie({ actorId: "admin", targetUserId: "product", exp: Date.now() + 60_000 }, secret)}`;
     const response = await dashboard(request("dashboard", cookie));

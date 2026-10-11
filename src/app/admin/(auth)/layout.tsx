@@ -1,6 +1,6 @@
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-import { getAuth } from "@/lib/auth/server";
+import { getAdminContext } from "@/lib/auth/admin-context";
+import { getMe } from "@/services/admin/me";
+import { AdminDataProvider } from "@/components/admin/admin-data-provider";
 import { AdminShell } from "@/components/admin/shell/admin-shell";
 
 export default async function AdminLayout({
@@ -8,11 +8,6 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getAuth().api.getSession({ headers: await headers() });
-
-  if (!session?.user) {
-    redirect("/admin/login");
-  }
-
-  return <AdminShell>{children}</AdminShell>;
+  const me = await getMe(await getAdminContext());
+  return <AdminDataProvider me={me}><AdminShell>{children}</AdminShell></AdminDataProvider>;
 }

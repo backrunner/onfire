@@ -1,9 +1,9 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, Inbox } from "lucide-react";
-import type { Paginated, TicketView } from "@/lib/api/types";
+import type { Paginated, TicketSummary } from "@/lib/api/types";
 import { useI18n } from "@/lib/i18n";
-import { cn, formatDateTime } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,10 +12,11 @@ import {
   PriorityBadge,
   SlaBadge,
 } from "@/components/admin/status-badges";
+import { LocalDateTime } from "@/components/local-date-time";
 import { interp } from "./utils";
 
 interface TicketListProps {
-  data?: Paginated<TicketView>;
+  data?: Paginated<TicketSummary>;
   isLoading: boolean;
   error?: Error;
   onRetry: () => void;
@@ -159,7 +160,7 @@ export function TicketList({
                       )}
                     />
                     <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
-                      {formatDateTime(ticket.updatedAt)}
+                      <LocalDateTime value={ticket.updatedAt} />
                     </span>
                   </div>
                   <p className="mt-1 truncate text-sm font-medium">

@@ -13,3 +13,5 @@ overrides:
   'next>postcss': 8.5.29
   sharp: 0.35.5
   'cosmiconfig>js-yaml': 4.3.2
+patchedDependencies:
+  '@opennextjs/cloudflare@1.20.10': patches/@opennextjs__cloudflare@1.20.10.patch

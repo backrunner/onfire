@@ -2,6 +2,32 @@
 
 Updated: 2026-10-11
 
+## Dashboard alignment and page loading — 2026-10-11
+
+- Recent-ticket title, subject column, header action and timestamps share the
+  same left/right content edges; the date column has sufficient width.
+- Authenticated SSR seeds current identity in a private, scope-keyed SWR cache.
+  Dashboard, ticket workspace and customer directory render initial scoped
+  data on the server through shared API services. Business data retains SWR
+  revalidation; metadata is preloaded and deduplicated for one minute.
+- Ticket summaries exclude large detail fields without changing the default
+  REST list contract. D1 placeholder expressions have unique aliases so batch
+  mapping preserves timestamps and SLA data. Detail, closed dialogs, logout
+  authentication and WebMCP runtime load only when needed or supported.
+- Navigation prefetch follows pointer/keyboard intent. SSR passes the selected
+  language dictionary; another language loads on selection. Shared language
+  constants make cookies usable in Server Components, and timestamps hydrate
+  consistently across time zones before displaying browser-local time.
+- Added a pinned pnpm patch for OpenNext 1.20.10 to inline Next 16.4's new
+  `preview-props.json`, fixing a runtime 500 missed by build/dry-run checks.
+  See `docs/PERFORMANCE.md` for verification and measurement boundaries.
+- Clean scoped candidate: 98 files / 832 tests and TypeScript pass; the working
+  tree production build passes. Production-browser checks pass for admin and customer portal,
+  including preview isolation, WebMCP and logout. Initial admin JS is 244–265 KB,
+  down 63–65% from the same dependency baseline; 25-row ticket payload is 5.8 KB
+  versus 117 KB. Fresh local migrations, dry-run/startup and production audit
+  (zero advisories) pass. No production deployment or data mutation.
+
 ## Dependency refresh with TypeScript 6 — 2026-10-11
 
 - Updated all direct application and independent site dependencies to the latest

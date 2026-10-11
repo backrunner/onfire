@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { Clock3, Glasses, Menu, Search, LogOut, UserRound } from "lucide-react";
 import { toast } from "sonner";
-import { signOut } from "@/lib/auth";
+import dynamic from "next/dynamic";
 import { usePreviewIdentity } from "@/lib/hooks/use-preview-identity";
-import { PreviewIdentityDialog } from "./preview-identity-dialog";
+const PreviewIdentityDialog = dynamic(() => import("./preview-identity-dialog").then((m) => m.PreviewIdentityDialog), { ssr: false });
 import { Badge } from "@/components/ui/badge";
 import { swrFetcher, qs } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
@@ -54,10 +54,6 @@ export function AdminHeader({ onMobileMenu }: { onMobileMenu: () => void }) {
   const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
-    router.prefetch("/admin/search");
-  }, [router]);
-
-  useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 180);
     return () => window.clearTimeout(timer);
   }, [query]);
@@ -71,12 +67,6 @@ export function AdminHeader({ onMobileMenu }: { onMobileMenu: () => void }) {
       keepPreviousData: true,
       revalidateOnFocus: false,
     });
-
-  useEffect(() => {
-    for (const ticket of suggestions?.tickets ?? []) {
-      router.prefetch(`/admin/tickets/${ticket.id}`);
-    }
-  }, [router, suggestions]);
 
   const submitSearch = () => {
     const q = query.trim();
@@ -140,7 +130,7 @@ export function AdminHeader({ onMobileMenu }: { onMobileMenu: () => void }) {
               setQuery(event.target.value);
               setSearchOpen(true);
             }}
-            onFocus={() => setSearchOpen(true)}
+            onFocus={() => { setSearchOpen(true); router.prefetch("/admin/search"); }}
             placeholder={t.topbar.searchPlaceholder}
             className="h-8 w-full rounded-md border border-border/70 bg-muted/35 pl-9 pr-3 text-xs text-foreground shadow-xs outline-none transition-colors placeholder:text-muted-foreground hover:border-border hover:bg-muted/55 focus:border-ring focus:bg-background focus:ring-2 focus:ring-ring/20"
             role="combobox"
@@ -168,6 +158,8 @@ export function AdminHeader({ onMobileMenu }: { onMobileMenu: () => void }) {
                   type="button"
                   role="option"
                   className="flex w-full items-center gap-3 rounded-sm px-2.5 py-2 text-left transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
+                  onMouseEnter={() => router.prefetch(`/admin/tickets/${ticket.id}`)}
+                  onFocus={() => router.prefetch(`/admin/tickets/${ticket.id}`)}
                   onClick={() => {
                     setSearchOpen(false);
                     router.push(`/admin/tickets/${ticket.id}`);
@@ -284,7 +276,7 @@ export function AdminHeader({ onMobileMenu }: { onMobileMenu: () => void }) {
                     // Sign-out should still proceed if preview cleanup fails.
                   }
                 }
-                await signOut();
+                await (await import("@/lib/auth/client")).signOut();
                 router.push("/admin/login");
               }}
             >
@@ -294,7 +286,7 @@ export function AdminHeader({ onMobileMenu }: { onMobileMenu: () => void }) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <PreviewIdentityDialog open={previewOpen} onOpenChange={setPreviewOpen} />
+      {previewOpen && <PreviewIdentityDialog open={previewOpen} onOpenChange={setPreviewOpen} />}
     </header>
     </div>
   );

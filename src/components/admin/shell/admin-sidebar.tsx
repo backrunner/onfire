@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { AdminLink as Link } from "@/components/admin/admin-link";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Ticket,
@@ -84,7 +83,6 @@ export function AdminSidebar({
   onMobileClose,
 }: AdminSidebarProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const { t } = useI18n();
   const { me, can, isLoading } = useMe();
 
@@ -107,14 +105,6 @@ export function AdminSidebar({
       return [item];
     }),
   })).filter((group) => group.items.length > 0);
-
-  const prefetchKey = visibleGroups
-    .flatMap((group) => group.items.map((item) => item.href))
-    .join("|");
-  useEffect(() => {
-    if (!prefetchKey) return;
-    for (const href of prefetchKey.split("|")) router.prefetch(href);
-  }, [prefetchKey, router]);
 
   const renderNav = (compact: boolean) => (
     <TooltipProvider delayDuration={0}>
@@ -148,7 +138,6 @@ export function AdminSidebar({
                     <Link
                       key={item.href}
                       href={item.href}
-                      prefetch
                       onClick={onMobileClose}
                       className={cn(
                         "group relative flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors",

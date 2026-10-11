@@ -117,6 +117,9 @@ overrides:
   sharp: 0.35.5
   cosmiconfig>js-yaml: 4.3.2
 
+patchedDependencies:
+  '@opennextjs/cloudflare@1.20.10': 05bdafb7555a6a59bbc20518693f291d45f34e9cd7a74466a229da814da2cc73
+
 importers:
 
   .:
@@ -144,7 +147,7 @@ importers:
         version: 4.7.0(monaco-editor@0.57.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@opennextjs/cloudflare':
         specifier: 1.20.10
-        version: 1.20.10(next@16.4.0(@babel/core@7.29.7(supports-color@10.2.2))(@types/node@26.6.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(supports-color@10.2.2)(wrangler@4.149.0(@types/node@26.6.5))
+        version: 1.20.10(patch_hash=05bdafb7555a6a59bbc20518693f291d45f34e9cd7a74466a229da814da2cc73)(next@16.4.0(@babel/core@7.29.7(supports-color@10.2.2))(@types/node@26.6.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(supports-color@10.2.2)(wrangler@4.149.0(@types/node@26.6.5))
       '@tiptap/extension-image':
         specifier: 3.31.4
         version: 3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))
@@ -7077,7 +7080,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@opennextjs/cloudflare@1.20.10(next@16.4.0(@babel/core@7.29.7(supports-color@10.2.2))(@types/node@26.6.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(supports-color@10.2.2)(wrangler@4.149.0(@types/node@26.6.5))':
+  '@opennextjs/cloudflare@1.20.10(patch_hash=05bdafb7555a6a59bbc20518693f291d45f34e9cd7a74466a229da814da2cc73)(next@16.4.0(@babel/core@7.29.7(supports-color@10.2.2))(@types/node@26.6.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(supports-color@10.2.2)(wrangler@4.149.0(@types/node@26.6.5))':
     dependencies:
       '@ast-grep/napi': 0.45.3
       '@dotenvx/dotenvx': 2.34.2
