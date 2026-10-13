@@ -169,6 +169,10 @@
 
 ## Ticket Lifecycle And SLA
 
+- Manual single/bulk and MCP closure default to customer notification. An
+  explicit boolean `notifyCustomer: false` suppresses only the customer closure
+  email; preserve staff policies, history and the notification choice in audit.
+  Reject stale closure snapshots without history or notification side effects.
 - New tickets start only the accept SLA. Reply SLA begins when an agent is assigned and resets on reassignment or escalation.
 - A public agent reply clears the first-reply deadline. A later customer reply changes the ticket back to processing but must not resurrect a completed first-reply SLA.
 - Dashboard, list, search, warning, and breach logic must use the same current-state SLA predicate; stale deadlines are never counted as overdue.
@@ -229,6 +233,10 @@
 
 ## ToB Interaction
 
+- Ticket workspace sorting lives in the list header and URL. Support priority
+  first (default), updated time in both directions and created time in both
+  directions. Sort before pagination with numeric ticket-number tie breakers;
+  changing sort resets page and bulk selection while retaining filters.
 - Top search is a ticket suggestion combobox. Suggestion click opens the ticket; Enter opens `/admin/search?q=...`.
 - Prefetch primary admin routes and suggested tickets. Avoid server navigation for local tab-only state.
 - Product selectors render a clear disabled state when no product exists.

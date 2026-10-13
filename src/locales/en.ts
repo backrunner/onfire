@@ -1012,6 +1012,14 @@ export const en: Translations = {
       low: 'Low'
     },
     list: {
+      sort: 'Sort',
+      sortOptions: {
+        priority: 'Priority first',
+        updated_desc: 'Recently updated',
+        updated_asc: 'Least recently updated',
+        created_desc: 'Newest first',
+        created_asc: 'Oldest first',
+      },
       total: '{{count}} total',
       selected: '{{count}} selected',
       noTickets: 'No tickets',
@@ -1117,6 +1125,9 @@ export const en: Translations = {
       reopenSuccess: 'Ticket reopened',
       statusUpdated: 'Status updated',
       priorityUpdated: 'Priority updated',
+      notifyCustomer: 'Notify customer',
+      notifyCustomerHint: 'Send a closure email. Turn off to close silently.',
+      silentClose: 'Close silently',
       closeConfirmTitle: 'Close Ticket',
       closeConfirmMessage: 'Are you sure you want to close this ticket? The customer will no longer be able to reply.',
       aiSuggest: 'AI Suggest',

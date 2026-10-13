@@ -1010,6 +1010,14 @@ export const zh = {
       low: '低'
     },
     list: {
+      sort: '排序',
+      sortOptions: {
+        priority: '优先级优先',
+        updated_desc: '最近更新',
+        updated_asc: '最久未更新',
+        created_desc: '最新创建',
+        created_asc: '最早创建',
+      },
       total: '共 {{count}} 条',
       selected: '已选 {{count}} 条',
       noTickets: '暂无工单',
@@ -1115,6 +1123,9 @@ export const zh = {
       reopenSuccess: '工单已重新打开',
       statusUpdated: '状态已更新',
       priorityUpdated: '优先级已更新',
+      notifyCustomer: '知会用户',
+      notifyCustomerHint: '发送关闭邮件，关闭此项可静默关闭。',
+      silentClose: '静默关闭',
       closeConfirmTitle: '关闭工单',
       closeConfirmMessage: '确定要关闭该工单吗？关闭后客户将无法继续回复。',
       aiSuggest: 'AI 建议',

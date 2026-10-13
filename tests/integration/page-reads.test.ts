@@ -85,6 +85,31 @@ const ticketsSchema = z.object({ ok: z.literal(true), data: z.object({
 const typesSchema = z.object({ ok: z.literal(true), data: z.array(z.object({ id: z.string(), productId: z.string() })) });
 
 describe("live, batched page reads", () => {
+  it.each([
+    ["priority", ["new", "foreign", "closed", "other"]],
+    ["updated_desc", ["foreign", "closed", "new", "other"]],
+    ["updated_asc", ["other", "new", "closed", "foreign"]],
+    ["created_desc", ["other", "foreign", "closed", "new"]],
+    ["created_asc", ["new", "closed", "foreign", "other"]],
+  ])("sorts %s before pagination, with stable ties and live scope", async (sort, expected) => {
+    await db.update(tickets).set({ createdAt: "2026-01-02", updatedAt: "2026-01-03" }).where(eq(tickets.id, "closed"));
+    await db.update(tickets).set({ createdAt: "2026-01-03", updatedAt: "2025-12-31" }).where(eq(tickets.id, "other"));
+    await db.update(tickets).set({ createdAt: "2026-01-02", updatedAt: "2026-01-03" }).where(eq(tickets.id, "foreign"));
+    const ids: string[] = [];
+    for (let page = 1; page <= 4; page++) {
+      const result = ticketsSchema.parse(await (await listTickets(request(`tickets?sort=${sort}&pageSize=1&page=${page}`))).json());
+      ids.push(result.data.items[0].id);
+    }
+    expect(ids).toEqual(expected);
+    sessionUserId = "product";
+    const scoped = ticketsSchema.parse(await (await listTickets(request(`tickets?sort=${sort}`))).json());
+    expect(scoped.data.items.map(row => row.id)).toEqual(expected.filter(id => id === "new" || id === "closed"));
+  });
+
+  it("rejects unknown ordering instead of interpolating SQL", async () => {
+    expect((await listTickets(request("tickets?sort=createdAt%20DESC"))).status).toBe(400);
+  });
+
   it("returns the allocated numeric number when a customer creates a ticket without optional metadata", async () => {
     await db.update(tenants).set({ defaultTeamId: "team1" }).where(eq(tenants.id, "t1"));
     await db.insert(customers).values({ id: "customer", tenantId: "t1", productId: "p1", email: "customer@example.com", createdAt: "2026-10-12", updatedAt: "2026-10-12" });

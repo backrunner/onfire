@@ -28,6 +28,8 @@ export interface TicketEvent {
   customerEmail?: string;
   /** Email ingestion can complete the same prescreening before ticket creation. */
   aiPrescreened?: boolean;
+  /** Only ticket_closed may opt out of the customer email; staff still receive the event. */
+  notifyCustomer?: boolean;
 }
 
 const NOTIFICATION_EVENTS = new Set<NotificationTriggerEvent>([
@@ -71,7 +73,7 @@ async function dispatch(db: Database, event: TicketEvent): Promise<void> {
   }
 
   const emailTemplate = EMAIL_BY_EVENT[event.type];
-  if (emailTemplate) {
+  if (emailTemplate && !(event.type === "ticket_closed" && event.notifyCustomer === false)) {
     jobs.push(
       sendTicketNotification(db, {
         ticketId: event.ticketId,

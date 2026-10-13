@@ -1,16 +1,16 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { eq, and, inArray } from "drizzle-orm";
-import { tickets, history } from "@/drizzle/schema";
+import { and, inArray } from "drizzle-orm";
+import { tickets } from "@/drizzle/schema";
 import { TicketStatus } from "@/lib/types";
-import { ok } from "@/lib/api/response";
+import { ApiError, ok } from "@/lib/api/response";
 import { withAuth, parseBody } from "@/lib/api/handler";
 import { ticketScopeCondition } from "@/lib/api/scope";
-import { emitTicketEvent } from "@/services/ticket-events";
+import { closeTicket } from "@/services/ticket-close";
+import { closeTicketSchema } from "@/lib/tickets/close-schema";
 
-const bulkCloseSchema = z.object({
+const bulkCloseSchema = closeTicketSchema.extend({
   ticketIds: z.array(z.string().min(1)).min(1).max(100),
-  reason: z.string().max(2000).optional(),
 });
 
 export const POST = withAuth({ permission: "ticket.close" }, async (req: NextRequest, ctx) => {
@@ -23,7 +23,6 @@ export const POST = withAuth({ permission: "ticket.close" }, async (req: NextReq
       and(inArray(tickets.id, body.ticketIds), ticketScopeCondition(ctx))
     );
 
-  const now = new Date().toISOString();
   const results: { id: string; success: boolean; error?: string }[] = [];
   const foundIds = new Set(rows.map((r) => r.id));
 
@@ -39,30 +38,13 @@ export const POST = withAuth({ permission: "ticket.close" }, async (req: NextReq
       continue;
     }
 
-    await ctx.db.batch([
-      ctx.db
-        .update(tickets)
-        .set({ status: TicketStatus.Closed, updatedAt: now })
-        .where(eq(tickets.id, ticket.id)),
-      ctx.db.insert(history).values({
-        id: crypto.randomUUID(),
-        ticketId: ticket.id,
-        actorId: ctx.user.id,
-        action: "closed",
-        snapshot: JSON.stringify({
-          previousStatus: ticket.status,
-          reason: body.reason,
-          bulk: true,
-        }),
-        createdAt: now,
-      }),
-    ]);
-
-    emitTicketEvent(ctx.db, {
-      type: "ticket_closed",
-      ticketId: ticket.id,
-      agentId: ticket.assigneeId ?? undefined,
-    });
+    try {
+      await closeTicket(ctx.db, ticket, ctx.user.id, { reason: body.reason, notifyCustomer: body.notifyCustomer, bulk: true });
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 409) throw error;
+      results.push({ id: ticket.id, success: false, error: error.message });
+      continue;
+    }
 
     results.push({ id: ticket.id, success: true });
   }

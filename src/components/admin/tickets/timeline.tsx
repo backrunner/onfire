@@ -174,6 +174,7 @@ interface Snapshot {
   newAssignee?: string;
   newAssigneeLevel?: number;
   reason?: string;
+  notifyCustomer?: boolean;
   stateName?: string;
   previousValue?: string | null;
   value?: string | null;
@@ -212,6 +213,7 @@ function snapshotDetail(
   if (s.newAssignee) {
     parts.push(`→ ${actors?.[s.newAssignee] ?? shortId(s.newAssignee)}`);
   }
+  if (s.notifyCustomer === false) parts.push(t.tickets.actions.silentClose);
   if (s.reason) {
     parts.push(s.reason);
   }

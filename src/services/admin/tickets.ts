@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { and, desc, eq, exists, inArray, or, sql, count, getTableColumns } from "drizzle-orm";
+import { and, asc, desc, eq, exists, inArray, or, sql, count, getTableColumns } from "drizzle-orm";
+import { TICKET_SORTS, type TicketSort } from "@/lib/tickets/sort";
 import { customers, products, tickets } from "@/drizzle/schema";
 import { TicketStatus, TicketPriority } from "@/lib/types";
 import type { AuthedContext } from "@/lib/api/handler";
@@ -22,6 +23,7 @@ export const listQuerySchema = z.object({
     .optional()
     .transform((v) => v === "true" || v === "1"),
   q: z.string().max(200).optional(),
+  sort: z.enum(TICKET_SORTS).default("priority"),
   page: z.coerce.number().int().min(1).default(1),
   summary: z.enum(["true", "false"]).optional().transform((v) => v === "true"),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
@@ -32,6 +34,16 @@ const priorityWeight = sql`CASE ${tickets.priority}
   WHEN 'high' THEN 0
   WHEN 'medium' THEN 1
   ELSE 2 END`;
+
+function ticketOrder(sort: TicketSort) {
+  switch (sort) {
+    case "updated_desc": return [desc(tickets.updatedAt), desc(tickets.number)];
+    case "updated_asc": return [asc(tickets.updatedAt), asc(tickets.number)];
+    case "created_desc": return [desc(tickets.createdAt), desc(tickets.number)];
+    case "created_asc": return [asc(tickets.createdAt), asc(tickets.number)];
+    default: return [priorityWeight, desc(tickets.updatedAt), desc(tickets.number)];
+  }
+}
 
 export async function listTickets(ctx: AuthedContext, query: z.infer<typeof listQuerySchema>) {
 
@@ -91,7 +103,7 @@ export async function listTickets(ctx: AuthedContext, query: z.infer<typeof list
       .select(projection)
       .from(tickets)
       .where(where)
-      .orderBy(priorityWeight, desc(tickets.updatedAt))
+      .orderBy(...ticketOrder(query.sort))
       .limit(query.pageSize)
       .offset((query.page - 1) * query.pageSize),
   ]);
@@ -121,7 +133,7 @@ export async function listTickets(ctx: AuthedContext, query: z.infer<typeof list
       ...(query.summary ? {
         id: row.id, number: row.number, subject: translatedTicketText(row, productLanguages.get(row.productId) ?? "en", "subject"),
         status: row.status, priority: row.priority, customerEmail: row.customerEmail,
-        updatedAt: row.updatedAt, sla: slaViewOf(row),
+        createdAt: row.createdAt, updatedAt: row.updatedAt, sla: slaViewOf(row),
       } : serializeTicket(row, productLanguages.get(row.productId))),
       assigneeName: row.assigneeId ? (names[row.assigneeId] ?? null) : null,
       customerLabel:

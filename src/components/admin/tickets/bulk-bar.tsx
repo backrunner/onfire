@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CloseNotificationOption } from "./close-notification-option";
 import { AssignDialog } from "./assign-dialog";
 import { ALL_STATUSES, interp, type BulkResponse } from "./utils";
 
@@ -42,6 +43,7 @@ export function BulkBar({ selectedIds, ticketNumbers, onClear, onDone }: BulkBar
   const { can } = useMe();
   const [assignOpen, setAssignOpen] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
+  const [notifyCustomer, setNotifyCustomer] = useState(true);
   const [statusOpen, setStatusOpen] = useState(false);
   const [closeReason, setCloseReason] = useState("");
   const [status, setStatus] = useState<string>("");
@@ -129,6 +131,7 @@ export function BulkBar({ selectedIds, ticketNumbers, onClear, onDone }: BulkBar
           disabled={busy}
           onClick={() => {
             setCloseReason("");
+            setNotifyCustomer(true);
             setCloseOpen(true);
           }}
         >
@@ -162,7 +165,7 @@ export function BulkBar({ selectedIds, ticketNumbers, onClear, onDone }: BulkBar
       />
 
       {/* Bulk close confirmation */}
-      <Dialog open={closeOpen} onOpenChange={setCloseOpen}>
+      <Dialog open={closeOpen} onOpenChange={(open) => { if (!busy) setCloseOpen(open); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t.tickets.bulk.closeTitle}</DialogTitle>
@@ -180,6 +183,7 @@ export function BulkBar({ selectedIds, ticketNumbers, onClear, onDone }: BulkBar
               className="text-sm"
             />
           </div>
+          <CloseNotificationOption checked={notifyCustomer} onCheckedChange={setNotifyCustomer} disabled={busy} />
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setCloseOpen(false)} disabled={busy}>
               {t.common.cancel}
@@ -193,12 +197,13 @@ export function BulkBar({ selectedIds, ticketNumbers, onClear, onDone }: BulkBar
                   api.post<BulkResponse>("/api/tob/tickets/bulk/close", {
                     ticketIds: selectedIds,
                     reason: closeReason || t.tickets.bulk.defaultCloseReason,
+                    notifyCustomer,
                   })
                 );
                 if (ok) setCloseOpen(false);
               }}
             >
-              {t.common.confirm}
+              {notifyCustomer ? t.tickets.actions.close : t.tickets.actions.silentClose}
             </Button>
           </DialogFooter>
         </DialogContent>

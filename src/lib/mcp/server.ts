@@ -1,3 +1,4 @@
+import { closeTicketSchema } from "@/lib/tickets/close-schema";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { safeHttpUrl } from "@/lib/external-url";
@@ -212,10 +213,10 @@ export function createMcpServer(ctx: McpGrantContext): McpServer {
       "close_ticket",
       {
         title: "Close ticket",
-        description: "Close a delegated OnFire ticket and record the reason.",
+        description: "Close a delegated OnFire ticket. Customer email is enabled by default; notifyCustomer=false closes silently while retaining staff notifications and history.",
         inputSchema: {
           ticketId: z.string().min(1),
-          reason: z.string().max(2000).optional(),
+          ...closeTicketSchema.shape,
         },
         annotations: { ...writeAnnotations, destructiveHint: true },
       },

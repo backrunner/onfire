@@ -63,7 +63,7 @@ export interface TicketView {
 }
 
 /** Lightweight workspace rows; bodies, translations and AI content stay in detail reads. */
-export type TicketSummary = Pick<TicketView, "number" | "id" | "subject" | "status" | "priority" | "customerEmail" | "customerLabel" | "updatedAt" | "sla">;
+export type TicketSummary = Pick<TicketView, "number" | "id" | "subject" | "status" | "priority" | "customerEmail" | "customerLabel" | "createdAt" | "updatedAt" | "sla">;
 
 export interface ReplyView {
   id: string;

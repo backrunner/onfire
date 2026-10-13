@@ -329,6 +329,14 @@ Closed → [Reopen] → Processing (reply SLA restarts when assigned)
 Moving a ticket to `replied` (single, bulk, or MCP) requires an existing public
 agent reply; otherwise the transition is rejected.
 
+Manual single/bulk closure and MCP closure default to notifying the customer.
+`notifyCustomer: false` skips only the customer closure email; staff notification
+policies and the closure audit still run. The choice is recorded in history,
+and stale concurrent closure requests cannot emit another closure event.
+The workspace offers priority-first, updated-time and created-time sorting;
+sorting runs before pagination, uses ticket numbers to break ties, and persists
+in the URL. Changing sort resets pagination and bulk selection.
+
 ### Rich-Text Replies and Inline Images
 
 - Agent (ToB) and customer (ToC) replies use a shared TipTap editor (bold,

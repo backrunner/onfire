@@ -196,11 +196,6 @@ export function ReplyComposer({
               </Label>
             </>
           )}
-          {closed && (
-            <span className="text-xs text-muted-foreground">
-              {t.tickets.detail.internalNote}
-            </span>
-          )}
           {!closed && (
             <Button
               variant="ghost"

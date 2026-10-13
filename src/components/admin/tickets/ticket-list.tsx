@@ -1,6 +1,14 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Inbox } from "lucide-react";
+import { ArrowDownWideNarrow, ChevronLeft, ChevronRight, Inbox } from "lucide-react";
+import { TICKET_SORTS, type TicketSort } from "@/lib/tickets/sort";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { Paginated, TicketSummary } from "@/lib/api/types";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -16,6 +24,8 @@ import { LocalDateTime } from "@/components/local-date-time";
 import { interp } from "./utils";
 
 interface TicketListProps {
+  sort: TicketSort;
+  onSortChange: (sort: TicketSort) => void;
   data?: Paginated<TicketSummary>;
   isLoading: boolean;
   error?: Error;
@@ -30,6 +40,8 @@ interface TicketListProps {
 
 /** Left-pane compact ticket list with multi-select and pagination. */
 export function TicketList({
+  sort,
+  onSortChange,
   data,
   isLoading,
   error,
@@ -42,14 +54,53 @@ export function TicketList({
   onPageChange,
 }: TicketListProps) {
   const { t } = useI18n();
+  const items = data?.items ?? [];
+  const allChecked = items.length > 0 && items.every((i) => selection.has(i.id));
+  const header = (
+    <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3 text-xs text-muted-foreground">
+      <Checkbox
+        checked={allChecked}
+        disabled={items.length === 0 || Boolean(error)}
+        onCheckedChange={(checked) => onToggleAll(checked === true)}
+        aria-label={t.common.all}
+      />
+      <span className="shrink-0">{interp(t.tickets.list.total, { count: data?.total ?? 0 })}</span>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-7 min-w-0 gap-1.5 px-2 text-xs"
+            aria-label={`${t.tickets.list.sort}: ${t.tickets.list.sortOptions[sort]}`}
+          >
+            <ArrowDownWideNarrow className="size-3.5 shrink-0" />
+            <span>{t.tickets.list.sort}</span>
+            <span className="truncate font-normal text-muted-foreground">{t.tickets.list.sortOptions[sort]}</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuRadioGroup
+            value={sort}
+            onValueChange={(value) => {
+              const selected = TICKET_SORTS.find((option) => option === value);
+              if (selected) onSortChange(selected);
+            }}
+          >
+            {TICKET_SORTS.map((option) => (
+              <DropdownMenuRadioItem key={option} value={option}>
+                {t.tickets.list.sortOptions[option]}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
 
   if (isLoading && !data) {
     return (
-      <div className="flex h-full min-h-0 flex-col" aria-hidden="true">
-        <div className="flex h-[29px] shrink-0 items-center gap-2 border-b border-border px-3">
-          <Skeleton className="size-4 shrink-0" />
-          <Skeleton className="h-3 w-16" />
-        </div>
+      <div className="flex h-full min-h-0 flex-col" aria-busy="true">
+        {header}
         <div className="min-h-0 flex-1 overflow-hidden px-3">
           <div className="divide-y divide-border">
             {Array.from({ length: 8 }).map((_, i) => (
@@ -81,30 +132,34 @@ export function TicketList({
 
   if (error) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-        <p className="text-sm text-muted-foreground">
-          {error.message || t.tickets.list.loadError}
-        </p>
-        <Button variant="outline" size="sm" onClick={onRetry}>
-          {t.tickets.list.retry}
-        </Button>
+      <div className="flex h-full min-h-0 flex-col">
+        {header}
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            {error.message || t.tickets.list.loadError}
+          </p>
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            {t.tickets.list.retry}
+          </Button>
+        </div>
       </div>
     );
   }
 
-  const items = data?.items ?? [];
   const totalPages = data?.totalPages ?? 1;
   const page = data?.page ?? 1;
-  const allChecked = items.length > 0 && items.every((i) => selection.has(i.id));
 
   if (items.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 p-10 text-center">
-        <Inbox className="size-7 text-muted-foreground/50" />
-        <p className="text-sm font-medium">{t.tickets.list.noTickets}</p>
-        <p className="text-xs text-muted-foreground">
-          {t.tickets.list.noTicketsHint}
-        </p>
+      <div className="flex h-full min-h-0 flex-col">
+        {header}
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-10 text-center">
+          <Inbox className="size-7 text-muted-foreground/50" />
+          <p className="text-sm font-medium">{t.tickets.list.noTickets}</p>
+          <p className="text-xs text-muted-foreground">
+            {t.tickets.list.noTicketsHint}
+          </p>
+        </div>
       </div>
     );
   }
@@ -112,14 +167,7 @@ export function TicketList({
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* Select-all header */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5 text-xs text-muted-foreground">
-        <Checkbox
-          checked={allChecked}
-          onCheckedChange={(checked) => onToggleAll(checked === true)}
-          aria-label={t.common.all}
-        />
-        <span>{interp(t.tickets.list.total, { count: data?.total ?? 0 })}</span>
-      </div>
+      {header}
 
       {/* Rows */}
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -160,7 +208,7 @@ export function TicketList({
                       )}
                     />
                     <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
-                      <LocalDateTime value={ticket.updatedAt} />
+                      <LocalDateTime value={sort.startsWith("created_") ? ticket.createdAt : ticket.updatedAt} />
                     </span>
                   </div>
                   <p className="mt-1 truncate text-sm font-medium">

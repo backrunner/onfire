@@ -1,6 +1,44 @@
 # OnFire Project Status
 
-Updated: 2026-10-12
+Updated: 2026-10-13
+
+## Ticket sorting and optional closure notification — 2026-10-13
+
+- The ticket list header offers priority first (the existing default), most/
+  least recently updated, and newest/oldest created. Sorting is applied in the
+  scoped database query before pagination with numeric ticket-number tie
+  breakers. The URL retains the selection across reloads; a sort change resets
+  pagination and bulk selection while preserving filters and the open ticket.
+  Creation-based ordering displays creation timestamps in the rows.
+- Single and bulk closure dialogs default to notifying the customer each time
+  they open. Switching notification off labels the confirmation as silent
+  closure. REST/account-key discovery, WebMCP and OAuth MCP expose the same
+  `notifyCustomer` boolean, defaulting to true for existing callers.
+- Silent closure skips only the customer email. Staff notification policies and
+  history still run, and the choice is stored in the closure snapshot. Manual
+  closures share the existing guarded transaction helper so a stale concurrent
+  request cannot append history or dispatch another notification. Automatic
+  closure retains its existing notification behavior.
+- Closed-ticket composers no longer repeat the internal-note label in the
+  footer; the editor placeholder, amber treatment and Add Note action remain.
+  No migration, binding or dependency change is required.
+- Frozen install, generated binding check, TypeScript, all 100 test files /
+  862 tests, OpenNext Worker build and email-agent dry-run pass. New migrated
+  SQLite tests cover sorting across pages, deterministic ties, scope, invalid
+  input, default/silent closure, bulk partial failures, MCP parity, retained
+  staff dispatch and rejected stale closure snapshots.
+- Local Playwright covers 14 cases: the actual workspace components at
+  1440x900 and 390x844 in en/zh and light/dark, plus bilingual empty/error/loading
+  states. Sort URL/reload/reset, single/bulk notification payloads, restored
+  defaults and the closed composer pass; screenshots show no page overflow or
+  clipped menus. Browser API data and delivery transports are fixtures.
+  Evidence: `.cache/onfire-ticket-controls-qa`. No real customer email or
+  production ticket mutation was used for validation.
+- Release review also passes Drizzle metadata checks, all migrations against
+  a fresh local D1, production dependency audit, production-configured OpenNext
+  build, main/email-agent deployment dry-runs and local Worker startup profiling.
+  The production database has no pending migrations; runtime variable values
+  match the deployed version. Release evidence: `.cache/onfire-release-20261013`.
 
 ## Metadata information hierarchy — 2026-10-12
 

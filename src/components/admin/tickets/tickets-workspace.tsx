@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { MousePointerClick } from "lucide-react";
 import dynamic from "next/dynamic";
+import { ticketSort } from "@/lib/tickets/sort";
 import { ticketsListKey } from "@/lib/tickets/list-key";
 import { swrFetcher } from "@/lib/api/client";
 import type { Paginated, TicketSummary } from "@/lib/api/types";
@@ -21,7 +22,7 @@ const BulkBar = dynamic(() => import("./bulk-bar").then((m) => m.BulkBar));
 
 /**
  * Split-view ticket workspace. All filter/selection state lives in the URL
- * (?status=&priority=&product=&team=&overdue=&q=&page=&ticket=) so views are
+ * (?status=&priority=&product=&team=&overdue=&q=&sort=&page=&ticket=) so views are
  * shareable; on mobile the panes stack and the detail takes over full width.
  */
 export function TicketsWorkspace({ initialKey, initialData }: { initialKey: string; initialData?: Paginated<TicketSummary> }) {
@@ -133,6 +134,11 @@ export function TicketsWorkspace({ initialKey, initialData }: { initialKey: stri
           )}
         >
           <TicketList
+            sort={ticketSort(searchParams.get("sort"))}
+            onSortChange={(sort) => {
+              setSelection(new Set());
+              setParams({ sort: sort === "priority" ? null : sort, page: null });
+            }}
             data={data}
             isLoading={isLoading}
             error={error as Error | undefined}

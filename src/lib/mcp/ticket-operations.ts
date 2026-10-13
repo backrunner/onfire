@@ -1,3 +1,4 @@
+import { closeTicket } from "@/services/ticket-close";
 import { and, count, desc, eq, exists, or, sql } from "drizzle-orm";
 import {
   agents,
@@ -599,35 +600,13 @@ export async function assignMcpTicket(
 
 export async function closeMcpTicket(
   ctx: McpGrantContext,
-  input: { ticketId: string; reason?: string },
+  input: { ticketId: string; reason?: string; notifyCustomer?: boolean },
 ): Promise<Record<string, unknown>> {
   requireMcpPermission(ctx, "tickets:close");
   const ticket = await loadVisibleTicket(ctx, input.ticketId);
-  if (ticket.status === TicketStatus.Closed) {
-    throw badRequest("Ticket is already closed");
-  }
-  const now = new Date().toISOString();
-  await ctx.db.batch([
-    ctx.db
-      .update(tickets)
-      .set({ status: TicketStatus.Closed, updatedAt: now })
-      .where(eq(tickets.id, ticket.id)),
-    ctx.db.insert(history).values({
-      id: crypto.randomUUID(),
-      ticketId: ticket.id,
-      actorId: ctx.user.id,
-      action: "closed",
-      snapshot: JSON.stringify({
-        previousStatus: ticket.status,
-        reason: input.reason,
-      }),
-      createdAt: now,
-    }),
-  ]);
-  emitTicketEvent(ctx.db, {
-    type: "ticket_closed",
-    ticketId: ticket.id,
-    agentId: ticket.assigneeId ?? undefined,
+  const now = await closeTicket(ctx.db, ticket, ctx.user.id, {
+    reason: input.reason,
+    notifyCustomer: input.notifyCustomer ?? true,
   });
   return {
     ticketId: ticket.id,

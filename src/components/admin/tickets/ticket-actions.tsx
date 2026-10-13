@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CloseNotificationOption } from "./close-notification-option";
 import { AssignDialog } from "./assign-dialog";
 import { ALL_STATUSES, VALID_TRANSITIONS } from "./utils";
 
@@ -51,6 +52,7 @@ export function TicketActions({ ticket, hasAgentReply = true, onMutated }: Ticke
   const [assignOpen, setAssignOpen] = useState(false);
   const [escalateOpen, setEscalateOpen] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
+  const [notifyCustomer, setNotifyCustomer] = useState(true);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -125,6 +127,7 @@ export function TicketActions({ ticket, hasAgentReply = true, onMutated }: Ticke
           className="h-8 text-destructive hover:text-destructive"
           onClick={() => {
             setReason("");
+            setNotifyCustomer(true);
             setCloseOpen(true);
           }}
         >
@@ -272,7 +275,7 @@ export function TicketActions({ ticket, hasAgentReply = true, onMutated }: Ticke
       </Dialog>
 
       {/* Close dialog */}
-      <Dialog open={closeOpen} onOpenChange={setCloseOpen}>
+      <Dialog open={closeOpen} onOpenChange={(open) => { if (!busy) setCloseOpen(open); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t.tickets.actions.closeConfirmTitle}</DialogTitle>
@@ -290,6 +293,7 @@ export function TicketActions({ ticket, hasAgentReply = true, onMutated }: Ticke
               className="text-sm"
             />
           </div>
+          <CloseNotificationOption checked={notifyCustomer} onCheckedChange={setNotifyCustomer} disabled={busy} />
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setCloseOpen(false)} disabled={busy}>
               {t.common.cancel}
@@ -303,13 +307,14 @@ export function TicketActions({ ticket, hasAgentReply = true, onMutated }: Ticke
                   () =>
                     api.post(`/api/tob/tickets/${ticket.id}/close`, {
                       reason: reason || undefined,
+                      notifyCustomer,
                     }),
                   t.tickets.actions.closeSuccess
                 );
                 if (ok) setCloseOpen(false);
               }}
             >
-              {t.tickets.actions.close}
+              {notifyCustomer ? t.tickets.actions.close : t.tickets.actions.silentClose}
             </Button>
           </DialogFooter>
         </DialogContent>
