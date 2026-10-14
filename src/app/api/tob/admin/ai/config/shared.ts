@@ -36,6 +36,8 @@ const assignmentSchema = z.object({
   model: z.string().trim().min(1).max(200),
   modelKind: z.enum(["text", "embedding", "rerank", "decision"]).optional(),
   modelDimensions: z.number().int().positive().max(16_384).optional(),
+  spamLabel: z.string().trim().min(1).max(200).optional(),
+  supportLabel: z.string().trim().min(1).max(200).optional(),
   enabled: z.boolean().optional(),
 });
 
@@ -65,6 +67,8 @@ const assignmentSelect = {
   model: aiTaskCredentials.model,
   modelKind: aiTaskCredentials.modelKind,
   modelDimensions: aiTaskCredentials.modelDimensions,
+  spamLabel: aiTaskCredentials.spamLabel,
+  supportLabel: aiTaskCredentials.supportLabel,
   priority: aiTaskCredentials.priority,
   enabled: aiTaskCredentials.enabled,
   credentialName: aiCredentials.name,
@@ -188,6 +192,11 @@ async function assertAssignableCredentials(
     if (!isProviderAllowedForTask(taskType, credential.provider)) {
       throw badRequest("Credential provider is not supported for this AI task");
     }
+    if (credential.provider === "decision" && !credential.baseUrl) throw badRequest("A decision endpoint is required");
+    const routeAssignment = assignments.find((item) => item.credentialId === credential.id)!;
+    if (taskType === "spam" && credential.provider === "huggingface" && (!routeAssignment.spamLabel || !routeAssignment.supportLabel || routeAssignment.spamLabel === routeAssignment.supportLabel)) {
+      throw badRequest("Distinct explicit spam and genuine-support labels are required for a classification model");
+    }
     const allowed =
       credential.scope === "system" ||
       (filled.scope !== "system" &&
@@ -303,6 +312,8 @@ export async function saveTaskRouting(
         model: assignment.model,
         modelKind: assignment.modelKind ?? null,
         modelDimensions: assignment.modelDimensions ?? null,
+        spamLabel: taskType === "spam" ? assignment.spamLabel ?? null : null,
+        supportLabel: taskType === "spam" ? assignment.supportLabel ?? null : null,
         priority,
         enabled: assignment.enabled ?? true,
         createdAt: now,

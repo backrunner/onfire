@@ -194,7 +194,7 @@ export const webMcpOperations: WebMcpOperation[] = [
   op("list_ai_routes", "Read task routes in an explicit system, tenant or product AI scope. Stored credential values are omitted.", undefined, "GET", "/admin/ai/config", { roles: adminRoles, query: aiScope }),
   op("save_ai_route", "Configure an AI task's ordered credential/model route in an explicit scope. The server verifies provider/model capabilities and parent-scope access.", undefined, "POST", "/admin/ai/config", { roles: adminRoles, query: aiScope, body: z.strictObject({
     taskType: z.enum(AI_TASK_TYPES), enabled: z.boolean(), inherit: z.boolean().optional(),
-    assignments: z.array(z.strictObject({ credentialId: id, model: z.string().trim().min(1).max(200), enabled: z.boolean().optional() })).max(20),
+    assignments: z.array(z.strictObject({ credentialId: id, model: z.string().trim().min(1).max(200), spamLabel: z.string().trim().min(1).max(200).optional(), supportLabel: z.string().trim().min(1).max(200).optional(), enabled: z.boolean().optional() })).max(20),
   }) }),
 ];
 

@@ -1,5 +1,6 @@
 import {
   isProviderAllowedForTask,
+  modelKindForTask,
   type AIProviderValue,
   type AITaskTypeValue,
 } from "@/lib/ai-config";
@@ -54,6 +55,8 @@ export const PROVIDER_PRESETS: Record<AIProviderValue, ProviderPreset> = {
     baseUrl: "https://api.typesafe.ai/v1",
     decisionModels: ["jev-latest", "jev-1.13.0", "jev-preview"],
   },
+  huggingface: { baseUrl: "", decisionModels: [] },
+  decision: { baseUrl: "", decisionModels: [] },
   qwen: {
     baseUrl: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
     embeddingModels: ["text-embedding-v4", "text-embedding-v3"],
@@ -88,7 +91,7 @@ export function modelsForTask(
 ): string[] {
   const preset = PROVIDER_PRESETS[provider];
   if (!providerSupportsTask(provider, taskType)) return [];
-  if (provider === "typesafe") return preset.decisionModels ?? [];
+  if (modelKindForTask(taskType, provider) === "decision") return preset.decisionModels ?? [];
   if (taskType === "embedding") return preset.embeddingModels ?? [];
   if (taskType === "rerank") return preset.rerankModels ?? [];
   return preset.languageModels ?? [];

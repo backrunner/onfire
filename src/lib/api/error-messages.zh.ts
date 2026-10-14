@@ -4,6 +4,8 @@
  * source literals — a mismatch silently falls back to English.
  */
 export const zhErrorMessages: Record<string, string> = {
+  "Content verification is temporarily unavailable. Please try again later.": "内容验证暂时不可用，请稍后重试。",
+  "Please submit a genuine support request or relevant ticket reply.": "请提交真实的支持请求或与工单相关的回复。",
   "TypeSafe model catalog request timed out. Try again later.": "TypeSafe 模型列表请求超时，请稍后重试。",
   "Could not connect to the TypeSafe model catalog. Check the API base URL or try again later.": "无法连接 TypeSafe 模型列表接口，请检查 API 地址或稍后重试。",
   "Invalid TypeSafe model catalog": "TypeSafe 返回的模型列表为空或格式无效。",

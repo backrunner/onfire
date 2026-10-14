@@ -1,6 +1,7 @@
 # TypeSafe / Jev screening
 
-OnFire supports TypeSafe's Jev System One models for **Ticket Prescreening**.
+OnFire supports TypeSafe's Jev System One models for **Ticket Prescreening** and the independent **AI Spam Filter** task.
+For standalone spam filtering and other decision models, see [Decision spam filtering](DECISION_SPAM.md).
 The provider uses `POST https://api.typesafe.ai/v1/systemone` with Bearer
 authentication and typed questions; it is not an OpenAI-compatible chat API.
 

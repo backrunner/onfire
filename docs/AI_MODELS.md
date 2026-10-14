@@ -35,3 +35,10 @@ upstream bodies that might echo credentials. TypeSafe additionally distinguishes
 timeouts, connection failures and invalid/empty catalogs, with one bounded retry
 for temporary network/server failures. Long `Retry-After` periods are left to
 the caller instead of holding the refresh request open.
+
+## Independent spam decisions
+
+The `spam` task uses decision capabilities: TypeSafe/Jev, Hugging Face
+text classifiers, or a commercial/self-hosted `onfire-decision-v1` endpoint.
+Classifier labels are explicitly mapped rather than inferred from model names.
+See [setup and protocol](DECISION_SPAM.md) for endpoint and model requirements.

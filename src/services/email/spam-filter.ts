@@ -1,8 +1,10 @@
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { Database } from "@/lib/db";
 import {
   spamFilterConfigs,
+  tickets,
+  replies,
   type SpamFilterConfigRow,
   type SpamFilterVerdict,
 } from "@/drizzle/schema";
@@ -15,6 +17,10 @@ import {
 } from "@/lib/spam-filter-providers";
 import { openStoredSecret, sealSecret } from "@/lib/secret-storage";
 import { readResponseText } from "@/lib/response-body";
+import { getAIProvider } from "@/services/ai/config";
+import type { AIRuntimeContext } from "@/lib/ai-scope";
+import { ApiError } from "@/lib/api/response";
+import type { AISpamOptions } from "@/services/ai/providers";
 
 const MAX_RESPONSE_BYTES = 64 * 1024;
 const CUSTOM_CONTENT_LIMIT = 100_000;
@@ -68,6 +74,8 @@ export interface SpamFilterInput {
   precedence?: string;
   listId?: string;
   returnPath?: string;
+  kind?: "new" | "reply";
+  ticketContext?: AISpamOptions["message"]["ticketContext"];
 }
 
 export interface SpamFilterResult {
@@ -76,6 +84,10 @@ export interface SpamFilterResult {
   reason?: string;
   referenceId?: string;
   provider: SpamFilterProvider;
+  model?: string;
+  decisionProvider?: string;
+  spamProbability?: number;
+  supportProbability?: number;
 }
 
 export { SPAM_FILTER_PROTOCOL };
@@ -118,6 +130,7 @@ export async function runExternalSpamFilter(
   input: SpamFilterInput,
   fetchImpl: typeof fetch = fetch
 ): Promise<SpamFilterResult> {
+  if (config.provider === "ai") throw new Error("AI spam filtering requires a scoped database context");
   const definition = spamFilterProviderDef(config.provider);
   const authSecret = await openSpamFilterSecret(config);
   switch (definition.id) {
@@ -132,6 +145,39 @@ export async function runExternalSpamFilter(
     default:
       return runCustom(config, input, authSecret, fetchImpl);
   }
+}
+
+/** The external stage also applies to matched email replies, before insertion. */
+export async function runSpamFilter(
+  db: Database, config: SpamFilterConfigRow, input: SpamFilterInput, context: AIRuntimeContext,
+): Promise<SpamFilterResult> {
+  if (config.provider !== "ai") return runExternalSpamFilter(config, input);
+  const provider = await getAIProvider(db, "spam", context);
+  if (!provider?.checkSpam) throw new Error("No AI spam decision route is available");
+  const result = await provider.checkSpam({
+    message: { subject: input.subject, content: input.content, fromEmail: input.fromEmail, toEmail: input.toEmail, spfResult: input.spfResult, dkimResult: input.dkimResult, kind: input.kind ?? "new", ticketContext: input.ticketContext },
+    timeoutMs: config.timeoutMs,
+  });
+  const score = Math.max(result.spamProbability, 1 - result.supportProbability);
+  const verdict = score >= config.spamThreshold ? "spam" : score >= config.suspectThreshold || result.supportProbability <= 0.5 || result.spamProbability >= 0.5 ? "suspect" : "allow";
+  return { verdict, score, provider: "ai", decisionProvider: result.provider, model: result.model, spamProbability: result.spamProbability, supportProbability: result.supportProbability, reason: `Spam probability ${result.spamProbability.toFixed(3)}; genuine support probability ${result.supportProbability.toFixed(3)}` };
+}
+
+export async function loadSpamTicketContext(db: Database, productId: string, ticketId: string) {
+  const ticket = await db.query.tickets.findFirst({ where: and(eq(tickets.id, ticketId), eq(tickets.productId, productId)), columns: { subject: true } });
+  if (!ticket) throw new Error("Spam filter ticket context is unavailable");
+  const reply = await db.query.replies.findFirst({ where: and(eq(replies.ticketId, ticketId), eq(replies.internal, false)), orderBy: [desc(replies.createdAt), desc(replies.id)], columns: { content: true } });
+  return { subject: ticket.subject, ...(reply ? { latestReply: reply.content } : {}) };
+}
+
+/** Public intake persists no customer ticket/reply unless an enabled filter allows it. */
+export async function enforceCustomerIntake(db: Database, input: SpamFilterInput, context: { tenantId: string; productId: string }): Promise<void> {
+  const config = await resolveSpamFilterConfig(db, context.tenantId);
+  if (!config) return;
+  let result: SpamFilterResult;
+  try { result = await runSpamFilter(db, config, input, context); }
+  catch { throw new ApiError(503, "Content verification is temporarily unavailable. Please try again later."); }
+  if (result.verdict !== "allow") throw new ApiError(400, "Please submit a genuine support request or relevant ticket reply.");
 }
 
 async function runCustom(

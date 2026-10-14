@@ -590,7 +590,7 @@ Customer JWTs are valid for 24 hours (`expiresIn: 86400`). After a 401, the ToC 
 
 OnFire provides a generic inbound email webhook, allowing users to use any email routing service (Zapier, Make, custom scripts, etc.) to forward emails to the system.
 
-**Endpoint**: `POST /webhooks/inbound`
+**Endpoint**: `POST /api/toc/webhooks/inbound`
 
 **Authentication Methods** (choose one):
 1. Bearer Token: `Authorization: Bearer <webhook_secret>`
@@ -677,11 +677,18 @@ Custom product templates use the same escaped variable renderer for preview and 
 - Use the installed `.agents/skills/typesafe-ai/SKILL.md` when working on
   TypeSafe/Jev capabilities. Read its live API and question guidance before
   changing the integration.
-- TypeSafe Jev uses native System One typed decisions for prescreening only,
+- TypeSafe Jev uses native System One typed decisions for prescreening and dedicated spam filtering,
   including fixed-label tagging and inbound spam/support/type classification.
   It is not a text-generation, translation, embedding or rerank provider.
   Decision routes retain scoped credentials, failover, cooldown and usage;
   raw probabilities and resolved model versions remain in internal audit JSON.
+  The `spam` task also supports Hugging Face classification and custom decision
+  endpoints. Spam and genuine-support labels are explicit. Enabled filtering
+  blocks all non-ticket customer intake before web/API/email writes, including
+  suspect decisions and verification failures. Email is quarantined for review;
+  web/API returns localized 400/503. Reply context excludes internal notes.
+  See `docs/DECISION_SPAM.md` for
+  activation, probability thresholds and endpoint contracts.
   See `docs/TYPESAFE.md` for setup, thresholds, limits and evaluation.
 
 - Dashboard assistant sessions use `ticket-<ticketId>` and recheck current ticket
@@ -863,7 +870,7 @@ POST /tasks/sla-scan      - SLA breach scan + auto-close (cron-invoked; Bearer A
 # Webhooks
 POST /webhooks/maileroo   - Maileroo inbound email webhook (validation_url callback auth)
 POST /webhooks/resend     - Resend inbound email webhook (Svix signature auth)
-POST /webhooks/inbound    - Generic inbound email webhook (requires auth)
+POST /webhooks/inbound    - Generic inbound email webhook (requires auth; relative to /api/toc)
 POST /webhooks/stalwart/:productId/mta-hook - Stalwart DATA-stage MTA Hook (Bearer auth)
 POST /webhooks/stalwart/:productId/events   - Stalwart Telemetry Webhook (X-Signature auth)
 ```

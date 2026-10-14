@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { api, qs, swrFetcher } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 import { useMe } from "@/lib/hooks/use-me";
+import { spamFilterSpecUrl } from "@/lib/onfire-docs";
 import {
   SPAM_FILTER_CUSTOM_HEADERS_EXAMPLE,
   SPAM_FILTER_CUSTOM_REQUEST_EXAMPLE,
@@ -32,13 +33,16 @@ interface SpamConfigView {
   provider?: SpamFilterProvider;
   endpointUrl: string | null;
   timeoutMs: number;
+  spamThreshold: number;
+  suspectThreshold: number;
   secretConfigured: boolean;
+  aiRouteConfigured?: boolean;
 }
 
 const GLOBAL = "__global__";
 
 export function SpamFilterManagement({ tenantId }: { tenantId?: string }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const m = t.management.spamFilter;
   const { can } = useMe();
   const isSuperAdmin = can("tenant.manage");
@@ -57,6 +61,8 @@ export function SpamFilterManagement({ tenantId }: { tenantId?: string }) {
     endpointUrl: "",
     authSecret: "",
     timeoutMs: "3000",
+    spamThreshold: "0.9",
+    suspectThreshold: "0.5",
   });
   const [pending, setPending] = useState(false);
 
@@ -68,6 +74,8 @@ export function SpamFilterManagement({ tenantId }: { tenantId?: string }) {
       endpointUrl: data.endpointUrl ?? "",
       authSecret: "",
       timeoutMs: String(data.timeoutMs),
+      spamThreshold: String(data.spamThreshold ?? 0.9),
+      suspectThreshold: String(data.suspectThreshold ?? 0.5),
     });
   }, [data]);
 
@@ -86,6 +94,8 @@ export function SpamFilterManagement({ tenantId }: { tenantId?: string }) {
             : null,
         ...(form.authSecret.trim() ? { authSecret: form.authSecret.trim() } : {}),
         timeoutMs: Number(form.timeoutMs) || 3000,
+        spamThreshold: Number(form.spamThreshold),
+        suspectThreshold: Number(form.suspectThreshold),
       });
       toast.success(t.management.toastUpdated);
       setForm((current) => ({ ...current, authSecret: "" }));
@@ -102,7 +112,7 @@ export function SpamFilterManagement({ tenantId }: { tenantId?: string }) {
       title={m.title}
       description={m.description}
       actions={
-        <Button size="sm" className="h-8" onClick={() => void save()} disabled={pending || !data}>
+        <Button size="sm" className="h-8" onClick={() => void save()} disabled={pending || !data || (form.mode === "custom" && form.provider === "ai" && data.aiRouteConfigured === false)}>
           <Save className="mr-1.5 size-3.5" />
           {pending ? t.common.loading : t.common.save}
         </Button>
@@ -149,6 +159,18 @@ export function SpamFilterManagement({ tenantId }: { tenantId?: string }) {
                 </SelectContent>
               </Select>
             </FormField>
+            {form.provider === "ai" && (
+              <>
+                <p className="col-span-full text-xs text-muted-foreground">{m.aiRouteHint}</p>
+                {data?.aiRouteConfigured === false && <p role="status" className="col-span-full text-xs text-amber-600 dark:text-amber-400">{m.aiRouteMissing}</p>}
+                <FormField label={m.spamThreshold}>
+                  <Input type="number" min={0} max={1} step={0.01} className="h-8" value={form.spamThreshold} onChange={(event) => setForm((current) => ({ ...current, spamThreshold: event.target.value }))} />
+                </FormField>
+                <FormField label={m.suspectThreshold} hint={m.suspectHint}>
+                  <Input type="number" min={0} max={1} step={0.01} className="h-8" value={form.suspectThreshold} onChange={(event) => setForm((current) => ({ ...current, suspectThreshold: event.target.value }))} />
+                </FormField>
+              </>
+            )}
             {provider.requiresEndpoint && (
               <FormField
                 label={provider.endpointKind === "site" ? m.siteUrl : m.endpoint}
@@ -201,10 +223,10 @@ export function SpamFilterManagement({ tenantId }: { tenantId?: string }) {
                 }
               />
             </FormField>
-            {provider.docsUrl && (
+            {(provider.docsUrl || form.provider === "custom" || form.provider === "ai") && (
               <div className="col-span-full space-y-1 text-xs text-muted-foreground">
                 <a
-                  href={provider.docsUrl}
+                  href={form.provider === "custom" ? spamFilterSpecUrl(language, "custom-spam-api") : form.provider === "ai" ? spamFilterSpecUrl(language, "decision-api") : provider.docsUrl!}
                   target="_blank"
                   rel="noreferrer"
                   className="underline underline-offset-2"

@@ -22,7 +22,7 @@
 - Notification policies live on tenant/product configuration tabs and scoped team pages. Only TeamAdmin has a first-level Notifications entry for their own teams.
 - Split product lifecycle from product configuration: `product.manage` creates/deletes products, while `product.settings` reads and updates SLA, auto-close, and team associations. ProductAdmin receives only `product.settings` within `user_products` scope.
 - Agents may escalate because escalation is required by the lifecycle. They may reassign only within their team when `allowReassign` is enabled.
-- AI credentials are SuperAdmin-only. TenantAdmin and ProductAdmin may maintain knowledge within product scope.
+- System AI credentials/routes are SuperAdmin-only. TenantAdmin may manage tenant AI scope; TenantAdmin and ProductAdmin may manage accessible product AI scope. Knowledge remains subject to ai.knowledge and product visibility.
 - AI assistant ticket context must pass `assertTicketVisible` before reaching a model.
 - Reject deletion of a tenant, product, or team with dependent records using HTTP 409.
 - Validate every submitted tenant/product/team association on create and update. SuperAdmin bypasses visibility scope, never tenant-integrity checks.
@@ -272,13 +272,26 @@
 ## AI
 
 - Language providers: OpenAI, OpenRouter, Anthropic, Google, xAI, DeepSeek.
-- TypeSafe Jev is a decision provider for prescreening only. Use its native
+- TypeSafe Jev is a decision provider for prescreening and dedicated spam filtering. Use its native
   System One API for spam/support probabilities, candidate type selection and
   fixed support tags; do not present it as a generative provider. Validate all
   typed answers before credential success and preserve raw judgments/model
   versions for audit. Inbound rejection applies each adverse probability
   independently to the product strictness threshold; uncertain type choices
   retain the unclassified fallback. See `docs/TYPESAFE.md`.
+- The independent `spam` task accepts TypeSafe, Hugging Face text classification,
+  and `onfire-decision-v1` HTTPS endpoints for open or commercial decision models.
+  Reuse encrypted scoped credentials, inheritance, failover and usage accounting.
+  HF spam and genuine-support labels must be distinct and explicitly mapped;
+  never infer the meaning of LABEL_1 or assume ham means a genuine ticket.
+  Tenant/global spam settings select AI and own ordered suspect/spam probability
+  thresholds. Enabling AI requires an enabled route for that scope. The gate covers customer
+  web/API tickets and replies plus new mail/matched replies before insertion.
+  Score both spam and lack of genuine support intent. Spam, suspect and unavailable
+  verification block admission: mail enters quarantine, web/API returns 400 or 503.
+  Contextual thanks and confirmations remain valid; internal notes never enter
+  provider context. Disabled spam settings still skip this gate.
+  See `docs/DECISION_SPAM.md`.
 - OpenAI persists `responses` or `chat`; default to Responses, retain Chat for compatible gateways.
 - Embedding providers: OpenAI, OpenRouter, Qwen/DashScope, Jina AI, Cohere, Google.
 - Rerank providers: Cohere and Jina AI. Every route must use a model matching its text, embedding, or rerank capability; provider-specific catalogs are fetched and exact model capabilities are verified by the server before assignment.
@@ -311,7 +324,7 @@
 - Cloudflare Email Sending uses `SEND_EMAIL` and sends HTML plus text.
 - Outbound replies propagate `In-Reply-To` and `References` through every provider. Maileroo uses the v2 structured email API and stores its returned reference ID.
 - Run deterministic local spam checks before external or AI work: duplicates, empty content, upstream spam verdicts, strict SPF/DKIM failures, automated/bounce/list mail, and sender rate limits.
-- Support an optional external spam classifier at global or tenant scope. Built-in adapters cover Postmark SpamCheck, Akismet, OOPSpam, and Stop Forum Spam; a custom HTTPS endpoint must speak the onfire-spam-v1 JSON contract shown in the settings UI. Tenant configuration overrides or disables the global default; failures continue to AI instead of dropping mail.
+- Support an optional external spam classifier at global or tenant scope. Built-in adapters cover Postmark SpamCheck, Akismet, OOPSpam, and Stop Forum Spam; a custom HTTPS endpoint must speak the onfire-spam-v1 JSON contract shown in the settings UI. Tenant configuration overrides or disables the global default; a configured filter holds suspect and verification failures for manual review rather than admitting mail.
 - External spam endpoints are sealed-credential outbound fetch sinks: public HTTPS/443 only, no redirects, bounded timeout/body, and strict response validation.
 - New inbound email uses one AI prescreening call for spam/support judgment, type selection, and ticket insights. Invalid or low-confidence type choices fall back to the product's `unclassified` type.
 - Spam and non-support results enter a recoverable quarantine with stage, provider, score, reason, and release audit. Releasing a new thread requires an explicit ticket type; replies retain the original ticket type.

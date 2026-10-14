@@ -24,6 +24,8 @@ const config = (
   endpointUrl,
   authSecret,
   timeoutMs: 1000,
+  spamThreshold: 0.9,
+  suspectThreshold: 0.5,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 });

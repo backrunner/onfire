@@ -11,6 +11,7 @@ import { GET, POST } from "@/app/api/tob/admin/ai/credentials/route";
 import { PATCH, DELETE } from "@/app/api/tob/admin/ai/credentials/[id]/route";
 import { GET as modelsGET } from "@/app/api/tob/admin/ai/models/route";
 import { createTestDb } from "./test-db";
+import { PATCH as spamPATCH, GET as spamGET } from "@/app/api/tob/admin/spam-filter/route";
 
 let db: Database;
 let actorId: string | null;
@@ -49,6 +50,52 @@ async function createCredential(query = "") {
   expect(JSON.stringify(body)).not.toContain(key);
   return z.object({ data: z.object({ id: z.string() }) }).parse(body).data.id;
 }
+
+describe("decision spam administration", () => {
+  const spamRequest = (method = "GET", body?: unknown, tenantId?: string) => new NextRequest(`https://admin.example.com/api/tob/admin/spam-filter${tenantId ? `?tenantId=${tenantId}` : ""}`, {
+    method, headers: { "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  it("requires a configured route and validates ordered thresholds before enabling AI", async () => {
+    const payload = { mode: "custom", provider: "ai", spamThreshold: 0.9, suspectThreshold: 0.5 };
+    expect((await spamPATCH(spamRequest("PATCH", payload))).status).toBe(400);
+    const id = await createCredential();
+    await saveTaskRouting(db, "spam", true, [{ credentialId: id, model: "jev-latest" }]);
+    expect((await spamPATCH(spamRequest("PATCH", { ...payload, suspectThreshold: 0.9 }))).status).toBe(400);
+    expect((await spamPATCH(spamRequest("PATCH", payload))).status).toBe(200);
+    const response = await spamGET(spamRequest());
+    expect(z.object({ data: z.record(z.string(), z.unknown()) }).parse(await response.json()).data).toMatchObject({ provider: "ai", aiRouteConfigured: true, spamThreshold: 0.9, suspectThreshold: 0.5, secretConfigured: false });
+  });
+  it("retains tenant scope enforcement for spam settings and inherited AI availability", async () => {
+    const id = await createCredential();
+    await saveTaskRouting(db, "spam", true, [{ credentialId: id, model: "jev-latest" }]);
+    actorId = "tenant-admin";
+    expect((await spamPATCH(spamRequest("PATCH", { tenantId: "other", mode: "disabled" }))).status).toBe(403);
+    expect((await spamPATCH(spamRequest("PATCH", { mode: "custom", provider: "ai" }))).status).toBe(200);
+    expect((await spamGET(spamRequest())).status).toBe(200);
+    actorId = "product-admin";
+    expect((await spamPATCH(spamRequest("PATCH", { mode: "disabled" }))).status).toBe(403);
+  });
+  it("requires a safe custom decision endpoint on create and forbids removing it on edit", async () => {
+    const payload = { name: "Commercial decision", provider: "decision", apiKey: "test-only-decision" };
+    expect((await POST(request("credentials", "POST", payload))).status).toBe(400);
+    expect((await POST(request("credentials", "POST", { ...payload, baseUrl: "https://127.0.0.1/predict" }))).status).toBe(400);
+    const created = await POST(request("credentials", "POST", { ...payload, baseUrl: "https://classifier.example.com/predict" }));
+    expect(created.status).toBe(201);
+    const id = z.object({ data: z.object({ id: z.string() }) }).parse(await created.json()).data.id;
+    await saveTaskRouting(db, "spam", true, [{ credentialId: id, model: "proprietary-v2" }]);
+    expect((await PATCH(request(`credentials/${id}`, "PATCH", { baseUrl: null }), route(id))).status).toBe(400);
+    fetchMock.mockClear();
+    expect((await PATCH(request(`credentials/${id}`, "PATCH", { apiKey: "rotated-decision-key" }), route(id))).status).toBe(200);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it("preserves explicit classifier mapping through credential rotation", async () => {
+    const created = await POST(request("credentials", "POST", { name: "Open classifier", provider: "huggingface", apiKey: "test-hf" }));
+    const id = z.object({ data: z.object({ id: z.string() }) }).parse(await created.json()).data.id;
+    await saveTaskRouting(db, "spam", true, [{ credentialId: id, model: "owner/classifier", spamLabel: "LABEL_1", supportLabel: "LABEL_0" }]);
+    expect((await PATCH(request(`credentials/${id}`, "PATCH", { apiKey: "test-hf-rotated" }), route(id))).status).toBe(200);
+    expect((await db.query.aiTaskCredentials.findFirst())?.spamLabel).toBe("LABEL_1");
+  });
+});
 
 describe("TypeSafe credentials API", () => {
   it("seals the key, hides it from reads, and uses the stored key for live model discovery", async () => {

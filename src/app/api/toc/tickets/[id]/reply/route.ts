@@ -12,6 +12,7 @@ import { enforceRateLimit } from "@/lib/rate-limit";
 import { sanitizeRichHtml, richHtmlToText, richTextIsEmpty } from "@/lib/rich-text";
 import { emitTicketEvent } from "@/services/ticket-events";
 import { resolveProductLanguage, requestedTocLanguage } from "@/lib/product-language";
+import { enforceCustomerIntake, loadSpamTicketContext } from "@/services/email/spam-filter";
 import { prepareReplyTranslation } from "@/services/ticket-translation";
 
 const replySchema = z.object({
@@ -67,6 +68,10 @@ export const POST = withCustomerAuth(async (req: NextRequest, ctx) => {
     where: eq(products.id, ticket.productId),
   });
   if (!product) throw notFound("Product not found");
+  await enforceCustomerIntake(ctx.db, {
+    messageId: "", fromEmail: ctx.customer.email ?? "", toEmail: "", subject: ticket.subject, content, kind: "reply",
+    ticketContext: await loadSpamTicketContext(ctx.db, product.id, ticket.id),
+  }, { tenantId: product.tenantId, productId: product.id });
   const sourceLanguage = resolveProductLanguage(
     product,
     requestedTocLanguage(req),

@@ -4,6 +4,7 @@ export const SPAM_FILTER_PROVIDERS = [
   "oopspam",
   "stopforumspam",
   "custom",
+  "ai",
 ] as const;
 
 export type SpamFilterProvider = (typeof SPAM_FILTER_PROVIDERS)[number];
@@ -24,6 +25,15 @@ export const SPAM_FILTER_PROVIDER_DEFS: Record<
   SpamFilterProvider,
   SpamFilterProviderDefinition
 > = {
+  ai: {
+    id: "ai",
+    requestUrl: null,
+    requiresSecret: false,
+    secretOptional: false,
+    requiresEndpoint: false,
+    endpointKind: null,
+    docsUrl: null,
+  },
   postmark: {
     id: "postmark",
     requestUrl: "https://spamcheck.postmarkapp.com/filter",
@@ -79,6 +89,7 @@ export const SPAM_FILTER_CUSTOM_HEADERS_EXAMPLE = {
 } as const;
 
 export const SPAM_FILTER_CUSTOM_REQUEST_EXAMPLE = {
+  kind: "new",
   messageId: "<ticket-123@onfire>",
   fromEmail: "customer@example.com",
   toEmail: "support@example.com",

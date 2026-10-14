@@ -3,7 +3,7 @@ import { z } from "zod";
 import { and, asc, count, eq, or } from "drizzle-orm";
 import { aiCredentials, aiTaskCredentials } from "@/drizzle/schema";
 import { withAuth, parseBody, parseQuery } from "@/lib/api/handler";
-import { ok } from "@/lib/api/response";
+import { badRequest, ok } from "@/lib/api/response";
 import {
   ALL_AI_PROVIDERS,
   OPENAI_API_MODES,
@@ -128,6 +128,7 @@ export const POST = withAuth({}, async (req: NextRequest, ctx) => {
     const ref = await parseFilledAiScope(req, ctx.db);
     await assertCanManageAiScope(ctx, ref);
     const body = await parseBody(req, createCredentialSchema);
+    if (body.provider === "decision" && !body.baseUrl) throw badRequest("A decision endpoint is required");
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     const purpose = AI_CREDENTIAL_SECRET_PURPOSE(id);

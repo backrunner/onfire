@@ -1,0 +1,1 @@
+ALTER TABLE `ai_task_credentials` ADD `support_label` text;

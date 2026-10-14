@@ -149,6 +149,8 @@ export const extraApiKeyOperations: AutomationOperation[] = [
         endpointUrl: z.string().max(2048).nullable().optional(),
         authSecret: z.string().max(2048).optional(),
         timeoutMs: z.number().int().min(500).max(10000).optional(),
+        spamThreshold: z.number().min(0).max(1).optional(),
+        suspectThreshold: z.number().min(0).max(1).optional(),
       }),
     },
   ),

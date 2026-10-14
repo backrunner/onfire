@@ -12,6 +12,7 @@ import {
 } from "@/lib/spam-filter-providers";
 import { Role } from "@/lib/types";
 import { sealSpamFilterSecret } from "@/services/email/spam-filter";
+import { hasConfiguredAITask } from "@/services/ai/config";
 
 const querySchema = z.object({ tenantId: z.string().optional() });
 const updateSchema = z.object({
@@ -21,6 +22,8 @@ const updateSchema = z.object({
   endpointUrl: z.string().max(2048).nullable().optional(),
   authSecret: z.string().max(2048).optional(),
   timeoutMs: z.number().int().min(500).max(10_000).default(3000),
+  spamThreshold: z.number().min(0).max(1).optional(),
+  suspectThreshold: z.number().min(0).max(1).optional(),
 });
 
 export const GET = withAuth({ permission: "spam.config" }, async (req, ctx) => {
@@ -40,9 +43,10 @@ export const GET = withAuth({ permission: "spam.config" }, async (req, ctx) => {
   const row = await ctx.db.query.spamFilterConfigs.findFirst({
     where: eq(spamFilterConfigs.scopeKey, scopeKey),
   });
+  const aiRouteConfigured = await hasConfiguredAITask(ctx.db, "spam", targetTenant ? { tenantId: targetTenant } : {});
   return ok(
     row
-      ? { ...row, authSecret: undefined, secretConfigured: Boolean(row.authSecret) }
+      ? { ...row, authSecret: undefined, secretConfigured: Boolean(row.authSecret), aiRouteConfigured }
       : {
           scopeKey,
           scope: targetTenant ? "tenant" : "global",
@@ -51,7 +55,10 @@ export const GET = withAuth({ permission: "spam.config" }, async (req, ctx) => {
           provider: "custom",
           endpointUrl: null,
           timeoutMs: 3000,
+          spamThreshold: 0.9,
+          suspectThreshold: 0.5,
           secretConfigured: false,
+          aiRouteConfigured,
         }
   );
 });
@@ -73,6 +80,9 @@ export const PATCH = withAuth({ permission: "spam.config" }, async (req: NextReq
   const provider =
     body.mode === "custom" ? normalizeSpamFilterProvider(body.provider) : "custom";
   const definition = spamFilterProviderDef(provider);
+  if (body.mode === "custom" && provider === "ai" && !await hasConfiguredAITask(ctx.db, "spam", targetTenant ? { tenantId: targetTenant } : {})) {
+    throw badRequest("Configure an enabled AI spam decision route for this scope first");
+  }
   if (
     body.mode === "custom" &&
     definition.requiresEndpoint &&
@@ -88,6 +98,9 @@ export const PATCH = withAuth({ permission: "spam.config" }, async (req: NextReq
   const existing = await ctx.db.query.spamFilterConfigs.findFirst({
     where: eq(spamFilterConfigs.scopeKey, scopeKey),
   });
+  const spamThreshold = body.spamThreshold ?? existing?.spamThreshold ?? 0.9;
+  const suspectThreshold = body.suspectThreshold ?? existing?.suspectThreshold ?? 0.5;
+  if (suspectThreshold >= spamThreshold) throw badRequest("Suspect threshold must be below spam threshold");
   if (
     body.mode === "custom" &&
     definition.requiresSecret &&
@@ -118,6 +131,8 @@ export const PATCH = withAuth({ permission: "spam.config" }, async (req: NextReq
       endpointUrl,
       authSecret,
       timeoutMs: body.timeoutMs,
+      spamThreshold,
+      suspectThreshold,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     })
@@ -129,6 +144,8 @@ export const PATCH = withAuth({ permission: "spam.config" }, async (req: NextReq
         endpointUrl,
         authSecret,
         timeoutMs: body.timeoutMs,
+        spamThreshold,
+        suspectThreshold,
         updatedAt: now,
       },
     });

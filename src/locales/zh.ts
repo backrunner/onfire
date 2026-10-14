@@ -803,6 +803,10 @@ export const zh = {
     apiKeyPlaceholder: '输入 API 密钥',
     apiKeyConfigured: '已配置 — 留空保持不变',
     baseUrl: '自定义 API 地址（可选）',
+    decisionEndpoint: 'Decision 接口（必填）',
+    interfaceSpec: 'OnFire 接口规范',
+    decisionEndpointHint: '填写遵循 onfire-decision-v1 概率协议的完整预测地址。',
+    classificationEndpointHint: '可选的完整分类接口地址，留空使用 Hugging Face Inference。',
     baseUrlPlaceholder: 'https://api.example.com/v1',
     save: '保存',
     saved: '配置已保存',
@@ -863,6 +867,9 @@ export const zh = {
       loadModels: '刷新模型列表',
       loadModelsFailed: '供应商模型列表拉取失败',
       typesafeHint: 'Jev 判断分类、固定标签与垃圾内容，不生成摘要或问题描述。',
+      spamLabel: '垃圾标签',
+      supportLabel: '真实工单标签',
+      spamLabelHint: '准确填写两种模型标签；真实工单类别必须排除推广、无意义和无关内容。',
       customModelHint: '也可以直接输入列表外的自定义模型',
       saved: '功能路由已保存',
       saveFailed: '功能路由保存失败'
@@ -871,6 +878,8 @@ export const zh = {
       agent: 'AI 助手',
       agentHint: '管理后台的 AI 对话助手',
       prescreening: '工单预审',
+      spam: 'AI 反垃圾',
+      spamHint: '在接收前验证客户工单及回复是否真实，在反垃圾设置中启用。',
       prescreeningHint: '自动审查新工单内容',
       prereply: '预回复生成',
       prereplyHint: '为客服生成建议回复',
@@ -921,6 +930,8 @@ export const zh = {
       xai: 'xAI (Grok)',
       deepseek: 'DeepSeek',
       typesafe: 'TypeSafe (Jev)',
+      huggingface: 'Hugging Face',
+      decision: 'Decision HTTP',
       qwen: '通义千问 / DashScope',
       jina: 'Jina AI',
       cohere: 'Cohere'
@@ -1642,8 +1653,8 @@ export const zh = {
     },
 
     spamFilter: {
-      title: '外部反垃圾服务',
-      description: '在 AI 预筛之前调用的可选分类服务，可选用内置 API 或自定义 HTTPS 端点',
+      title: '反垃圾',
+      description: '在工单预审前，使用反垃圾服务或 AI decision 模型过滤入站邮件。',
       scope: '配置范围',
       global: '全局默认',
       mode: '模式',
@@ -1664,11 +1675,21 @@ export const zh = {
       timeout: '超时（毫秒）',
       docs: '接口文档',
       protocolTitle: '自定义端点约定',
-      protocolHint: '向你的端点 POST JSON。verdict 必须是 allow、suspect 或 spam。score 为 0–1。可选字段：autoSubmitted、precedence、listId、returnPath。',
+      protocolHint: 'POST JSON。仅真实沟通返回 allow；spam 和 suspect 都会拦截。字段和失败处理详见 OnFire 接口规范。',
       headersExample: '请求头',
       requestExample: '请求体',
       responseExample: '响应体',
+      aiRouteMissing: '此范围尚无已启用的 AI 反垃圾路由。',
+      aiRouteHint: '先在 AI 功能路由中配置「AI 反垃圾」。凭据按产品、租户、系统层级继承。',
+      spamThreshold: '非真实工单概率阈值',
+      suspectThreshold: '可疑概率阈值',
+      suspectHint: '需低于垃圾阈值。可疑邮件进入隔离区等待人工审核。',
       providers: {
+        ai: {
+          name: 'AI decision 模型',
+          description: '使用 AI 凭据池中的 Jev、Hugging Face 分类模型或 decision 接口。',
+          mapping: ''
+        },
         postmark: {
           name: 'Postmark SpamCheck',
           description: '免费 SpamAssassin 评分，无需 API 密钥。',

@@ -40,7 +40,8 @@ import {
 } from "@/services/ticket-types";
 import {
   resolveSpamFilterConfig,
-  runExternalSpamFilter,
+  runSpamFilter,
+  loadSpamTicketContext,
 } from "./spam-filter";
 import {
   effectiveProductLanguages,
@@ -592,7 +593,7 @@ export async function processInboundEmail(
     const external = await resolveSpamFilterConfig(db, context.tenant.id);
     if (external) {
       try {
-        const verdict = await runExternalSpamFilter(external, {
+        const verdict = await runSpamFilter(db, external, {
           messageId: row.messageId,
           fromEmail: normalizedFrom,
           toEmail: normalizedTo,
@@ -604,24 +605,28 @@ export async function processInboundEmail(
           precedence: payload.precedence,
           listId: payload.listId,
           returnPath: payload.returnPath,
-        });
-        if (verdict.verdict === "spam") {
+          kind: replyTicketId ? "reply" : "new",
+          ticketContext: replyTicketId ? await loadSpamTicketContext(db, context.product.id, replyTicketId) : undefined,
+        }, { tenantId: context.tenant.id, productId: context.product.id });
+        if (verdict.verdict !== "allow") {
           return quarantine(db, emailId, {
             stage: "external",
             provider: verdict.provider,
             verdict: verdict.verdict,
             score: verdict.score,
-            reason: verdict.reason || "External service classified the message as spam",
+            reason: verdict.reason || "Message is not verified as genuine support",
             result: verdict,
             candidateTicketId: replyTicketId,
           });
         }
+        await db.update(inboundEmails).set({ filterResult: JSON.stringify({ external: verdict }) }).where(eq(inboundEmails.id, emailId));
       } catch (error) {
-        console.error("External spam filter failed; continuing to AI", error);
-        await db
-          .update(inboundEmails)
-          .set({ filterResult: JSON.stringify({ externalError: error instanceof Error ? error.message : String(error) }) })
-          .where(eq(inboundEmails.id, emailId));
+        console.error("Spam filter failed; holding message for review", error);
+        return quarantine(db, emailId, {
+          stage: "external", provider: external.provider, verdict: "suspect",
+          reason: "Content verification is unavailable; manual review is required",
+          result: { verificationUnavailable: true }, candidateTicketId: replyTicketId,
+        });
       }
     }
 

@@ -32,6 +32,7 @@ import {
 } from "./provider-presets";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ModelCombobox } from "./model-combobox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -53,6 +54,8 @@ interface TaskAssignmentView {
   blockedUntil: string | null;
   modelKind: AIModelKind | null;
   modelDimensions: number | null;
+  spamLabel?: string | null;
+  supportLabel?: string | null;
 }
 
 interface TaskRoutingView {
@@ -73,6 +76,8 @@ interface AssignmentDraft {
   enabled: boolean;
   modelKind?: AIModelKind;
   modelDimensions?: number;
+  spamLabel?: string;
+  supportLabel?: string;
 }
 
 export function RoutingTab({
@@ -186,6 +191,8 @@ function TaskRoutingCard({
         enabled: assignment.enabled,
         modelKind: assignment.modelKind ?? undefined,
         modelDimensions: assignment.modelDimensions ?? undefined,
+        spamLabel: assignment.spamLabel ?? "",
+        supportLabel: assignment.supportLabel ?? "",
       })) ?? []
     );
   }, [config]);
@@ -248,6 +255,8 @@ function TaskRoutingCard({
           enabled: assignment.enabled,
           modelKind: assignment.modelKind ?? undefined,
           modelDimensions: assignment.modelDimensions ?? undefined,
+          spamLabel: assignment.spamLabel ?? "",
+        supportLabel: assignment.supportLabel ?? "",
         }))
       );
     }
@@ -275,6 +284,8 @@ function TaskRoutingCard({
           : assignments.map((assignment) => ({
               credentialId: assignment.credentialId,
               model: assignment.model.trim(),
+              ...(assignment.spamLabel?.trim() ? { spamLabel: assignment.spamLabel.trim() } : {}),
+              ...(assignment.supportLabel?.trim() ? { supportLabel: assignment.supportLabel.trim() } : {}),
               ...(assignment.modelKind ? { modelKind: assignment.modelKind } : {}),
               ...(assignment.modelDimensions ? { modelDimensions: assignment.modelDimensions } : {}),
               enabled: assignment.enabled,
@@ -391,8 +402,8 @@ function TaskRoutingCard({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <div className="min-w-[640px]">
-              <div className="grid grid-cols-[1.5rem_minmax(10rem,1fr)_minmax(14rem,1.5fr)_8.5rem] items-center gap-3 border-b pb-1.5 text-[11px] text-muted-foreground">
+            <div className="sm:min-w-[640px]">
+              <div className="hidden sm:grid grid-cols-[1.5rem_minmax(10rem,1fr)_minmax(14rem,1.5fr)_8.5rem] items-center gap-3 border-b pb-1.5 text-[11px] text-muted-foreground">
                 <span className="text-center">#</span>
                 <span>{r.credential}</span>
                 <span>{t.aiConfig.model}</span>
@@ -428,12 +439,13 @@ function TaskRoutingCard({
                 <div
                   key={assignment.id}
                   className={cn(
-                    "grid grid-cols-[1.5rem_minmax(10rem,1fr)_minmax(14rem,1.5fr)_8.5rem] items-center gap-3 border-b py-2 last:border-0",
+                    "grid grid-cols-[1.5rem_minmax(0,1fr)] sm:grid-cols-[1.5rem_minmax(10rem,1fr)_minmax(14rem,1.5fr)_8.5rem] items-center gap-3 border-b py-2 last:border-0",
                     !assignment.enabled && "opacity-60"
                   )}
                 >
                   <span className="text-center text-[11px] tabular-nums text-muted-foreground">{index + 1}</span>
                   <div className="flex min-w-0 items-center gap-1.5">
+                      <Label htmlFor={`credential-${taskType}-${assignment.id}`} className="shrink-0 whitespace-nowrap text-xs sm:hidden">{r.credential}</Label>
                       <Select
                         value={assignment.credentialId}
                         onValueChange={(credentialId) => {
@@ -447,10 +459,13 @@ function TaskRoutingCard({
                               : "",
                             modelKind: nextCredential ? modelKindForTask(taskType, nextCredential.provider) : undefined,
                             modelDimensions: undefined,
+                            spamLabel: "",
+                            supportLabel: "",
                           });
                         }}
                       >
                         <SelectTrigger
+                          id={`credential-${taskType}-${assignment.id}`}
                           size="sm"
                           className="w-full min-w-0"
                           aria-label={r.credential}
@@ -482,8 +497,9 @@ function TaskRoutingCard({
                         </Tooltip>
                       )}
                     </div>
-                    <div className="flex min-w-0 items-center gap-1.5">
-                      <Label htmlFor={`model-${taskType}-${assignment.id}`} className="sr-only">
+                    <div className="col-start-2 min-w-0 space-y-2 sm:col-start-auto">
+                      <div className="flex min-w-0 items-center gap-1.5">
+                      <Label htmlFor={`model-${taskType}-${assignment.id}`} className="shrink-0 whitespace-nowrap text-xs sm:sr-only">
                         {t.aiConfig.model}
                       </Label>
                       <div className="min-w-0 flex-1">
@@ -527,8 +543,18 @@ function TaskRoutingCard({
                           <TooltipContent className="max-w-72">{r.typesafeHint}</TooltipContent>
                         </Tooltip>
                       )}
+                      </div>
+                      {taskType === "spam" && credential?.provider === "huggingface" && (
+                        <div className="space-y-1">
+                          <Label htmlFor={`spam-label-${assignment.id}`} className="text-xs">{r.spamLabel}</Label>
+                          <Input id={`spam-label-${assignment.id}`} className="h-8" value={assignment.spamLabel ?? ""} placeholder="spam / LABEL_1" onChange={(event) => updateAssignment(index, { spamLabel: event.target.value })} />
+                          <Label htmlFor={`support-label-${assignment.id}`} className="text-xs">{r.supportLabel}</Label>
+                          <Input id={`support-label-${assignment.id}`} className="h-8" value={assignment.supportLabel ?? ""} placeholder="genuine_support" onChange={(event) => updateAssignment(index, { supportLabel: event.target.value })} />
+                          <p className="text-xs text-muted-foreground">{r.spamLabelHint}</p>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex shrink-0 items-center gap-0.5">
+                    <div className="col-start-2 flex shrink-0 items-center justify-end gap-0.5 sm:col-start-auto">
                       <span className="flex size-8 items-center justify-center">
                         <Switch
                           size="sm"

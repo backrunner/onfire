@@ -35,6 +35,7 @@ import {
   resolveProductLanguage,
 } from "@/lib/product-language";
 import { prepareTicketTranslation } from "@/services/ticket-translation";
+import { enforceCustomerIntake } from "@/services/email/spam-filter";
 
 const listQuerySchema = z.object({
   status: z.enum(TicketStatus).optional(),
@@ -186,6 +187,8 @@ export const POST = withCustomerAuth(async (req: NextRequest, { db, customer }) 
   if (!teamId) {
     throw badRequest("No team available to handle this ticket");
   }
+
+  await enforceCustomerIntake(db, { messageId: "", fromEmail: customer.email ?? "", toEmail: "", subject: body.subject, content: body.content, kind: "new" }, { tenantId: product.tenantId, productId: product.id });
 
   const now = new Date().toISOString();
   const ticketId = crypto.randomUUID();

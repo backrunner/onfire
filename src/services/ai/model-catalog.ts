@@ -21,6 +21,8 @@ const DEFAULT_BASE_URLS: Record<AIProviderValue, string> = {
   xai: "https://api.x.ai/v1",
   deepseek: "https://api.deepseek.com",
   typesafe: "https://api.typesafe.ai/v1",
+  huggingface: "https://router.huggingface.co/hf-inference/models",
+  decision: "",
   qwen: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
   jina: "https://api.jina.ai/v1",
   cohere: "https://api.cohere.com/v2",
@@ -306,6 +308,13 @@ export async function listProviderModels(
   configuredBaseUrl?: string | null,
   dimensions = EMBEDDING_DIMENSIONS,
 ): Promise<AIModelDescriptor[]> {
+  // Classifier endpoints have no universal model catalog. Explicit route IDs
+  // select a decision capability; runtime validates the actual probabilities.
+  if (provider === "decision" || provider === "huggingface") {
+    if (configuredBaseUrl && !safeAIBaseUrl(configuredBaseUrl)) throw new Error("AI base URL is unsafe or invalid");
+    if (provider === "decision" && !configuredBaseUrl) throw new Error("A decision endpoint is required");
+    return [];
+  }
   if (!configuredBaseUrl && STATIC_ONLY_PROVIDERS.has(provider)) {
     return (STATIC_MODELS[provider] ?? []).map((model) => ({
       ...model,
@@ -374,6 +383,10 @@ export function resolveAssignableModel(
 ): AIModelDescriptor | null {
   const id = normalizeProviderModelId(provider, modelId.trim());
   if (!id) return null;
+  if (provider === "huggingface" || provider === "decision") {
+    if (expectedKind !== "decision" || (provider === "huggingface" && !/^[\w.-]+\/[\w.-]+$/.test(id))) return null;
+    return { id, kind: "decision" };
+  }
   const match = findCompatibleModel(catalog, id, expectedKind, dimensions);
   if (match) return match;
   if (catalog.some((model) => model.id === id)) return null;

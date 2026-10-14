@@ -68,12 +68,17 @@ export const PATCH = withAuth(
     const existing = await findCredential(ctx);
     const body = await parseBody(req, updateCredentialSchema);
     const nextProvider = body.provider ?? existing.provider;
+    if (nextProvider === "decision" && !(body.baseUrl === undefined ? existing.baseUrl : body.baseUrl)) {
+      throw badRequest("A decision endpoint is required");
+    }
 
     const routes = await ctx.db
       .select({
         id: aiTaskCredentials.id,
         taskType: aiTaskCredentials.taskType,
         model: aiTaskCredentials.model,
+        spamLabel: aiTaskCredentials.spamLabel,
+        supportLabel: aiTaskCredentials.supportLabel,
       })
       .from(aiTaskCredentials)
       .where(eq(aiTaskCredentials.credentialId, existing.id));
@@ -89,7 +94,8 @@ export const PATCH = withAuth(
     if (modelChanges && routes.length > 0) {
       if (
         routes.some(
-          (route) => !isProviderAllowedForTask(route.taskType, nextProvider)
+          (route) => !isProviderAllowedForTask(route.taskType, nextProvider) ||
+            (nextProvider === "huggingface" && (!route.spamLabel || !route.supportLabel || route.spamLabel === route.supportLabel))
         )
       ) {
         throw badRequest(
@@ -113,7 +119,7 @@ export const PATCH = withAuth(
       }
       for (const route of routes) {
         const model = normalizeProviderModelId(nextProvider, route.model);
-        const match = nextProvider === "typesafe"
+        const match = ["typesafe", "huggingface", "decision"].includes(nextProvider)
           ? resolveAssignableModel(nextProvider, models, model, modelKindForTask(route.taskType, nextProvider))
           : findCompatibleModel(models, model, modelKindForTask(route.taskType, nextProvider));
         if (!match) {

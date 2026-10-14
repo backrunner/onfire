@@ -16,6 +16,7 @@ import {
 import { useI18n } from "@/lib/i18n";
 import { api, ApiClientError, swrFetcher } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
+import { spamFilterSpecUrl } from "@/lib/onfire-docs";
 import {
   ALL_AI_PROVIDERS,
   type AIProviderValue,
@@ -96,7 +97,7 @@ export function CredentialsTab({
   tenantId?: string;
   productId?: string;
 }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const c = t.aiConfig.credentials;
   const scopeQuery = aiScopeQuery({ scope, tenantId, productId });
   const { data, error, isLoading, mutate } = useSWR<AiCredentialView[]>(
@@ -245,8 +246,8 @@ export function CredentialsTab({
 
   return (
     <>
-      <div className="grid items-stretch gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <Card className="h-full min-h-[320px] gap-0 py-0 lg:min-h-[520px]">
+      <div className="grid min-w-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <Card className="h-full min-w-0 min-h-[320px] gap-0 py-0 lg:min-h-[520px]">
           <CardHeader className="flex items-center justify-between px-4 py-4">
             <div>
               <CardTitle className="text-sm">{c.title}</CardTitle>
@@ -279,7 +280,7 @@ export function CredentialsTab({
           </CardContent>
         </Card>
 
-        <Card className="h-full min-h-[320px] gap-0 py-0 lg:min-h-[520px]">
+        <Card className="h-full min-w-0 min-h-[320px] gap-0 py-0 lg:min-h-[520px]">
           {creating || selected ? (
             <>
               <CardHeader className="px-5 py-4">
@@ -366,13 +367,15 @@ export function CredentialsTab({
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="credential-url" className="text-xs">{t.aiConfig.baseUrl}</Label>
+                  <Label htmlFor="credential-url" className="text-xs">{form.provider === "decision" ? t.aiConfig.decisionEndpoint : t.aiConfig.baseUrl}</Label>
+                  {(form.provider === "decision" || form.provider === "huggingface") && <p className="text-xs text-muted-foreground">{form.provider === "decision" ? t.aiConfig.decisionEndpointHint : t.aiConfig.classificationEndpointHint}</p>}
+                  {(form.provider === "decision" || form.provider === "huggingface") && <a href={spamFilterSpecUrl(language, form.provider === "decision" ? "decision-api" : "classification")} target="_blank" rel="noopener noreferrer" className="inline-block text-xs text-muted-foreground underline underline-offset-2">{t.aiConfig.interfaceSpec}</a>}
                   <Input
                     id="credential-url"
                     className="h-8"
                     value={form.baseUrl}
                     onChange={(event) => setForm({ ...form, baseUrl: event.target.value })}
-                    placeholder={PROVIDER_PRESETS[form.provider].baseUrl}
+                    placeholder={PROVIDER_PRESETS[form.provider].baseUrl || "https://classifier.example.com/predict"}
                   />
                 </div>
 

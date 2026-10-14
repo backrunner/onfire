@@ -16,6 +16,8 @@ import {
   createProvider,
   screenWithProvider,
   type AIScreeningOptions,
+  type AISpamOptions,
+  type AISpamResult,
   type AICompletionOptions,
   type AICompletionResult,
   type AIEmbeddingOptions,
@@ -56,6 +58,8 @@ export interface RoutedCredential {
   model: string;
   modelKind: AIModelKind;
   modelDimensions: number | null;
+  spamLabel?: string | null;
+  supportLabel?: string | null;
   priority: number;
   cooldownSeconds: number;
   blockedUntil: string | null;
@@ -98,6 +102,8 @@ export async function hasConfiguredAITask(
       model: aiTaskCredentials.model,
       modelKind: aiTaskCredentials.modelKind,
       modelDimensions: aiTaskCredentials.modelDimensions,
+      spamLabel: aiTaskCredentials.spamLabel,
+      supportLabel: aiTaskCredentials.supportLabel,
     })
     .from(aiTaskCredentials)
     .innerJoin(
@@ -125,6 +131,7 @@ export async function hasConfiguredAITask(
       row.credentialEnabled &&
       isProviderAllowedForTask(taskType, row.provider) &&
       kind === modelKindForTask(taskType, row.provider) &&
+      (row.provider !== "huggingface" || Boolean(row.spamLabel && row.supportLabel && row.spamLabel !== row.supportLabel)) &&
       (kind !== "embedding" || (row.modelDimensions !== null && row.modelDimensions > 0));
   });
 }
@@ -153,6 +160,8 @@ async function listAvailableCredentials(
       model: aiTaskCredentials.model,
       modelKind: aiTaskCredentials.modelKind,
       modelDimensions: aiTaskCredentials.modelDimensions,
+      spamLabel: aiTaskCredentials.spamLabel,
+      supportLabel: aiTaskCredentials.supportLabel,
       priority: aiTaskCredentials.priority,
     })
     .from(aiTaskCredentials)
@@ -190,9 +199,10 @@ async function listAvailableCredentials(
         isProviderAllowedForTask(taskType, row.provider) &&
         (taskType === "embedding" || !row.blockedUntil || Date.parse(row.blockedUntil) <= now)
     )
-    .map((row) => {
+    .map((row): RoutedCredential | null => {
       const modelKind = row.modelKind ?? classifyAIModel(row.model);
       if (modelKind !== modelKindForTask(taskType, row.provider)) return null;
+      if (row.provider === "huggingface" && (!row.spamLabel || !row.supportLabel || row.spamLabel === row.supportLabel)) return null;
       if (modelKind === "embedding" && (!row.modelDimensions || row.modelDimensions < 1)) return null;
       return {
         id: row.credentialId,
@@ -205,6 +215,8 @@ async function listAvailableCredentials(
         model: row.model,
         modelKind,
         modelDimensions: row.modelDimensions,
+        spamLabel: row.spamLabel,
+        supportLabel: row.supportLabel,
         priority: row.priority,
         cooldownSeconds: row.cooldownSeconds,
         blockedUntil: row.blockedUntil,
@@ -231,6 +243,8 @@ async function buildProvider(candidate: RoutedCredential): Promise<AIProvider> {
     baseUrl,
     apiMode: candidate.apiMode,
     embeddingDimensions: candidate.modelDimensions ?? undefined,
+    spamLabel: candidate.spamLabel,
+    supportLabel: candidate.supportLabel,
   };
   return createProvider(providerConfig);
 }
@@ -358,6 +372,18 @@ class FailoverAIProvider implements AIProvider {
     return this.execute(async (provider) => {
       const result = await provider.complete(options);
       options.validateResult?.(result);
+      return result;
+    });
+  }
+
+  checkSpam(options: AISpamOptions): Promise<AISpamResult> {
+    if (this.taskType !== "spam") return Promise.reject(new Error("Spam decisions require the spam task"));
+    return this.execute(async (provider) => {
+      if (!provider.checkSpam) throw new Error("Provider does not support spam decisions");
+      const result = await provider.checkSpam(options);
+      if (!Number.isFinite(result.spamProbability) || result.spamProbability < 0 || result.spamProbability > 1 || !Number.isFinite(result.supportProbability) || result.supportProbability < 0 || result.supportProbability > 1 || !result.model) {
+        throw new Error("Invalid spam decision response");
+      }
       return result;
     });
   }

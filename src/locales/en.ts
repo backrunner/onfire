@@ -805,6 +805,10 @@ export const en: Translations = {
     apiKeyPlaceholder: 'Enter API key',
     apiKeyConfigured: 'Configured — leave blank to keep',
     baseUrl: 'Custom API URL (optional)',
+    decisionEndpoint: 'Decision endpoint (required)',
+    interfaceSpec: 'OnFire interface specification',
+    decisionEndpointHint: 'Exact prediction URL using the onfire-decision-v1 probability contract.',
+    classificationEndpointHint: 'Optional exact text-classification endpoint. Leave blank for Hugging Face Inference.',
     baseUrlPlaceholder: 'https://api.example.com/v1',
     save: 'Save',
     saved: 'Configuration saved',
@@ -865,6 +869,9 @@ export const en: Translations = {
       loadModels: 'Refresh model list',
       loadModelsFailed: 'Failed to load provider models',
       typesafeHint: 'Jev selects categories and fixed tags, and checks spam. It does not generate summaries or issue descriptions.',
+      spamLabel: 'Spam label',
+      supportLabel: 'Genuine support label',
+      spamLabelHint: 'Map both exact model labels. The genuine-support class must exclude promotion, meaningless and unrelated content.',
       customModelHint: 'You can also type a custom model not in the list',
       saved: 'Function routing saved',
       saveFailed: 'Failed to save function routing'
@@ -873,6 +880,8 @@ export const en: Translations = {
       agent: 'AI Assistant',
       agentHint: 'Conversational assistant in the admin dashboard',
       prescreening: 'Ticket Prescreening',
+      spam: 'AI Spam Filter',
+      spamHint: 'Verify genuine customer tickets and replies before admission. Enable in Spam Filter settings.',
       prescreeningHint: 'Automatically screen new ticket content',
       prereply: 'Pre-reply Generation',
       prereplyHint: 'Generate suggested replies for agents',
@@ -923,6 +932,8 @@ export const en: Translations = {
       xai: 'xAI (Grok)',
       deepseek: 'DeepSeek',
       typesafe: 'TypeSafe (Jev)',
+      huggingface: 'Hugging Face',
+      decision: 'Decision HTTP',
       qwen: 'Qwen / DashScope',
       jina: 'Jina AI',
       cohere: 'Cohere'
@@ -1644,8 +1655,8 @@ export const en: Translations = {
     },
 
     spamFilter: {
-      title: 'External Spam Filter',
-      description: 'Optional classifier used before AI prescreening. Built-in APIs or a custom HTTPS endpoint.',
+      title: 'Spam Filter',
+      description: 'Filter inbound messages before ticket prescreening with a spam service or an AI decision model.',
       scope: 'Configuration Scope',
       global: 'Global Default',
       mode: 'Mode',
@@ -1666,11 +1677,21 @@ export const en: Translations = {
       timeout: 'Timeout (ms)',
       docs: 'API documentation',
       protocolTitle: 'Custom endpoint contract',
-      protocolHint: 'POST JSON to your endpoint. verdict must be allow, suspect, or spam. score is 0–1. Optional fields: autoSubmitted, precedence, listId, returnPath.',
+      protocolHint: 'POST JSON. Return allow only for genuine support; spam and suspect both block admission. See the OnFire specification for fields and failure behavior.',
       headersExample: 'Request headers',
       requestExample: 'Request body',
       responseExample: 'Response body',
+      aiRouteMissing: 'No enabled AI Spam Filter route is available for this scope.',
+      aiRouteHint: 'Configure the AI Spam Filter route in AI function routing first. Credentials follow product, tenant and system inheritance.',
+      spamThreshold: 'Non-ticket probability threshold',
+      suspectThreshold: 'Suspect probability threshold',
+      suspectHint: 'Below the spam threshold. Suspect messages are held for manual review.',
       providers: {
+        ai: {
+          name: 'AI decision model',
+          description: 'Jev, Hugging Face classifiers or a decision endpoint using the AI credential pool.',
+          mapping: ''
+        },
         postmark: {
           name: 'Postmark SpamCheck',
           description: 'Free SpamAssassin score for the message. No API key.',

@@ -897,6 +897,7 @@ export const history = sqliteTable(
 export type AITaskType =
   | "agent"
   | "prescreening"
+  | "spam"
   | "prereply"
   | "translation"
   | "embedding"
@@ -909,6 +910,8 @@ export type AIProvider =
   | "xai"
   | "deepseek"
   | "typesafe"
+  | "huggingface"
+  | "decision"
   | "qwen"
   | "jina"
   | "cohere";
@@ -973,6 +976,8 @@ export const aiTaskCredentials = sqliteTable(
     credentialId: text("credential_id").notNull(),
     model: text("model").notNull(),
     modelKind: text("model_kind").$type<"text" | "embedding" | "rerank" | "decision">(),
+    spamLabel: text("spam_label"),
+    supportLabel: text("support_label"),
     modelDimensions: integer("model_dimensions"),
     priority: integer("priority").notNull().default(0),
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
@@ -1161,6 +1166,7 @@ export type SpamFilterScope = "global" | "tenant";
 export type SpamFilterMode = "inherit" | "disabled" | "custom";
 export type SpamFilterProvider =
   | "custom"
+  | "ai"
   | "akismet"
   | "oopspam"
   | "postmark"
@@ -1181,6 +1187,8 @@ export const spamFilterConfigs = sqliteTable("spam_filter_configs", {
   endpointUrl: text("endpoint_url"),
   authSecret: text("auth_secret"),
   timeoutMs: integer("timeout_ms").notNull().default(3000),
+  spamThreshold: real("spam_threshold").notNull().default(0.9),
+  suspectThreshold: real("suspect_threshold").notNull().default(0.5),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

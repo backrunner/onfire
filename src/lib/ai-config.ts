@@ -3,6 +3,7 @@ import { safePublicHttpUrl } from "@/lib/external-url";
 export const AI_TASK_TYPES = [
   "agent",
   "prescreening",
+  "spam",
   "prereply",
   "translation",
   "embedding",
@@ -35,6 +36,8 @@ export const ALL_AI_PROVIDERS = [
   "jina",
   "cohere",
   "typesafe",
+  "huggingface",
+  "decision",
 ] as const;
 
 export const OPENAI_API_MODES = ["responses", "chat"] as const;
@@ -44,6 +47,7 @@ export type AIModelKind = "text" | "embedding" | "rerank" | "decision";
 
 /** The capability expected by each route. Keep this server-side contract in one place. */
 export function modelKindForTask(taskType: AITaskTypeValue, provider?: AIProviderValue): AIModelKind {
+  if (taskType === "spam") return "decision";
   if (taskType === "prescreening" && provider === "typesafe") return "decision";
   if (taskType === "embedding") return "embedding";
   if (taskType === "rerank") return "rerank";
@@ -84,7 +88,9 @@ export function isProviderAllowedForTask(
   taskType: AITaskTypeValue,
   provider: AIProviderValue
 ): boolean {
+  if (taskType === "spam") return ["typesafe", "huggingface", "decision"].includes(provider);
   if (provider === "typesafe") return taskType === "prescreening";
+  if (provider === "huggingface" || provider === "decision") return false;
   const providers = taskType === "embedding"
     ? EMBEDDING_AI_PROVIDERS
     : taskType === "rerank"

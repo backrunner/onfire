@@ -68,6 +68,7 @@ export interface AIProvider {
   embeddingSpace?: string;
   complete(options: AICompletionOptions): Promise<AICompletionResult>;
   screen?(options: AIScreeningOptions): Promise<AICompletionResult>;
+  checkSpam?(options: AISpamOptions): Promise<AISpamResult>;
   embed(text: string, options?: AIEmbeddingOptions): Promise<AIEmbeddingResult>;
   rerank?(options: AIRerankOptions): Promise<AIRerankResult>;
 }
@@ -91,6 +92,21 @@ export interface ProviderConfig {
   baseUrl?: string | null;
   apiMode?: "responses" | "chat";
   embeddingDimensions?: number;
+  spamLabel?: string | null;
+  supportLabel?: string | null;
+}
+
+export interface AISpamOptions {
+  message: { subject: string; content: string; fromEmail?: string; toEmail?: string; spfResult?: string; dkimResult?: boolean; kind?: "new" | "reply"; ticketContext?: { subject: string; latestReply?: string } };
+  timeoutMs: number;
+}
+
+export interface AISpamResult {
+  spamProbability: number;
+  supportProbability: number;
+  provider: AIProviderType;
+  model: string;
+  usage?: AICompletionResult["usage"];
 }
 
 /** Language tasks must never persist or present an empty model response. */
@@ -106,6 +122,11 @@ export function requireCompletionContent(
 
 export async function createProvider(config: ProviderConfig): Promise<AIProvider> {
   switch (config.provider) {
+    case "huggingface":
+    case "decision": {
+      const { SpamDecisionProvider } = await import("./spam-decision");
+      return new SpamDecisionProvider(config);
+    }
     case "typesafe": {
       const { TypeSafeProvider } = await import("./typesafe");
       return new TypeSafeProvider(config);
