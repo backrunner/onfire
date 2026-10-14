@@ -2,6 +2,46 @@
 
 Updated: 2026-10-14
 
+## Production release — 2026-10-14
+
+- All pending changes are committed and pushed to `main`: `16a63ef` adds
+  genuine-support admission and scoped decision providers; `598b7be` refreshes
+  the bilingual handbook, upgrades svedocs to 0.3.0, and refines the full site UI.
+- A private production D1 export and Time Travel bookmark are preserved under
+  `.cache/onfire-release-20261014`. Replaying `0034_decision_spam.sql` and
+  `0035_genuine_support_label.sql` on the export preserves every original column
+  and row in all 65 tables; integrity and foreign-key checks pass. Both migrations
+  are now applied remotely, all four new columns/defaults are verified, and no
+  migrations or foreign-key violations remain.
+- Production-configured source `598b7be` is deployed at 100% as main Worker
+  `a6307f6a-585f-400c-b24e-f32fba32306a` and email agent
+  `1516865f-daa2-4db8-9546-a9d3521e2d13`. Domains remain `onfire.alkinum.com`
+  and `support.alkinum.io`; current bindings, secret names, mail address/product
+  mapping, and five-minute cron match the pre-release configuration.
+- Cloudflare Pages deployment `22eba54c` publishes the verified static site at
+  `https://onfire.pwp.sh`. Live browser checks cover en/zh, light/dark and
+  1440/390px (40 page cases, eight interaction combinations). All 34 live routes,
+  Markdown twins, canonical/language alternates, search, mobile navigation,
+  llms/sitemap/robots/license artifacts pass; screenshots show the new design.
+- Fresh frozen installs, generated bindings, TypeScript, 102 files / 914 tests,
+  Drizzle metadata, all 36 fresh-local migrations, production OpenNext build,
+  both deployment dry-runs, staged/history secret scans and startup profiling
+  pass. Actual local workerd HTTP verifies six portal/health/boundary cases.
+  Startup active CPU is 19.6ms locally; the generated CPU profile was removed.
+  GitHub CI run `38526793259` passes the full secret and quality jobs for
+  `598b7be`, including audit and Worker build.
+- Ten live HTTP probes verify public/direct/proxied pages and health, denied
+  cross-surface APIs, unauthenticated 401 and the expected admin Access 302.
+  Eight affected production JavaScript assets match the build by SHA-256.
+  Application dependency audit has zero findings. The static site's existing
+  upstream build dependencies still have unpatched braces (high) and
+  sprintf-js (moderate) findings, recorded in its README; those build packages
+  do not execute in the deployed static site.
+- Evidence is in `.cache/onfire-release-20261014`. This release verification
+  performs no customer/staff mail send, paid AI inference or authenticated
+  production ticket mutation; it does not establish live classifier accuracy
+  or mailbox delivery. Disabled integrations keep their configured state.
+
 ## Documentation visual refinement — 2026-10-14
 
 - `apps/site` now uses an opaque edge-to-edge header and a shared 1280px
