@@ -20,18 +20,19 @@
   export let onCloseMobileMenu: SvedocsNavbarProps["onCloseMobileMenu"];
 
   const href = (path: string) => resolveLocalizedHref(path, context);
+  const normalize = (path: string | undefined) => path?.replace(/\/$/, "") || "/";
 </script>
 
 <header class="of-header">
   <div class="of-navbar">
     <a href={href("/")} class="of-brand" aria-label={context.t("brand.home")}
-      ><BrandMark size={35} /><span>OnFire</span></a
+      ><BrandMark size={30} /><span>OnFire</span></a
     >
     <nav class="of-topnav" aria-label={context.t("nav.primary")}>
       {#each context.config.theme.nav as item (item.href)}
         <a
           href={href(item.href)}
-          aria-current={context.activeNavHref === href(item.href)
+          aria-current={normalize(context.activeNavHref) === normalize(href(item.href))
             ? "page"
             : undefined}
           >{resolveLocalizedText(item.label, item.labelKey, context)}</a
@@ -77,6 +78,7 @@
     <nav aria-label={context.t("nav.primary")}>
       {#each context.config.theme.nav as item (item.href)}<a
           href={href(item.href)}
+          aria-current={normalize(context.activeNavHref) === normalize(href(item.href)) ? "page" : undefined}
           onclick={onCloseMobileMenu}
           >{resolveLocalizedText(
             item.label,
@@ -92,6 +94,7 @@
         <Sidebar
           items={mobileTree?.length ? mobileTree : context.tree}
           currentPath={mobileCurrentPath || context.page?.routePath || ""}
+          visible={mobileMenuOpen}
         />
       </nav>{/if}
   </div>

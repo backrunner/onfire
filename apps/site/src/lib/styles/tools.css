@@ -7,7 +7,7 @@
   padding: 0;
   margin: 0 auto;
   border: 1px solid var(--sd-line);
-  border-radius: 14px;
+  border-radius: 8px;
   background: var(--sd-panel);
   color: var(--sd-ink);
   box-shadow: 0 30px 90px rgb(0 0 0 / 20%);
@@ -15,8 +15,6 @@
 }
 .sd-search-dialog::backdrop {
   background: rgb(24 23 25 / 35%);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
 }
 .of-search-heading {
   display: flex;
@@ -62,7 +60,7 @@
   display: block;
   margin-top: 5px;
   color: var(--of-accent);
-  font-size: 11px;
+  font-size: 12px;
 }
 .sd-search-results p {
   margin: 9px 0 0;
@@ -74,6 +72,9 @@
 .sd-empty-state {
   padding: 20px;
 }
+.sd-empty-state .of-button {
+  margin-top: 16px;
+}
 .sd-floating-toolbar {
   position: fixed;
   bottom: max(24px, env(safe-area-inset-bottom));
@@ -83,10 +84,10 @@
 .sd-floating-tool {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border: 1px solid var(--sd-line);
-  border-radius: 10px;
+  border-radius: 6px;
   background: var(--sd-panel);
   box-shadow: var(--of-shadow);
 }
@@ -100,7 +101,7 @@
 .sd-page,
 .sd-render-error {
   background: var(--sd-panel);
-  border-radius: 12px;
+  border-radius: 8px;
 }
 .sd-error-panel {
   padding: 34px;

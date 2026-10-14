@@ -85,7 +85,7 @@
                 onclick={() => (selected = id)}
               >
                 <span class="of-ticket-meta"
-                  ><span><i class:of-green={id === 3}></i>OF–{1049 - id}</span
+                  ><span><i class:of-green={id === 3}></i>#{1049 - id}</span
                   ><span>{t(`preview.time${id}`)}</span></span
                 >
                 <strong>{t(`preview.subject${id}`)}</strong><small
@@ -108,7 +108,7 @@
             aria-label={t("preview.conversation")}
           >
             <div class="of-conversation-title">
-              <span class="of-ticket-meta">OF–{1049 - selected}</span>
+              <span class="of-ticket-meta">#{1049 - selected}</span>
               <h3>{t(`preview.subject${selected}`)}</h3>
               <div>
                 <span class="of-pill"
@@ -190,6 +190,7 @@
                 <div>
                   <h4>{t(`preview.route${step}`)}</h4>
                   <p>{t(`preview.routedetail${step}`)}</p>
+                  {#if step > 1}<small class="of-route-count">{t(`preview.routecount${step}`)}</small>{/if}
                 </div>
                 <svelte:component this={tabs[step - 1].icon} size={20} />
               </li>{/each}

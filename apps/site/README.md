@@ -1,19 +1,20 @@
 # OnFire site
 
 The public OnFire landing page and documentation site is a standalone SvelteKit
-app powered by svedocs 0.2.3 and SvelteKit 3. It is intentionally separate from
+app powered by svedocs 0.3.0 and SvelteKit 3. It is intentionally separate from
 the Next.js application so the marketing/docs surface can be deployed as a
 static Cloudflare site without changing the ticket system runtime.
 
 Use Node.js 22.17 or later and TypeScript 6.x. SvelteKit configuration now lives
 in `vite.config.ts`, and local imports use the package's `#lib/*` mapping. The
-Vite alias from `$app/environment` to `$app/env` keeps svedocs 0.2.3 compatible
-with the renamed SvelteKit API; remove it once upstream adopts the new name.
+framework and CLI are pinned together at 0.3.0. This release uses SvelteKit 3's
+`$app/env` directly; the former environment-import compatibility alias is removed.
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm check
 pnpm check:content
+pnpm licenses:inventory
 pnpm build
 pnpm preview
 ```
@@ -45,6 +46,12 @@ The theme owns its navigation, sidebar, reading layout, footer, and CSS. It
 imports only `svedocs/theme/base.css`; search, route loading, syntax highlighting,
 code copy, table of contents, and theme state retain the svedocs behavior.
 
+The visual system uses an opaque full-width header, an aligned 1280px shell,
+continuous article surfaces, readable type, and restrained brand accents. The
+homepage leads with product information and quickstart/integration links, then
+an interactive sample and a plain guide directory. Avoid decorative hero art,
+repeated promotional sections, numbered feature cards, and metadata dot chains.
+
 - `src/lib/styles`: shared light/dark tokens, navigation, landing, workspace,
   reading, and dialog styles.
 - `src/lib/theme`: typed svedocs component replacements registered in Vite.
@@ -60,12 +67,37 @@ Geist and Geist Mono are bundled locally. Their SIL OFL notices and the Lucide
 notice ship in `/licenses/`. Vite emits bundled dependency notices at
 `/third-party-licenses.txt`.
 
-pnpm overrides keep svedocs on Sharp 0.35.5 and its math renderer on KaTeX 0.18.2
-for published security fixes. Recheck `pnpm audit --prod` when upgrading upstream
-and remove the overrides once its minimum versions include the fixes. The
-2026-10-11 audit still reports upstream build dependencies `braces` (high) and
-`sprintf-js` (moderate), for which no patched releases are available. This
-static site does not run those build dependencies in a deployed server.
+The site owns an independent pnpm workspace and lockfile. Upgrade from this
+folder with `pnpm exec svedocs upgrade <version> --package-manager pnpm`, then
+review overrides and the generated lockfile. svedocs 0.3.0 already includes
+Sharp 0.35.5, so the former Sharp override is removed. A global KaTeX 0.19.0
+override also covers older math-plugin dependencies, and the targeted
+`satori>fflate: 0.7.5` override fixes its pinned vulnerable 0.7.3 dependency.
+
+The 2026-10-14 `pnpm audit --prod` reports two upstream build-dependency findings:
+`braces` (high) and `sprintf-js` (moderate), with no patched releases available.
+The static deployment does not run those build dependencies in a server.
+Recheck the audit when upgrading upstream; do not describe this as a clean audit.
+
+Run `pnpm licenses:inventory` after dependency changes. It records the site's
+resolved dependencies in `dependency-licenses.json`, independently of the main
+application inventory. The current inventory covers 264 packages on darwin-arm64
+and has no unknown license metadata; other platforms can resolve different native
+packages. This metadata check is not legal clearance.
+
+## Documentation maintenance
+
+The handbook has 16 documentation pages per language, plus two landing pages.
+Both locales cover setup, deployment, ticket lifecycle, access, AI, genuine-support
+filtering and its HTTP spec, forms, languages, notifications, security, email,
+customer integration, account REST keys, MCP/WebMCP, and recovery.
+
+[DOCUMENTATION_AUDIT.md](./DOCUMENTATION_AUDIT.md) maps each chapter to the source
+contracts checked during this refresh. Update English and Chinese together and
+run the strict translation/content check. Document stored uploads separately
+from implemented indexing, and current source separately from production rollout.
+Changes to customer intake must keep the spam/decision API spec and the dashboard
+spec link aligned. The `spam-filter` document remains the canonical spec source.
 
 Deploy a verified build from the repository root with the existing Wrangler login:
 

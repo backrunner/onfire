@@ -48,6 +48,10 @@
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       controller.moveActive(event.key === "ArrowDown" ? 1 : -1);
+      void tick().then(() => {
+        input?.closest("dialog")?.querySelector('[aria-selected="true"]')
+          ?.scrollIntoView({ block: "nearest" });
+      });
     }
     if (event.key === "Enter") {
       event.preventDefault();
@@ -121,6 +125,8 @@
           role="combobox"
           aria-autocomplete="list"
           aria-controls="onfire-search-results"
+          aria-activedescendant={$recordsStatus !== "loading" && $recordsStatus !== "error" && $results[$activeIndex]
+            ? `onfire-search-result-${$activeIndex}` : undefined}
           aria-expanded="true"
           oninput={(event) => controller.setQuery(event.currentTarget.value)}
         /></label
@@ -136,16 +142,23 @@
       class="sd-search-results"
       role="listbox"
       aria-label={context.t("search.results")}
+      aria-busy={$recordsStatus === "loading"}
     >
       {#if $recordsStatus === "loading"}<p class="sd-empty-state" role="status">
           {context.t("search.loadingIndex")}
-        </p>{:else if $results.length === 0}<p
+        </p>{:else if $recordsStatus === "error"}
+        <div class="sd-empty-state" role="alert">
+          <p>{context.t("search.indexError")}</p>
+          <button class="of-button of-button-secondary" type="button" onclick={() => window.location.reload()}>{context.t("render.reload")}</button>
+        </div>
+        {:else if $results.length === 0}<p
           class="sd-empty-state"
           role="status"
         >
           {context.t("search.empty")}
         </p>{:else}{#each $results as result, index}<a
             class:sd-active={index === $activeIndex}
+            id={`onfire-search-result-${index}`}
             href={result.url}
             role="option"
             aria-selected={index === $activeIndex}

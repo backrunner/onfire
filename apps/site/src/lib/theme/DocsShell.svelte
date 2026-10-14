@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Article, TableOfContents } from "svedocs/theme";
-  import { ArrowUpRight, BookOpen } from "@lucide/svelte";
+  import { ArrowUpRight } from "@lucide/svelte";
   import type { SvedocsDocsShellProps } from "svedocs/theme/types";
   import Sidebar from "./Sidebar.svelte";
 
@@ -16,24 +16,15 @@
 <div class="of-docs-layout">
   <aside class="of-docs-sidebar" aria-label={context.t("nav.documentation")}>
     <div class="of-sidebar-heading">
-      <BookOpen size={16} strokeWidth={1.8} /><span
-        >{context.localeCode === "zh" ? "使用手册" : "Handbook"}</span
-      >
+      {context.t("docs.handbook")}
     </div>
     <nav><Sidebar items={navigationTree} currentPath={page.routePath} /></nav>
     <div class="of-sidebar-help">
-      <span
-        >{context.localeCode === "zh"
-          ? "找不到你需要的内容？"
-          : "Can’t find what you need?"}</span
-      >
       <a
         href="https://github.com/backrunner/onfire/issues"
         target="_blank"
         rel="noreferrer"
-        >{context.localeCode === "zh"
-          ? "提交反馈"
-          : "Open an issue"}<ArrowUpRight size={13} /></a
+        >{context.t("docs.feedback")}<ArrowUpRight size={13} /></a
       >
     </div>
   </aside>

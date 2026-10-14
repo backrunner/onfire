@@ -1,6 +1,114 @@
 # OnFire Project Status
 
-Updated: 2026-10-13
+Updated: 2026-10-14
+
+## Documentation visual refinement — 2026-10-14
+
+- `apps/site` now uses an opaque edge-to-edge header and a shared 1280px
+  container. Continuous article surfaces replace the outer reading card;
+  larger body/navigation text, wider content, aligned full-width tables and
+  quieter code blocks improve desktop and mobile reading. Zinc neutrals and
+  restrained orange accents preserve the existing brand in both themes.
+- The bilingual homepage replaces decorative logo art, repeated slogans,
+  feature cards, and provider strips with concrete product copy, quickstart /
+  deployment / integration links, the existing interactive sample workspace,
+  a plain guide directory and a compact repository command. Page titles and
+  Markdown twins describe the actual product. Sample references use #numbers;
+  routing metadata and footer legal links no longer use dot-delimited chains.
+- Localized top navigation normalizes trailing slashes before active-state
+  matching. Search exposes loading, empty and failed-index states with reload
+  recovery; keyboard selection scrolls into view and declares the active option
+  to assistive technology. Existing locale anchors, code copy, sidebar reveal,
+  navigation history, search scope and no-JS content remain connected.
+- Frozen site install, Svelte/TypeScript checks, strict content validation
+  (34 pages / 164 records, zero errors/warnings), and static build pass. Root
+  generated bindings, TypeScript, all 102 test files / 914 tests, application
+  Worker build and email-agent dry-run also pass. No dependency or schema change.
+- Chromium covers 136 page cases, eight interaction combinations and 231
+  internal links across en/zh, light/dark and 1440/390px. Extended checks cover
+  320–1920px alignment/reflow, three preview modes, copy denial, keyboard/focus,
+  empty/loading/error search and recovery, locale navigation, reduced motion,
+  no-JS/canonical/alternates, 404, and mobile WebKit. Final table/layout checks
+  cover all 32 documents in Chromium and WebKit at 320/390/1024/1440px (256
+  cases). Rendered screenshots were inspected. Evidence is in
+  `.cache/onfire-site-design`; search failures are local network fault injection.
+- Existing application/documentation work is preserved. No commit, push,
+  production deployment, database operation, or external notification occurred.
+
+## Documentation source refresh and svedocs 0.3.0 — 2026-10-14
+
+- The independent `apps/site` workspace upgrades framework and CLI together
+  from 0.2.3 to the current published 0.3.0, verified against npm and the upstream
+  release. SvelteKit 3 now needs no `$app/environment` alias. Remove the obsolete
+  Sharp override; keep KaTeX 0.19.0 across math plugins and patched Satori
+  fflate 0.7.5. The site lockfile remains separate from the application.
+- English/Chinese handbooks now have 16 pages each, plus two landing pages.
+  They cover current tickets, scopes/security, AI/knowledge, genuine-support
+  filtering and HTTP specs, forms/languages, notifications/email, customer
+  identity/proxy, account API keys, MCP/WebMCP, deployment and recovery.
+  `apps/site/DOCUMENTATION_AUDIT.md` maps chapters to checked source contracts.
+- Correct stale scope/failure statements in requirements and the nonexistent
+  generic inbound webhook alias in AGENTS. Document actual API paths, stored
+  document extraction limits, separate credential authority, uncertain mail
+  recovery and pending decision-filter migrations without claiming deployment.
+- Expanded navigation now reveals the active chapter inside the desktop sidebar
+  or opened mobile menu, including footer navigation and browser history.
+- Frozen install, Svelte/TypeScript checks and strict bilingual content checks
+  pass with zero errors/warnings; static build passes. Content check reports
+  34 pages / 164 search records. Site-specific license inventory records 264
+  packages on darwin-arm64 with no unknown license metadata.
+- Local Chromium verifies 136 page cases, eight interaction cases and 231
+  internal links across en/zh, light/dark and 1440/390px. Search, copy, TOC,
+  paired spec anchors/query, language/theme changes, next/previous/history,
+  mobile menu and active selection, no exceptions/overflow, Markdown twins,
+  llms/sitemap/robots/license output, 404 and no-JS reading pass. Evidence is
+  in `.cache/onfire-docs-refresh`. A final-build pass checks all 34 routes,
+  canonical origins/paths and both language alternates after copy polishing.
+- Production dependency audit still reports two unpatched upstream build
+  dependencies: braces (high), sprintf-js (moderate). The static site does not
+  execute those dependencies in a deployed server. No commit, push or Pages
+  deployment was performed for this refresh.
+
+## Genuine support admission and decision filtering — 2026-10-14
+
+- The independent `spam` task now judges both spam/promotion and genuine support
+  intent. Jev batches two Noul judgments; Decision HTTP requires both finite
+  probabilities; contextual Hugging Face classifiers require distinct explicit
+  spam and genuine-support labels. Generic SMS spam/ham models are no longer
+  suggested because ham does not establish a genuine ticket.
+- Non-ticket score is max(spam probability, one minus support probability).
+  Neither high administrator thresholds nor a low spam probability can admit
+  a message judged non-support. Spam and suspect results both block admission.
+  Provider failures/disabled or exhausted AI routes fail closed while the spam
+  filter is enabled. Disabled spam configuration still skips the gate.
+- The configured gate applies before customer ticket/reply insertion through
+  web/API and email. Email rejection and verification outages enter quarantine
+  for manual release; web/API reject with localized HTTP 400 or retryable 503.
+  Rejected replies do not reopen tickets, append history or emit notifications.
+  Staff replies/internal notes remain outside the customer intake gate.
+- Reply judgments include the product-owned ticket subject and latest public
+  reply, excluding internal notes. Prompt policy preserves genuine complaints,
+  questions, feedback and contextual confirmation/thanks while excluding
+  promotion, sales/partnership outreach, meaningless and unrelated text.
+- Scoped encrypted credentials, ordered fallback, cooldown and request/model
+  usage are retained. Migration `0034_decision_spam.sql` adds spam mapping and
+  thresholds; `0035_genuine_support_label.sql` adds explicit support mapping.
+  No new binding or dependency is required.
+- Credential prediction settings and custom/AI spam settings link directly to
+  localized OnFire specifications at `onfire.pwp.sh/docs/.../guides/spam-filter`.
+  `apps/site` contains bilingual policy, Decision HTTP and custom verdict API
+  specifications, examples, field tables, limits and failure behavior. Index
+  and AI guides link to the page. The new documentation has not been published.
+- Generated bindings, TypeScript, all 102 files / 914 tests, application and
+  email-agent builds/dry-runs, Drizzle metadata, all 36 migrations on a fresh
+  local D1, startup profiling and production audit pass. Site Svelte check,
+  static build and strict content checks pass (18 pages, no errors/warnings).
+- Local browser QA covers the actual spam, routing and credential components
+  at 1440/390px in en/zh and light/dark, plus loading/empty/error/missing-route
+  states (32 cases). Eight local documentation cases cover localized links, anchors,
+  Markdown twins and narrow layouts (40 browser cases total). Evidence: `.cache/onfire-decision-spam-qa`.
+  Provider responses and UI API data are fixtures, not accuracy or production
+  evidence. No live inference, customer email, commit or deployment was performed.
 
 ## Ticket sorting and optional closure notification — 2026-10-13
 

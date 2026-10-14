@@ -28,12 +28,11 @@
     </nav>
   </div>
   <div class="of-footer-bottom">
-    <span
-      >© 2026 BackRunner &amp; contributors · <a
+    <div class="of-footer-legal">
+      <span>© 2026 BackRunner &amp; contributors</span><a
         href="https://github.com/backrunner/onfire/blob/main/LICENSE"
         >Apache 2.0</a
-      ></span
-    >
+      ></div>
     <a href="https://svedocs.dev">{context.t("footer.platform")}</a>
   </div>
 </footer>

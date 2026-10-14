@@ -5,7 +5,11 @@ allowBuilds:
   sharp: true
   workerd: true
 
-# Remove when upstream minimum versions include these security fixes.
+minimumReleaseAgeExclude:
+  - satori@0.55.1
+  - svedocs-cli@0.3.0
+  - svedocs@0.3.0
+# rehype/remark math still resolve older KaTeX; keep the full tree patched.
 overrides:
-  'svedocs>sharp': 0.35.5
-  katex: 0.18.2
+  'satori>fflate': 0.7.5
+  katex: 0.19.0

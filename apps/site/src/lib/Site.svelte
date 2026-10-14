@@ -22,9 +22,6 @@
           <a href={item.path}>{item.label}</a>
         {/each}
       </nav>
-      <div class="of-doc-label">
-        {page.locale === "zh" ? "ONFIRE / 使用手册" : "ONFIRE / HANDBOOK"}
-      </div>
       <h1>{page.title}</h1>
       {#if page.description}<p>{page.description}</p>{/if}
     </header>

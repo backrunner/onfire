@@ -8,8 +8,6 @@ import { svedocs } from "svedocs/vite";
 import svedocsConfig from "./svedocs.config.ts";
 
 export default defineConfig({
-  // svedocs 0.2.3 still imports the pre-v3 name for this unchanged API.
-  resolve: { alias: { "$app/environment": "$app/env" } },
   build: { license: { fileName: "third-party-licenses.txt" } },
   plugins: [
     svedocs({
