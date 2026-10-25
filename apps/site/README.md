@@ -74,10 +74,9 @@ Sharp 0.35.5, so the former Sharp override is removed. A global KaTeX 0.19.0
 override also covers older math-plugin dependencies, and the targeted
 `satori>fflate: 0.7.5` override fixes its pinned vulnerable 0.7.3 dependency.
 
-The 2026-10-14 `pnpm audit --prod` reports two upstream build-dependency findings:
-`braces` (high) and `sprintf-js` (moderate), with no patched releases available.
-The static deployment does not run those build dependencies in a server.
-Recheck the audit when upgrading upstream; do not describe this as a clean audit.
+The 2026-10-25 full and production dependency audits report no known
+vulnerabilities. This supersedes the 2026-10-14 build-dependency findings.
+Recheck both audits when upgrading upstream.
 
 Run `pnpm licenses:inventory` after dependency changes. It records the site's
 resolved dependencies in `dependency-licenses.json`, independently of the main

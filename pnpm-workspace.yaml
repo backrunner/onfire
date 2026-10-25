@@ -4,14 +4,13 @@ allowBuilds:
   workerd: true
 overrides:
   '@node-minify/core>glob': 10.5.0
-  'ajv>fast-uri': 3.1.8
-  'express>qs': 6.16.0
-  'body-parser>qs': 6.16.0
+  'ajv>fast-uri': 3.1.9
+  'express>qs': 6.16.1
+  'body-parser>qs': 6.16.1
   hono: 4.13.13
   '@esbuild-kit/core-utils>esbuild': 0.28.2
-  dompurify: 3.4.16
-  'next>postcss': 8.5.29
+  dompurify: 3.4.17
+  'next>postcss': 8.5.31
   sharp: 0.35.5
   'cosmiconfig>js-yaml': 4.3.2
-patchedDependencies:
-  '@opennextjs/cloudflare@1.20.10': patches/@opennextjs__cloudflare@1.20.10.patch
+  'miniflare>undici': 7.30.1

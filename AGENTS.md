@@ -13,7 +13,7 @@ OnFire is a minimalist modern ticket system designed to enable users to quickly 
 - **Frontend**: React 19 + TypeScript
 - **UI Components**: shadcn/ui (zinc theme)
 - **Styling**: Tailwind CSS 4
-- **AI**: OpenAI/OpenRouter/Anthropic/Google/xAI/DeepSeek language models + OpenAI/OpenRouter/Qwen/Jina/Cohere/Google embeddings + Cohere/Jina reranking + Cloudflare Vectorize
+- **AI**: OpenAI/OpenRouter/Anthropic/Google/xAI/DeepSeek language models + OpenAI/OpenRouter/Qwen/Jina/Cohere/Google embeddings + OpenRouter/Cohere/Jina reranking + Cloudflare Vectorize
 
 Current status and task requirements live in `.agents/STATUS.md` and `.agents/REQUIREMENTS.md`. Development and visual rules live in `.agents/DEVELOPMENT.md` and `.agents/DESIGN.md`.
 
@@ -23,6 +23,9 @@ and time; state, language and version use small semantic badges. See
 `.agents/DESIGN.md` for the shared information hierarchy patterns.
 Read `.agents/GUARD.md` before accepting UI changes; the OnFire development skill
 links the same review checks.
+UI labels and built-in system explanations follow the selected language without
+appending translations. Review views preserve customer and provider-authored
+originals; normal visual fixtures use one language at a time.
 
 ## Project Structure
 
@@ -549,6 +552,31 @@ Each product can be independently configured:
 - **AI Filtering**: Enable only after the Ticket Prescreening task has an
   enabled AI credential route
 
+### Filtered Input Review
+
+Review separates a bounded content reader from filtering evidence and restoration
+controls. Formatted content, plain text and submitted fields switch in place;
+model/score evidence expands on demand. Compact list rows use a labeled ticket
+button for restored results. Images use a thumbnail strip and keyboard-accessible
+lightbox rather than expanding inside the body.
+AI filtering reuses the existing spam-task credential/model editor, including
+Jev and inherited/fallback credentials; it never collects a second model API key.
+
+The system/tenant spam settings include a paginated table of inputs filtered in
+the last 30 days: existing inbound email quarantine and web/API submissions.
+Only `spam.config` administrators within live product/tenant scope can read or
+restore entries; preview is read-only. Detail reads retain complete original
+text and sanitized rich content. Image references are separated from review HTML;
+remote images remain placeholders until explicitly opened, with no referrer sent.
+New email requires an explicit product ticket type. Web/API restoration retains
+its original type, immutable form version, metadata and customer identity;
+customer replies return to their original open ticket. Restoration bypasses the
+filter decision only, rechecks business validity and translation, records actor,
+reason and result, and uses the normal routing/SLA/notification flow. Duplicate
+restoration cannot create another ticket/reply. Migration `0036_filtered_inputs.sql`
+must precede the Worker release; previously discarded web/API content cannot be
+backfilled. REST account-key and WebMCP tools expose separate read/restore grants.
+
 ### Customer Portal Return URLs
 
 Each product may configure:
@@ -707,7 +735,8 @@ Custom product templates use the same escaped variable renderer for preview and 
 - Language tasks (`agent`, `prescreening`, `prereply`, `translation`) support OpenAI, OpenRouter, Anthropic, Google, xAI, and DeepSeek.
 - OpenAI explicitly selects `responses` or `chat`; new configurations default to Responses API.
 - Embedding is separate and supports OpenAI, OpenRouter, Qwen/DashScope, Jina AI, Cohere, and Google. Models must support the dimension of the bound Vectorize index, discovered at runtime.
-- Reranking is separate and supports Cohere and Jina AI. Knowledge retrieval reranks a bounded candidate set and preserves vector/D1 order when no rerank route is configured or reranking fails.
+- Reranking is separate and supports OpenRouter, Cohere and Jina AI. Knowledge retrieval reranks a bounded candidate set and preserves vector/D1 order when no rerank route is configured or reranking fails.
+- OpenRouter discovery reads text, embedding and `models?output_modalities=rerank` catalogs. Shared model pickers search by ID/display name without changing the selected model, support keyboard selection and manual custom IDs, and show disabled explanations for incompatible or unverified embedding dimensions.
 - Provider-specific model catalogs are fetched with each provider's required authentication and pagination. Route saves persist server-verified text, embedding, or rerank capability metadata for catalog-listed models; models outside the catalog are accepted when name-based classification matches the task capability (custom embedding models request the bound index dimension), while catalog-listed models with the wrong capability or incompatible dimensions stay rejected.
 - Catalog and TypeSafe screening fetches use `redirect: "manual"` and reject non-2xx responses. Cloudflare Workers does not implement `redirect: "error"`; do not replace this with automatic redirect following. Preset model sources and refresh behavior are recorded in `docs/AI_MODELS.md`.
 - Provider credentials are stored once in an encrypted credential pool and can be reused by multiple AI tasks.
@@ -814,6 +843,9 @@ GET                   /admin/email-logs/inbound  - Inbound email logs
 POST                  /admin/email-logs/inbound/:id/release - Release quarantined email
 GET                   /admin/email-logs/outbound - Outbound email logs
 GET/PATCH             /admin/spam-filter - Global or tenant external spam service
+GET                   /admin/spam-filter/inputs - Recent scoped filtered inputs
+GET                   /admin/spam-filter/inputs/:source/:id - Full filtered input
+POST                  /admin/spam-filter/inputs/:source/:id/release - Restore with audit reason
 POST                  /admin/email-config/:productId/test - Test outbound config
 POST                  /admin/email-config/:productId/webhook-secret - Generate webhook secret
 
@@ -966,7 +998,7 @@ Customers may be email-backed or `externalId`-only. Ticket lists, search, labels
 - Prefetch navigation on pointer or keyboard intent. Avoid eagerly downloading every sidebar destination. Product/team metadata is preloaded with relevant pages and deduplicated for one minute.
 - Load ticket detail, closed preview/assistant dialogs, authentication actions and unsupported-browser WebMCP code on demand. Pass only the selected UI dictionary from SSR; load another language when selected.
 - Import language cookie constants from the shared server-safe module. SSR timestamps hydrate in UTC before switching to browser-local time.
-- OpenNext 1.20.10 requires the checked-in pnpm patch to inline Next 16.4's `preview-props.json`. A successful build alone is insufficient: smoke-test the production Worker over HTTP after framework/adapter changes.
+- OpenNext 1.20.13 includes Next 16.4's `preview-props.json` manifest fix upstream; the former local pnpm patch is removed. A successful build alone is insufficient: smoke-test the production Worker over HTTP after framework/adapter changes.
 
 ### Color Specifications
 
@@ -1151,5 +1183,5 @@ for the separately recorded production deployment.
 
 - Use `xxx(comp): desc`, for example `feat(ai): add qwen embeddings` or `fix(rbac): scope assistant tickets`.
 - Do not commit, deploy, apply remote migrations, or create remote Cloudflare resources unless explicitly requested.
-- The verified OpenNext Cloudflare 1.20.10 / Next 16.4.0 build uses Web API-only `src/middleware.ts`. Verify adapter support before migrating to Node `proxy.ts`; domain routing is covered by `src/middleware.test.ts`.
+- The verified OpenNext Cloudflare 1.20.13 / Next 16.4.3 build uses Web API-only `src/middleware.ts`. Verify adapter support before migrating to Node `proxy.ts`; domain routing is covered by `src/middleware.test.ts`.
 - Track `pnpm-lock.yaml`, `wrangler.types.env`, and generated `worker-configuration.d.ts`; regenerate types after Wrangler config changes. pnpm 11 overrides belong in `pnpm-workspace.yaml`.

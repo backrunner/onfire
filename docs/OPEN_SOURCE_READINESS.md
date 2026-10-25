@@ -4,6 +4,29 @@ Review date: **2026-09-09**
 
 Revision reviewed: `f1523a3` plus the follow-up site cleanup commit.
 
+### Dependency security follow-up — 2026-10-25
+
+The current worktree uses Next.js 16.4.3, React 19.3.1, Better Auth and plugins
+1.7.12, OpenNext 1.20.13, Wrangler 4.152.0 and Vitest 5.0.5. The independent
+site uses svedocs 0.3.0 and SvelteKit 3.1.0. TypeScript remains 6.0.3. No major
+version migration or release-age bypass is introduced. OpenNext now includes
+the manifest fix upstream; the former local pnpm patch is removed.
+
+Both workspaces' full and production audits report zero known vulnerabilities.
+This supersedes the historical findings below. Scoped security overrides and
+compatible transitive updates fix the application audit without suppressions;
+Miniflare alone receives the patched Undici 7.30.1 override.
+
+The full application CI quality sequence passes locally under Node 22.23.4 and
+pnpm 12.3.4, including frozen install, generated bindings, TypeScript, all 939
+tests, production audit and both Worker builds. Gitleaks 8.30.1 scans 170 commits
+without findings. Fresh local migrations, Drizzle metadata, dry-run/startup,
+12 actual local Worker authentication/SSR/discovery HTTP checks and 50 browser
+regression cases pass. The site passes type/content checks and static build.
+License inventories cover 812 application and 264 site entries on darwin-arm64,
+with no unknown metadata. See `.agents/STATUS.md` for evidence boundaries.
+No remote CI, commit, push, migration or deployment is claimed by these checks.
+
 ### Dependency update follow-up — 2026-10-11
 
 All application and independent site direct dependencies are on their latest

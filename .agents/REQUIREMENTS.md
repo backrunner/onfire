@@ -294,7 +294,8 @@
   See `docs/DECISION_SPAM.md`.
 - OpenAI persists `responses` or `chat`; default to Responses, retain Chat for compatible gateways.
 - Embedding providers: OpenAI, OpenRouter, Qwen/DashScope, Jina AI, Cohere, Google.
-- Rerank providers: Cohere and Jina AI. Every route must use a model matching its text, embedding, or rerank capability; provider-specific catalogs are fetched and exact model capabilities are verified by the server before assignment.
+- Rerank providers: OpenRouter, Cohere and Jina AI. Every route must use a model matching its text, embedding, or rerank capability; provider-specific catalogs are fetched and exact model capabilities are verified by the server before assignment.
+- OpenRouter discovery combines text, embeddings and `models?output_modalities=rerank` catalogs. Model pickers search IDs and display names independently of the selected model; retain manual custom IDs, refresh and keyboard selection. Embedding models with incompatible or unverified index dimensions remain visible with an explanation and cannot be selected from the list.
 - Store provider credentials independently from task routing so one encrypted credential can be reused by multiple AI functions.
 - Each AI task owns an ordered credential route with a model per route entry. Runtime calls skip disabled or cooling-down credentials and try the next configured entry after a provider failure.
 - When a failed credential has another available route entry, place it in a configurable cooldown. Do not cooldown the final credential, and never repeat a successful provider call because health bookkeeping failed.
@@ -328,6 +329,32 @@
 - External spam endpoints are sealed-credential outbound fetch sinks: public HTTPS/443 only, no redirects, bounded timeout/body, and strict response validation.
 - New inbound email uses one AI prescreening call for spam/support judgment, type selection, and ticket insights. Invalid or low-confidence type choices fall back to the product's `unclassified` type.
 - Spam and non-support results enter a recoverable quarantine with stage, provider, score, reason, and release audit. Releasing a new thread requires an explicit ticket type; replies retain the original ticket type.
+
+## Filtered Input Review
+
+- Spam settings show the last 30 days of blocked web/API tickets and replies,
+  verification failures, and recoverable inbound mail in one paginated table.
+- List rows distinguish content, customer/product, source/time and a concise
+  filter explanation. Review bounds long content in a reader; formatted/plain
+  text and submitted fields switch in place. Decision probabilities use labeled
+  values inside a collapsed disclosure. Restored results use a labeled ticket
+  link button; restoration actions/errors remain visible outside the reader.
+  Review images use small thumbnails and a lightbox with previous/next and Escape
+  controls. Remote images load only when explicitly opened, without a referrer.
+- AI filtering selects existing AI credentials and compatible models through
+  the shared spam-task editor. Do not collect another model API key in spam
+  settings or maintain a separate credential/route store.
+- Read/detail/restore require `spam.config` and live tenant/product scope.
+  Preview cannot restore. Raw webhook payloads and credentials are never exposed;
+  review renders sanitized rich content without automatically loading remote images.
+- Restore new input as a ticket and replies on their original open ticket. Retain
+  original web form/version/metadata and revalidate current customer, type, form,
+  routing and translation. Only the filtering decision is bypassed.
+- Require a restoration note; new mail also requires a product-owned ticket type.
+  Retain actor/time/reason and result links. Commit web restoration audit with the
+  ticket/reply, reject stale reply state and prevent duplicate restoration side effects.
+- Provide separate REST account-key/WebMCP read/detail/restore operations. Existing
+  OAuth MCP grants do not expand. Old discarded web/API content is unavailable.
 
 ## Notifications
 

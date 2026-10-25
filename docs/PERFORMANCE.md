@@ -48,15 +48,13 @@ loads when the user switches languages; the cookie survives reloads.
 
 ## Production Worker compatibility
 
-OpenNext 1.20.10 does not include Next 16.4's `preview-props.json` in its manifest
+OpenNext 1.20.10 omitted Next 16.4's `preview-props.json` from its manifest
 inlining glob. A production Worker could build successfully and still return
-HTTP 500 on a page request. The pinned pnpm patch in
-`patches/@opennextjs__cloudflare@1.20.10.patch` adds this file to the existing
-manifest loader. Frozen installs apply it reproducibly.
+HTTP 500 on a page request. OpenNext 1.20.13 includes the fix upstream, so the
+2026-10-25 dependency update removes the former local pnpm patch.
 
 After changing Next or OpenNext, verify actual authenticated HTTP responses in
-the built Worker as well as compilation and deployment dry-run. Remove the
-patch when the installed adapter handles this manifest itself.
+the built Worker as well as compilation and deployment dry-run.
 
 ## Measured comparison
 

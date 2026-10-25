@@ -1,6 +1,177 @@
 # OnFire Project Status
 
-Updated: 2026-10-14
+Updated: 2026-10-25
+
+## Production release preparation — 2026-10-25
+
+- The operator authorized committing, pushing and deploying the pending intake,
+  model-selection and dependency work. npm's official registry and the supported
+  upgrade command both confirm svedocs and svedocs-cli 0.3.0 are still the latest
+  published stable versions; the site retains exact matching pins.
+- Production main/email bindings, address/product maps, domains and secret names
+  match the ignored deployment configurations. Only migration 0036 is pending.
+  A private D1 export is saved under `.cache/onfire-release-20261025`; replaying
+  0036 preserves all rows in all 66 original tables, with successful integrity
+  and foreign-key checks.
+- Node 22 frozen install, bindings, TypeScript, all 939 tests, production audit,
+  production-configured OpenNext build, both production dry-runs and startup
+  checks pass. Site frozen install, type/content checks, static build and license
+  inventory pass. Deployment and remote CI results are recorded separately after
+  the published revision is verified.
+
+## Compatible dependency and security update — 2026-10-25
+
+- Upgrade Next.js 16.4.0 → 16.4.3, React/React DOM 19.3.0 → 19.3.1,
+  Better Auth and both plugins 1.7.7 → 1.7.12, OpenNext 1.20.10 → 1.20.13,
+  Wrangler 4.149.0 → 4.152.0, aligned Tiptap 3.32.0, Radix 1.8.1,
+  postal-mime 4.1.4 and compatible assistant/MCP/Zod/tooling releases.
+  Site updates SvelteKit to 3.1.0, Vite to 8.3.5 and compatible icons/checker.
+  TypeScript remains 6.0.3. Keep Hono 4.13.13 rather than bypass pnpm's
+  release-age protection for the newly published 4.13.14.
+- Refresh compatible transitive resolutions and existing scoped security
+  overrides; pin only Miniflare's Undici to patched 7.30.1. Full and production
+  audits now report zero known vulnerabilities in both workspaces, down from
+  19 application findings. No advisory is suppressed. OpenNext contains the
+  `preview-props.json` fix upstream, so remove the obsolete local pnpm patch.
+- All application CI quality commands pass with Node 22.23.4 and pnpm 12.3.4:
+  frozen install, generated bindings, TypeScript, 103 files / 939 tests,
+  production audit and Worker build. Gitleaks 8.30.1 scans all 170 commits with
+  no findings; a snapshot of all current non-ignored source files also passes.
+  Drizzle metadata, all 37 migrations on fresh isolated local D1,
+  both Worker dry-runs and startup profiling pass. A transient first local-D1
+  transport failure resolves on retry; the final complete check sequence passes.
+- Actual local workerd HTTP passes 12 checks for login, session isolation,
+  authenticated Dashboard/SSR, Passkey listing, OAuth grants/discovery and logout
+  using isolated synthetic credentials. Model search, rich-text editing and the
+  static site pass 50 Chromium/WebKit cases across languages, themes and screen
+  sizes. Browser screenshots were inspected. No live AI/mail/Vectorize calls.
+- Site frozen install, Svelte checks, strict bilingual content validation and
+  static build pass. Regenerated license inventories cover 812 application and
+  264 site entries on darwin-arm64, with no unknown license metadata.
+  Evidence is under `.cache/onfire-deps-20261025` and `.cache/onfire-models-qa`.
+  These are local checks of the pending worktree, not a remote GitHub Actions
+  run. No commit, push, remote migration or deployment was performed.
+
+## OpenRouter embedding/rerank discovery and model search — 2026-10-25
+
+- Discovery combines the text catalog, `/embeddings/models`, and
+  `/models?output_modalities=rerank`; OpenRouter is now a rerank route provider
+  with its `/rerank` protocol, shared validation, scoped routing and usage.
+  Redirects and empty rerank responses fail; search units are not counted as tokens.
+- Embedding dimension discovery handles arrays and comma-formatted sizes, plus
+  documented Qwen3, Voyage and Google families when descriptions are truncated.
+  Public live discovery returns 467 text, 35 embedding and 10 rerank models;
+  19 embeddings have catalog/documented 1024-dimension compatibility. Other embeddings
+  remain visible but disabled with a localized compatibility explanation.
+- Shared model pickers search IDs and display names independently of the saved
+  model, with arrow/Enter/Escape selection, focus return, refresh, custom IDs,
+  wrapped long labels and bounded scrolling. English/Chinese and light/dark
+  desktop/mobile flows pass 23 Chromium/WebKit fixture cases; screenshots were
+  inspected under `.cache/onfire-models-qa`.
+- Frozen install, generated bindings, TypeScript, 103 files / 939 tests, the
+  application Worker build and email-agent dry-run pass,
+  including persisted OpenRouter rerank route execution with mocked inference.
+  Public catalog requests use no production credential or paid inference.
+  The dependency audit reports 19 existing production advisories, including
+  Next.js 16.4.0; security upgrades are separate from this change. No dependency,
+  schema, remote setting, commit or deployment change is included.
+
+## Compact filtered-input rows and image review — 2026-10-16
+
+- List rows use two text lines, inline state, customer/product hierarchy without
+  repeated labels, short received times and a concise reason. Full timestamps,
+  input kind and provider evidence remain in review. Restored rows have one
+  labeled `Ticket #123` button; their subject still opens the audit dialog.
+- Review combines identity into its header, bounds content without forcing a
+  tall empty reader and collapses model/score evidence by default. Sanitized image
+  references are projected separately from body HTML into 64px thumbnails and a
+  lightbox with keyboard navigation, focus return, Escape and load-failure state.
+  Remote images remain placeholders until explicitly opened and send no referrer.
+  Stored originals, release transactions and credential routing are unchanged.
+- No additional migration or dependency is required. Frozen install, generated
+  bindings check, TypeScript, 103 files / 928 tests, Worker build and email-agent
+  dry-run pass. Local Chromium fixtures pass 32 cases at 1440x900 and 390x844 in
+  English/Chinese and light/dark: restoration, loading/empty/error/preview states,
+  original-language preservation, 64px thumbnails, lightbox navigation and failure,
+  Escape/focus return, ticket links and explicit remote loading without referrers.
+  Screenshots were inspected in `.cache/onfire-filtered-inputs-qa`.
+  No commit, deployment, remote migration or live provider call was made.
+
+## Filter review layout and shared AI credentials — 2026-10-16
+
+- Filtered-input rows separate subject/preview, customer/product, source/time,
+  and a concise filter explanation; narrow screens use stacked rows. Numeric
+  probabilities move out of the list into labeled values in review.
+- Review uses a bounded content reader alongside the decision/restoration area.
+  Formatted content, plain text and submitted fields switch in place. Long
+  provider explanations expand on demand, and restore errors stay with the
+  persistent actions. Original content and the existing restoration checks remain.
+- Selecting AI filtering embeds the existing spam-task credential/model editor.
+  It uses saved AI credentials, including Jev, with the same scope inheritance,
+  model compatibility, fallback ordering and API authorization. Saving a route
+  refreshes readiness without resetting the unsaved filter selection. Preview
+  disables writes. Thresholds and timeout are in advanced settings.
+- No schema, provider protocol, production credential or remote configuration
+  change is required for this revision. Verification uses synthetic local UI/API
+  fixtures and the existing provider integration tests, not live Jev inference.
+- Frozen install, binding generation check, TypeScript, 102 files / 925 tests,
+  application Worker build and email-agent dry-run pass. Chromium passes 42
+  cases across English/Chinese, light/dark, 1440x900 and 390x844: review and
+  restoration, content/field switching, bounded long content, visible errors,
+  language switching, saved Jev credential selection, model compatibility,
+  tenant inheritance/override, preview and credential loading/empty/error states.
+  Screenshots and harnesses are under `.cache/onfire-filtered-inputs-qa`.
+  No commit, remote migration, deployment or live provider request was made.
+
+
+## Filtered input review and restoration — 2026-10-15
+
+- System and tenant spam settings now include a paginated last-30-days table
+  combining existing email quarantine with newly retained web/API rejections
+  and verification outages. Rows show product/customer, source, content preview,
+  reason, time and review state. Detail views show full plain/rich content and
+  submitted fields; sanitized remote images become explicit links during review.
+- Built-in filter reasons and provider labels follow the selected UI language;
+  customer originals and custom provider explanations remain unchanged. Visual
+  fixtures now use separate English and Chinese samples instead of concatenated
+  translations. Switching languages verifies both localized explanations and
+  preservation of original content.
+- `spam.config` and live product/tenant scope guard list/detail/restoration;
+  preview cannot mutate. Account keys and WebMCP expose separate list, detail
+  and restore operations; remote OAuth grants are unchanged.
+- Restoration requires a note, preserves original web type/form/metadata, and
+  validates live customer ownership, type/form availability, routing and required
+  translation. New mail requires a product ticket type; replies return to their
+  original open ticket. Normal assignment, numeric ticket references, SLA and
+  notification behavior are retained. Audit records link actor/time/reason/result.
+- Web restoration commits its audit with the ticket/reply and uses deterministic
+  output IDs to prevent duplicate effects. Customer and email replies use the
+  shared guarded transition to reject a ticket closed during translation. Failed
+  restores remain reviewable. A previously matched email cannot silently become
+  a new ticket when its original sender/thread is no longer valid.
+- Additive migration `0036_filtered_inputs.sql` is generated and applied locally.
+  Apply it before releasing the Worker. Earlier discarded web/API submissions
+  cannot be backfilled; the 30-day table window does not delete stored records.
+- Frozen install, generated bindings, TypeScript, all 102 files / 925 tests,
+  application Worker build and email-agent dry-run pass. Drizzle metadata and all
+  37 migrations against a fresh local D1 pass; production dependency audit reports
+  no known vulnerabilities. Main Worker dry-run and local startup profiling pass.
+- Chromium checks cover 24 cases: en/zh, light/dark, 1440x900 and 390x844, new web
+  intake/mail/reply restoration, notes/type validation, result links/status
+  filtering, loading/empty/error states, no available types, preview and language
+  switching with foreign-language originals. Inspected
+  screenshots show no page overflow and persistent dialog actions. UI API data
+  and classifier decisions are synthetic fixtures, not production accuracy evidence.
+- Actual workerd HTTP passes 13 checks using isolated migrated D1 and temporary
+  scoped keys: merged list/detail, denied restore grant, concurrent new-ticket and
+  reply restoration, email release/retry, pending/restored queries and bad source.
+  D1 confirms exactly 3 tickets (including the original), 1 reply, 3 audit events,
+  no orphan references, and no outbound mail/notification logs. This found and
+  corrected a D1-specific `db.run(sql)` batch incompatibility missed by the SQLite
+  test adapter; final writes use prepared `insert().select()` builders.
+- Evidence and local harnesses: `.cache/onfire-filtered-inputs-qa`. No commit,
+  remote migration, production deployment, paid AI call or external notification
+  was performed. Temporary local servers and generated startup profile are removed.
 
 ## Production release — 2026-10-14
 
