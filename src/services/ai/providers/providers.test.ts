@@ -19,6 +19,33 @@ function mockJson(body: unknown) {
 }
 
 describe("AI provider protocols", () => {
+  it.each([undefined, "https://gateway.example.com/v1/"])("uses OpenRouter reranking with base URL %s", async (baseUrl) => {
+    const fetchMock = mockJson({
+      results: [{ index: 1, relevance_score: 0.92, document: { text: "second" } }],
+      usage: { total_tokens: 42, search_units: 1 },
+    });
+    const provider = new OpenRouterProvider({ provider: "openrouter", model: "cohere/rerank-v3.5", apiKey: "test", baseUrl });
+    await expect(provider.rerank({ query: "q", documents: ["first", "second"], topN: 1 })).resolves.toEqual({
+      results: [{ index: 1, relevanceScore: 0.92, document: "second" }], usage: { totalTokens: 42 },
+    });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(`${baseUrl?.replace(/\/$/, "") ?? "https://openrouter.ai/api/v1"}/rerank`);
+    expect(init).toMatchObject({ redirect: "manual", headers: { Authorization: "Bearer test" } });
+    expect(JSON.parse(String(init?.body))).toEqual({ model: "cohere/rerank-v3.5", query: "q", documents: ["first", "second"], top_n: 1 });
+  });
+
+  it.each([307, 429, 503])("rejects OpenRouter rerank HTTP %s without exposing upstream bodies", async (status) => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("test-secret echoed", { status }));
+    const provider = new OpenRouterProvider({ provider: "openrouter", model: "cohere/rerank-v3.5", apiKey: "test-secret" });
+    await expect(provider.rerank({ query: "q", documents: ["first"] })).rejects.toThrow(`OpenRouter Rerank API error (HTTP ${status})`);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it.each([{}, { results: [] }])("rejects empty OpenRouter rerank output (%j)", async (body) => {
+    mockJson(body);
+    const provider = new OpenRouterProvider({ provider: "openrouter", model: "cohere/rerank-v3.5", apiKey: "test" });
+    await expect(provider.rerank({ query: "q", documents: ["first"] })).rejects.toThrow("Invalid OpenRouter rerank response");
+  });
   it("uses OpenRouter's OpenAI-compatible chat endpoint", async () => {
     const fetchMock = mockJson({ choices: [{ message: { content: "ok" } }] });
     const provider = new OpenRouterProvider({

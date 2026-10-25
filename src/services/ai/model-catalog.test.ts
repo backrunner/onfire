@@ -106,10 +106,12 @@ describe("AI model catalog", () => {
     const compatible = await listProviderModels("jina", "secret", undefined, 768);
     expect(findCompatibleModel(compatible, "jina-embeddings-v4", "embedding", 768)?.dimensions).toBe(768);
   });
-  it("combines OpenRouter text and embedding catalogs", async () => {
+  it("combines OpenRouter text, embedding and rerank catalogs", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const url = String(input);
-      return url.endsWith("/embeddings/models")
+      return url.includes("output_modalities=rerank")
+        ? json({ data: [{ id: "cohere/rerank-v3.5", name: "Cohere Rerank", architecture: { modality: "text->rerank" } }] })
+        : url.endsWith("/embeddings/models")
         ? json({ data: [{
             id: "voyageai/voyage-code-4",
             description: "Matryoshka embeddings at 2048, 1024, 512, and 256...",
@@ -122,12 +124,44 @@ describe("AI model catalog", () => {
     expect(models).toEqual(expect.arrayContaining([
       { id: "vendor/chat", kind: "text", name: undefined, contextLength: undefined, dimensions: undefined },
       { id: "voyageai/voyage-code-4", kind: "embedding", name: undefined, contextLength: undefined, dimensions: 1024 },
+      { id: "cohere/rerank-v3.5", kind: "rerank", name: "Cohere Rerank", contextLength: undefined, dimensions: undefined },
     ]));
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
       "https://openrouter.ai/api/v1/models",
       "https://openrouter.ai/api/v1/embeddings/models",
+      "https://openrouter.ai/api/v1/models?output_modalities=rerank",
     ]);
+  });
+
+  it("recognizes OpenRouter dimensions despite truncated descriptions and comma formatting", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => json({ data:
+      String(input).endsWith("/embeddings/models") ? [
+        { id: "qwen/qwen3-embedding-8b", description: "Text embedding and ranking tasks..." },
+        { id: "voyageai/voyage-code-4", description: "Matryoshka embeddings at 2048..." },
+        { id: "google/gemini-embedding-2" },
+        { id: "liquid/lfm-embedding", description: "Produces 1,024-dimensional embeddings." },
+        { id: "vendor/array-embed", dimensions: [256, 512, 1024] },
+        { id: "vendor/fixed-embed", dimensions: 768 },
+        { id: "vendor/unknown-embed" },
+      ] : [],
+    }));
+    const models = await listProviderModels("openrouter", "secret");
+    for (const id of ["qwen/qwen3-embedding-8b", "voyageai/voyage-code-4", "google/gemini-embedding-2", "liquid/lfm-embedding", "vendor/array-embed"]) {
+      expect(findCompatibleModel(models, id, "embedding")?.dimensions, id).toBe(1024);
+    }
+    expect(findCompatibleModel(models, "vendor/fixed-embed", "embedding")).toBeNull();
+    expect(findCompatibleModel(models, "vendor/unknown-embed", "embedding")).toBeNull();
+    const smallIndex = await listProviderModels("openrouter", "secret", undefined, 768);
+    expect(findCompatibleModel(smallIndex, "qwen/qwen3-embedding-8b", "embedding", 768)?.dimensions).toBe(768);
+    expect(findCompatibleModel(smallIndex, "voyageai/voyage-code-4", "embedding", 768)).toBeNull();
+  });
+
+  it("keeps a failed rerank refresh visible instead of returning an incomplete catalog", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+      String(input).includes("output_modalities=rerank")
+        ? new Response("secret upstream detail", { status: 503 }) : json({ data: [] }));
+    await expect(listProviderModels("openrouter", "secret")).rejects.toThrow("Model catalog request failed (HTTP 503)");
   });
 
   it("uses Anthropic API-key headers and follows cursor pagination", async () => {

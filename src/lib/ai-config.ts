@@ -28,7 +28,7 @@ export const EMBEDDING_AI_PROVIDERS = [
   "google",
 ] as const;
 
-export const RERANK_AI_PROVIDERS = ["cohere", "jina"] as const;
+export const RERANK_AI_PROVIDERS = ["openrouter", "cohere", "jina"] as const;
 
 export const ALL_AI_PROVIDERS = [
   ...LANGUAGE_AI_PROVIDERS,

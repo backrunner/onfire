@@ -28,6 +28,11 @@ describe("TypeSafe task boundaries", () => {
 });
 
 describe("AI base URL validation", () => {
+  it("allows OpenRouter reranking consistently in routing and runtime", () => {
+    expect(isProviderAllowedForTask("rerank", "openrouter")).toBe(true);
+    expect(providerSupportsTask("openrouter", "rerank")).toBe(true);
+    expect(modelsForTask("openrouter", "rerank")).toContain("cohere/rerank-v3.5");
+  });
   it("normalizes public HTTPS gateway paths", () => {
     expect(safeAIBaseUrl("https://gateway.example.com/v1/")).toBe(
       "https://gateway.example.com/v1"

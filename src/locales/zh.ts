@@ -871,6 +871,9 @@ export const zh = {
       supportLabel: '真实工单标签',
       spamLabelHint: '准确填写两种模型标签；真实工单类别必须排除推广、无意义和无关内容。',
       customModelHint: '也可以直接输入列表外的自定义模型',
+      searchModels: '搜索模型 ID 或名称',
+      noModelsFound: '没有匹配的模型',
+      incompatibleDimensions: '输出维度与知识库索引不兼容或尚未确认',
       saved: '功能路由已保存',
       saveFailed: '功能路由保存失败'
     },

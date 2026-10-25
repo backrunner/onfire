@@ -86,11 +86,12 @@ function numericDimensions(value: Record<string, unknown>): number[] {
     value.embedding_dimensions,
     value.output_dimension,
     value.outputDimensionality,
-  ].filter((entry): entry is number => typeof entry === "number" && Number.isInteger(entry) && entry > 0);
+  ].flatMap((entry) => Array.isArray(entry) ? entry : [entry])
+    .filter((entry): entry is number => typeof entry === "number" && Number.isInteger(entry) && entry > 0);
   const description = String(value.description ?? "");
   const described = Array.from(
-    description.matchAll(/(?:^|\D)(\d{3,5})[- ]?(?:dimensional|dimensions?)/gi),
-    (match) => Number(match[1]),
+    description.matchAll(/(?:^|\D)(\d{1,2},\d{3}|\d{3,5})[- ]?(?:dimensional|dimensions?)/gi),
+    (match) => Number(match[1].replaceAll(",", "")),
   );
   const listed = Array.from(
     description.matchAll(/embeddings?\s+(?:at|in)\s+([\d, and]+)(?:\.{3}|\s+dimensions?)/gi),
@@ -114,6 +115,23 @@ function supportsOnFireDimensions(
   }
   if (provider === "cohere" && id === "embed-v4.0") {
     return [256, 512, 1024, 1536].includes(targetDimensions);
+  }
+  if (numericDimensions({ ...value, description: "" }).length > 0) return false;
+  // OpenRouter's descriptions are truncated and often omit output sizes.
+  // Only enrich documented families; unknown/fixed-size models stay guarded.
+  // https://qwenlm.github.io/blog/qwen3-embedding/
+  // https://www.mongodb.com/docs/voyageai/models/text-embeddings/
+  if (provider === "openrouter") {
+    if (/^qwen\/qwen3-embedding-(?:0\.6|4|8)b$/.test(id)) {
+      const maximum = id.endsWith("8b") ? 4096 : id.endsWith("4b") ? 2560 : 1024;
+      return targetDimensions >= 32 && targetDimensions <= maximum;
+    }
+    if (/^voyageai\/(?:voyage-4(?:-large|-lite)?|voyage-code-[34]|voyage-3(?:-large|\.5(?:-lite)?)|voyage-multimodal-3\.5)$/.test(id)) {
+      return [256, 512, 1024, 2048].includes(targetDimensions);
+    }
+    if (/^google\/gemini-embedding-(?:001|2(?:-preview)?)$/.test(id)) {
+      return targetDimensions > 0 && targetDimensions <= 3072;
+    }
   }
   if (dimensions.length > 0) return false;
   if (STATIC_MODELS[provider]?.some((model) => model.id === id && model.dimensions === targetDimensions)) return true;
@@ -288,7 +306,11 @@ async function listOpenAiCompatibleModels(
   dimensions: number,
 ): Promise<AIModelDescriptor[]> {
   const paths: Array<{ path: string; kind?: AIModelKind }> = provider === "openrouter"
-    ? [{ path: "models", kind: "text" }, { path: "embeddings/models", kind: "embedding" }]
+    ? [
+        { path: "models", kind: "text" },
+        { path: "embeddings/models", kind: "embedding" },
+        { path: "models?output_modalities=rerank", kind: "rerank" },
+      ]
     : [{ path: "models" }];
   const models: AIModelDescriptor[] = [];
   for (const item of paths) {

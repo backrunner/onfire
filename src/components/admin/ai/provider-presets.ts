@@ -32,7 +32,8 @@ export const PROVIDER_PRESETS: Record<AIProviderValue, ProviderPreset> = {
       "openai/gpt-6-astra",
       "x-ai/grok-4.7",
     ],
-    embeddingModels: ["openai/text-embedding-3-small"],
+    embeddingModels: ["openai/text-embedding-3-small", "qwen/qwen3-embedding-8b", "google/gemini-embedding-001", "baai/bge-m3"],
+    rerankModels: ["cohere/rerank-v3.5", "qwen/qwen3-reranker-8b", "voyageai/rerank-2.5"],
   },
   anthropic: {
     baseUrl: "https://api.anthropic.com/v1",

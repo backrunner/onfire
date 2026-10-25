@@ -184,7 +184,7 @@ function TaskRoutingCard({
   const [pending, setPending] = useState(false);
   const [catalogs, setCatalogs] = useState<Record<
     string,
-    Array<{ id: string; kind: AIModelKind; dimensions?: number }>
+    Array<{ id: string; name?: string; kind: AIModelKind; dimensions?: number }>
   >>({});
   const [loadingCatalog, setLoadingCatalog] = useState<string | null>(null);
 
@@ -323,7 +323,7 @@ function TaskRoutingCard({
       const scopeQuery = aiScopeQuery({ scope, tenantId, productId })
         .replace("?", "&");
       const result = await api.get<{
-        models: Array<{ id: string; kind: AIModelKind; dimensions?: number }>;
+        models: Array<{ id: string; name?: string; kind: AIModelKind; dimensions?: number }>;
       }>(
         `/api/tob/admin/ai/models?credentialId=${encodeURIComponent(credentialId)}&taskType=${taskType}${scopeQuery}`,
       );
@@ -438,11 +438,16 @@ function TaskRoutingCard({
               const availableModels = fetchedModels
                 ? fetchedModels
                     .filter((model) =>
-                      model.kind === modelKindForTask(taskType, credential?.provider) &&
-                      (model.kind !== "embedding" || model.dimensions !== undefined)
+                      model.kind === modelKindForTask(taskType, credential?.provider)
                     )
-                    .map((model) => model.id)
-                : models;
+                    .map((model) => ({
+                      id: model.id,
+                      name: model.name,
+                      disabled: model.kind === "embedding" && model.dimensions === undefined,
+                      description: model.kind === "embedding" && model.dimensions === undefined
+                        ? r.incompatibleDimensions : undefined,
+                    }))
+                : models.map((id) => ({ id }));
               const usedByOthers = new Set(
                 assignments
                   .filter((_, itemIndex) => itemIndex !== index)
@@ -525,12 +530,16 @@ function TaskRoutingCard({
                         id={`model-${taskType}-${assignment.id}`}
                         value={assignment.model}
                         options={availableModels.filter(
-                          (model, modelIndex, all) => all.indexOf(model) === modelIndex
+                          (model, modelIndex, all) => all.findIndex((item) => item.id === model.id) === modelIndex
                         )}
                         loading={loadingCatalog === assignment.credentialId}
                         placeholder={t.aiConfig.modelPlaceholder}
+                        label={t.aiConfig.model}
                         refreshLabel={t.aiConfig.routing.loadModels}
                         customHint={t.aiConfig.routing.customModelHint}
+                        searchLabel={r.searchModels}
+                        emptyLabel={r.noModelsFound}
+                        loadingLabel={t.common.loading}
                         onOpen={() => {
                           if (
                             !catalogs[assignment.credentialId] &&

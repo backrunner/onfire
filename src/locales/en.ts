@@ -873,6 +873,9 @@ export const en: Translations = {
       supportLabel: 'Genuine support label',
       spamLabelHint: 'Map both exact model labels. The genuine-support class must exclude promotion, meaningless and unrelated content.',
       customModelHint: 'You can also type a custom model not in the list',
+      searchModels: 'Search model ID or name',
+      noModelsFound: 'No matching models',
+      incompatibleDimensions: 'Output dimensions are incompatible or unverified for the knowledge index',
       saved: 'Function routing saved',
       saveFailed: 'Failed to save function routing'
     },

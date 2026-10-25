@@ -12,6 +12,7 @@ import { PATCH, DELETE } from "@/app/api/tob/admin/ai/credentials/[id]/route";
 import { GET as modelsGET } from "@/app/api/tob/admin/ai/models/route";
 import { createTestDb } from "./test-db";
 import { PATCH as spamPATCH, GET as spamGET } from "@/app/api/tob/admin/spam-filter/route";
+import { getAIProvider } from "@/services/ai/config";
 
 let db: Database;
 let actorId: string | null;
@@ -50,6 +51,32 @@ async function createCredential(query = "") {
   expect(JSON.stringify(body)).not.toContain(key);
   return z.object({ data: z.object({ id: z.string() }) }).parse(body).data.id;
 }
+
+describe("OpenRouter model routing", () => {
+  it("discovers and saves rerank capabilities, then executes the saved scoped route", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/rerank")) return Response.json({ results: [{ index: 1, relevance_score: 0.9 }], usage: { total_tokens: 8 } });
+      if (url.includes("output_modalities=rerank")) return Response.json({ data: [{ id: "cohere/rerank-v3.5", architecture: { modality: "text->rerank" } }] });
+      if (url.endsWith("/embeddings/models")) return Response.json({ data: [{ id: "qwen/qwen3-embedding-8b" }] });
+      return Response.json({ data: [{ id: "openai/gpt-5", architecture: { modality: "text->text" } }] });
+    });
+    const created = await POST(request("credentials", "POST", { name: "OpenRouter", provider: "openrouter", apiKey: "test-only-openrouter-key" }));
+    expect(created.status).toBe(201);
+    const id = z.object({ data: z.object({ id: z.string() }) }).parse(await created.json()).data.id;
+    const response = await modelsGET(request(`models?credentialId=${id}&taskType=rerank`));
+    expect(response.status).toBe(200);
+    const catalog = z.object({ data: z.object({ models: z.array(z.object({ id: z.string(), kind: z.string() })) }) }).parse(await response.json());
+    expect(catalog.data.models).toEqual(expect.arrayContaining([{ id: "cohere/rerank-v3.5", kind: "rerank" }, { id: "qwen/qwen3-embedding-8b", kind: "embedding" }]));
+    await saveTaskRouting(db, "rerank", true, [{ credentialId: id, model: "cohere/rerank-v3.5" }]);
+    expect(await db.query.aiTaskCredentials.findFirst()).toMatchObject({ modelKind: "rerank", modelDimensions: null });
+    await expect(saveTaskRouting(db, "rerank", true, [{ credentialId: id, model: "openai/gpt-5" }])).rejects.toThrow();
+    const provider = await getAIProvider(db, "rerank", { productId: "product" });
+    expect(provider?.rerank).toBeTypeOf("function");
+    await expect(provider!.rerank!({ query: "support", documents: ["irrelevant", "support"] })).resolves.toMatchObject({ results: [{ index: 1, relevanceScore: 0.9 }], usage: { totalTokens: 8 } });
+    expect(fetchMock.mock.calls.at(-1)?.[0]).toBe("https://openrouter.ai/api/v1/rerank");
+  });
+});
 
 describe("decision spam administration", () => {
   const spamRequest = (method = "GET", body?: unknown, tenantId?: string) => new NextRequest(`https://admin.example.com/api/tob/admin/spam-filter${tenantId ? `?tenantId=${tenantId}` : ""}`, {
