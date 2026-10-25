@@ -14,13 +14,19 @@ order: 5
 | `prereply` | Language providers; suggested agent replies |
 | `translation` | Language providers; product text, ticket and public-reply translation |
 | `embedding` | OpenAI, OpenRouter, Qwen, Jina, Cohere, Google |
-| `rerank` | Cohere, Jina |
+| `rerank` | OpenRouter, Cohere, Jina |
 
 Jev returns typed decisions, not summaries or new issue prose. A classifier or
 Decision HTTP credential cannot generate replies, translations or embeddings.
 OpenAI supports Responses (default) or Chat for compatible gateways; OpenRouter
 uses Chat. Model IDs are verified against task capability and runtime output.
 Custom endpoints require public HTTPS without query strings, fragments or redirects.
+
+Model pickers search IDs and display names without changing the selected model.
+Use arrow keys and Enter to choose, Escape to close, or refresh the provider list;
+custom model IDs remain editable. OpenRouter discovery combines its text,
+embedding and rerank catalogs. Embeddings with incompatible or unverified index
+dimensions remain visible with an explanation and cannot be selected from the list.
 
 ## Scoped configuration
 

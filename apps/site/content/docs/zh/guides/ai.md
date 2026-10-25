@@ -14,12 +14,17 @@ order: 5
 | `prereply` | 语言提供商，客服建议回复 |
 | `translation` | 语言提供商，产品文本、工单和公开回复翻译 |
 | `embedding` | OpenAI、OpenRouter、Qwen、Jina、Cohere、Google |
-| `rerank` | Cohere、Jina |
+| `rerank` | OpenRouter、Cohere、Jina |
 
 Jev 返回类型化判断，不生成摘要或新的问题描述。分类器和 Decision HTTP 不能生成
 回复、翻译或向量。OpenAI 支持 Responses（默认）或兼容网关的 Chat，OpenRouter
 使用 Chat。模型 ID 按任务能力验证，运行时也验证输出。自定义地址必须是公开 HTTPS，
 不含查询、片段或重定向。
+
+模型选择框支持按 ID 或显示名称搜索，搜索不会修改已选模型。可用方向键和 Enter
+选择、Escape 关闭，或刷新提供商列表；仍可直接编辑自定义模型 ID。OpenRouter
+分别拉取文本、向量嵌入与重排目录。与索引维度不兼容或尚未确认的向量模型会显示
+说明并在列表中禁用。
 
 ## 范围配置
 

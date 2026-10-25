@@ -34,6 +34,22 @@ for manual review/release. Web/API clients receive HTTP 400 without a ticket or
 reply being created. Exhausted routes, invalid model responses and verification
 outages hold email for review and return HTTP 503 to web/API clients.
 
+## Review and restore filtered inputs
+
+Apply `0036_filtered_inputs.sql` before deploying this feature. System and tenant
+spam settings show inputs filtered in the last 30 days, including email quarantine
+and retained web/API tickets and replies. Administrators with `spam.config` can
+review only their live product/tenant scope; preview mode is read-only. Review
+preserves original text, submitted fields and filtering evidence. Remote images
+load only when explicitly opened and send no referrer.
+
+To restore a false positive, enter a review reason. New email also requires an
+explicit product ticket type. New requests become tickets; matching customer
+replies return to their original open ticket. Restoration bypasses the filter
+decision only and rechecks customer identity, form/type validity, routing and
+translation. Repeated restoration returns the existing result. Older discarded
+web/API content cannot be recovered from before this migration.
+
 ## Decision API
 
 A commercial or self-hosted decision endpoint must implement **onfire-decision-v1**.
