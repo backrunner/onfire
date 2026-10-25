@@ -4,6 +4,13 @@
  * source literals — a mismatch silently falls back to English.
  */
 export const zhErrorMessages: Record<string, string> = {
+  "Filtered input not found": "未找到被过滤的输入",
+  "Invalid filtered input source": "无效的过滤记录来源",
+  "Restored ticket no longer exists": "已恢复的工单已不存在",
+  "This input is being restored. Refresh to check its status.": "该输入正在恢复，请刷新查看状态。",
+  "Original ticket is no longer available for this sender": "原工单已不存在或不再属于该发件人",
+  "Ticket changed; refresh and try again": "工单已发生变化，请刷新后重试",
+
   "Content verification is temporarily unavailable. Please try again later.": "内容验证暂时不可用，请稍后重试。",
   "Please submit a genuine support request or relevant ticket reply.": "请提交真实的支持请求或与工单相关的回复。",
   "TypeSafe model catalog request timed out. Try again later.": "TypeSafe 模型列表请求超时，请稍后重试。",

@@ -1310,6 +1310,33 @@ export const inboundEmails = sqliteTable(
   ],
 );
 
+/** Valid customer submissions held by the admission filter, before ticket/reply writes. */
+export const filteredInputs = sqliteTable("filtered_inputs", {
+  id: text("id").primaryKey(),
+  productId: text("product_id").notNull(),
+  customerId: text("customer_id").notNull(),
+  ticketId: text("ticket_id"),
+  subject: text("subject").notNull(),
+  content: text("content").notNull(),
+  contentHtml: text("content_html"),
+  ticketTypeId: text("ticket_type_id"),
+  templateVersionId: text("template_version_id"),
+  metadata: text("metadata"),
+  priority: text("priority").$type<TicketPriority>(),
+  language: text("language").notNull(),
+  filterProvider: text("filter_provider").notNull(),
+  filterVerdict: text("filter_verdict").notNull(),
+  filterScore: real("filter_score"),
+  filterReason: text("filter_reason").notNull(),
+  filterResult: text("filter_result"),
+  restoredTicketId: text("restored_ticket_id"),
+  restoredReplyId: text("restored_reply_id"),
+  releasedAt: text("released_at"),
+  releasedBy: text("released_by"),
+  releaseReason: text("release_reason"),
+  createdAt: text("created_at").notNull(),
+}, (t) => [index("filtered_inputs_product_created_idx").on(t.productId, t.createdAt)]);
+
 export const outboundEmails = sqliteTable(
   "outbound_emails",
   {

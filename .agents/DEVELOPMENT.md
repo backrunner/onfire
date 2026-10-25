@@ -32,6 +32,7 @@
 
 - TypeScript strict; avoid `any`, ignored errors, and unchecked production casts.
 - Keep Cloudflare runtime code Web API-compatible and use current Workers binding types.
+- D1 transaction batches require prepared query builders (for example guarded `insert().select()` writes); do not pass `db.run(sql)` to `db.batch()`. SQLite adapter tests can miss this runtime difference, so verify changed transaction paths over local workerd HTTP.
 - Business tables mostly lack foreign keys, so delete endpoints preserve integrity explicitly.
 - Public ToC routes require identity validation, D1 rate limits, and Turnstile where configured.
 - Treat Turnstile as a paired frontend/backend feature: configure the secret and public site key together, and fail closed when only the backend secret is present.

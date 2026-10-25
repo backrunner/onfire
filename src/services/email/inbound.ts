@@ -1,6 +1,6 @@
+import { guardedTicketChange } from "@/lib/tickets/guarded-change";
 import { and, desc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { parseTicketNumber } from "@/lib/tickets/number";
-import type { BatchItem } from "drizzle-orm/batch";
 import type { Database } from "@/lib/db";
 import { ticketCustomerEmail } from "@/lib/tickets/customer-contact";
 import { sanitizeRichHtml } from "@/lib/rich-text";
@@ -238,65 +238,35 @@ async function addEmailReply(
   )
     ? translation.detectedLanguage
     : context.product.defaultLanguage;
-  const statements: [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]] = [
-    db.insert(replies).values({
-      id: replyId,
-      ticketId: ticket.id,
-      senderEmail: context.row.fromEmail,
-      content: context.content,
-      contentHtml: context.contentHtml,
-      detectedLanguage: translation.detectedLanguage,
-      translations: translation.translations,
-      source: "email",
-      sourceEmailId: context.row.id,
-      createdAt: now,
-    }),
-    db.insert(history).values({
-      id: crypto.randomUUID(),
-      ticketId: ticket.id,
-      actorId: release?.actorId ?? null,
-      action: "customer_replied",
-      snapshot: JSON.stringify({ source: "email", released: Boolean(release) }),
-      createdAt: now,
-    }),
-    db
-      .update(inboundEmails)
-      .set({
-        processingStatus: "processed",
-        ticketId: ticket.id,
-        replyId,
-        processedAt: now,
-        ...(release && {
-          releasedAt: now,
-          releasedBy: release.actorId,
-          releaseReason: release.reason,
-        }),
-      })
-      .where(eq(inboundEmails.id, context.row.id)),
-  ];
-  if (ticket.status === TicketStatus.Replied) {
-    statements.push(
-      db
-        .update(tickets)
-        .set({
-          status: TicketStatus.Processing,
-          slaReplyDeadline: null,
-          ...(!ticket.customerLanguage && {
-            customerLanguage: detectedCustomerLanguage,
-          }),
-          updatedAt: now,
-        })
-        .where(eq(tickets.id, ticket.id))
-    );
-  } else if (!ticket.customerLanguage) {
-    statements.push(
-      db
-        .update(tickets)
-        .set({ customerLanguage: detectedCustomerLanguage, updatedAt: now })
-        .where(eq(tickets.id, ticket.id))
-    );
-  }
-  await db.batch(statements);
+  const changed = await guardedTicketChange(db, ticket, {
+    ...(ticket.status === TicketStatus.Replied ? { status: TicketStatus.Processing, slaReplyDeadline: null } : {}),
+    ...(!ticket.customerLanguage && { customerLanguage: detectedCustomerLanguage }),
+    updatedAt: now,
+  }, {
+    actorId: release?.actorId ?? null, action: "customer_replied", createdAt: now,
+    snapshot: JSON.stringify({ source: "email", released: Boolean(release), ...(release && { reason: release.reason }) }),
+  }, (applied) => [
+    db.insert(replies).select(db.select({
+      id: sql<string>`${replyId}`.as("id"),
+      ticketId: tickets.id,
+      senderId: sql<null>`NULL`.as("sender_id"),
+      senderEmail: sql<string | null>`${context.row.fromEmail}`.as("sender_email"),
+      content: sql<string>`${context.content}`.as("content"),
+      contentHtml: sql<string | null>`${context.contentHtml}`.as("content_html"),
+      detectedLanguage: sql<string | null>`${translation.detectedLanguage}`.as("detected_language"),
+      translations: sql<string | null>`${translation.translations}`.as("translations"),
+      internal: sql<boolean>`0`.as("internal"),
+      source: sql<"email">`'email'`.as("source"),
+      sourceEmailId: sql<string>`${context.row.id}`.as("source_email_id"),
+      emailSent: sql<boolean>`0`.as("email_sent"),
+      createdAt: sql<string>`${now}`.as("created_at"),
+    }).from(tickets).where(and(eq(tickets.id, ticket.id), applied))),
+    db.update(inboundEmails).set({
+      processingStatus: "processed", ticketId: ticket.id, replyId, processedAt: now,
+      ...(release && { releasedAt: now, releasedBy: release.actorId, releaseReason: release.reason }),
+    }).where(and(eq(inboundEmails.id, context.row.id), applied)),
+  ]);
+  if (!changed) throw new Error("Ticket changed; refresh and try again");
   emitTicketEvent(db, {
     type: "customer_replied",
     ticketId: ticket.id,
@@ -736,6 +706,7 @@ export async function releaseQuarantinedEmail(
     if (candidateTicketId) {
       const reply = await addEmailReply(db, context, candidateTicketId, release);
       if (reply) return reply;
+      throw new Error("Original ticket is no longer available for this sender");
     }
     if (!input.ticketTypeId) throw new Error("A ticket type is required to release a new email");
     const type = await db.query.ticketTypes.findFirst({

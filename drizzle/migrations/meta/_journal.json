@@ -253,6 +253,13 @@
       "when": 1791949536625,
       "tag": "0035_genuine_support_label",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1792047668024,
+      "tag": "0036_filtered_inputs",
+      "breakpoints": true
     }
   ]
 }

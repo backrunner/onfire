@@ -3,6 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import type { Database } from "@/lib/db";
 import {
   spamFilterConfigs,
+  filteredInputs,
   tickets,
   replies,
   type SpamFilterConfigRow,
@@ -171,13 +172,23 @@ export async function loadSpamTicketContext(db: Database, productId: string, tic
 }
 
 /** Public intake persists no customer ticket/reply unless an enabled filter allows it. */
-export async function enforceCustomerIntake(db: Database, input: SpamFilterInput, context: { tenantId: string; productId: string }): Promise<void> {
+export async function enforceCustomerIntake(db: Database, input: SpamFilterInput, context: { tenantId: string; productId: string }, recovery: Pick<typeof filteredInputs.$inferInsert, "customerId" | "language" | "ticketId" | "contentHtml" | "ticketTypeId" | "templateVersionId" | "metadata" | "priority">): Promise<void> {
   const config = await resolveSpamFilterConfig(db, context.tenantId);
   if (!config) return;
-  let result: SpamFilterResult;
+  let result: SpamFilterResult | undefined;
   try { result = await runSpamFilter(db, config, input, context); }
-  catch { throw new ApiError(503, "Content verification is temporarily unavailable. Please try again later."); }
-  if (result.verdict !== "allow") throw new ApiError(400, "Please submit a genuine support request or relevant ticket reply.");
+  catch { /* Preserve the submission for review without persisting provider errors/secrets. */ }
+  if (result?.verdict === "allow") return;
+  await db.insert(filteredInputs).values({
+    ...recovery, id: crypto.randomUUID(), productId: context.productId,
+    subject: input.subject, content: input.content,
+    filterProvider: result?.decisionProvider ?? result?.provider ?? config.provider,
+    filterVerdict: result?.verdict ?? "unavailable", filterScore: result?.score,
+    filterReason: result?.reason ?? (result ? "Content was filtered" : "Content verification is temporarily unavailable"),
+    filterResult: result ? JSON.stringify(result) : null, createdAt: new Date().toISOString(),
+  });
+  if (!result) throw new ApiError(503, "Content verification is temporarily unavailable. Please try again later.");
+  throw new ApiError(400, "Please submit a genuine support request or relevant ticket reply.");
 }
 
 async function runCustom(

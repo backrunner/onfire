@@ -37,6 +37,7 @@ import { Label } from "@/components/ui/label";
 import { ModelCombobox } from "./model-combobox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { aiScopeQuery } from "./scope";
 import { AiRoutingSkeleton } from "./ai-loading-skeletons";
@@ -84,10 +85,18 @@ export function RoutingTab({
   scope = "system",
   tenantId,
   productId,
+  taskTypes = AI_TASK_TYPES,
+  embedded = false,
+  readOnly = false,
+  onSaved,
 }: {
   scope?: "system" | "tenant" | "product";
   tenantId?: string;
   productId?: string;
+  taskTypes?: readonly AITaskTypeValue[];
+  embedded?: boolean;
+  readOnly?: boolean;
+  onSaved?: () => void;
 }) {
   const { t } = useI18n();
   const scopeQuery = aiScopeQuery({ scope, tenantId, productId });
@@ -101,12 +110,13 @@ export function RoutingTab({
   );
 
   if (routing.isLoading || credentials.isLoading) {
+    if (embedded) return <div aria-busy="true" aria-label={t.common.loading} className="space-y-4 py-1"><div className="space-y-2"><Skeleton className="h-4 w-28" /><Skeleton className="h-3 w-64 max-w-full" /></div><div className="grid gap-3 sm:grid-cols-2"><Skeleton className="h-9 w-full" /><Skeleton className="h-9 w-full" /></div><div className="flex justify-between border-t pt-3"><Skeleton className="h-8 w-24" /><Skeleton className="h-8 w-32" /></div></div>;
     return <AiRoutingSkeleton />;
   }
 
   if (routing.error || credentials.error) {
     return (
-      <Card>
+      <Card className={embedded ? "border-0 bg-transparent shadow-none" : undefined}>
         <CardContent className="flex min-h-48 flex-col items-center justify-center gap-3 text-center">
           <p className="text-sm text-muted-foreground">{t.aiConfig.loadFailed}</p>
           <Button
@@ -127,7 +137,7 @@ export function RoutingTab({
 
   return (
     <div className="grid min-w-0 gap-3">
-      {AI_TASK_TYPES.map((taskType) => (
+      {taskTypes.map((taskType) => (
         <TaskRoutingCard
           key={taskType}
           taskType={taskType}
@@ -136,7 +146,9 @@ export function RoutingTab({
           productId={productId}
           config={routing.data?.find((item) => item.taskType === taskType) ?? null}
           credentials={credentials.data ?? []}
-          onSaved={() => void routing.mutate()}
+          embedded={embedded}
+          readOnly={readOnly}
+          onSaved={() => { void routing.mutate(); onSaved?.(); }}
         />
       ))}
     </div>
@@ -151,6 +163,8 @@ function TaskRoutingCard({
   config,
   credentials,
   onSaved,
+  embedded,
+  readOnly,
 }: {
   taskType: AITaskTypeValue;
   scope: "system" | "tenant" | "product";
@@ -159,6 +173,8 @@ function TaskRoutingCard({
   config: TaskRoutingView | null;
   credentials: AiCredentialView[];
   onSaved: () => void;
+  embedded: boolean;
+  readOnly: boolean;
 }) {
   const { t } = useI18n();
   const r = t.aiConfig.routing;
@@ -264,6 +280,7 @@ function TaskRoutingCard({
   };
 
   const save = async () => {
+    if (readOnly) return;
     if (enabled && !inherit && !canEnable) {
       toast.error(r.routeRequired);
       return;
@@ -319,17 +336,17 @@ function TaskRoutingCard({
   };
 
   return (
-    <Card className="flex min-w-0 flex-col gap-0 rounded-lg py-0">
-      <CardHeader className="px-4 py-3">
+    <Card className={cn("flex min-w-0 flex-col gap-0 rounded-lg py-0", embedded && "rounded-none border-0 bg-transparent shadow-none")}>
+      <CardHeader className={cn("px-4 py-3", embedded && "px-0 pt-0")}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
+            <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-md bg-muted", embedded && "hidden")}>
               <GitBranch className="size-4 text-muted-foreground" />
             </span>
             <div className="min-w-0">
-              <CardTitle className="text-sm">{t.aiConfig.tasks[taskType]}</CardTitle>
+              <CardTitle className="text-sm">{embedded ? t.management.spamFilter.aiCredentials : t.aiConfig.tasks[taskType]}</CardTitle>
               <CardDescription className="text-xs">
-                {t.aiConfig.tasks[`${taskType}Hint` as const]}
+                {embedded ? t.management.spamFilter.aiCredentialsHint : t.aiConfig.tasks[`${taskType}Hint` as const]}
               </CardDescription>
             </div>
           </div>
@@ -339,7 +356,7 @@ function TaskRoutingCard({
                 <Switch
                   id={`task-enabled-${taskType}`}
                   checked={enabled && canEnable}
-                  disabled={pending || !canEnable}
+                  disabled={pending || readOnly || !canEnable}
                   onCheckedChange={(next) => {
                     if (next && !canEnable) {
                       toast.error(r.routeRequired);
@@ -356,7 +373,8 @@ function TaskRoutingCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="flex min-w-0 flex-1 flex-col gap-3 px-4 pb-3">
+      <CardContent className={cn("flex min-w-0 flex-1 flex-col gap-3 px-4 pb-3", embedded && "px-0 pb-0")}>
+        <fieldset disabled={readOnly} className="contents">
         {inherit ? (
           <div className="flex min-h-24 flex-1 flex-col gap-3">
             <div className="rounded-md border border-dashed px-3 py-3">
@@ -599,7 +617,7 @@ function TaskRoutingCard({
                 disabled={compatibleCredentials.length === 0}
               >
                 <Plus className="size-4" />
-                {r.addFallback}
+                {embedded && assignments.length === 0 ? t.management.spamFilter.configureCredentials : r.addFallback}
               </Button>
               {scope !== "system" && (
                 <Button
@@ -614,11 +632,12 @@ function TaskRoutingCard({
               )}
             </div>
           )}
-          <Button size="sm" className="h-8" onClick={save} disabled={pending}>
+          <Button size="sm" className="h-8" onClick={save} disabled={pending || readOnly}>
             {pending && <Loader2 className="size-4 animate-spin" />}
-            {t.aiConfig.save}
+            {embedded ? t.management.spamFilter.saveCredentials : t.aiConfig.save}
           </Button>
         </div>
+        </fieldset>
       </CardContent>
     </Card>
   );

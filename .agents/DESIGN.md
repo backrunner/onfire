@@ -19,6 +19,10 @@ Avoid generic AI-dashboard composition: no oversized headings inside operational
 ## Components
 
 - Start from existing shadcn/ui and zinc tokens.
+- Interface labels and built-in system explanations use only the selected UI
+  language. Do not append another language's translation. Preserve customer
+  originals and provider-authored text during review; keep ordinary visual-test
+  fixtures in one language and test mixed-language content separately.
 - Avoid middot/bullet-delimited UI metadata. Use explicit label/value groups,
   alignment and spacing; keep each field together when it wraps on mobile.
 - Use a definition list for compact resource metadata. Put the identifier in a

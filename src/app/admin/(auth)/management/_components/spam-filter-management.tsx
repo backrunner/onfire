@@ -1,5 +1,7 @@
 "use client";
 
+import { FilteredInputs } from "./filtered-inputs";
+import { RoutingTab } from "@/components/admin/ai/routing-tab";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { Save } from "lucide-react";
@@ -44,7 +46,7 @@ const GLOBAL = "__global__";
 export function SpamFilterManagement({ tenantId }: { tenantId?: string }) {
   const { t, language } = useI18n();
   const m = t.management.spamFilter;
-  const { can } = useMe();
+  const { can, me } = useMe();
   const isSuperAdmin = can("tenant.manage");
   const { data: tenants } = useSWR<TenantRef[]>(
     isSuperAdmin ? "/api/tob/admin/tenants" : null,
@@ -77,11 +79,13 @@ export function SpamFilterManagement({ tenantId }: { tenantId?: string }) {
       spamThreshold: String(data.spamThreshold ?? 0.9),
       suspectThreshold: String(data.suspectThreshold ?? 0.5),
     });
-  }, [data]);
+  // Route health refreshes must not discard the unsaved filtering selection.
+  }, [scope, data?.mode, data?.provider, data?.endpointUrl, data?.timeoutMs, data?.spamThreshold, data?.suspectThreshold]);
 
   const provider = spamFilterProviderDef(form.provider);
   const labels = m.providers;
   const save = async () => {
+    if (me?.preview) return;
     setPending(true);
     try {
       await api.patch("/api/tob/admin/spam-filter", {
@@ -108,17 +112,12 @@ export function SpamFilterManagement({ tenantId }: { tenantId?: string }) {
   };
 
   return (
+    <div className="space-y-4">
     <ManagerPanel
       title={m.title}
       description={m.description}
-      actions={
-        <Button size="sm" className="h-8" onClick={() => void save()} disabled={pending || !data || (form.mode === "custom" && form.provider === "ai" && data.aiRouteConfigured === false)}>
-          <Save className="mr-1.5 size-3.5" />
-          {pending ? t.common.loading : t.common.save}
-        </Button>
-      }
     >
-      <div className="grid max-w-3xl gap-4 sm:grid-cols-2">
+      <fieldset disabled={Boolean(me?.preview)} className="grid min-w-0 gap-4 sm:grid-cols-2">
         {isSuperAdmin && !tenantId && (
           <FormField label={m.scope}>
             <Select value={scope} onValueChange={setScope}>
@@ -144,7 +143,7 @@ export function SpamFilterManagement({ tenantId }: { tenantId?: string }) {
         </FormField>
         {form.mode === "custom" && (
           <>
-            <FormField label={m.provider} hint={labels[form.provider].description}>
+            <FormField label={m.provider} hint={form.provider === "ai" ? undefined : labels[form.provider].description}>
               <Select
                 value={form.provider}
                 onValueChange={(next) =>
@@ -161,14 +160,17 @@ export function SpamFilterManagement({ tenantId }: { tenantId?: string }) {
             </FormField>
             {form.provider === "ai" && (
               <>
-                <p className="col-span-full text-xs text-muted-foreground">{m.aiRouteHint}</p>
-                {data?.aiRouteConfigured === false && <p role="status" className="col-span-full text-xs text-amber-600 dark:text-amber-400">{m.aiRouteMissing}</p>}
+                <div className="col-span-full min-w-0 border-t pt-4"><RoutingTab key={scope} scope={scope === GLOBAL ? "system" : "tenant"} tenantId={scope === GLOBAL ? undefined : scope} taskTypes={["spam"]} embedded readOnly={Boolean(me?.preview)} onSaved={() => { void mutate(); }} /></div>
+                <details className="col-span-full border-t pt-3"><summary className="cursor-pointer text-xs font-medium text-muted-foreground">{m.advanced}</summary><div className="mt-3 grid gap-4 sm:grid-cols-2">
                 <FormField label={m.spamThreshold}>
                   <Input type="number" min={0} max={1} step={0.01} className="h-8" value={form.spamThreshold} onChange={(event) => setForm((current) => ({ ...current, spamThreshold: event.target.value }))} />
                 </FormField>
                 <FormField label={m.suspectThreshold} hint={m.suspectHint}>
                   <Input type="number" min={0} max={1} step={0.01} className="h-8" value={form.suspectThreshold} onChange={(event) => setForm((current) => ({ ...current, suspectThreshold: event.target.value }))} />
                 </FormField>
+                <FormField label={m.timeout}><Input type="number" min={500} max={10000} className="h-8" value={form.timeoutMs} onChange={(event) => setForm((current) => ({ ...current, timeoutMs: event.target.value }))} /></FormField>
+                <a className="self-end text-xs text-muted-foreground underline underline-offset-2" href={spamFilterSpecUrl(language, "decision-api")} target="_blank" rel="noreferrer">{m.docs}</a>
+                </div></details>
               </>
             )}
             {provider.requiresEndpoint && (
@@ -211,7 +213,7 @@ export function SpamFilterManagement({ tenantId }: { tenantId?: string }) {
                 />
               </FormField>
             )}
-            <FormField label={m.timeout}>
+            {form.provider !== "ai" && <FormField label={m.timeout}>
               <Input
                 type="number"
                 min={500}
@@ -222,11 +224,11 @@ export function SpamFilterManagement({ tenantId }: { tenantId?: string }) {
                   setForm((current) => ({ ...current, timeoutMs: event.target.value }))
                 }
               />
-            </FormField>
-            {(provider.docsUrl || form.provider === "custom" || form.provider === "ai") && (
+            </FormField>}
+            {form.provider !== "ai" && (provider.docsUrl || form.provider === "custom") && (
               <div className="col-span-full space-y-1 text-xs text-muted-foreground">
                 <a
-                  href={form.provider === "custom" ? spamFilterSpecUrl(language, "custom-spam-api") : form.provider === "ai" ? spamFilterSpecUrl(language, "decision-api") : provider.docsUrl!}
+                  href={form.provider === "custom" ? spamFilterSpecUrl(language, "custom-spam-api") : provider.docsUrl!}
                   target="_blank"
                   rel="noreferrer"
                   className="underline underline-offset-2"
@@ -251,8 +253,11 @@ export function SpamFilterManagement({ tenantId }: { tenantId?: string }) {
             )}
           </>
         )}
-      </div>
+      </fieldset>
+      <div className="mt-4 flex items-center justify-between gap-3 border-t pt-3"><p role="status" className="text-xs text-muted-foreground">{form.mode === "custom" && form.provider === "ai" && data?.aiRouteConfigured === false ? m.aiRouteMissing : ""}</p><Button size="sm" className="h-8 shrink-0" onClick={() => void save()} disabled={pending || !data || Boolean(me?.preview) || (form.mode === "custom" && form.provider === "ai" && data.aiRouteConfigured !== true)}><Save className="mr-1.5 size-3.5" />{pending ? t.common.loading : t.common.save}</Button></div>
     </ManagerPanel>
+    <FilteredInputs key={scope} tenantId={scope === GLOBAL ? undefined : scope} />
+    </div>
   );
 }
 

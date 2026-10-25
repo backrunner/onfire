@@ -177,3 +177,24 @@ route entries. Errors never create invented scores or silently admit a message.
 These are interface and admission rules, not a promise of perfect model accuracy.
 Evaluate labeled English/Chinese examples, promotions, meaningless text, genuine
 complaints, quoted spam and contextual replies with your chosen model.
+
+## Review and restore false positives
+
+System and tenant spam settings show filtered inputs from the last 30 days,
+including web/API tickets and replies, verification outages, and inbound email
+quarantine. Open a row to inspect the full text, sanitized rich content and
+filter reason. Images are separated into a compact thumbnail strip with a
+lightbox. Remote images remain placeholders until explicitly opened; opening
+them sends no referrer. Restored rows link to a clearly labeled ticket number.
+
+Administrators with `spam.config` can restore an entry after entering a note.
+New email also requires a ticket type. Web submissions retain their original
+form version and fields; replies go to the original open ticket. Restoration
+rechecks current ownership, form/type validity, routing and required translation,
+and runs normal assignment, SLA and notifications. Failed restoration remains
+reviewable; repeated restoration cannot create another ticket or reply.
+
+Migration `0036_filtered_inputs.sql` must be applied before deploying this feature.
+Earlier web/API rejections were not stored and cannot be recovered retroactively.
+The table's 30-day window is a display limit, not a deletion policy. Existing
+inbound mail logs and their release audit remain compatible.

@@ -8,6 +8,7 @@ import {
   emailConfigs,
   emailTemplates,
   inboundEmails,
+  filteredInputs,
   notificationLogs,
   ticketTypes,
   ticketTypeRoutes,
@@ -385,6 +386,7 @@ export const DELETE = withAuth({ permission: "product.manage" }, async (_req: Ne
     ctx.db.query.categoryRoutes.findFirst({ where: eq(categoryRoutes.productId, product.id) }),
     ctx.db.query.emailConfigs.findFirst({ where: eq(emailConfigs.productId, product.id) }),
     ctx.db.query.emailTemplates.findFirst({ where: eq(emailTemplates.productId, product.id) }),
+    ctx.db.query.filteredInputs.findFirst({ where: eq(filteredInputs.productId, product.id) }),
     ctx.db.query.inboundEmails.findFirst({ where: eq(inboundEmails.productId, product.id) }),
     ctx.db.query.outboundEmails.findFirst({ where: eq(outboundEmails.productId, product.id) }),
     ctx.db.query.notificationRules.findFirst({
