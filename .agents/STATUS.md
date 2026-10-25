@@ -2,6 +2,40 @@
 
 Updated: 2026-10-25
 
+## Production release — 2026-10-25
+
+- Commit and push `6a2351a` for filtered-input review/restoration, `238b9c6`
+  for OpenRouter catalogs/search, `05771d3` for compatible security updates,
+  and `e29f7b5` for matching bilingual handbook changes. GitHub CI run
+  `40176329739` passes both secret and quality jobs for release source `e29f7b5`,
+  including all 939 tests, frozen install, generated bindings, TypeScript,
+  production audit and Worker build.
+- Back up production D1 privately and preserve a Time Travel bookmark under
+  `.cache/onfire-release-20261025`. Replaying migration 0036 on the export
+  preserves all rows in all 66 original tables. Apply it remotely before the
+  Worker; all 23 new columns are present, no migrations remain and the remote
+  foreign-key check returns no violations.
+- Deploy main Worker `0d55d2a3-21c0-4582-8344-189d7928f9a7` and email agent
+  `f7c97d6e-462a-441e-9580-8c0d9ca58111` at 100% traffic. Existing secrets,
+  bindings, sender/product maps, sender restrictions and five-minute cron match
+  the pre-release settings. Both mail queues retain exactly one consumer.
+- Publish Cloudflare Pages deployment `30889145-fbd3-4eb6-a863-e1b0698350fb`
+  at `https://onfire.pwp.sh`. npm's official registry and the supported upgrade
+  command confirm svedocs and svedocs-cli 0.3.0 remain latest stable; retain
+  matching exact pins. Site checks pass for 34 pages / 166 search records.
+- Live checks pass 10 HTTP probes, SHA-256 comparison of five affected scripts,
+  40 bilingual desktop/mobile and light/dark page cases, eight interaction
+  combinations, all 34 routes, Markdown twins and SEO/agent/license artifacts.
+  The authenticated production UI reads real OpenRouter embedding/rerank
+  catalogs and independently searches Qwen/Voyage models. Verification drafts
+  are discarded without saving AI settings. The filtered-input review loads
+  its current empty state successfully. Live screenshots were inspected.
+- Production health is 200, cross-surface requests remain 404 and public admin
+  access keeps its expected Cloudflare Access 302. Python's default HTTP client
+  is blocked at the edge; Node/browser probes verify the application responses.
+  No paid inference, customer restoration, live mail/notification send or remote
+  Vectorize mutation is performed by release verification.
+
 ## Production release preparation — 2026-10-25
 
 - The operator authorized committing, pushing and deploying the pending intake,
