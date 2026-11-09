@@ -1,6 +1,60 @@
 # OnFire Project Status
 
-Updated: 2026-10-25
+Updated: 2026-11-10
+
+## Production release preparation — 2026-11-10
+
+- Review and sign separate intake-filter and form-editor commits. Production
+  variables/bindings and build-time domains match the ignored operator config;
+  remote D1 has no pending migrations. The unchanged email agent is not part
+  of this application-only release.
+- Release audit discovers GHSA-3g3m-2fjr-6pw4 and GHSA-g3hv-75wg-m249 in
+  OpenNext's build-time dependency tree. Scope overrides to OpenNext and
+  node-minify's glob 14.0.2 plus glob's minimatch 11.0.1. Frozen install,
+  regenerated bindings, TypeScript, 940 tests, fresh local migrations, Drizzle
+  metadata, production-configured OpenNext build and deployment dry-run pass.
+  Production audit is clean; dependency-license inventory has 805 entries and
+  no missing metadata. No framework or application runtime dependency changes.
+- Existing UI checks cover 12 en/zh, light/dark and desktop/tablet/mobile
+  combinations. Release evidence: `.cache/onfire-release-20261110`.
+  Remote CI and deployment outcomes are recorded separately after verification.
+
+## Intake filtering audit and form editor — 2026-11-10
+
+- Production inspection found configured AI decision routes but no global/tenant
+  admission-filter configuration. Product email AI filters were also disabled.
+  Post-creation prescreening therefore classified non-support content only after
+  ticket creation; that task is not an admission gate.
+- Enabled AI admission filtering for the existing tenant using its existing
+  inherited spam route, suspect/spam thresholds 0.5/0.9 and a bounded 10-second
+  timeout. Conditional configuration write and readback confirm the setting;
+  existing tickets and model routes are unchanged. No new provider, secret,
+  migration, notification or historical-ticket mutation was introduced.
+- Settings now expose the saved effective filter, including tenant inheritance,
+  and explicitly distinguish a configured model from enabled admission. The
+  API projects only provider/inheritance, never inherited secrets. Regression
+  coverage includes absent configuration, model-only setup, inheritance and
+  explicit tenant disable.
+- HTML-only inbound mail uses the shared text renderer, removing style/script
+  bodies and preserving paragraph separation before filtering and ticket writes.
+- The form editor responds to its own container width. Names, keys, help text,
+  type badges and actions have separate space; full labels wrap, selection works
+  by keyboard, boundary reorder buttons stay aligned, and the nonfunctional drag
+  handle is removed. A density follow-up puts type badges beside field keys and
+  actions on the right, reducing ordinary field rows from 106px to 66px while
+  retaining wrapping for long content and the full 32px action targets.
+  The assistant sits below the editor instead of squeezing
+  four columns into the modal. Field palette descriptions wrap as needed.
+- Frozen install, generated bindings, TypeScript, 103 files / 940 tests and
+  application Worker build plus email-agent dry-run pass. Browser verification
+  covers en/zh, light/dark and 390/900/1440px (12 combinations, two screens
+  each), field selection/reordering/deletion/save and configured-but-disabled
+  filtering. Screenshots are inspected. These use actual components and synthetic
+  data, not production form writes or live model inference. Evidence is under
+  `.cache/onfire-intake-form-qa`.
+- Initial validation applied only the tenant configuration live. Source/UI
+  release evidence is recorded separately; these checks do not establish live
+  classifier replay or authenticated production UI behavior.
 
 ## Production release — 2026-10-25
 

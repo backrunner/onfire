@@ -1016,13 +1016,11 @@
       "homepage": "https://sharp.pixelplumbing.com"
     },
     {
-      "name": "@isaacs/cliui",
+      "name": "@isaacs/nonrecursive-glob-match",
       "versions": [
-        "8.0.2"
+        "1.1.0"
       ],
-      "license": "ISC",
-      "author": "Ben Coe",
-      "homepage": "https://github.com/yargs/cliui#readme"
+      "license": "BlueOak-1.0.0"
     },
     {
       "name": "@jridgewell/gen-mapping",
@@ -1400,14 +1398,6 @@
       "license": "MIT",
       "author": "Peculiar Ventures LLC",
       "homepage": "https://github.com/PeculiarVentures/x509#readme"
-    },
-    {
-      "name": "@pkgjs/parseargs",
-      "versions": [
-        "0.11.0"
-      ],
-      "license": "MIT",
-      "homepage": "https://github.com/pkgjs/parseargs#readme"
     },
     {
       "name": "@poppinss/colors",
@@ -2990,7 +2980,6 @@
     {
       "name": "balanced-match",
       "versions": [
-        "1.0.2",
         "4.0.4"
       ],
       "license": "MIT",
@@ -3049,7 +3038,6 @@
     {
       "name": "brace-expansion",
       "versions": [
-        "2.1.7",
         "5.0.12"
       ],
       "license": "MIT",
@@ -3675,15 +3663,6 @@
       "homepage": "https://github.com/Raynos/duplexer"
     },
     {
-      "name": "eastasianwidth",
-      "versions": [
-        "0.2.0"
-      ],
-      "license": "MIT",
-      "author": "Masaki Komagata",
-      "homepage": "https://github.com/komagata/eastasianwidth#readme"
-    },
-    {
       "name": "ee-first",
       "versions": [
         "1.1.1"
@@ -3705,8 +3684,7 @@
       "name": "emoji-regex",
       "versions": [
         "10.6.0",
-        "8.0.0",
-        "9.2.2"
+        "8.0.0"
       ],
       "license": "MIT",
       "author": "Mathias Bynens",
@@ -4025,15 +4003,6 @@
       "homepage": "https://github.com/sindresorhus/find-up#readme"
     },
     {
-      "name": "foreground-child",
-      "versions": [
-        "3.3.1"
-      ],
-      "license": "ISC",
-      "author": "Isaac Z. Schlueter",
-      "homepage": "https://github.com/tapjs/foreground-child#readme"
-    },
-    {
       "name": "form-data",
       "versions": [
         "4.0.6"
@@ -4197,16 +4166,7 @@
     {
       "name": "glob",
       "versions": [
-        "10.5.0"
-      ],
-      "license": "ISC",
-      "author": "Isaac Z. Schlueter",
-      "homepage": "https://github.com/isaacs/node-glob#readme"
-    },
-    {
-      "name": "glob",
-      "versions": [
-        "13.0.6"
+        "14.0.2"
       ],
       "license": "BlueOak-1.0.0",
       "author": "Isaac Z. Schlueter",
@@ -4578,15 +4538,6 @@
     {
       "name": "isexe",
       "versions": [
-        "2.0.0"
-      ],
-      "license": "ISC",
-      "author": "Isaac Z. Schlueter",
-      "homepage": "https://github.com/isaacs/isexe#readme"
-    },
-    {
-      "name": "isexe",
-      "versions": [
         "3.1.5"
       ],
       "license": "BlueOak-1.0.0",
@@ -4594,13 +4545,13 @@
       "homepage": "https://github.com/isaacs/isexe#readme"
     },
     {
-      "name": "jackspeak",
+      "name": "isexe",
       "versions": [
-        "3.4.3"
+        "2.0.0"
       ],
-      "license": "BlueOak-1.0.0",
+      "license": "ISC",
       "author": "Isaac Z. Schlueter",
-      "homepage": "https://github.com/isaacs/jackspeak#readme"
+      "homepage": "https://github.com/isaacs/isexe#readme"
     },
     {
       "name": "jiti",
@@ -4769,19 +4720,18 @@
     {
       "name": "lru-cache",
       "versions": [
-        "10.4.3",
-        "5.1.1"
+        "11.5.3"
       ],
-      "license": "ISC",
+      "license": "BlueOak-1.0.0",
       "author": "Isaac Z. Schlueter",
       "homepage": "https://github.com/isaacs/node-lru-cache#readme"
     },
     {
       "name": "lru-cache",
       "versions": [
-        "11.5.3"
+        "5.1.1"
       ],
-      "license": "BlueOak-1.0.0",
+      "license": "ISC",
       "author": "Isaac Z. Schlueter",
       "homepage": "https://github.com/isaacs/node-lru-cache#readme"
     },
@@ -5184,16 +5134,8 @@
     {
       "name": "minimatch",
       "versions": [
-        "9.0.9"
-      ],
-      "license": "ISC",
-      "author": "Isaac Z. Schlueter",
-      "homepage": "https://github.com/isaacs/minimatch#readme"
-    },
-    {
-      "name": "minimatch",
-      "versions": [
-        "10.2.6"
+        "10.2.6",
+        "11.0.1"
       ],
       "license": "BlueOak-1.0.0",
       "author": "Isaac Z. Schlueter",
@@ -5452,15 +5394,6 @@
       "homepage": "https://github.com/sindresorhus/p-try#readme"
     },
     {
-      "name": "package-json-from-dist",
-      "versions": [
-        "1.0.1"
-      ],
-      "license": "BlueOak-1.0.0",
-      "author": "Isaac Z. Schlueter",
-      "homepage": "https://github.com/isaacs/package-json-from-dist#readme"
-    },
-    {
       "name": "parse-entities",
       "versions": [
         "4.0.2"
@@ -5518,8 +5451,7 @@
     {
       "name": "path-scurry",
       "versions": [
-        "1.11.1",
-        "2.0.2"
+        "3.0.0"
       ],
       "license": "BlueOak-1.0.0",
       "author": "Isaac Z. Schlueter",
@@ -6336,7 +6268,6 @@
       "name": "string-width",
       "versions": [
         "4.2.3",
-        "5.1.2",
         "7.2.0",
         "8.3.0"
       ],
@@ -6978,8 +6909,6 @@
       "name": "wrap-ansi",
       "versions": [
         "6.2.0",
-        "7.0.0",
-        "8.1.0",
         "9.0.2"
       ],
       "license": "MIT",
