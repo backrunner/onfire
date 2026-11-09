@@ -1738,6 +1738,10 @@ export const zh = {
       },
     },
     spamFilter: {
+      savedStatus: '已保存的入口过滤状态',
+      activeHint: '在客户网页、API 和邮件写入前执行。租户可覆盖此设置，AI 可用性按每次提交的产品检查。',
+      inactiveHint: '此入口过滤未启用。邮件仍执行本地检查及产品单独启用的邮件过滤。',
+      routeOnlyHint: '已配置 AI 路由，但不会自动开启过滤。请选择启用及 AI 判定，然后保存。',
       aiCredentials: "AI 凭据",
       aiCredentialsHint: "直接使用已保存的 AI 凭据和模型，无需再次填写密钥。",
       saveCredentials: "保存凭据选择",

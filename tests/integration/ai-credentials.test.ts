@@ -92,6 +92,23 @@ describe("decision spam administration", () => {
     const response = await spamGET(spamRequest());
     expect(z.object({ data: z.record(z.string(), z.unknown()) }).parse(await response.json()).data).toMatchObject({ provider: "ai", aiRouteConfigured: true, spamThreshold: 0.9, suspectThreshold: 0.5, secretConfigured: false });
   });
+  it("distinguishes a configured model from effective filtering and resolves tenant overrides", async () => {
+    const id = await createCredential();
+    await saveTaskRouting(db, "spam", true, [{ credentialId: id, model: "jev-latest" }]);
+    const read = async (tenantId?: string) => {
+      const response = await spamGET(spamRequest("GET", undefined, tenantId));
+      expect(response.status).toBe(200);
+      return z.object({ data: z.record(z.string(), z.unknown()) }).parse(await response.json()).data;
+    };
+    expect(await read()).toMatchObject({ mode: "disabled", aiRouteConfigured: true, effectiveFilter: null });
+    expect(await read("tenant")).toMatchObject({ mode: "inherit", aiRouteConfigured: true, effectiveFilter: null });
+    expect((await spamPATCH(spamRequest("PATCH", { mode: "custom", provider: "ai" }))).status).toBe(200);
+    expect(await read()).toMatchObject({ effectiveFilter: { provider: "ai", inherited: false } });
+    expect(await read("tenant")).toMatchObject({ effectiveFilter: { provider: "ai", inherited: true } });
+    expect((await spamPATCH(spamRequest("PATCH", { tenantId: "tenant", mode: "disabled" }))).status).toBe(200);
+    expect(await read("tenant")).toMatchObject({ mode: "disabled", effectiveFilter: null });
+    expect(await read("other")).toMatchObject({ effectiveFilter: { provider: "ai", inherited: true } });
+  });
   it("retains tenant scope enforcement for spam settings and inherited AI availability", async () => {
     const id = await createCredential();
     await saveTaskRouting(db, "spam", true, [{ credentialId: id, model: "jev-latest" }]);

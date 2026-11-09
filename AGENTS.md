@@ -715,6 +715,9 @@ Custom product templates use the same escaped variable renderer for preview and 
   blocks all non-ticket customer intake before web/API/email writes, including
   suspect decisions and verification failures. Email is quarantined for review;
   web/API returns localized 400/503. Reply context excludes internal notes.
+  Configuring a spam model route does not activate admission: separately enable
+  global/tenant spam filtering. Settings show the saved effective filter and
+  tenant inheritance independently of model-route readiness.
   See `docs/DECISION_SPAM.md` for
   activation, probability thresholds and endpoint contracts.
   See `docs/TYPESAFE.md` for setup, thresholds, limits and evaluation.

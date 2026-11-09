@@ -11,7 +11,7 @@ import {
   spamFilterProviderDef,
 } from "@/lib/spam-filter-providers";
 import { Role } from "@/lib/types";
-import { sealSpamFilterSecret } from "@/services/email/spam-filter";
+import { resolveSpamFilterConfig, sealSpamFilterSecret } from "@/services/email/spam-filter";
 import { hasConfiguredAITask } from "@/services/ai/config";
 
 const querySchema = z.object({ tenantId: z.string().optional() });
@@ -44,9 +44,13 @@ export const GET = withAuth({ permission: "spam.config" }, async (req, ctx) => {
     where: eq(spamFilterConfigs.scopeKey, scopeKey),
   });
   const aiRouteConfigured = await hasConfiguredAITask(ctx.db, "spam", targetTenant ? { tenantId: targetTenant } : {});
+  const effective = targetTenant
+    ? await resolveSpamFilterConfig(ctx.db, targetTenant)
+    : row?.mode === "custom" ? row : null;
+  const effectiveFilter = effective ? { provider: effective.provider, inherited: effective.scopeKey !== scopeKey } : null;
   return ok(
     row
-      ? { ...row, authSecret: undefined, secretConfigured: Boolean(row.authSecret), aiRouteConfigured }
+      ? { ...row, authSecret: undefined, secretConfigured: Boolean(row.authSecret), aiRouteConfigured, effectiveFilter }
       : {
           scopeKey,
           scope: targetTenant ? "tenant" : "global",
@@ -59,6 +63,7 @@ export const GET = withAuth({ permission: "spam.config" }, async (req, ctx) => {
           suspectThreshold: 0.5,
           secretConfigured: false,
           aiRouteConfigured,
+          effectiveFilter,
         }
   );
 });

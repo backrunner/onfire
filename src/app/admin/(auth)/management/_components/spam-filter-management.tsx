@@ -19,6 +19,7 @@ import {
   type SpamFilterProvider,
 } from "@/lib/spam-filter-providers";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -39,6 +40,7 @@ interface SpamConfigView {
   suspectThreshold: number;
   secretConfigured: boolean;
   aiRouteConfigured?: boolean;
+  effectiveFilter?: { provider: SpamFilterProvider; inherited: boolean } | null;
 }
 
 const GLOBAL = "__global__";
@@ -117,6 +119,19 @@ export function SpamFilterManagement({ tenantId }: { tenantId?: string }) {
       title={m.title}
       description={m.description}
     >
+      {data && (
+        <div role="status" className="mb-4 space-y-1.5 border-b pb-3">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-medium">{m.savedStatus}</span>
+            <Badge variant="secondary" className="shrink-0 whitespace-nowrap">
+              {data.effectiveFilter ? m.enabled : m.disabled}
+            </Badge>
+            {data.effectiveFilter && <span className="text-xs text-muted-foreground">{labels[data.effectiveFilter.provider].name}{data.effectiveFilter.inherited ? ` (${m.inherit})` : ""}</span>}
+          </div>
+          <p className="text-xs leading-5 text-muted-foreground">{data.effectiveFilter ? m.activeHint : m.inactiveHint}</p>
+          {data.aiRouteConfigured && !data.effectiveFilter && <p className="text-xs leading-5 text-amber-700 dark:text-amber-400">{m.routeOnlyHint}</p>}
+        </div>
+      )}
       <fieldset disabled={Boolean(me?.preview)} className="grid min-w-0 gap-4 sm:grid-cols-2">
         {isSuperAdmin && !tenantId && (
           <FormField label={m.scope}>

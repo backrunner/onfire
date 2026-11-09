@@ -115,7 +115,7 @@ describe("inbound email processing", () => {
       db,
       email(address, {
         bodyPlain: "  \n\t",
-        bodyHtml: "<p>The HTML fallback is useful.</p>",
+        bodyHtml: "<head><style>body { color: red }</style></head><script>tracking()</script><p>The HTML fallback is useful.</p>",
       })
     );
 

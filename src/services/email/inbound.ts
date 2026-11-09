@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { parseTicketNumber } from "@/lib/tickets/number";
 import type { Database } from "@/lib/db";
 import { ticketCustomerEmail } from "@/lib/tickets/customer-contact";
-import { sanitizeRichHtml } from "@/lib/rich-text";
+import { richHtmlToText, sanitizeRichHtml } from "@/lib/rich-text";
 import {
   emailConfigs,
   history,
@@ -90,17 +90,6 @@ interface StoredEmailContext {
   contentHtml: string | null;
   product: typeof products.$inferSelect;
   tenant: typeof tenants.$inferSelect;
-}
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .trim();
 }
 
 async function quarantine(
@@ -410,7 +399,7 @@ async function loadStoredContext(db: Database, row: InboundEmailRow): Promise<St
   if (!product) throw new Error("Product not found");
   const tenant = await db.query.tenants.findFirst({ where: eq(tenants.id, product.tenantId) });
   if (!tenant) throw new Error("Tenant not found");
-  const content = row.bodyPlain?.trim() || stripHtml(row.bodyHtml || "");
+  const content = row.bodyPlain?.trim() || richHtmlToText(row.bodyHtml || "");
   // Sanitized HTML preserves customer formatting and hosted inline images;
   // cid: attachment images are filtered out by the sanitizer.
   const contentHtml = row.bodyHtml ? sanitizeRichHtml(row.bodyHtml) || null : null;
@@ -464,7 +453,7 @@ export async function processInboundEmail(
   }
 
   const now = new Date().toISOString();
-  const content = payload.bodyPlain?.trim() || stripHtml(payload.bodyHtml || "");
+  const content = payload.bodyPlain?.trim() || richHtmlToText(payload.bodyHtml || "");
   const emailId = reclaim?.id ?? crypto.randomUUID();
   const inboundValues = {
       id: emailId,

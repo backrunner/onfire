@@ -1740,6 +1740,10 @@ export const en: Translations = {
       },
     },
     spamFilter: {
+      savedStatus: 'Saved intake filtering',
+      activeHint: 'Applied before customer web/API and email intake. Tenant overrides still apply; AI availability is checked for each product at intake.',
+      inactiveHint: 'This admission filter is off. Email still uses local checks and any separately enabled product email filtering.',
+      routeOnlyHint: 'An AI route is configured, but it does not activate filtering. Select Enabled and AI decision, then save.',
       aiCredentials: "AI credentials",
       aiCredentialsHint: "Use saved AI credentials and models. No additional API key is needed.",
       saveCredentials: "Save credential selection",
