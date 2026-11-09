@@ -292,7 +292,7 @@ export function FormBuilderAssistant({
   );
 
   return (
-    <aside className="flex min-h-72 w-full min-w-0 flex-col border-t md:w-80 md:shrink-0 md:border-l md:border-t-0">
+    <aside className="col-span-full flex h-80 w-full min-w-0 flex-col border-t">
       <div className="flex items-center gap-2 border-b px-3 py-3">
         <Bot className="size-4 text-muted-foreground" />
         <div className="min-w-0">

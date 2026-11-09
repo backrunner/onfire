@@ -4,7 +4,7 @@ import { FormFieldSchema } from "@/lib/form-schema";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
-import { ChevronDown, ChevronUp, GripVertical, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 
 interface CanvasProps {
   fields: FormFieldSchema[];
@@ -46,82 +46,57 @@ export function Canvas({
   }
 
   return (
-    <div className="flex-1 space-y-2 p-4 border rounded-lg bg-muted/30 overflow-auto">
+    <div className="min-w-0 w-full space-y-1.5">
       {fields.map((field, index) => (
         <div
           key={field.id}
           className={cn(
-            "flex items-center gap-2 p-3 bg-background rounded-lg border cursor-pointer transition-colors",
+            "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center rounded-md border bg-background transition-colors",
             selectedFieldId === field.id
               ? "border-primary ring-1 ring-primary"
               : "hover:border-muted-foreground/50"
           )}
-          onClick={() => onSelectField(field.id)}
         >
-          {!readOnly && (
-            <div className="cursor-grab text-muted-foreground">
-              <GripVertical className="size-4" />
-            </div>
-          )}
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-medium truncate text-sm">{field.label}</span>
-              {field.required && (
-                <span className="text-destructive text-sm">*</span>
-              )}
-              <span className="text-xs text-muted-foreground px-1.5 py-0.5 bg-muted rounded">
+          <button
+            type="button"
+            aria-pressed={selectedFieldId === field.id}
+            className="block w-full min-w-0 rounded-md px-3 py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={() => onSelectField(field.id)}
+          >
+            <span className="block text-sm font-medium leading-5 [overflow-wrap:anywhere]">
+              {field.label}
+              {field.required && <span className="ml-1 text-destructive" aria-label={fb.required}>*</span>}
+            </span>
+            <span className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+              <span className="min-w-0 font-mono [overflow-wrap:anywhere]">{field.key}</span>
+              <span className="shrink-0 whitespace-nowrap rounded bg-muted px-1.5 py-0.5">
                 {fb.types[field.type]}
               </span>
-            </div>
-            <div className="text-xs text-muted-foreground truncate">
-              {field.key}
-              {field.helpText && ` - ${field.helpText}`}
-            </div>
-          </div>
-
+            </span>
+            {field.helpText && (
+              <span className="mt-1.5 block text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]">
+                {field.helpText}
+              </span>
+            )}
+          </button>
           {!readOnly && (
-            <div className="flex items-center gap-1">
-            {index > 0 && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label={fb.moveUp}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  moveField(index, index - 1);
-                }}
-              >
+            <div className="flex shrink-0 items-center pr-2">
+              <Button type="button" variant="ghost" size="icon" className="size-8"
+                aria-label={fb.moveUp} title={fb.moveUp} disabled={index === 0}
+                onClick={() => moveField(index, index - 1)}>
                 <ChevronUp className="size-4" />
               </Button>
-            )}
-            {index < fields.length - 1 && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label={fb.moveDown}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  moveField(index, index + 1);
-                }}
-              >
+              <Button type="button" variant="ghost" size="icon" className="size-8"
+                aria-label={fb.moveDown} title={fb.moveDown} disabled={index === fields.length - 1}
+                onClick={() => moveField(index, index + 1)}>
                 <ChevronDown className="size-4" />
               </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 text-destructive hover:text-destructive"
-              aria-label={t.common.delete}
-              onClick={(e) => {
-                e.stopPropagation();
-                onDeleteField(field.id);
-              }}
-            >
-              <Trash2 className="size-4" />
-            </Button>
+              <Button type="button" variant="ghost" size="icon"
+                className="size-8 text-destructive hover:text-destructive"
+                aria-label={t.common.delete} title={t.common.delete}
+                onClick={() => onDeleteField(field.id)}>
+                <Trash2 className="size-4" />
+              </Button>
             </div>
           )}
         </div>

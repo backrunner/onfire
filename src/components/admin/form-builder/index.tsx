@@ -302,7 +302,7 @@ export function FormBuilder({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="@container flex h-full min-h-0 min-w-0 flex-col">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b p-3 sm:p-4">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -410,25 +410,25 @@ export function FormBuilder({
       )}
 
       {/* Main Content */}
-      <div className="min-h-0 flex-1 overflow-y-auto md:flex md:overflow-hidden">
+      <div className="grid min-h-0 flex-1 auto-rows-max items-start content-start overflow-y-auto @min-[960px]:grid-cols-[11rem_minmax(0,1fr)_16rem]">
         {/* Left Panel - Field Palette */}
-        <div className="w-full border-b p-3 md:w-56 md:shrink-0 md:overflow-auto md:border-r md:border-b-0 md:p-4">
+        <div className="min-w-0 border-b p-3 @min-[960px]:border-r @min-[960px]:border-b-0">
           <FieldPalette onAddField={handleAddField} disabled={Boolean(translationLang) || translating} />
         </div>
 
         {/* Center - Canvas */}
-        <div className="flex min-h-80 w-full flex-col overflow-hidden p-3 md:min-h-0 md:min-w-0 md:flex-1 md:p-4">
+        <div className="flex min-h-80 min-w-0 flex-col p-3">
           {translationLang && (
             <p className="mb-2 text-xs text-muted-foreground">
               {fb.translationModeHint}
             </p>
           )}
-          <Tabs defaultValue="edit" className="flex min-h-0 flex-1 flex-col">
-            <TabsList>
+          <Tabs defaultValue="edit" className="flex flex-col">
+            <TabsList className="shrink-0">
               <TabsTrigger value="edit">{fb.editTab}</TabsTrigger>
               <TabsTrigger value="preview">{fb.previewTab}</TabsTrigger>
             </TabsList>
-            <TabsContent value="edit" className="flex-1 flex mt-4">
+            <TabsContent value="edit" className="mt-3 flex min-w-0">
               <Canvas
                 fields={displaySchema.fields}
                 selectedFieldId={selectedFieldId}
@@ -452,7 +452,7 @@ export function FormBuilder({
         {/* Right Panel - Property Editor (locked while a translation batch runs) */}
         <fieldset
           disabled={translating}
-          className="w-full min-w-0 border-t md:w-72 md:shrink-0 md:overflow-auto md:border-t-0 md:border-l"
+          className="min-w-0 border-t @min-[960px]:border-t-0 @min-[960px]:border-l"
         >
           <PropertyPanel
             field={selectedField || null}

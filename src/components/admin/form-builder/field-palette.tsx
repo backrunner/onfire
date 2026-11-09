@@ -41,22 +41,22 @@ export function FieldPalette({ onAddField, disabled }: FieldPaletteProps) {
       <h3 className="font-medium text-sm text-muted-foreground mb-3">
         {t.formBuilder.fieldTypes}
       </h3>
-      <div className="grid grid-cols-2 gap-1 md:block md:space-y-1">
+      <div className="grid grid-cols-2 gap-1 @min-[960px]:block @min-[960px]:space-y-1">
         {FIELD_ICONS.map(({ type, icon: Icon }) => (
           <Button
             key={type}
             variant="ghost"
-            className="h-auto w-full justify-start px-2 py-2 md:px-3"
+            className="h-auto w-full justify-start px-2 py-2"
             onClick={() => onAddField(type)}
             disabled={disabled}
           >
-            <div className="flex min-w-0 items-center gap-2 md:gap-3">
+            <div className="flex min-w-0 items-center gap-2">
               <div className="shrink-0 rounded bg-muted p-1.5">
                 <Icon className="size-4" />
               </div>
               <div className="min-w-0 text-left">
                 <div className="truncate text-sm font-medium">{types[type]}</div>
-                <div className="hidden text-xs text-muted-foreground md:block">
+                <div className="hidden whitespace-normal text-xs leading-4 text-muted-foreground @min-[960px]:block">
                   {types[`${type}Desc` as keyof typeof types]}
                 </div>
               </div>
