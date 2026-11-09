@@ -2,6 +2,28 @@
 
 Updated: 2026-11-10
 
+## Production release — 2026-11-10
+
+- Sign and push `007a71d` for effective intake filtering and HTML fallback,
+  `8c9e165` for compact responsive form rows, and `73247f4` for the scoped
+  build-dependency fixes. GitHub CI run `42680047843` passes both secret and
+  quality jobs for release source `73247f4`, including all 940 tests,
+  production audit and Worker build.
+- Deploy the application Worker version
+  `025cca46-f396-4014-bdda-e6c2510d098e` at 100% traffic. All 18 production
+  bindings, including existing secrets and runtime configuration, match the
+  pre-release settings. No remote migrations are pending or applied; the
+  unchanged email agent and documentation site are not redeployed.
+- Live verification passes eight HTTP probes for portal/health availability,
+  authentication and surface isolation, and exact SHA-256 comparison of four
+  affected scripts and five stylesheets. Tenant AI admission filtering remains
+  configured with thresholds 0.5/0.9 and a 10-second timeout; ticket count and
+  latest number both remain 15. Evidence: `.cache/onfire-release-20261110`.
+- These probes confirm the published assets and public runtime behavior, not
+  authenticated production UI interaction or live classifier accuracy. The
+  earlier component browser checks cover the form interactions and layouts;
+  release verification does not send customer mail or invoke live inference.
+
 ## Production release preparation — 2026-11-10
 
 - Review and sign separate intake-filter and form-editor commits. Production
